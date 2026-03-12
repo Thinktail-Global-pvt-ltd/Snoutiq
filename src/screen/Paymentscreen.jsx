@@ -442,6 +442,9 @@ export const PaymentScreen = ({
     () => optimizeAvatarUrl(effectiveVet.image),
     [effectiveVet.image]
   );
+  const acknowledgementCardClass = acknowledged
+    ? "border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm"
+    : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/40";
 
 
   return (
@@ -494,10 +497,12 @@ export const PaymentScreen = ({
                         </h3>
                         <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                           <ShieldCheck size={12} />
-                          Secure
+                      online    
                         </span>
                       </div>
-
+                      <p className="text-xs text-gray-500 md:text-sm">
+                        MVSc - 10+ yrs experience
+                      </p>
                       <p className="mt-1 text-xs text-gray-500 md:text-sm">
                         Video Consultation • 15 mins •{" "}
                         {/* <span className="font-semibold text-gray-700">{slotLabel}</span> */}
@@ -505,15 +510,15 @@ export const PaymentScreen = ({
 
                       <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
                         <div>
-                          <p className="text-[11px] text-gray-500">Payable amount</p>
+                          <p className="text-[11px] text-gray-500">Consultation amount</p>
                           <div className="flex items-center gap-2">
                             {discountAmount > 0 ? (
                               <span className="text-[11px] text-gray-400 line-through">
-                                Rs {formatInr(toInt(totalBeforeDiscount))}
+                                Rs 499
                               </span>
                             ) : null}
                             <span className="text-base font-bold text-gray-900">
-                              Rs {formatInr(createOrderAmountInr)}
+                              Rs 399
                             </span>
                           </div>
                         </div>
@@ -574,12 +579,6 @@ export const PaymentScreen = ({
                       <span>Rs {formatInr(gstAmount)}</span>
                     </div>
 
-                    <div className="flex justify-between">
-                      <span>Digital Prescription</span>
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold">
-                        FREE
-                      </span>
-                    </div>
 
                     <div className="border-t border-gray-100 pt-4 flex justify-between items-end font-semibold text-gray-900">
                       <span>Total to pay</span>
@@ -621,26 +620,6 @@ export const PaymentScreen = ({
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
-                  <div className="text-xs font-semibold text-gray-800 mb-3">
-                    Before you pay
-                  </div>
-                  <ul className="space-y-3 text-xs text-gray-600">
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-gray-300" />
-                      Keep your pet in a well-lit room for video.
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-gray-300" />
-                      Keep previous reports or photos handy if available.
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-gray-300" />
-                      You will receive a join link on WhatsApp after payment.
-                    </li>
-                  </ul>
-                </div>
-
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                   <div className="text-xs font-semibold text-blue-700 mb-3">
                     After you pay - here is what happens
@@ -680,19 +659,31 @@ export const PaymentScreen = ({
                   </ul>
                 </div>
 
-                <label className="rounded-2xl border border-gray-200 bg-white p-4 text-xs text-gray-600 flex items-start gap-3 md:hidden">
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-gray-600 transition-all md:hidden ${acknowledgementCardClass}`}
+                >
                   <input
                     type="checkbox"
                     checked={acknowledged}
                     onChange={(e) => setAcknowledged(e.target.checked)}
-                    className="mt-1 h-4 w-4 accent-[#3998de]"
+                    className="mt-1 h-4 w-4 shrink-0 accent-[#3998de]"
                   />
-                  <div>
-                    <div className="font-bold text-gray-700">
-                      I acknowledge and agree to proceed
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold text-gray-900">
+                        I acknowledge and agree to proceed
+                      </div>
+                      <span className="rounded-full border border-blue-200 bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                        Required
+                      </span>
                     </div>
-                    <div className="mt-1 text-gray-500">
-                      I understand the limitations and conditions of this consultation.
+                    <div className="mt-1.5 text-xs leading-5 text-gray-600">
+                      I understand the limitations and conditions of this
+                      consultation.
+                    </div>
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-blue-700">
+                      <ShieldCheck size={12} />
+                      Please confirm before continuing to payment.
                     </div>
                   </div>
                 </label>
@@ -812,19 +803,27 @@ export const PaymentScreen = ({
                   </ul>
                 </div>
 
-                <label className="hidden md:flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-600">
+                <label
+                  className={`hidden cursor-pointer items-start gap-3 rounded-xl border p-4 text-gray-600 transition-all md:flex ${acknowledgementCardClass}`}
+                >
                   <input
                     type="checkbox"
                     checked={acknowledged}
                     onChange={(e) => setAcknowledged(e.target.checked)}
-                    className="mt-1 h-4 w-4 accent-[#3998de]"
+                    className="mt-1 h-4 w-4 shrink-0 accent-[#3998de]"
                   />
-                  <div>
-                    <div className="font-bold text-gray-700">
-                      I acknowledge and agree to proceed
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold text-gray-900">
+                        I acknowledge and agree to proceed
+                      </div>
+                      <span className="rounded-full border border-blue-200 bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                        Required
+                      </span>
                     </div>
-                    <div className="text-gray-500">
-                      I understand the limitations and conditions of this consultation.
+                    <div className="mt-1 text-xs leading-5 text-gray-600">
+                      I understand the limitations and conditions of this
+                      consultation.
                     </div>
                   </div>
                 </label>

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
 import { PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
-import { apiPost, apiBaseUrl } from "../lib/api";
+import { apiBaseUrl } from "../lib/api";
 import { useLocation } from "react-router-dom";
 import {
   CheckCircle2,
@@ -498,14 +498,6 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
   const [loadingBreeds, setLoadingBreeds] = useState(false);
   const [breedError, setBreedError] = useState("");
   const breedDropdownRef = useRef(null);
-  const [otpToken, setOtpToken] = useState("");
-  const [otpValue, setOtpValue] = useState("");
-  const [otpStatus, setOtpStatus] = useState("idle");
-  const [otpMessage, setOtpMessage] = useState("");
-  const [otpError, setOtpError] = useState("");
-  const [otpCooldown, setOtpCooldown] = useState(0);
-  const [otpPhone, setOtpPhone] = useState("");
-  const otpInputRef = useRef(null);
   const [liveDoctorCount, setLiveDoctorCount] = useState(null);
   const paymentVet = useMemo(() => resolvePrimaryPaymentVet(), []);
   const [resolvedDoctorImage, setResolvedDoctorImage] = useState(
@@ -518,16 +510,6 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     }),
     [paymentVet, resolvedDoctorImage]
   );
-
-  const resetOtpState = () => {
-    setOtpToken("");
-    setOtpValue("");
-    setOtpStatus("idle");
-    setOtpMessage("");
-    setOtpError("");
-    setOtpCooldown(0);
-    setOtpPhone("");
-  };
 
   useEffect(() => {
     setResolvedDoctorImage(paymentVet?.image || "");
@@ -750,14 +732,6 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
   }, [details.type]);
 
   useEffect(() => {
-    if (otpCooldown <= 0) return;
-    const timer = window.setTimeout(() => {
-      setOtpCooldown((prev) => Math.max(0, prev - 1));
-    }, 1000);
-    return () => window.clearTimeout(timer);
-  }, [otpCooldown]);
-
-  useEffect(() => {
     let active = true;
 
     const fetchLiveStatus = async () => {
@@ -792,17 +766,6 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    const digits = details.ownerMobile.replace(/\D/g, "");
-    if (digits.length !== 10) {
-      if (otpStatus !== "idle") resetOtpState();
-      return;
-    }
-    if (otpPhone && digits !== otpPhone) {
-      resetOtpState();
-    }
-  }, [details.ownerMobile, otpPhone, otpStatus]);
 
   useEffect(() => {
     if (!breedDropdownOpen) return;
@@ -864,113 +827,11 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     return "File";
   }, [uploadKind]);
 
-  const ownerPhoneDigits = details.ownerMobile.replace(/\D/g, "");
-  const otpVerified = otpStatus === "verified";
-  const showOtpSection = ownerPhoneDigits.length === 10 || otpStatus !== "idle";
-
-  const fetchGeo = () =>
-    new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve(null);
-      navigator.geolocation.getCurrentPosition(
-        (pos) =>
-          resolve({
-            lat: pos.coords.latitude,
-            lang: pos.coords.longitude,
-          }),
-        () => resolve(null),
-        { timeout: 4000 }
-      );
-    });
-
-  const sendOtp = async () => {
-    const phone = ownerPhoneDigits;
-    if (phone.length !== 10) {
-      setOtpError("Enter a valid 10-digit mobile number first.");
-      return;
-    }
-
-    setOtpError("");
-    setOtpMessage("");
-    setOtpStatus("sending");
-
-    try {
-      const data = await apiPost("/api/send-otp", {
-        type: "whatsapp",
-        value: phone,
-      });
-      if (!data?.token) {
-        throw new Error("OTP token missing. Please try again.");
-      }
-
-      setOtpToken(data.token);
-      setOtpPhone(phone);
-      setOtpStatus("sent");
-      setOtpMessage(data?.message || "OTP sent to your WhatsApp.");
-      setOtpCooldown(30);
-      setOtpValue("");
-      window.setTimeout(() => otpInputRef.current?.focus(), 100);
-    } catch (err) {
-      setOtpStatus("error");
-      setOtpError(err?.message || "Failed to send OTP.");
-    }
-  };
-
-  const verifyOtp = async () => {
-    if (!otpToken) {
-      setOtpError("Send OTP first.");
-      return;
-    }
-    if (otpValue.trim().length < 4) {
-      setOtpError("Enter the 4-digit OTP.");
-      return;
-    }
-
-    setOtpError("");
-    setOtpMessage("");
-    setOtpStatus("verifying");
-
-    try {
-      const location = await fetchGeo();
-      const payload = {
-        token: otpToken,
-        otp: otpValue.trim(),
-        phone: ownerPhoneDigits,
-      };
-      if (location) {
-        payload.lat = location.lat;
-        payload.lang = location.lang;
-      }
-      const data = await apiPost("/api/verify-otp", payload);
-      if (data?.success === false) {
-        throw new Error(data?.error || data?.message || "OTP verification failed.");
-      }
-
-      setOtpStatus("verified");
-      setOtpMessage("Mobile number verified.");
-      setOtpError("");
-    } catch (err) {
-      setOtpStatus("error");
-      setOtpError(err?.message || "OTP verification failed.");
-    }
-  };
-
-  const otpSendDisabled =
-    otpStatus === "sending" ||
-    otpStatus === "verifying" ||
-    otpCooldown > 0 ||
-    ownerPhoneDigits.length !== 10;
-  const otpVerifyDisabled =
-    otpStatus === "verifying" ||
-    otpValue.trim().length < 4 ||
-    !otpToken ||
-    ownerPhoneDigits.length !== 10;
-
   // ✅ UPDATED: gender required
   const isValid =
     details.ownerName.trim().length > 0 &&
     details.ownerMobile.replace(/\D/g, "").length === 10 &&
     details.city.trim().length > 1 &&
-    otpVerified &&
     details.name.trim().length > 0 &&
     details.type !== null &&
     details.petDob &&
@@ -989,7 +850,6 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     if (details.ownerMobile.replace(/\D/g, "").length !== 10)
       return "Please enter 10-digit mobile number";
     if (!details.city.trim()) return "Please enter city name";
-    if (!otpVerified) return "Please verify mobile number with OTP";
     if (!details.name.trim()) return "Please enter your pet's name";
     if (!details.type) return "Please select pet type";
     if (!details.gender) return "Please select pet gender"; // ✅ NEW
@@ -1430,113 +1290,17 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                             />
                           </div>
                         </div>
-                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                          <Shield size={12} className="text-[#3998de]" />
-                          No spam. Only consultation updates.
-                        </p>
-
-                        {showOtpSection && (
-                          <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-3">
-                                <div
-                                  className={[
-                                    "w-9 h-9 rounded-full flex items-center justify-center",
-                                    otpVerified
-                                      ? "bg-emerald-100 text-emerald-600"
-                                      : "bg-blue-100 text-blue-600",
-                                  ].join(" ")}
-                                >
-                                  <Shield size={16} />
-                                </div>
-                                <div>
-                                  <p className="text-sm font-semibold text-gray-900">
-                                    Verify mobile number
-                                  </p>
-                                  <p className="text-xs text-gray-500">
-                                    OTP will be sent on WhatsApp to +91{" "}
-                                    {ownerPhoneDigits}
-                                  </p>
-                                </div>
-                              </div>
-                              {otpVerified ? (
-                                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  Verified
-                                </span>
-                              ) : null}
-                            </div>
-
-                            {!otpVerified && (
-                              <div className="space-y-3">
-                                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                  <button
-                                    type="button"
-                                    onClick={sendOtp}
-                                    disabled={otpSendDisabled}
-                                    className={[
-                                      "px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
-                                      otpSendDisabled
-                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                        : "bg-[#3998de] text-white hover:bg-[#2f86c3]",
-                                    ].join(" ")}
-                                  >
-                                    {otpStatus === "sending"
-                                      ? "Sending..."
-                                      : otpCooldown > 0
-                                      ? "Resend OTP"
-                                      : "Send OTP"}
-                                  </button>
-                                  <div className="text-xs text-gray-500 flex items-center gap-1">
-                                    <Clock size={12} className="text-gray-400" />
-                                    {otpCooldown > 0
-                                      ? `Resend in ${otpCooldown}s`
-                                      : "OTP valid for 10 minutes"}
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                                  <input
-                                    ref={otpInputRef}
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    value={otpValue}
-                                    onChange={(e) =>
-                                      setOtpValue(
-                                        e.target.value.replace(/\D/g, "").slice(0, 4)
-                                      )
-                                    }
-                                    placeholder="Enter OTP"
-                                    className={`${fieldBase} md:flex-1 text-center tracking-widest`}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={verifyOtp}
-                                    disabled={otpVerifyDisabled}
-                                    className={[
-                                      "px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
-                                      otpVerifyDisabled
-                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                        : "bg-emerald-600 text-white hover:bg-emerald-700",
-                                    ].join(" ")}
-                                  >
-                                    {otpStatus === "verifying" ? "Verifying..." : "Verify OTP"}
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {otpMessage ? (
-                              <p className="text-xs text-emerald-600">{otpMessage}</p>
-                            ) : null}
-                            {otpError ? (
-                              <p className="text-xs text-red-600 flex items-center gap-1">
-                                <AlertCircle size={12} />
-                                {otpError}
-                              </p>
-                            ) : null}
-                          </div>
-                        )}
+                        <div className="mt-2 flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3">
+                          <FaWhatsapp
+                            size={16}
+                            className="mt-0.5 shrink-0 text-emerald-600"
+                          />
+                          <p className="text-xs font-medium leading-5 text-emerald-800">
+                            Please provide your active WhatsApp number so we can
+                            share consultation updates and important case
+                            communication without delay.
+                          </p>
+                        </div>
                       </div>
 
                       <div className="space-y-2 md:col-span-2">
@@ -2433,8 +2197,16 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                         {getInitials(vetName)}
                       </div>
                     )}
-                    <div>
-                      <div className="text-sm font-semibold">{vetName}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="truncate text-sm font-semibold">{vetName}</div>
+                        {isDrShashankSelected ? (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-100 border border-emerald-200/50">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                            Online
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-xs text-white/80">{vetMetaLine}</div>
                       <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200/50 bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-amber-100">
                         Verified
