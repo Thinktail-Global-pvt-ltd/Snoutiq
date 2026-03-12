@@ -2,11 +2,13 @@
 
 namespace App\Services\Push;
 
-use Kreait\Firebase\Contract\Messaging;
-use Kreait\Firebase\Messaging\CloudMessage;
 use App\Models\DeviceToken;
+use App\Models\FcmNotification;
+use Illuminate\Support\Facades\Log;
+use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
+use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\MulticastSendReport;
 use Throwable;
 
@@ -15,6 +17,14 @@ class FcmService
     private const DELIVERY_MODE_HYBRID = 'hybrid';
     private const DELIVERY_MODE_DATA_ONLY = 'data_only';
     private const DELIVERY_MODE_NOTIFICATION_ONLY = 'notification_only';
+    private const STATUS_SENT = 'sent';
+    private const STATUS_FAILED = 'failed';
+    private const STATUS_SKIPPED = 'skipped';
+    private const TARGET_TOKEN = 'token';
+    private const TARGET_MULTICAST_TOKEN = 'multicast_token';
+    private const TARGET_TOPIC = 'topic';
+
+    private static ?bool $notificationTableExists = null;
 
     public function __construct(private readonly Messaging $messaging)
     {
@@ -222,22 +232,30 @@ class FcmService
 
     /**
      * @param array<int,string> $tokens
-     * @return array<int,string>
+     * @return array{valid:array<int,string>,invalid:array<int,string>}
      */
-    private function filterValidTokens(array $tokens): array
+    private function partitionTokensByValidity(array $tokens): array
     {
-        $normalized = array_map(fn ($t) => $this->normalizeToken($t), $tokens);
+        $normalized = array_values(array_unique(array_map(fn ($t) => $this->normalizeToken($t), $tokens)));
+        $valid = [];
+        $invalid = [];
 
-        return array_values(array_unique(array_filter($normalized, function ($token) {
+        foreach ($normalized as $token) {
             if (!$this->isLikelyFcmToken($token)) {
-                \Log::warning('Skipping FCM send; token looks invalid', [
+                Log::warning('Skipping FCM send; token looks invalid', [
                     'token' => $token,
                 ]);
-                return false;
+                $invalid[] = $token;
+                continue;
             }
 
-            return true;
-        })));
+            $valid[] = $token;
+        }
+
+        return [
+            'valid' => $valid,
+            'invalid' => $invalid,
+        ];
     }
 
     /**
@@ -248,20 +266,49 @@ class FcmService
     public function sendToToken(string $token, string $title, string $body, array $data = []): void
     {
         $normalizedToken = $this->normalizeToken($token);
+        $normalizedData = $this->normalizeDataPayload($data);
+        $deliveryMode = $this->resolveDeliveryMode($normalizedData);
+        $notificationType = $this->resolveNotificationType($normalizedData);
+        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
+        $source = $this->resolveDispatchSource();
+        $recipient = $this->resolveRecipientContexts([$normalizedToken])[$normalizedToken] ?? [];
+
         if (!$this->isLikelyFcmToken($normalizedToken)) {
-            \Log::warning('Skipping FCM send; token rejected as invalid format', [
+            Log::warning('Skipping FCM send; token rejected as invalid format', [
                 'token' => $normalizedToken,
             ]);
+
+            $this->storeDispatchLog([
+                'status' => self::STATUS_SKIPPED,
+                'target_type' => self::TARGET_TOKEN,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $normalizedToken,
+                'to_topic' => null,
+                'device_token_id' => $recipient['device_token_id'] ?? null,
+                'user_id' => $recipient['user_id'] ?? null,
+                'owner_model' => $recipient['owner_model'] ?? null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => null,
+                'error_code' => 'invalid_token_format',
+                'error_message' => 'Token rejected as invalid format',
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => null,
+                'sent_at' => null,
+            ]);
+
             return;
         }
 
-        $normalizedData = $this->normalizeDataPayload($data);
-        $deliveryMode = $this->resolveDeliveryMode($normalizedData);
         $dataOnly = $this->shouldSendDataOnly($normalizedData);
-        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
         $includesNotification = array_key_exists('notification', $payload);
 
-        \Log::info('FCM send to token attempt', [
+        Log::info('FCM send to token attempt', [
             'token' => $this->maskToken($normalizedToken),
             'title' => $title,
             'data_keys' => array_keys($normalizedData),
@@ -272,11 +319,64 @@ class FcmService
         ]);
 
         $message = CloudMessage::fromArray($payload);
-        $this->sendMessage($message, $normalizedToken);
+        try {
+            $responsePayload = $this->sendMessage($message, $normalizedToken);
+            $providerMessageId = $this->extractProviderMessageId($responsePayload);
 
-        \Log::info('FCM send to token success', [
-            'token' => $this->maskToken($normalizedToken),
-        ]);
+            Log::info('FCM send to token success', [
+                'token' => $this->maskToken($normalizedToken),
+            ]);
+
+            $this->storeDispatchLog([
+                'status' => self::STATUS_SENT,
+                'target_type' => self::TARGET_TOKEN,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $normalizedToken,
+                'to_topic' => null,
+                'device_token_id' => $recipient['device_token_id'] ?? null,
+                'user_id' => $recipient['user_id'] ?? null,
+                'owner_model' => $recipient['owner_model'] ?? null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => $providerMessageId,
+                'error_code' => null,
+                'error_message' => null,
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => $responsePayload,
+                'sent_at' => now(),
+            ]);
+        } catch (MessagingException | FirebaseException | Throwable $e) {
+            $this->storeDispatchLog([
+                'status' => self::STATUS_FAILED,
+                'target_type' => self::TARGET_TOKEN,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $normalizedToken,
+                'to_topic' => null,
+                'device_token_id' => $recipient['device_token_id'] ?? null,
+                'user_id' => $recipient['user_id'] ?? null,
+                'owner_model' => $recipient['owner_model'] ?? null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => null,
+                'error_code' => $this->normalizeErrorCode($e),
+                'error_message' => $e->getMessage(),
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => null,
+                'sent_at' => null,
+            ]);
+
+            throw $e;
+        }
     }
 
     /**
@@ -287,7 +387,45 @@ class FcmService
      */
     public function sendMulticast(array $tokens, string $title, string $body, array $data = []): array
     {
-        $validTokens = $this->filterValidTokens($tokens);
+        $normalizedData = $this->normalizeDataPayload($data);
+        $deliveryMode = $this->resolveDeliveryMode($normalizedData);
+        $notificationType = $this->resolveNotificationType($normalizedData);
+        $payload = $this->buildPayloadArray('', $title, $body, $normalizedData);
+        unset($payload['token']);
+
+        $partitionedTokens = $this->partitionTokensByValidity($tokens);
+        $validTokens = $partitionedTokens['valid'];
+        $invalidTokens = $partitionedTokens['invalid'];
+        $source = $this->resolveDispatchSource();
+        $recipientContexts = $this->resolveRecipientContexts(array_merge($validTokens, $invalidTokens));
+
+        foreach ($invalidTokens as $invalidToken) {
+            $recipient = $recipientContexts[$invalidToken] ?? [];
+
+            $this->storeDispatchLog([
+                'status' => self::STATUS_SKIPPED,
+                'target_type' => self::TARGET_MULTICAST_TOKEN,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $invalidToken,
+                'to_topic' => null,
+                'device_token_id' => $recipient['device_token_id'] ?? null,
+                'user_id' => $recipient['user_id'] ?? null,
+                'owner_model' => $recipient['owner_model'] ?? null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => null,
+                'error_code' => 'invalid_token_format',
+                'error_message' => 'Token rejected as invalid format',
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => null,
+                'sent_at' => null,
+            ]);
+        }
 
         if (empty($validTokens)) {
             return [
@@ -297,13 +435,74 @@ class FcmService
             ];
         }
 
-        $normalizedData = $this->normalizeDataPayload($data);
-        $payload = $this->buildPayloadArray('', $title, $body, $normalizedData);
-        unset($payload['token']);
-
         $message = CloudMessage::fromArray($payload);
+        try {
+            $response = $this->sendMulticastMessage($message, $validTokens);
+        } catch (MessagingException | FirebaseException | Throwable $e) {
+            foreach ($validTokens as $targetToken) {
+                $recipient = $recipientContexts[$targetToken] ?? [];
 
-        return $this->sendMulticastMessage($message, $validTokens);
+                $this->storeDispatchLog([
+                    'status' => self::STATUS_FAILED,
+                    'target_type' => self::TARGET_MULTICAST_TOKEN,
+                    'notification_type' => $notificationType,
+                    'delivery_mode' => $deliveryMode,
+                    'from_source' => $source['source'],
+                    'from_file' => $source['file'],
+                    'from_line' => $source['line'],
+                    'to_target' => $targetToken,
+                    'to_topic' => null,
+                    'device_token_id' => $recipient['device_token_id'] ?? null,
+                    'user_id' => $recipient['user_id'] ?? null,
+                    'owner_model' => $recipient['owner_model'] ?? null,
+                    'title' => $title,
+                    'notification_text' => $body,
+                    'provider_message_id' => null,
+                    'error_code' => $this->normalizeErrorCode($e),
+                    'error_message' => $e->getMessage(),
+                    'data_payload' => $normalizedData,
+                    'request_payload' => $payload,
+                    'response_payload' => null,
+                    'sent_at' => null,
+                ]);
+            }
+
+            throw $e;
+        }
+
+        foreach ($validTokens as $targetToken) {
+            $recipient = $recipientContexts[$targetToken] ?? [];
+            $result = $response['results'][$targetToken] ?? null;
+            $ok = (bool) ($result['ok'] ?? false);
+
+            $this->storeDispatchLog([
+                'status' => $ok ? self::STATUS_SENT : self::STATUS_FAILED,
+                'target_type' => self::TARGET_MULTICAST_TOKEN,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $targetToken,
+                'to_topic' => null,
+                'device_token_id' => $recipient['device_token_id'] ?? null,
+                'user_id' => $recipient['user_id'] ?? null,
+                'owner_model' => $recipient['owner_model'] ?? null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => is_string($result['provider_message_id'] ?? null)
+                    ? $result['provider_message_id']
+                    : null,
+                'error_code' => !$ok ? $this->stringifyValue($result['code'] ?? null, 120) : null,
+                'error_message' => !$ok ? $this->stringifyValue($result['error'] ?? null, 65535) : null,
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => is_array($result['response'] ?? null) ? $result['response'] : $result,
+                'sent_at' => $ok ? now() : null,
+            ]);
+        }
+
+        return $response;
     }
 
     /**
@@ -328,25 +527,83 @@ class FcmService
      */
     public function sendToTopic(string $topic, string $title, string $body, array $data = [], array $tokensToEnsure = []): void
     {
-        if (!empty($tokensToEnsure)) {
-            $this->messaging->subscribeToTopic($topic, $tokensToEnsure);
-        }
-
         $normalizedData = $this->normalizeDataPayload($data);
+        $deliveryMode = $this->resolveDeliveryMode($normalizedData);
+        $notificationType = $this->resolveNotificationType($normalizedData);
         $payload = $this->buildPayloadArray('', $title, $body, $normalizedData);
         unset($payload['token']);
         $payload['topic'] = $topic;
+        $source = $this->resolveDispatchSource();
 
         $message = CloudMessage::fromArray($payload);
-        $this->sendMessage($message, $topic);
+        try {
+            if (!empty($tokensToEnsure)) {
+                $this->messaging->subscribeToTopic($topic, $tokensToEnsure);
+            }
+
+            $responsePayload = $this->sendMessage($message, $topic);
+
+            $this->storeDispatchLog([
+                'status' => self::STATUS_SENT,
+                'target_type' => self::TARGET_TOPIC,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $topic,
+                'to_topic' => $topic,
+                'device_token_id' => null,
+                'user_id' => null,
+                'owner_model' => null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => $this->extractProviderMessageId($responsePayload),
+                'error_code' => null,
+                'error_message' => null,
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => $responsePayload,
+                'sent_at' => now(),
+            ]);
+        } catch (MessagingException | FirebaseException | Throwable $e) {
+            $this->storeDispatchLog([
+                'status' => self::STATUS_FAILED,
+                'target_type' => self::TARGET_TOPIC,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $topic,
+                'to_topic' => $topic,
+                'device_token_id' => null,
+                'user_id' => null,
+                'owner_model' => null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => null,
+                'error_code' => $this->normalizeErrorCode($e),
+                'error_message' => $e->getMessage(),
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => null,
+                'sent_at' => null,
+            ]);
+
+            throw $e;
+        }
     }
 
-    private function sendMessage(CloudMessage $message, string $target): void
+    /**
+     * @return array<string,mixed>
+     */
+    private function sendMessage(CloudMessage $message, string $target): array
     {
         try {
-            $this->messaging->send($message);
+            return $this->messaging->send($message);
         } catch (MessagingException | FirebaseException | Throwable $e) {
-            \Log::error('FCM send failed', [
+            Log::error('FCM send failed', [
                 'target' => $target,
                 'error' => $e->getMessage(),
             ]);
@@ -362,7 +619,7 @@ class FcmService
         try {
             $report = $this->messaging->sendMulticast($message, $tokens);
         } catch (MessagingException | FirebaseException | Throwable $e) {
-            \Log::error('FCM multicast send failed', [
+            Log::error('FCM multicast send failed', [
                 'tokens' => $tokens,
                 'error' => $e->getMessage(),
             ]);
@@ -384,9 +641,15 @@ class FcmService
         $results = [];
         foreach ($report->getItems() as $sendReport) {
             $token = $sendReport->target()->value();
+            $responsePayload = $sendReport->result();
+            $providerMessageId = $this->extractProviderMessageId($responsePayload);
 
             if ($sendReport->isSuccess()) {
-                $results[$token] = ['ok' => true];
+                $results[$token] = [
+                    'ok' => true,
+                    'provider_message_id' => $providerMessageId,
+                    'response' => $responsePayload,
+                ];
                 continue;
             }
 
@@ -395,10 +658,242 @@ class FcmService
                 'ok' => false,
                 'code' => $error?->getCode(),
                 'error' => $error?->getMessage(),
+                'provider_message_id' => $providerMessageId,
+                'response' => $responsePayload,
             ];
         }
 
         return $results;
+    }
+
+    private function resolveNotificationType(array $normalizedData): ?string
+    {
+        $candidates = [
+            $normalizedData['type'] ?? null,
+            $normalizedData['notification_type'] ?? null,
+            $normalizedData['event'] ?? null,
+            $normalizedData['action'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $trimmed = trim($candidate);
+            if ($trimmed === '') {
+                continue;
+            }
+
+            return $this->truncate($trimmed, 64);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int,string> $tokens
+     * @return array<string,array<string,mixed>>
+     */
+    private function resolveRecipientContexts(array $tokens): array
+    {
+        if (empty($tokens)) {
+            return [];
+        }
+
+        $contexts = [];
+        $rows = DeviceToken::query()
+            ->select(['id', 'user_id', 'token', 'meta'])
+            ->whereIn('token', $tokens)
+            ->get();
+
+        foreach ($rows as $row) {
+            $rowToken = $this->normalizeToken((string) $row->token);
+            if ($rowToken === '') {
+                continue;
+            }
+
+            $meta = is_array($row->meta) ? $row->meta : [];
+            $ownerModel = is_string($meta['owner_model'] ?? null) ? $meta['owner_model'] : null;
+
+            $contexts[$rowToken] = [
+                'device_token_id' => $row->id,
+                'user_id' => $row->user_id !== null ? (int) $row->user_id : null,
+                'owner_model' => $ownerModel,
+            ];
+        }
+
+        return $contexts;
+    }
+
+    /**
+     * @return array{source:?string,file:?string,line:?int}
+     */
+    private function resolveDispatchSource(): array
+    {
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 30);
+
+        foreach ($trace as $frame) {
+            $class = $frame['class'] ?? null;
+            if (!is_string($class) || $class === self::class) {
+                continue;
+            }
+
+            $function = is_string($frame['function'] ?? null) ? $frame['function'] : 'unknown';
+            $source = $class.'@'.$function;
+            $file = isset($frame['file']) && is_string($frame['file']) ? $frame['file'] : null;
+            $line = isset($frame['line']) ? (int) $frame['line'] : null;
+
+            return [
+                'source' => $source,
+                'file' => $file,
+                'line' => $line,
+            ];
+        }
+
+        return [
+            'source' => null,
+            'file' => null,
+            'line' => null,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $attributes
+     */
+    private function storeDispatchLog(array $attributes): void
+    {
+        if (self::$notificationTableExists === false) {
+            return;
+        }
+
+        try {
+            FcmNotification::query()->create([
+                'status' => $this->truncate((string) ($attributes['status'] ?? ''), 20),
+                'target_type' => $this->truncate((string) ($attributes['target_type'] ?? ''), 32),
+                'notification_type' => $this->truncate(
+                    $this->stringifyValue($attributes['notification_type'] ?? null, 64),
+                    64
+                ),
+                'delivery_mode' => $this->truncate(
+                    $this->stringifyValue($attributes['delivery_mode'] ?? null, 32),
+                    32
+                ),
+                'from_source' => $this->truncate($this->stringifyValue($attributes['from_source'] ?? null, 255), 255),
+                'from_file' => $this->truncate($this->stringifyValue($attributes['from_file'] ?? null, 255), 255),
+                'from_line' => isset($attributes['from_line']) ? (int) $attributes['from_line'] : null,
+                'to_target' => $this->truncate($this->stringifyValue($attributes['to_target'] ?? null, 512), 512),
+                'to_topic' => $this->truncate($this->stringifyValue($attributes['to_topic'] ?? null, 191), 191),
+                'device_token_id' => isset($attributes['device_token_id']) ? (int) $attributes['device_token_id'] : null,
+                'user_id' => isset($attributes['user_id']) ? (int) $attributes['user_id'] : null,
+                'owner_model' => $this->truncate($this->stringifyValue($attributes['owner_model'] ?? null, 255), 255),
+                'title' => $this->truncate($this->stringifyValue($attributes['title'] ?? null, 255), 255),
+                'notification_text' => $this->stringifyValue($attributes['notification_text'] ?? null, 65535),
+                'provider_message_id' => $this->truncate(
+                    $this->stringifyValue($attributes['provider_message_id'] ?? null, 191),
+                    191
+                ),
+                'error_code' => $this->truncate($this->stringifyValue($attributes['error_code'] ?? null, 120), 120),
+                'error_message' => $this->stringifyValue($attributes['error_message'] ?? null, 65535),
+                'data_payload' => is_array($attributes['data_payload'] ?? null) ? $attributes['data_payload'] : null,
+                'request_payload' => is_array($attributes['request_payload'] ?? null) ? $attributes['request_payload'] : null,
+                'response_payload' => is_array($attributes['response_payload'] ?? null) ? $attributes['response_payload'] : null,
+                'sent_at' => $attributes['sent_at'] ?? null,
+            ]);
+        } catch (Throwable $e) {
+            if ($this->isMissingTableError($e)) {
+                self::$notificationTableExists = false;
+            }
+
+            Log::warning('fcm.notification.persist_failed', [
+                'error' => $e->getMessage(),
+                'status' => $attributes['status'] ?? null,
+                'to_target' => $attributes['to_target'] ?? null,
+                'target_type' => $attributes['target_type'] ?? null,
+            ]);
+        }
+    }
+
+    private function isMissingTableError(Throwable $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, '42s02')
+            || str_contains($message, 'base table or view not found')
+            || str_contains($message, 'fcm_notifications');
+    }
+
+    /**
+     * @param array<string,mixed>|null $responsePayload
+     */
+    private function extractProviderMessageId(?array $responsePayload): ?string
+    {
+        if (!is_array($responsePayload)) {
+            return null;
+        }
+
+        $name = $responsePayload['name'] ?? null;
+        if (!is_string($name)) {
+            return null;
+        }
+
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+
+        return $this->truncate($name, 191);
+    }
+
+    private function normalizeErrorCode(Throwable $e): ?string
+    {
+        $code = $e->getCode();
+        if (!is_int($code) && !is_string($code)) {
+            return null;
+        }
+
+        $codeAsString = trim((string) $code);
+        if ($codeAsString === '' || $codeAsString === '0') {
+            return null;
+        }
+
+        return $this->truncate($codeAsString, 120);
+    }
+
+    private function truncate(?string $value, int $length): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        return substr($value, 0, $length);
+    }
+
+    private function stringifyValue(mixed $value, int $maxLength): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed === '') {
+                return null;
+            }
+
+            return $this->truncate($trimmed, $maxLength);
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return $this->truncate((string) $value, $maxLength);
+        }
+
+        $encoded = json_encode($value);
+        if ($encoded === false) {
+            return null;
+        }
+
+        return $this->truncate($encoded, $maxLength);
     }
 
     private function maskToken(string $token): string
