@@ -30,16 +30,26 @@ class Prescription extends Model
         'diagnosis',
         'diagnosis_status',
         'disease_name',
+        'prognosis',
         'is_chronic',
         'treatment_plan',
         'medications_json',
         'home_care',
+        'history_snapshot',
         'video_inclinic',
         'call_session',
+        'follow_up_required',
         'follow_up_date',
         'follow_up_notification_sent_at',
         'follow_up_type',
         'follow_up_notes',
+        'system_affected',
+        'system_affected_id',
+        'mucous_membrane',
+        'dehydration_level',
+        'abdominal_pain_reaction',
+        'auscultation',
+        'physical_exam_other',
         'pet_id',
         'video_appointment_id',
         'in_clinic_appointment_id',
@@ -51,6 +61,8 @@ class Prescription extends Model
         'temperature' => 'float',
         'weight' => 'float',
         'heart_rate' => 'float',
+        'system_affected_id' => 'integer',
+        'follow_up_required' => 'boolean',
         'follow_up_date' => 'date',
         'follow_up_notification_sent_at' => 'datetime',
         'is_chronic' => 'boolean',
@@ -70,5 +82,10 @@ class Prescription extends Model
     public function pet(): BelongsTo
     {
         return $this->belongsTo(Pet::class, 'pet_id');
+    }
+
+    public function systemAffected(): BelongsTo
+    {
+        return $this->belongsTo(AffectedSystem::class, 'system_affected_id');
     }
 }

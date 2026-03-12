@@ -48,15 +48,25 @@ class MedicalRecordController extends Controller
             'diagnosis' => ['nullable', 'string', 'max:255'],
             'diagnosis_status' => ['nullable', 'string', 'max:255'],
             'disease_name' => ['nullable', 'string', 'max:255'],
+            'prognosis' => ['nullable', 'string', 'in:good,fair,poor,grave'],
             'treatment_plan' => ['nullable', 'string'],
             'home_care' => ['nullable', 'string'],
+            'history_snapshot' => ['nullable', 'string'],
             'video_inclinic' => ['nullable', 'string', 'max:255'],
             'call_session' => ['nullable', 'string', 'max:255'],
             'medicines' => ['nullable', 'string', 'max:2000'],
             'medications_json' => ['nullable'],
+            'follow_up_required' => ['nullable', 'boolean'],
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
+            'system_affected' => ['nullable', 'string', 'max:100'],
+            'system_affected_id' => ['nullable', 'integer', 'exists:affected_systems,id'],
+            'mucous_membrane' => ['nullable', 'string', 'in:normal_pink,cherry_red,yellow,white'],
+            'dehydration_level' => ['nullable', 'string', 'in:no,mild,moderate,severe'],
+            'abdominal_pain_reaction' => ['nullable', 'string', 'in:painful,no_pain'],
+            'auscultation' => ['nullable', 'string', 'in:normal,abnormal'],
+            'physical_exam_other' => ['nullable', 'string'],
             'pet_id' => ['nullable', 'integer'],
             'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
             'in_clinic_appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
@@ -136,6 +146,10 @@ class MedicalRecordController extends Controller
         $inClinicAppointmentId = $validated['in_clinic_appointment_id']
             ?? $validated['in_clinic_appointtment_id']
             ?? null;
+        $resolvedSystemAffectedId = $this->resolveSystemAffectedId(
+            $validated['system_affected_id'] ?? null,
+            $validated['system_affected'] ?? null
+        );
 
         $prescriptionPayload = [
             'medical_record_id' => $record->id,
@@ -153,13 +167,23 @@ class MedicalRecordController extends Controller
             'diagnosis_status' => $validated['diagnosis_status'] ?? $prescription->diagnosis_status,
             'is_chronic' => $isChronic,
             'disease_name' => $diseaseName ?? $prescription->disease_name,
+            'prognosis' => $validated['prognosis'] ?? $prescription->prognosis,
             'treatment_plan' => $validated['treatment_plan'] ?? $prescription->treatment_plan,
             'home_care' => $validated['home_care'] ?? $prescription->home_care,
+            'history_snapshot' => $validated['history_snapshot'] ?? $prescription->history_snapshot,
             'video_inclinic' => $validated['video_inclinic'] ?? $prescription->video_inclinic,
             'call_session' => $validated['call_session'] ?? $prescription->call_session,
+            'follow_up_required' => $validated['follow_up_required'] ?? $prescription->follow_up_required,
             'follow_up_date' => $validated['follow_up_date'] ?? $prescription->follow_up_date,
             'follow_up_type' => $validated['follow_up_type'] ?? $prescription->follow_up_type,
             'follow_up_notes' => $validated['follow_up_notes'] ?? $prescription->follow_up_notes,
+            'system_affected' => $validated['system_affected'] ?? $prescription->system_affected,
+            'system_affected_id' => $resolvedSystemAffectedId ?? $prescription->system_affected_id,
+            'mucous_membrane' => $validated['mucous_membrane'] ?? $prescription->mucous_membrane,
+            'dehydration_level' => $validated['dehydration_level'] ?? $prescription->dehydration_level,
+            'abdominal_pain_reaction' => $validated['abdominal_pain_reaction'] ?? $prescription->abdominal_pain_reaction,
+            'auscultation' => $validated['auscultation'] ?? $prescription->auscultation,
+            'physical_exam_other' => $validated['physical_exam_other'] ?? $prescription->physical_exam_other,
             'pet_id' => $petId ?? $prescription->pet_id,
             'video_appointment_id' => $validated['video_appointment_id'] ?? $prescription->video_appointment_id,
             'in_clinic_appointment_id' => $inClinicAppointmentId ?? $prescription->in_clinic_appointment_id,
@@ -214,15 +238,25 @@ class MedicalRecordController extends Controller
             'diagnosis' => ['nullable', 'string', 'max:255'],
             'diagnosis_status' => ['nullable', 'string', 'max:255'],
             'disease_name' => ['nullable', 'string', 'max:255'],
+            'prognosis' => ['nullable', 'string', 'in:good,fair,poor,grave'],
             'treatment_plan' => ['nullable', 'string'],
             'home_care' => ['nullable', 'string'],
+            'history_snapshot' => ['nullable', 'string'],
             'video_inclinic' => ['nullable', 'string', 'max:255'],
             'call_session' => ['nullable', 'string', 'max:255'],
             'medicines' => ['nullable', 'string', 'max:2000'],
             'medications_json' => ['nullable'],
+            'follow_up_required' => ['nullable', 'boolean'],
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
+            'system_affected' => ['nullable', 'string', 'max:100'],
+            'system_affected_id' => ['nullable', 'integer', 'exists:affected_systems,id'],
+            'mucous_membrane' => ['nullable', 'string', 'in:normal_pink,cherry_red,yellow,white'],
+            'dehydration_level' => ['nullable', 'string', 'in:no,mild,moderate,severe'],
+            'abdominal_pain_reaction' => ['nullable', 'string', 'in:painful,no_pain'],
+            'auscultation' => ['nullable', 'string', 'in:normal,abnormal'],
+            'physical_exam_other' => ['nullable', 'string'],
             'pet_id' => ['nullable', 'integer'],
             'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
             'in_clinic_appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
@@ -292,6 +326,10 @@ class MedicalRecordController extends Controller
         $inClinicAppointmentId = $validated['in_clinic_appointment_id']
             ?? $validated['in_clinic_appointtment_id']
             ?? null;
+        $resolvedSystemAffectedId = $this->resolveSystemAffectedId(
+            $validated['system_affected_id'] ?? null,
+            $validated['system_affected'] ?? null
+        );
 
         $record = MedicalRecord::create([
             'user_id' => $user->id,
@@ -320,13 +358,23 @@ class MedicalRecordController extends Controller
             'diagnosis_status' => $validated['diagnosis_status'] ?? null,
             'is_chronic' => ($validated['diagnosis_status'] ?? '') === 'chronic',
             'disease_name' => $validated['disease_name'] ?? $validated['diagnosis'] ?? null,
+            'prognosis' => $validated['prognosis'] ?? null,
             'treatment_plan' => $validated['treatment_plan'] ?? null,
             'home_care' => $validated['home_care'] ?? null,
+            'history_snapshot' => $validated['history_snapshot'] ?? null,
             'video_inclinic' => $validated['video_inclinic'] ?? null,
             'call_session' => $validated['call_session'] ?? null,
+            'follow_up_required' => $validated['follow_up_required'] ?? null,
             'follow_up_date' => $validated['follow_up_date'] ?? null,
             'follow_up_type' => $validated['follow_up_type'] ?? null,
             'follow_up_notes' => $validated['follow_up_notes'] ?? null,
+            'system_affected' => $validated['system_affected'] ?? null,
+            'system_affected_id' => $resolvedSystemAffectedId,
+            'mucous_membrane' => $validated['mucous_membrane'] ?? null,
+            'dehydration_level' => $validated['dehydration_level'] ?? null,
+            'abdominal_pain_reaction' => $validated['abdominal_pain_reaction'] ?? null,
+            'auscultation' => $validated['auscultation'] ?? null,
+            'physical_exam_other' => $validated['physical_exam_other'] ?? null,
             'pet_id' => $petId,
             'video_appointment_id' => $validated['video_appointment_id'] ?? null,
             'in_clinic_appointment_id' => $inClinicAppointmentId,
@@ -654,6 +702,30 @@ class MedicalRecordController extends Controller
         }
 
         return $normalized ?: null;
+    }
+
+    private function resolveSystemAffectedId($systemAffectedIdInput, ?string $systemAffectedInput): ?int
+    {
+        if (is_numeric($systemAffectedIdInput) && (int) $systemAffectedIdInput > 0) {
+            return (int) $systemAffectedIdInput;
+        }
+
+        $raw = trim((string) $systemAffectedInput);
+        if ($raw === '' || !Schema::hasTable('affected_systems')) {
+            return null;
+        }
+
+        $rawLower = strtolower($raw);
+        $normalizedCode = preg_replace('/[^a-z0-9]+/', '_', $rawLower) ?? '';
+        $normalizedCode = trim($normalizedCode, '_');
+
+        $matchedId = DB::table('affected_systems')
+            ->whereRaw('LOWER(code) = ?', [$rawLower])
+            ->orWhereRaw('LOWER(code) = ?', [$normalizedCode])
+            ->orWhereRaw('LOWER(name) = ?', [$rawLower])
+            ->value('id');
+
+        return is_numeric($matchedId) ? (int) $matchedId : null;
     }
 
     private function markCallSessionCompleted(?string $channelName): void
