@@ -88,7 +88,7 @@ const WHY_CONSULT_ONLINE = [
   {
     icon: "💰",
     title: "Fixed Pricing",
-    desc: "₹399 day consult & ₹499 night consult. 🔥 Get ₹100 OFF on your first consultation. No hidden charges.",
+    desc: "Flat ₹399 consultation after ₹100 OFF on your first consultation. Same pricing applies day and night. No hidden charges.",
   },
   {
     icon: "🏠",
@@ -216,9 +216,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const [brokenImages, setBrokenImages] = useState(() => new Set());
   const [activeBioVet, setActiveBioVet] = useState(null);
   const [isStartingConsult, setIsStartingConsult] = useState(false);
-  const [isDesktopViewport, setIsDesktopViewport] = useState(
-    isDesktopViewportNow,
-  );
+  const [isDesktopViewport, setIsDesktopViewport] =
+    useState(isDesktopViewportNow);
   const [shouldLoadVets, setShouldLoadVets] = useState(false);
   const [showMobileStickyCta, setShowMobileStickyCta] = useState(false);
 
@@ -237,7 +236,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    )
       return undefined;
 
     const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
@@ -429,11 +431,14 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       return next;
     });
   };
+  const CONSULT_PRICE_DAY = 499;
+  const CONSULT_DISCOUNTED_PRICE = 399;
+  const CONSULT_DISCOUNT_AMOUNT = CONSULT_PRICE_DAY - CONSULT_DISCOUNTED_PRICE;
+  const isDay = isDayTime(); // sirf label/slot text ke liye rakh sakte ho, pricing ke liye nahi
+  const originalConsultPrice = CONSULT_PRICE_DAY;
+  const discountedConsultPrice = CONSULT_DISCOUNTED_PRICE;
+  const consultDiscountAmount = CONSULT_DISCOUNT_AMOUNT;
 
-  const isDay = isDayTime();
-  const originalConsultPrice = isDay ? 499 : 599;
-  const discountedConsultPrice = isDay ? 399 : 499;
-  const consultDiscountAmount = originalConsultPrice - discountedConsultPrice;
   const mobileTopTickerItems = [
     "India's Trusted Online Vet Platform",
     "Talk to a Vet Online in 15 Minutes",
@@ -451,21 +456,21 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const sortedVets = useMemo(() => {
     const list = [...vets];
     return list.sort((a, b) => {
-      const aPrice = isDay ? a.priceDay : a.priceNight;
-      const bPrice = isDay ? b.priceDay : b.priceNight;
-      return (aPrice || 0) - (bPrice || 0);
+      const aPrice = Number(a?.priceDay) || 0;
+      const bPrice = Number(b?.priceDay) || 0;
+      return aPrice - bPrice;
     });
-  }, [vets, isDay]);
+  }, [vets]);
 
-  const handleSelectVet = (vet, rateType) => {
+  const handleSelectVet = (vet) => {
     if (typeof onSelectVet !== "function") return;
-    const isDaySlot = rateType ? rateType === "day" : isDayTime();
-    const bookingRateType = isDaySlot ? "day" : "night";
-    const bookingPrice = isDaySlot ? vet?.priceDay : vet?.priceNight;
+
+    const bookingPrice = Number(vet?.priceDay) || 499;
 
     onSelectVet({
       ...vet,
-      bookingRateType,
+      priceNight: bookingPrice,
+      bookingRateType: "day",
       bookingPrice,
     });
   };
@@ -532,7 +537,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       : "Available";
     const profileRows = [
       { label: "Experience", value: experienceValue },
-      { label: isDay ? "Day response" : "Night response", value: responseLabel },
+      {
+        label: isDay ? "Day response" : "Night response",
+        value: responseLabel,
+      },
       { label: "Expertise", value: clipText(specializationSummary, 48) },
       // {
       //   label: "Rating",
@@ -703,7 +711,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       },
       {
         q: "How much does an online vet consultation cost?",
-        a: "Day consultation (8 AM - 8 PM) is ₹399 and night consultation (8 PM - 8 AM) is ₹499. Pricing is fixed and transparent.",
+        a: "Online vet consultation is ₹399 after ₹100 OFF on your first consultation. Same pricing applies during day and night. Pricing is fixed and transparent.",
       },
       {
         q: "Will I receive guidance after consultation?",
@@ -824,9 +832,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </header>
 
       {/* Hero */}
-      <section
-        className="landing-hero relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-4 md:py-5 lg:min-h-[calc(100vh-64px)] lg:py-3"
-      >
+      <section className="landing-hero relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-4 md:py-5 lg:min-h-[calc(100vh-64px)] lg:py-3">
         <div className="pointer-events-none absolute -top-24 right-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
         <div className="relative mx-auto max-w-5xl px-4 sm:px-5 lg:flex lg:min-h-[calc(100vh-88px)] lg:items-center">
@@ -844,7 +850,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               </h1>
 
               <p className="mt-2.5 text-sm leading-relaxed text-slate-500 md:text-[15px]">
-                Connect with experienced, verified veterinarians from the comfort of your home. No waiting rooms, no travel — real medical guidance for your pet, anytime.
+                Connect with experienced, verified veterinarians from the
+                comfort of your home. No waiting rooms, no travel — real medical
+                guidance for your pet, anytime.
               </p>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -864,27 +872,22 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
-                  <span
-                    className={`h-2 w-2 rounded-full ${isDay ? "bg-amber-400" : "bg-indigo-400"}`}
-                  />
-
-                  <span>{isDay ? "Day Consult" : "Night Consult"}</span>
-
-                  <span className="font-medium text-slate-500">
-                    {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
-                  </span>
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
 
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="text-slate-400">:</span>
+                    <span>Online Consultation</span>
+
+                    <span className="font-medium text-slate-500">
+                      (Available Day & Night)
+                    </span>
 
                     <span className="text-xs font-semibold text-slate-500 line-through">
-                      ₹{isDay ? 499 : 599}
+                      ₹{originalConsultPrice}
                     </span>
 
                     <span className="text-sm font-extrabold text-emerald-700">
-                      ₹{isDay ? 399 : 499}
+                      ₹{discountedConsultPrice}
                     </span>
-
                     <span className="text-xs font-bold text-red-600">
                       ₹100 OFF
                     </span>
@@ -1116,19 +1119,21 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               disabled={isStartingConsult}
               className="btn-highlight-anim cta-spotlight group inline-flex w-full max-w-[27rem] items-center justify-center gap-4 rounded-[14px] border border-[#79bceb]/60 bg-gradient-to-r from-[#328fd4] to-[#4aa2e3] px-8 py-[1.02rem] text-center text-white shadow-[0_12px_28px_rgba(41,130,198,0.34)] transition hover:from-[#2f86c8] hover:to-[#4398d8] md:max-w-[32rem] md:px-10 disabled:cursor-not-allowed disabled:opacity-80"
             >
-              {isStartingConsult
-                ? "Connecting Dr Shashank..."
-                : (
-                    <span className="flex flex-col items-center leading-tight">
-                      <span className="text-[20px] font-extrabold tracking-[0.01em] md:text-[22px]">
-                        Consult a Vet Online
-                      </span>
-                      <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-white/16 px-3 py-1 text-[12px] font-semibold md:text-[13px]">
-                        <span className="font-extrabold">₹{isDay ? 399 : 499}</span>
-                        <span className="text-white/90">₹100 OFF</span>
-                      </span>
+              {isStartingConsult ? (
+                "Connecting Dr Shashank..."
+              ) : (
+                <span className="flex flex-col items-center leading-tight">
+                  <span className="text-[20px] font-extrabold tracking-[0.01em] md:text-[22px]">
+                    Consult a Vet Online
+                  </span>
+                  <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-white/16 px-3 py-1 text-[12px] font-semibold md:text-[13px]">
+                    <span className="font-extrabold">
+                      ₹{discountedConsultPrice}
                     </span>
-                  )}
+                    <span className="text-white/90">₹100 OFF</span>
+                  </span>
+                </span>
+              )}
               <ArrowRight className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
             </button>
           </div>
@@ -1509,24 +1514,18 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                       </div>
                     ) : null}
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="mt-4 grid gap-3 sm:grid-cols-1">
                       <div className="rounded-2xl border border-slate-200 bg-white p-4">
                         <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                          Day consult (8 AM - 8 PM)
+                          Online consultation
                         </div>
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
                           {formatPrice(activeBioVet.priceDay) ||
                             "Price on request"}
                         </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                          Night consult (8 PM - 8 AM)
-                        </div>
-                        <div className="mt-1 text-lg font-extrabold text-slate-900">
-                          {formatPrice(activeBioVet.priceNight) ||
-                            "Price on request"}
+                        <div className="mt-1 text-xs text-slate-500">
+                          Same consultation pricing applies during day and
+                          night.
                         </div>
                       </div>
                     </div>

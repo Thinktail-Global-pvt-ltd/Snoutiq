@@ -233,26 +233,18 @@ const N =
                     bg: "bg-slate-50 border-slate-200",
                   };
   };
+
 function getCurrentPrice() {
-  const h = new Date().getHours();
-  const isDay = h >= 8 && h < 22;
-  return isDay
-    ? {
-        amount: 499,
-        finalAmount: 399,
-        label: "Day consult · 8 AM–10 PM",
-        rateType: "day",
-      }
-    : {
-        amount: 599,
-        finalAmount: 499,
-        label: "Night consult · 10 PM–8 AM",
-        rateType: "night",
-      };
+  return {
+    amount: 499,
+    finalAmount: 399,
+    label: "Online consult · Available Day & Night",
+    rateType: "flat",
+  };
 }
 const PAYMENT_AMOUNTS = {
-    day: 499,
-    night: 599,
+    standard: 499,
+    discounted: 399,
   },
   formatInr = (value) => {
     const n = Number(value);
@@ -269,7 +261,7 @@ const PAYMENT_AMOUNTS = {
     },
     {
       q: "How do I pay for the consultation?",
-      a: "Securely via UPI, Credit/Debit Cards, or Netbanking before the consultation. Day consult base ₹499 becomes ₹399 after ₹100 off, and night consult base ₹599 becomes ₹499 after ₹100 off.",
+      a: "Securely via UPI, Credit/Debit Cards, or Netbanking before the consultation. The standard consultation price is ₹499, and after ₹100 off you pay ₹399. The same pricing applies during day and night.",
     },
     {
       q: "Are the vets qualified?",
@@ -330,16 +322,16 @@ const SEO_CANONICAL = "https://www.snoutiq.com/";
 const SEO_OG_IMAGE = "https://www.snoutiq.com/og-image.jpg";
 const SEO_OG_IMAGE_ALT = "SnoutIQ Online Vet Consultation India";
 const SEO_OWNER_ATTR = "data-homepage-seo";
+
 function DynamicConsultLabel({
   amount: a,
   finalAmount: t,
-  rateType: s,
   prefixText: r = "Consult a Vet Now",
 }) {
   return e.jsxs("span", {
     className:
       "inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-center align-middle leading-tight sm:flex-nowrap",
-    title: s === "day" ? "Day consult pricing active" : "Night consult pricing active",
+    title: "Flat online consultation pricing active",
     children: [
       e.jsx("span", { className: "text-base leading-none", children: "⚡" }),
       e.jsx("span", { className: "font-extrabold text-white", children: r }),
@@ -361,6 +353,7 @@ function DynamicConsultLabel({
     ],
   });
 }
+
 function S({ icon: a, title: t, desc: s, tag: r }) {
   return e.jsxs("div", {
     className:
@@ -619,15 +612,17 @@ function Ie() {
         ? !0
         : window.matchMedia("(min-width: 1024px)").matches,
     ),
-    { amount, finalAmount, label, rateType } = getCurrentPrice(),
+    { amount, finalAmount, label } = getCurrentPrice(),
     consultPriceText = `₹${formatInr(finalAmount)}`,
     originalPriceText = `₹${formatInr(amount)}`,
-    dayConsultPriceText = `₹${formatInr(PAYMENT_AMOUNTS.day - 100)}`,
-    nightConsultPriceText = `₹${formatInr(PAYMENT_AMOUNTS.night - 100)}`;
+    flatConsultPriceText = `₹${formatInr(PAYMENT_AMOUNTS.discounted)}`;
   return (
     k.useEffect(() => {
       const head = document.head;
-      const titleWithTemplate = SEO_TITLE_TEMPLATE.replace("%s", SEO_TITLE_BASE);
+      const titleWithTemplate = SEO_TITLE_TEMPLATE.replace(
+        "%s",
+        SEO_TITLE_BASE,
+      );
       document.title = titleWithTemplate;
       document.documentElement.lang = "en-IN";
 
@@ -876,7 +871,7 @@ function Ie() {
       );
     }, [showDeferredSections]),
     e.jsxs("div", {
-      className: "flex min-h-screen flex-col bg-white", 
+      className: "flex min-h-screen flex-col bg-white",
       children: [
         e.jsx(Q, { consultPath: "/20+vetsonline?start=details" }),
         e.jsxs("main", {
@@ -941,13 +936,9 @@ function Ie() {
                             }),
                             " for ",
                             e.jsx("strong", { children: consultPriceText }),
-                            " after ₹100 off on the current ",
-                            e.jsx("strong", {
-                              children: rateType === "day" ? "day" : "night",
-                            }),
-                            " slot (",
+                            " after ₹100 off on the flat consultation price (",
                             originalPriceText,
-                            " base) and receive expert diagnosis, guidance, and follow-up.",
+                            " base), with the same pricing available during day and night. Receive expert diagnosis, guidance, and follow-up.",
                           ],
                         }),
                         e.jsxs("div", {
@@ -962,7 +953,6 @@ function Ie() {
                                 children: e.jsx(DynamicConsultLabel, {
                                   amount: amount,
                                   finalAmount: finalAmount,
-                                  rateType: rateType,
                                   prefixText: "Consult a Vet Now",
                                 }),
                               }),
@@ -984,10 +974,11 @@ function Ie() {
                           className:
                             "mb-8 flex flex-wrap items-center gap-2 rounded-2xl border border-orange-100 bg-white/90 p-3 text-sm text-slate-700 shadow-sm shadow-orange-100/60",
                           children: [
-                            e.jsxs("span", {
+                            e.jsx("span", {
                               className:
                                 "rounded-full bg-slate-900 px-3 py-1 font-semibold text-white",
-                              children: ["Currently: ", label],
+                              children:
+                                "Online Consultation · Available Day & Night",
                             }),
                             e.jsxs("span", {
                               className:
@@ -1059,7 +1050,8 @@ function Ie() {
                                       className:
                                         "h-10 w-10 rounded-2xl bg-brand flex items-center justify-center",
                                       children: e.jsx("span", {
-                                        className: "text-white font-black text-sm",
+                                        className:
+                                          "text-white font-black text-sm",
                                         children: "S",
                                       }),
                                     }),
@@ -1132,674 +1124,695 @@ function Ie() {
                   children: [
                     e.jsx(pe, {}),
                     e.jsx("section", {
-              className: "bg-slate-50 py-16 sm:py-20",
-              children: e.jsxs("div", {
-                className: "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
-                children: [
-                  e.jsxs("div", {
-                    className: "mb-10 text-center",
-                    children: [
-                      e.jsx("span", {
-                        className:
-                          "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-4 tracking-wide",
-                        children: "HOW IT WORKS",
-                      }),
-                      e.jsx("h2", {
-                        className:
-                          "text-3xl sm:text-4xl font-extrabold text-slate-900",
-                        children: "Healthcare in 3 simple steps",
-                      }),
-                      e.jsx("p", {
-                        className: "text-slate-500 mt-3 max-w-xl mx-auto",
-                        children:
-                          "From symptom to solution - no queues, no stress.",
-                      }),
-                    ],
-                  }),
-                  e.jsxs("div", {
-                    className: "relative grid gap-4 sm:grid-cols-3 sm:gap-6",
-                    children: [
-                      e.jsx("div", {
-                        className:
-                          "hidden sm:block absolute top-10 left-[22%] right-[22%] h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent",
-                      }),
-                      [
-                        {
-                          n: "01",
-                          icon: P,
-                          title: "Open the App",
-                          desc: "Download SnoutIQ. Tell us about your pet in 30 seconds.",
-                        },
-                        {
-                          n: "02",
-                          icon: _,
-                          title: "Connect or Book",
-                          desc: "Start a video consult instantly, or book a clinic slot near you.",
-                        },
-                        {
-                          n: "03",
-                          icon: H,
-                          title: "Get Expert Care",
-                          desc: "Diagnosis, consultation, records - all done. Follow-up reminders included.",
-                        },
-                      ].map((s) =>
-                        e.jsxs(
-                          "div",
-                          {
-                            className:
-                              "relative flex flex-col items-center rounded-3xl border border-slate-100 bg-white p-6 text-center shadow-sm transition-all hover:border-brand/20 hover:shadow-md sm:p-7",
+                      className: "bg-slate-50 py-16 sm:py-20",
+                      children: e.jsxs("div", {
+                        className: "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
+                        children: [
+                          e.jsxs("div", {
+                            className: "mb-10 text-center",
                             children: [
-                              e.jsx("div", {
+                              e.jsx("span", {
                                 className:
-                                  "absolute -top-4 left-1/2 -translate-x-1/2 h-8 w-8 rounded-full bg-brand text-white text-xs font-black flex items-center justify-center shadow-md",
-                                children: s.n,
+                                  "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-4 tracking-wide",
+                                children: "HOW IT WORKS",
                               }),
-                              e.jsx("div", {
+                              e.jsx("h2", {
                                 className:
-                                  "mt-4 h-14 w-14 rounded-2xl bg-brand-light flex items-center justify-center mb-5",
-                                children: e.jsx(s.icon, {
-                                  className: "h-7 w-7 text-brand",
-                                }),
-                              }),
-                              e.jsx("h3", {
-                                className:
-                                  "font-bold text-slate-900 text-lg mb-2",
-                                children: s.title,
+                                  "text-3xl sm:text-4xl font-extrabold text-slate-900",
+                                children: "Healthcare in 3 simple steps",
                               }),
                               e.jsx("p", {
                                 className:
-                                  "text-slate-500 text-sm leading-relaxed",
-                                children: s.desc,
+                                  "text-slate-500 mt-3 max-w-xl mx-auto",
+                                children:
+                                  "From symptom to solution - no queues, no stress.",
                               }),
                             ],
-                          },
-                          s.n,
-                        ),
-                      ),
-                    ],
-                  }),
-                ],
-              }),
-            }),
-            e.jsxs("section", {
-              className: "overflow-hidden bg-white py-16 sm:py-20",
-              children: [
-                e.jsx("div", {
-                  className: "mx-auto mb-8 max-w-7xl px-4 sm:px-6 lg:px-8",
-                  children: e.jsxs("div", {
-                    className: "flex items-end justify-between gap-4",
-                    children: [
-                      e.jsxs("div", {
-                        children: [
-                          e.jsx("span", {
+                          }),
+                          e.jsxs("div", {
                             className:
-                              "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-3 tracking-wide",
-                            children: "OUR VETS",
-                          }),
-                          e.jsx("h2", {
-                            className:
-                              "text-3xl sm:text-4xl font-extrabold text-slate-900",
-                            children: "The doctors behind SnoutIQ",
-                          }),
-                          e.jsx("p", {
-                            className: "text-slate-500 mt-2 max-w-md",
-                            children:
-                              "Every vet carries a minimum of 7 years of clinical experience. Verified. Rated. Ready.",
-                          }),
-                        ],
-                      }),
-                      e.jsxs(b, {
-                        to: N,
-                        target: "_blank",
-                        rel: "noopener noreferrer",
-                        className:
-                          "hidden sm:flex items-center gap-1 text-brand font-semibold text-sm shrink-0 hover:underline",
-                        children: [
-                          "View all ",
-                          e.jsx(v, { className: "h-4 w-4" }),
-                        ],
-                      }),
-                    ],
-                  }),
-                }),
-                e.jsx("div", {
-                  className:
-                    "flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:px-6 lg:px-8",
-                  style: { scrollbarWidth: "none", msOverflowStyle: "none" },
-                  children: a.map((s, r) => e.jsx(me, { vet: s, idx: r }, r)),
-                }),
-                e.jsx("p", {
-                  className:
-                    "mt-3 text-center text-xs text-slate-400 sm:hidden",
-                  children: "← swipe to explore →",
-                }),
-              ],
-            }),
-            e.jsx("section", {
-              className: "bg-slate-50 py-16 sm:py-20",
-              children: e.jsxs("div", {
-                className: "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
-                children: [
-                  e.jsxs("div", {
-                    className:
-                      "mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end",
-                    children: [
-                      e.jsxs("div", {
-                        children: [
-                          e.jsx("span", {
-                            className:
-                              "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-3 tracking-wide",
-                            children: "SERVICES",
-                          }),
-                          e.jsx("h2", {
-                            className:
-                              "text-3xl sm:text-4xl font-extrabold text-slate-900",
-                            children: "What we offer",
-                          }),
-                          e.jsx("p", {
-                            className: "text-slate-500 mt-2",
-                            children:
-                              "Everything your pet needs - online and in your city.",
-                          }),
-                        ],
-                      }),
-                      e.jsx(b, {
-                        to: N,
-                        target: "_blank",
-                        rel: "noopener noreferrer",
-                        children: e.jsx(w, {
-                          variant: "outline",
-                          className: "shrink-0",
-                          children: "View All Services",
-                        }),
-                      }),
-                    ],
-                  }),
-                  e.jsxs("div", {
-                    className: "grid gap-5 sm:grid-cols-2 lg:grid-cols-3",
-                    children: [
-                      e.jsx(A, {
-                        title: "Online Video Consultation",
-                        description:
-                          `Connect with a verified vet in under 15 minutes from wherever you are. ${label} is active right now.`,
-                        icon: _,
-                        badge: "All India",
-                        price: consultPriceText,
-                        href: C,
-                        features: [
-                          "Available 24/7",
-                          "15-min video call",
-                          `Day: ${dayConsultPriceText} after ₹100 off`,
-                          `Night: ${nightConsultPriceText} after ₹100 off`,
-                        ],
-                      }),
-                      e.jsx(A, {
-                        title: "Vaccination Packages",
-                        description:
-                          "Full first-year protection for your puppy or kitten - all vaccines, one package.",
-                        icon: W,
-                        badge: "Delhi NCR",
-                        price: "₹3200",
-                        href: "/delhi-ncr",
-                        features: [
-                          "Puppy & kitten plans",
-                          "DHPPi + Rabies included",
-                          "50+ verified clinics",
-                          "SMS reminders",
-                        ],
-                      }),
-                      e.jsx(A, {
-                        title: "Neuter & Spay",
-                        description:
-                          "Safe, affordable surgical procedures by experienced surgeons.",
-                        icon: O,
-                        badge: "Delhi NCR",
-                        price: "₹8000",
-                        href: "/delhi-ncr/dog-neutering",
-                        features: [
-                          "Dogs & cats",
-                          "Pre-op check included",
-                          "Post-op care guide",
-                          "Transparent pricing",
-                        ],
-                      }),
-                    ],
-                  }),
-                ],
-              }),
-            }),
-            e.jsx("section", {
-              className: "bg-white py-16 sm:py-20",
-              children: e.jsxs("div", {
-                className: "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
-                children: [
-                  e.jsxs("div", {
-                    className: "mb-10 text-center",
-                    children: [
-                      e.jsx("span", {
-                        className:
-                          "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-3 tracking-wide",
-                        children: "FOR PROFESSIONALS",
-                      }),
-                      e.jsx("h2", {
-                        className:
-                          "text-3xl sm:text-4xl font-extrabold text-slate-900",
-                        children: "Are you a vet or clinic?",
-                      }),
-                    ],
-                  }),
-                  e.jsxs("div", {
-                    className: "grid gap-5 sm:grid-cols-2",
-                    children: [
-                      e.jsxs("div", {
-                        className:
-                          "group relative overflow-hidden rounded-3xl border border-brand/20 bg-gradient-to-br from-brand-light via-white to-blue-50 p-6 transition-all duration-300 hover:shadow-xl hover:shadow-brand/10 sm:p-8",
-                        children: [
-                          e.jsx("div", {
-                            className:
-                              "absolute top-0 right-0 h-48 w-48 rounded-full bg-brand/5 -translate-y-16 translate-x-16",
-                          }),
-                          e.jsx($, {
-                            className: "h-11 w-11 text-brand mb-6 relative",
-                          }),
-                          e.jsx("h3", {
-                            className:
-                              "text-2xl font-extrabold text-slate-900 mb-3",
-                            children: "For Veterinarians",
-                          }),
-                          e.jsx("p", {
-                            className: "text-slate-600 mb-6 leading-relaxed",
-                            children:
-                              "Join India's growing pet consultation network. A dedicated app connects you 1-on-1 with pet parents - consult from anywhere, grow your practice.",
-                          }),
-                          e.jsx("ul", {
-                            className:
-                              "mb-6 space-y-2.5 text-sm text-slate-700",
+                              "relative grid gap-4 sm:grid-cols-3 sm:gap-6",
                             children: [
-                              "Dedicated mobile app",
-                              "1-on-1 consultations",
-                              "Flexible schedule",
-                              "Expand your patient base",
-                            ].map((s) =>
-                              e.jsxs(
-                                "li",
+                              e.jsx("div", {
+                                className:
+                                  "hidden sm:block absolute top-10 left-[22%] right-[22%] h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent",
+                              }),
+                              [
                                 {
-                                  className: "flex items-center gap-2",
-                                  children: [
-                                    e.jsx("span", {
-                                      className:
-                                        "h-5 w-5 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center",
-                                      children: "✓",
-                                    }),
-                                    s,
-                                  ],
+                                  n: "01",
+                                  icon: P,
+                                  title: "Open the App",
+                                  desc: "Download SnoutIQ. Tell us about your pet in 30 seconds.",
                                 },
-                                s,
+                                {
+                                  n: "02",
+                                  icon: _,
+                                  title: "Connect or Book",
+                                  desc: "Start a video consult instantly, or book a clinic slot near you.",
+                                },
+                                {
+                                  n: "03",
+                                  icon: H,
+                                  title: "Get Expert Care",
+                                  desc: "Diagnosis, consultation, records - all done. Follow-up reminders included.",
+                                },
+                              ].map((s) =>
+                                e.jsxs(
+                                  "div",
+                                  {
+                                    className:
+                                      "relative flex flex-col items-center rounded-3xl border border-slate-100 bg-white p-6 text-center shadow-sm transition-all hover:border-brand/20 hover:shadow-md sm:p-7",
+                                    children: [
+                                      e.jsx("div", {
+                                        className:
+                                          "absolute -top-4 left-1/2 -translate-x-1/2 h-8 w-8 rounded-full bg-brand text-white text-xs font-black flex items-center justify-center shadow-md",
+                                        children: s.n,
+                                      }),
+                                      e.jsx("div", {
+                                        className:
+                                          "mt-4 h-14 w-14 rounded-2xl bg-brand-light flex items-center justify-center mb-5",
+                                        children: e.jsx(s.icon, {
+                                          className: "h-7 w-7 text-brand",
+                                        }),
+                                      }),
+                                      e.jsx("h3", {
+                                        className:
+                                          "font-bold text-slate-900 text-lg mb-2",
+                                        children: s.title,
+                                      }),
+                                      e.jsx("p", {
+                                        className:
+                                          "text-slate-500 text-sm leading-relaxed",
+                                        children: s.desc,
+                                      }),
+                                    ],
+                                  },
+                                  s.n,
+                                ),
                               ),
-                            ),
-                          }),
-                          e.jsx(b, {
-                            to: "/vets",
-                            children: e.jsxs(w, {
-                              variant: "brand",
-                              className: "gap-2",
-                              children: [
-                                "Apply as a Vet ",
-                                e.jsx(v, { className: "h-4 w-4" }),
-                              ],
-                            }),
+                            ],
                           }),
                         ],
                       }),
-                      e.jsxs("div", {
-                        className:
-                          "group relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/50 p-6 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 sm:p-8",
-                        children: [
-                          e.jsx("div", {
-                            className:
-                              "absolute top-0 right-0 h-48 w-48 rounded-full bg-slate-100/50 -translate-y-16 translate-x-16",
-                          }),
-                          e.jsx(P, {
-                            className: "h-11 w-11 text-slate-700 mb-6 relative",
-                          }),
-                          e.jsx("h3", {
-                            className:
-                              "text-2xl font-extrabold text-slate-900 mb-3",
-                            children: "For Pet Clinics",
-                          }),
-                          e.jsx("p", {
-                            className: "text-slate-600 mb-6 leading-relaxed",
-                            children:
-                              "Give your clinic a digital front-end. Manage appointments, send reminders, and connect with pet parents - without sharing personal numbers.",
-                          }),
-                          e.jsx("ul", {
-                            className:
-                              "mb-6 space-y-2.5 text-sm text-slate-700",
-                            children: [
-                              "Appointment management",
-                              "WhatsApp notifications",
-                              "No personal number sharing",
-                              "Recurring revenue model",
-                            ].map((s) =>
-                              e.jsxs(
-                                "li",
-                                {
-                                  className: "flex items-center gap-2",
-                                  children: [
-                                    e.jsx("span", {
-                                      className:
-                                        "h-5 w-5 rounded-full bg-slate-800 text-white text-[10px] font-bold flex items-center justify-center",
-                                      children: "✓",
-                                    }),
-                                    s,
-                                  ],
-                                },
-                                s,
-                              ),
-                            ),
-                          }),
-                          e.jsx(b, {
-                            to: "/clinics",
-                            children: e.jsxs(w, {
-                              variant: "secondary",
-                              className: "gap-2 border border-slate-300",
-                              children: [
-                                "Apply as a Clinic ",
-                                e.jsx(v, { className: "h-4 w-4" }),
-                              ],
-                            }),
-                          }),
-                        ],
-                      }),
-                    ],
-                  }),
-                ],
-              }),
-            }),
-            e.jsxs("section", {
-              className: "relative overflow-hidden bg-slate-900 py-16 sm:py-20",
-              children: [
-                e.jsxs("div", {
-                  className: "pointer-events-none absolute inset-0",
-                  children: [
-                    e.jsx("div", {
-                      className:
-                        "absolute top-0 left-0 h-64 w-64 rounded-full bg-brand/10 -translate-x-1/2 -translate-y-1/2 blur-3xl",
                     }),
-                    e.jsx("div", {
-                      className:
-                        "absolute bottom-0 right-0 h-64 w-64 rounded-full bg-blue-600/10 translate-x-1/2 translate-y-1/2 blur-3xl",
-                    }),
-                  ],
-                }),
-                e.jsxs("div", {
-                  className: "relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
-                  children: [
-                    e.jsxs("div", {
-                      className: "mb-10 text-center",
+                    e.jsxs("section", {
+                      className: "overflow-hidden bg-white py-16 sm:py-20",
                       children: [
-                        e.jsx("span", {
+                        e.jsx("div", {
                           className:
-                            "inline-block rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold text-blue-300 mb-4 tracking-wide",
-                          children: "REVIEWS",
+                            "mx-auto mb-8 max-w-7xl px-4 sm:px-6 lg:px-8",
+                          children: e.jsxs("div", {
+                            className: "flex items-end justify-between gap-4",
+                            children: [
+                              e.jsxs("div", {
+                                children: [
+                                  e.jsx("span", {
+                                    className:
+                                      "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-3 tracking-wide",
+                                    children: "OUR VETS",
+                                  }),
+                                  e.jsx("h2", {
+                                    className:
+                                      "text-3xl sm:text-4xl font-extrabold text-slate-900",
+                                    children: "The doctors behind SnoutIQ",
+                                  }),
+                                  e.jsx("p", {
+                                    className: "text-slate-500 mt-2 max-w-md",
+                                    children:
+                                      "Every vet carries a minimum of 7 years of clinical experience. Verified. Rated. Ready.",
+                                  }),
+                                ],
+                              }),
+                              e.jsxs(b, {
+                                to: N,
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className:
+                                  "hidden sm:flex items-center gap-1 text-brand font-semibold text-sm shrink-0 hover:underline",
+                                children: [
+                                  "View all ",
+                                  e.jsx(v, { className: "h-4 w-4" }),
+                                ],
+                              }),
+                            ],
+                          }),
                         }),
-                        e.jsx("h2", {
+                        e.jsx("div", {
                           className:
-                            "text-3xl sm:text-4xl font-extrabold text-white",
-                          children: "Pet parents love SnoutIQ",
+                            "flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:px-6 lg:px-8",
+                          style: {
+                            scrollbarWidth: "none",
+                            msOverflowStyle: "none",
+                          },
+                          children: a.map((s, r) =>
+                            e.jsx(me, { vet: s, idx: r }, r),
+                          ),
                         }),
                         e.jsx("p", {
-                          className: "text-slate-400 mt-3",
-                          children: "Real stories from real pet parents.",
+                          className:
+                            "mt-3 text-center text-xs text-slate-400 sm:hidden",
+                          children: "← swipe to explore →",
                         }),
                       ],
                     }),
-                    e.jsx("div", {
-                      className: "grid gap-4 sm:grid-cols-3 sm:gap-5",
-                      children: [
-                        {
-                          name: "Priya Sharma",
-                          role: "Dog Parent · Mumbai",
-                          stars: 5,
-                          text: "My Golden was vomiting at 2 AM. Connected to a vet in 2 minutes. The doctor was so calm and guided me perfectly. Genuinely could not have managed without this app.",
-                        },
-                        {
-                          name: "Rahul Verma",
-                          role: "Cat Parent · Delhi NCR",
-                          stars: 5,
-                          text: "Got the kitten vaccination package through SnoutIQ. Clinic was verified, vet was experienced, and the reminders in the app made sure we never missed a dose.",
-                        },
-                        {
-                          name: "Ananya Desai",
-                          role: "Dog Parent · Bangalore",
-                          stars: 5,
-                          text: "My indie dog gets anxious at clinics. Video consults have been a game-changer for us. Affordable, quick, and the vet actually took time to understand her.",
-                        },
-                      ].map((s, r) =>
-                        e.jsxs(
-                          "div",
-                          {
+                    e.jsx("section", {
+                      className: "bg-slate-50 py-16 sm:py-20",
+                      children: e.jsxs("div", {
+                        className: "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
+                        children: [
+                          e.jsxs("div", {
                             className:
-                              "rounded-3xl border border-white/10 bg-white/5 p-6 transition-colors hover:bg-white/10",
+                              "mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end",
                             children: [
-                              e.jsx("div", {
-                                className: "flex gap-0.5 mb-5",
-                                children: Array(s.stars)
-                                  .fill(0)
-                                  .map((n, o) =>
-                                    e.jsx(
-                                      "span",
-                                      {
-                                        className: "text-yellow-400 text-base",
-                                        children: "★",
-                                      },
-                                      o,
-                                    ),
-                                  ),
-                              }),
-                              e.jsxs("p", {
-                                className:
-                                  "text-slate-300 text-sm leading-relaxed mb-6",
-                                children: ['"', s.text, '"'],
-                              }),
                               e.jsxs("div", {
-                                className: "flex items-center gap-3",
+                                children: [
+                                  e.jsx("span", {
+                                    className:
+                                      "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-3 tracking-wide",
+                                    children: "SERVICES",
+                                  }),
+                                  e.jsx("h2", {
+                                    className:
+                                      "text-3xl sm:text-4xl font-extrabold text-slate-900",
+                                    children: "What we offer",
+                                  }),
+                                  e.jsx("p", {
+                                    className: "text-slate-500 mt-2",
+                                    children:
+                                      "Everything your pet needs - online and in your city.",
+                                  }),
+                                ],
+                              }),
+                              e.jsx(b, {
+                                to: N,
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                children: e.jsx(w, {
+                                  variant: "outline",
+                                  className: "shrink-0",
+                                  children: "View All Services",
+                                }),
+                              }),
+                            ],
+                          }),
+                          e.jsxs("div", {
+                            className:
+                              "grid gap-5 sm:grid-cols-2 lg:grid-cols-3",
+                            children: [
+                              e.jsx(A, {
+                                title: "Online Video Consultation",
+                                description: "Connect with a verified vet in under 15 minutes from wherever you are. Flat consultation pricing is available day and night.",
+                                icon: _,
+                                badge: "All India",
+                                price: consultPriceText,
+                                href: C,
+                                features: [
+                                  "Available 24/7",
+                                  "15-min video call",
+                                  `Pay ${flatConsultPriceText} after ₹100 off`,
+                                  "Same pricing day & night",
+                                ],
+                              }),
+                              e.jsx(A, {
+                                title: "Vaccination Packages",
+                                description:
+                                  "Full first-year protection for your puppy or kitten - all vaccines, one package.",
+                                icon: W,
+                                badge: "Delhi NCR",
+                                price: "₹3200",
+                                href: "/delhi-ncr",
+                                features: [
+                                  "Puppy & kitten plans",
+                                  "DHPPi + Rabies included",
+                                  "50+ verified clinics",
+                                  "SMS reminders",
+                                ],
+                              }),
+                              e.jsx(A, {
+                                title: "Neuter & Spay",
+                                description:
+                                  "Safe, affordable surgical procedures by experienced surgeons.",
+                                icon: O,
+                                badge: "Delhi NCR",
+                                price: "₹8000",
+                                href: "/delhi-ncr/dog-neutering",
+                                features: [
+                                  "Dogs & cats",
+                                  "Pre-op check included",
+                                  "Post-op care guide",
+                                  "Transparent pricing",
+                                ],
+                              }),
+                            ],
+                          }),
+                        ],
+                      }),
+                    }),
+                    e.jsx("section", {
+                      className: "bg-white py-16 sm:py-20",
+                      children: e.jsxs("div", {
+                        className: "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
+                        children: [
+                          e.jsxs("div", {
+                            className: "mb-10 text-center",
+                            children: [
+                              e.jsx("span", {
+                                className:
+                                  "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-3 tracking-wide",
+                                children: "FOR PROFESSIONALS",
+                              }),
+                              e.jsx("h2", {
+                                className:
+                                  "text-3xl sm:text-4xl font-extrabold text-slate-900",
+                                children: "Are you a vet or clinic?",
+                              }),
+                            ],
+                          }),
+                          e.jsxs("div", {
+                            className: "grid gap-5 sm:grid-cols-2",
+                            children: [
+                              e.jsxs("div", {
+                                className:
+                                  "group relative overflow-hidden rounded-3xl border border-brand/20 bg-gradient-to-br from-brand-light via-white to-blue-50 p-6 transition-all duration-300 hover:shadow-xl hover:shadow-brand/10 sm:p-8",
                                 children: [
                                   e.jsx("div", {
                                     className:
-                                      "h-9 w-9 rounded-full bg-brand/30 flex items-center justify-center text-brand font-bold text-sm",
-                                    children: s.name
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join(""),
+                                      "absolute top-0 right-0 h-48 w-48 rounded-full bg-brand/5 -translate-y-16 translate-x-16",
                                   }),
-                                  e.jsxs("div", {
+                                  e.jsx($, {
+                                    className:
+                                      "h-11 w-11 text-brand mb-6 relative",
+                                  }),
+                                  e.jsx("h3", {
+                                    className:
+                                      "text-2xl font-extrabold text-slate-900 mb-3",
+                                    children: "For Veterinarians",
+                                  }),
+                                  e.jsx("p", {
+                                    className:
+                                      "text-slate-600 mb-6 leading-relaxed",
+                                    children:
+                                      "Join India's growing pet consultation network. A dedicated app connects you 1-on-1 with pet parents - consult from anywhere, grow your practice.",
+                                  }),
+                                  e.jsx("ul", {
+                                    className:
+                                      "mb-6 space-y-2.5 text-sm text-slate-700",
                                     children: [
-                                      e.jsx("p", {
-                                        className:
-                                          "font-bold text-white text-sm",
-                                        children: s.name,
-                                      }),
-                                      e.jsx("p", {
-                                        className: "text-slate-500 text-xs",
-                                        children: s.role,
-                                      }),
-                                    ],
+                                      "Dedicated mobile app",
+                                      "1-on-1 consultations",
+                                      "Flexible schedule",
+                                      "Expand your patient base",
+                                    ].map((s) =>
+                                      e.jsxs(
+                                        "li",
+                                        {
+                                          className: "flex items-center gap-2",
+                                          children: [
+                                            e.jsx("span", {
+                                              className:
+                                                "h-5 w-5 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center",
+                                              children: "✓",
+                                            }),
+                                            s,
+                                          ],
+                                        },
+                                        s,
+                                      ),
+                                    ),
+                                  }),
+                                  e.jsx(b, {
+                                    to: "/vets",
+                                    children: e.jsxs(w, {
+                                      variant: "brand",
+                                      className: "gap-2",
+                                      children: [
+                                        "Apply as a Vet ",
+                                        e.jsx(v, { className: "h-4 w-4" }),
+                                      ],
+                                    }),
+                                  }),
+                                ],
+                              }),
+                              e.jsxs("div", {
+                                className:
+                                  "group relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/50 p-6 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 sm:p-8",
+                                children: [
+                                  e.jsx("div", {
+                                    className:
+                                      "absolute top-0 right-0 h-48 w-48 rounded-full bg-slate-100/50 -translate-y-16 translate-x-16",
+                                  }),
+                                  e.jsx(P, {
+                                    className:
+                                      "h-11 w-11 text-slate-700 mb-6 relative",
+                                  }),
+                                  e.jsx("h3", {
+                                    className:
+                                      "text-2xl font-extrabold text-slate-900 mb-3",
+                                    children: "For Pet Clinics",
+                                  }),
+                                  e.jsx("p", {
+                                    className:
+                                      "text-slate-600 mb-6 leading-relaxed",
+                                    children:
+                                      "Give your clinic a digital front-end. Manage appointments, send reminders, and connect with pet parents - without sharing personal numbers.",
+                                  }),
+                                  e.jsx("ul", {
+                                    className:
+                                      "mb-6 space-y-2.5 text-sm text-slate-700",
+                                    children: [
+                                      "Appointment management",
+                                      "WhatsApp notifications",
+                                      "No personal number sharing",
+                                      "Recurring revenue model",
+                                    ].map((s) =>
+                                      e.jsxs(
+                                        "li",
+                                        {
+                                          className: "flex items-center gap-2",
+                                          children: [
+                                            e.jsx("span", {
+                                              className:
+                                                "h-5 w-5 rounded-full bg-slate-800 text-white text-[10px] font-bold flex items-center justify-center",
+                                              children: "✓",
+                                            }),
+                                            s,
+                                          ],
+                                        },
+                                        s,
+                                      ),
+                                    ),
+                                  }),
+                                  e.jsx(b, {
+                                    to: "/clinics",
+                                    children: e.jsxs(w, {
+                                      variant: "secondary",
+                                      className:
+                                        "gap-2 border border-slate-300",
+                                      children: [
+                                        "Apply as a Clinic ",
+                                        e.jsx(v, { className: "h-4 w-4" }),
+                                      ],
+                                    }),
                                   }),
                                 ],
                               }),
                             ],
-                          },
-                          r,
-                        ),
-                      ),
+                          }),
+                        ],
+                      }),
                     }),
-                  ],
-                }),
-              ],
-            }),
-            e.jsx("section", {
-              className: "border-y border-brand/10 bg-[#f0f7ff] py-14 sm:py-16",
-              children: e.jsxs("div", {
-                className: "mx-auto max-w-3xl px-4 text-center",
-                children: [
-                  e.jsx("p", {
-                    className: "text-brand text-sm font-semibold mb-3",
-                    children: "GET THE APP",
-                  }),
-                  e.jsx("h2", {
-                    className:
-                      "text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3",
-                    children: "Need a quick answer for your pet?",
-                  }),
-                  e.jsx("p", {
-                    className: "mx-auto mb-6 max-w-lg text-slate-500",
-                    children:
-                      "Download the SnoutIQ app for instant vet consultation, booking help, and complete pet care support in one place.",
-                  }),
-                  e.jsxs("a", {
-                    href: N,
-                    target: "_blank",
-                    rel: "noopener noreferrer",
-                    className:
-                      "inline-flex items-center gap-2 rounded-2xl bg-brand px-8 py-4 text-base font-bold text-white transition-colors hover:bg-brand-hover shadow-lg shadow-brand/20",
-                    children: [
-                      "Download App",
-                      e.jsx(v, { className: "h-5 w-5 shrink-0" }),
-                    ],
-                  }),
-                ],
-              }),
-            }),
-            e.jsx("section", {
-              className: "bg-white py-16 sm:py-20",
-              children: e.jsxs("div", {
-                className: "mx-auto max-w-2xl px-4 sm:px-6 lg:px-8",
-                children: [
-                  e.jsxs("div", {
-                    className: "mb-10 text-center",
-                    children: [
-                      e.jsx("span", {
-                        className:
-                          "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-4 tracking-wide",
-                        children: "FAQ",
-                      }),
-                      e.jsx("h2", {
-                        className:
-                          "text-3xl sm:text-4xl font-extrabold text-slate-900",
-                        children: "Common questions",
-                      }),
-                    ],
-                  }),
-                  e.jsx("div", {
-                    className: "space-y-3",
-                    "data-faq-root": !0,
-                    children: B.map((s, r) =>
-                      e.jsxs(
-                        "div",
-                        {
-                          "data-faq-item": !0,
-                          className:
-                            "rounded-2xl border transition-all duration-200 overflow-hidden border-slate-200 hover:border-slate-300",
+                    e.jsxs("section", {
+                      className:
+                        "relative overflow-hidden bg-slate-900 py-16 sm:py-20",
+                      children: [
+                        e.jsxs("div", {
+                          className: "pointer-events-none absolute inset-0",
                           children: [
-                            e.jsxs("button", {
-                              "data-faq-btn": !0,
-                              "aria-expanded": "false",
+                            e.jsx("div", {
                               className:
-                                "w-full text-left px-6 py-4 flex items-center justify-between gap-4",
+                                "absolute top-0 left-0 h-64 w-64 rounded-full bg-brand/10 -translate-x-1/2 -translate-y-1/2 blur-3xl",
+                            }),
+                            e.jsx("div", {
+                              className:
+                                "absolute bottom-0 right-0 h-64 w-64 rounded-full bg-blue-600/10 translate-x-1/2 translate-y-1/2 blur-3xl",
+                            }),
+                          ],
+                        }),
+                        e.jsxs("div", {
+                          className:
+                            "relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
+                          children: [
+                            e.jsxs("div", {
+                              className: "mb-10 text-center",
                               children: [
                                 e.jsx("span", {
                                   className:
-                                    "font-semibold text-slate-900 text-sm sm:text-base leading-snug",
-                                  children: s.q,
+                                    "inline-block rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold text-blue-300 mb-4 tracking-wide",
+                                  children: "REVIEWS",
                                 }),
-                                e.jsx(K, {
-                                  "data-faq-icon": !0,
+                                e.jsx("h2", {
                                   className:
-                                    "h-5 w-5 text-brand shrink-0 transition-transform duration-200",
+                                    "text-3xl sm:text-4xl font-extrabold text-white",
+                                  children: "Pet parents love SnoutIQ",
+                                }),
+                                e.jsx("p", {
+                                  className: "text-slate-400 mt-3",
+                                  children:
+                                    "Real stories from real pet parents.",
                                 }),
                               ],
                             }),
                             e.jsx("div", {
-                              "data-faq-panel": !0,
-                              hidden: !0,
-                              className:
-                                "px-6 pb-5 text-slate-500 text-sm leading-relaxed border-t border-brand/10 pt-4 bg-brand-light/30",
-                              children: s.a,
+                              className: "grid gap-4 sm:grid-cols-3 sm:gap-5",
+                              children: [
+                                {
+                                  name: "Priya Sharma",
+                                  role: "Dog Parent · Mumbai",
+                                  stars: 5,
+                                  text: "My Golden was vomiting at 2 AM. Connected to a vet in 2 minutes. The doctor was so calm and guided me perfectly. Genuinely could not have managed without this app.",
+                                },
+                                {
+                                  name: "Rahul Verma",
+                                  role: "Cat Parent · Delhi NCR",
+                                  stars: 5,
+                                  text: "Got the kitten vaccination package through SnoutIQ. Clinic was verified, vet was experienced, and the reminders in the app made sure we never missed a dose.",
+                                },
+                                {
+                                  name: "Ananya Desai",
+                                  role: "Dog Parent · Bangalore",
+                                  stars: 5,
+                                  text: "My indie dog gets anxious at clinics. Video consults have been a game-changer for us. Affordable, quick, and the vet actually took time to understand her.",
+                                },
+                              ].map((s, r) =>
+                                e.jsxs(
+                                  "div",
+                                  {
+                                    className:
+                                      "rounded-3xl border border-white/10 bg-white/5 p-6 transition-colors hover:bg-white/10",
+                                    children: [
+                                      e.jsx("div", {
+                                        className: "flex gap-0.5 mb-5",
+                                        children: Array(s.stars)
+                                          .fill(0)
+                                          .map((n, o) =>
+                                            e.jsx(
+                                              "span",
+                                              {
+                                                className:
+                                                  "text-yellow-400 text-base",
+                                                children: "★",
+                                              },
+                                              o,
+                                            ),
+                                          ),
+                                      }),
+                                      e.jsxs("p", {
+                                        className:
+                                          "text-slate-300 text-sm leading-relaxed mb-6",
+                                        children: ['"', s.text, '"'],
+                                      }),
+                                      e.jsxs("div", {
+                                        className: "flex items-center gap-3",
+                                        children: [
+                                          e.jsx("div", {
+                                            className:
+                                              "h-9 w-9 rounded-full bg-brand/30 flex items-center justify-center text-brand font-bold text-sm",
+                                            children: s.name
+                                              .split(" ")
+                                              .map((n) => n[0])
+                                              .join(""),
+                                          }),
+                                          e.jsxs("div", {
+                                            children: [
+                                              e.jsx("p", {
+                                                className:
+                                                  "font-bold text-white text-sm",
+                                                children: s.name,
+                                              }),
+                                              e.jsx("p", {
+                                                className:
+                                                  "text-slate-500 text-xs",
+                                                children: s.role,
+                                              }),
+                                            ],
+                                          }),
+                                        ],
+                                      }),
+                                    ],
+                                  },
+                                  r,
+                                ),
+                              ),
                             }),
                           ],
-                        },
-                        r,
-                      ),
-                    ),
-                  }),
-                ],
-              }),
-            }),
-                    e.jsxs("section", {
-              className: "relative overflow-hidden bg-brand py-14 sm:py-16",
-              children: [
-                e.jsxs("div", {
-                  className: "pointer-events-none absolute inset-0",
-                  children: [
-                    e.jsx("div", {
-                      className:
-                        "absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/5 blur-3xl",
-                    }),
-                    e.jsx("div", {
-                      className:
-                        "absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-white/5 blur-3xl",
-                    }),
-                  ],
-                }),
-                e.jsxs("div", {
-                  className: "relative mx-auto max-w-3xl px-4 text-center",
-                  children: [
-                    e.jsx("h2", {
-                      className:
-                        "text-3xl sm:text-4xl font-extrabold text-white mb-4",
-                      children: "Ready to give your pet the best care?",
-                    }),
-                    e.jsx("p", {
-                      className: "mx-auto mb-6 max-w-xl text-lg text-blue-200",
-                      children:
-                        "Download the SnoutIQ app or start a video consult right now. No appointment needed.",
-                    }),
-                    e.jsxs("div", {
-                      className:
-                        "flex flex-col sm:flex-row gap-4 justify-center",
-                      children: [
-                        e.jsx(b, {
-                          to: C,
-                          children: e.jsx(w, {
-                            variant: "primary",
-                            size: "lg",
-                            className:
-                              "w-full sm:w-auto bg-orange-500 text-white hover:bg-orange-600 shadow-xl shadow-orange-900/30 px-4 sm:px-6",
-                            children: e.jsx(DynamicConsultLabel, {
-                              amount: amount,
-                              finalAmount: finalAmount,
-                              rateType: rateType,
-                              prefixText: "Consult a Vet Now",
-                            }),
-                          }),
-                        }),
-                        e.jsx(b, {
-                          to: N,
-                          target: "_blank",
-                          rel: "noopener noreferrer",
-                          children: e.jsx(w, {
-                            size: "lg",
-                            className:
-                              "w-full sm:w-auto bg-white text-brand hover:bg-blue-50 font-bold",
-                            children: "Download Free App",
-                          }),
                         }),
                       ],
                     }),
-                  ],
-                }),
-              ],
+                    e.jsx("section", {
+                      className:
+                        "border-y border-brand/10 bg-[#f0f7ff] py-14 sm:py-16",
+                      children: e.jsxs("div", {
+                        className: "mx-auto max-w-3xl px-4 text-center",
+                        children: [
+                          e.jsx("p", {
+                            className: "text-brand text-sm font-semibold mb-3",
+                            children: "GET THE APP",
+                          }),
+                          e.jsx("h2", {
+                            className:
+                              "text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3",
+                            children: "Need a quick answer for your pet?",
+                          }),
+                          e.jsx("p", {
+                            className: "mx-auto mb-6 max-w-lg text-slate-500",
+                            children:
+                              "Download the SnoutIQ app for instant vet consultation, booking help, and complete pet care support in one place.",
+                          }),
+                          e.jsxs("a", {
+                            href: N,
+                            target: "_blank",
+                            rel: "noopener noreferrer",
+                            className:
+                              "inline-flex items-center gap-2 rounded-2xl bg-brand px-8 py-4 text-base font-bold text-white transition-colors hover:bg-brand-hover shadow-lg shadow-brand/20",
+                            children: [
+                              "Download App",
+                              e.jsx(v, { className: "h-5 w-5 shrink-0" }),
+                            ],
+                          }),
+                        ],
+                      }),
+                    }),
+                    e.jsx("section", {
+                      className: "bg-white py-16 sm:py-20",
+                      children: e.jsxs("div", {
+                        className: "mx-auto max-w-2xl px-4 sm:px-6 lg:px-8",
+                        children: [
+                          e.jsxs("div", {
+                            className: "mb-10 text-center",
+                            children: [
+                              e.jsx("span", {
+                                className:
+                                  "inline-block rounded-full bg-brand-light px-4 py-1.5 text-xs font-semibold text-brand mb-4 tracking-wide",
+                                children: "FAQ",
+                              }),
+                              e.jsx("h2", {
+                                className:
+                                  "text-3xl sm:text-4xl font-extrabold text-slate-900",
+                                children: "Common questions",
+                              }),
+                            ],
+                          }),
+                          e.jsx("div", {
+                            className: "space-y-3",
+                            "data-faq-root": !0,
+                            children: B.map((s, r) =>
+                              e.jsxs(
+                                "div",
+                                {
+                                  "data-faq-item": !0,
+                                  className:
+                                    "rounded-2xl border transition-all duration-200 overflow-hidden border-slate-200 hover:border-slate-300",
+                                  children: [
+                                    e.jsxs("button", {
+                                      "data-faq-btn": !0,
+                                      "aria-expanded": "false",
+                                      className:
+                                        "w-full text-left px-6 py-4 flex items-center justify-between gap-4",
+                                      children: [
+                                        e.jsx("span", {
+                                          className:
+                                            "font-semibold text-slate-900 text-sm sm:text-base leading-snug",
+                                          children: s.q,
+                                        }),
+                                        e.jsx(K, {
+                                          "data-faq-icon": !0,
+                                          className:
+                                            "h-5 w-5 text-brand shrink-0 transition-transform duration-200",
+                                        }),
+                                      ],
+                                    }),
+                                    e.jsx("div", {
+                                      "data-faq-panel": !0,
+                                      hidden: !0,
+                                      className:
+                                        "px-6 pb-5 text-slate-500 text-sm leading-relaxed border-t border-brand/10 pt-4 bg-brand-light/30",
+                                      children: s.a,
+                                    }),
+                                  ],
+                                },
+                                r,
+                              ),
+                            ),
+                          }),
+                        ],
+                      }),
+                    }),
+                    e.jsxs("section", {
+                      className:
+                        "relative overflow-hidden bg-brand py-14 sm:py-16",
+                      children: [
+                        e.jsxs("div", {
+                          className: "pointer-events-none absolute inset-0",
+                          children: [
+                            e.jsx("div", {
+                              className:
+                                "absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/5 blur-3xl",
+                            }),
+                            e.jsx("div", {
+                              className:
+                                "absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-white/5 blur-3xl",
+                            }),
+                          ],
+                        }),
+                        e.jsxs("div", {
+                          className:
+                            "relative mx-auto max-w-3xl px-4 text-center",
+                          children: [
+                            e.jsx("h2", {
+                              className:
+                                "text-3xl sm:text-4xl font-extrabold text-white mb-4",
+                              children: "Ready to give your pet the best care?",
+                            }),
+                            e.jsx("p", {
+                              className:
+                                "mx-auto mb-6 max-w-xl text-lg text-blue-200",
+                              children:
+                                "Download the SnoutIQ app or start a video consult right now. No appointment needed.",
+                            }),
+                            e.jsxs("div", {
+                              className:
+                                "flex flex-col sm:flex-row gap-4 justify-center",
+                              children: [
+                                e.jsx(b, {
+                                  to: C,
+                                  children: e.jsx(w, {
+                                    variant: "primary",
+                                    size: "lg",
+                                    className:
+                                      "w-full sm:w-auto bg-orange-500 text-white hover:bg-orange-600 shadow-xl shadow-orange-900/30 px-4 sm:px-6",
+                                    children: e.jsx(DynamicConsultLabel, {
+                                      amount: amount,
+                                      finalAmount: finalAmount,
+                                      prefixText: "Consult a Vet Now",
+                                    }),
+                                  }),
+                                }),
+                                e.jsx(b, {
+                                  to: N,
+                                  target: "_blank",
+                                  rel: "noopener noreferrer",
+                                  children: e.jsx(w, {
+                                    size: "lg",
+                                    className:
+                                      "w-full sm:w-auto bg-white text-brand hover:bg-blue-50 font-bold",
+                                    children: "Download Free App",
+                                  }),
+                                }),
+                              ],
+                            }),
+                          ],
+                        }),
+                      ],
                     }),
                   ],
                 })

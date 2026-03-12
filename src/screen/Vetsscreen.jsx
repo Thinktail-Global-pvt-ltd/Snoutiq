@@ -37,7 +37,7 @@ const DUMMY_VETS_PAYLOAD = [
         break_do_not_disturb_time_example_2_4_pm: '["No"]',
         do_you_offer_a_free_follow_up_within_3_days_after_a_consulta: "Yes",
         video_day_rate: 499,
-        video_night_rate: 599,
+        video_night_rate: 499,
       },
     ],
   },

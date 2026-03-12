@@ -208,7 +208,7 @@ const DEFAULT_PRIMARY_PAYMENT_VET = {
   rating: 5,
   reviews: 0,
   priceDay: 499,
-  priceNight: 599,
+  priceNight: 499,
   bookingRateType: "day",
   bookingPrice: 499,
   isSnoutiqAssigned: true,
@@ -223,7 +223,7 @@ const DEFAULT_PRIMARY_PAYMENT_VET = {
     degree: "MVSc",
     years_of_experience: "10",
     video_day_rate: "499.00",
-    video_night_rate: "599.00",
+    video_night_rate: "499.00",
     specialization_select_all_that_apply:
       "Dogs, Cats, Exotic Pet, Surgery, Skin / Dermatology, General Practice, Endocrinology",
     response_time_for_online_consults_day: "15 To 20 Mins",
@@ -268,50 +268,14 @@ const resolveDoctorImage = (doctor, assetRoot) => {
   );
 };
 
-const resolvePrimaryPaymentVet = (inputVet) => {
-  const providedDoctorName = pickValue(
-    inputVet?.name,
-    inputVet?.doctor_name,
-    inputVet?.raw?.doctor_name
-  );
-  const isProvidedShashank = isDrShashankVet(providedDoctorName);
-  const sourceVet = isProvidedShashank ? inputVet : DEFAULT_PRIMARY_PAYMENT_VET;
-  const bookingRateType =
-    inputVet?.bookingRateType === "day" || inputVet?.bookingRateType === "night"
-      ? inputVet.bookingRateType
-      : isDayTime()
-      ? "day"
-      : "night";
-  const priceDay =
-    toNumber(pickValue(sourceVet?.priceDay, sourceVet?.raw?.video_day_rate)) ||
-    DEFAULT_PRIMARY_PAYMENT_VET.priceDay;
-  const priceNight =
-    toNumber(pickValue(sourceVet?.priceNight, sourceVet?.raw?.video_night_rate)) ||
-    DEFAULT_PRIMARY_PAYMENT_VET.priceNight;
-  const bookingPrice =
-    toNumber(
-      pickValue(
-        sourceVet?.bookingPrice,
-        bookingRateType === "day" ? priceDay : priceNight
-      )
-    ) || (bookingRateType === "day" ? priceDay : priceNight);
-  const doctorId =
-    toNumber(
-      pickValue(
-        sourceVet?.doctor_id,
-        sourceVet?.id,
-        sourceVet?.raw?.doctor_id,
-        sourceVet?.raw?.id,
-        DEFAULT_PRIMARY_PAYMENT_VET.doctor_id
-      )
-    ) || DEFAULT_PRIMARY_PAYMENT_VET.doctor_id;
-  const displayName =
-    pickValue(
-      sourceVet?.name,
-      sourceVet?.doctor_name,
-      sourceVet?.raw?.doctor_name,
-      DEFAULT_PRIMARY_PAYMENT_VET.name
-    ) || DEFAULT_PRIMARY_PAYMENT_VET.name;
+const resolvePrimaryPaymentVet = () => {
+  const sourceVet = DEFAULT_PRIMARY_PAYMENT_VET;
+
+  const priceDay = 499;
+  const priceNight = 499; // night me bhi same
+  const bookingRateType = "day";
+  const bookingPrice = 499;
+
   const doctorName =
     pickValue(
       sourceVet?.doctor_name,
@@ -320,11 +284,18 @@ const resolvePrimaryPaymentVet = (inputVet) => {
       DEFAULT_PRIMARY_PAYMENT_VET.doctor_name
     ) || DEFAULT_PRIMARY_PAYMENT_VET.doctor_name;
 
+  const displayName =
+    pickValue(
+      sourceVet?.name,
+      sourceVet?.doctor_name,
+      sourceVet?.raw?.doctor_name,
+      DEFAULT_PRIMARY_PAYMENT_VET.name
+    ) || DEFAULT_PRIMARY_PAYMENT_VET.name;
+
   return {
     ...DEFAULT_PRIMARY_PAYMENT_VET,
-    ...(isProvidedShashank ? sourceVet : {}),
     id: 116,
-     doctor_id: 116,
+    doctor_id: 116,
     clinic_id: 115,
     name: displayName,
     doctor_name: doctorName,
@@ -336,14 +307,15 @@ const resolvePrimaryPaymentVet = (inputVet) => {
     autoAssigned: true,
     assignedBy: "snoutiq",
     raw: {
-  ...(DEFAULT_PRIMARY_PAYMENT_VET.raw || {}),
-  ...(isProvidedShashank && sourceVet?.raw ? sourceVet.raw : {}),
-  id: 116,
-  doctor_id: 116,
-  clinic_id: 115,
-  vet_registeration_id: 115,
-  doctor_name: doctorName,
-},
+      ...(DEFAULT_PRIMARY_PAYMENT_VET.raw || {}),
+      id: 116,
+      doctor_id: 116,
+      clinic_id: 115,
+      vet_registeration_id: 115,
+      doctor_name: doctorName,
+      video_day_rate: "499.00",
+      video_night_rate: "499.00",
+    },
   };
 };
 

@@ -70,7 +70,7 @@ const DEFAULT_AUTO_ASSIGNED_VET = {
   rating: 5,
   reviews: 0,
   priceDay: 499,
-  priceNight: 599,
+  priceNight: 499,
   bookingRateType: "day",
   bookingPrice: 499,
   isSnoutiqAssigned: true,
@@ -82,7 +82,7 @@ const DEFAULT_AUTO_ASSIGNED_VET = {
     degree: "MVSc",
     years_of_experience: "10",
     video_day_rate: "499.00",
-    video_night_rate: "599.00",
+    video_night_rate: "499.00",
     specialization_select_all_that_apply:
       "Dogs, Cats, Exotic Pet, Surgery, Skin / Dermatology, General Practice, Endocrinology",
     response_time_for_online_consults_day: "15 To 20 Mins",
@@ -95,14 +95,11 @@ const DEFAULT_AUTO_ASSIGNED_VET = {
 };
 
 const getDefaultAssignedVet = () => {
-  const bookingRateType = isDayTime() ? "day" : "night";
   return {
     ...DEFAULT_AUTO_ASSIGNED_VET,
-    bookingRateType,
-    bookingPrice:
-      bookingRateType === "day"
-        ? DEFAULT_AUTO_ASSIGNED_VET.priceDay
-        : DEFAULT_AUTO_ASSIGNED_VET.priceNight,
+    bookingRateType: "day",
+    bookingPrice: DEFAULT_AUTO_ASSIGNED_VET.priceDay,
+    priceNight: DEFAULT_AUTO_ASSIGNED_VET.priceDay,
   };
 };
 
@@ -220,17 +217,11 @@ const pickBestMatchVetFromApi = async () => {
       const vets = [];
       payload.data.forEach((clinic) => {
         (clinic?.doctors || []).forEach((doc) => {
-          const priceDay = Number(doc?.video_day_rate);
-          const priceNight = Number(doc?.video_night_rate);
-          if (
-            !Number.isFinite(priceDay) ||
-            !Number.isFinite(priceNight) ||
-            priceDay <= 2 ||
-            priceNight <= 2
-          ) {
-            return;
-          }
-
+         const priceDay = Number(doc?.video_day_rate);
+if (!Number.isFinite(priceDay) || priceDay <= 2) {
+  return;
+}
+const priceNight = priceDay; // always same as day charge
           const sourceImage =
             doc?.doctor_image_blob_url ||
             doc?.doctor_image_url ||
@@ -282,15 +273,12 @@ const pickBestMatchVetFromApi = async () => {
             /goyal/i.test(String(vet?.name || ""))
         ) || vets[0];
 
-      const bookingRateType = isDayTime() ? "day" : "night";
-      const bookingPrice =
-        bookingRateType === "day" ? bestMatch.priceDay : bestMatch.priceNight;
-
       return {
-        ...bestMatch,
-        bookingRateType,
-        bookingPrice,
-      };
+  ...bestMatch,
+  priceNight: bestMatch.priceDay,
+  bookingRateType: "day",
+  bookingPrice: bestMatch.priceDay,
+};
     } catch {
       // Try next API URL.
     }

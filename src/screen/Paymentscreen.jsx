@@ -83,23 +83,22 @@ const stripEmpty = (payload) =>
     )
   );
 
+const STATIC_DOCTOR_NAME = "Dr. Shashannk Goyal";
+const STATIC_DOCTOR_ID = 116;
+const STATIC_CLINIC_ID = 115;
+const STATIC_SERVICE_ID = "consult_basic";
+const STATIC_RATE_TYPE = "day";
+const STATIC_SLOT_LABEL = "Day (8 AM - 10 PM)";
+const STATIC_CONSULTATION_AMOUNT = 499;
+const STATIC_SERVICE_AMOUNT = 0;
+const STATIC_DISCOUNT_AMOUNT = 100;
+const GST_RATE = 0.18;
+
 const getCurrentPricingIST = () => {
-  const parts = new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-
-  const hour = Number(parts.find((p) => p.type === "hour")?.value || 0);
-  const rateType = hour >= 8 && hour < 22 ? "day" : "night";
-  const consultationAmount = rateType === "night" ? 599 : 499;
-  const slotLabel =
-    rateType === "night" ? "Night (10 PM - 8 AM)" : "Day (8 AM - 10 PM)";
-
   return {
-    rateType,
-    consultationAmount,
-    slotLabel,
+    rateType: STATIC_RATE_TYPE,
+    consultationAmount: STATIC_CONSULTATION_AMOUNT,
+    slotLabel: STATIC_SLOT_LABEL,
   };
 };
 
@@ -110,54 +109,19 @@ export const PaymentScreen = ({
   onPay,
   onBack,
 }) => {
-  // ✅ slot decide: priority -> bookingRateType (from selection)
-  // fallback -> current time (if parent didn't pass)
   const livePricing = useMemo(() => getCurrentPricingIST(), []);
-  const rateType = livePricing.rateType;
 
-  // ✅ fee: priority -> bookingPrice (from selection), fallback -> rateType price
-  const fee = livePricing.consultationAmount;
+  const consultationAmount = STATIC_CONSULTATION_AMOUNT;
   const slotLabel = livePricing.slotLabel;
 
-  const consultationAmount = useMemo(() => {
-    return round2(Math.max(fee, 0));
-  }, [fee]);
-
-  // ✅ TESTING: remove service charge for now
-  const service = useMemo(() => {
-    const metaAmount = toNumber(
-      pickValue(paymentMeta?.service_charge_inr, paymentMeta?.serviceChargeInr, 0)
-    );
-    return round2(Math.max(metaAmount ?? 0, 0));
-  }, [paymentMeta]);
-  const gstRate = 0.18;
-  const taxableAmountBeforeDiscount = useMemo(() => {
-    const metaAmount = toNumber(
-      pickValue(
-        paymentMeta?.taxable_amount_before_discount_inr,
-        paymentMeta?.taxableAmountBeforeDiscountInr
-      )
-    );
-    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
-    return round2(Math.max(consultationAmount + service, 0));
-  }, [consultationAmount, paymentMeta, service]);
-  const gstAmountBeforeDiscount = useMemo(() => {
-    const metaAmount = toNumber(
-      pickValue(
-        paymentMeta?.gst_amount_before_discount_inr,
-        paymentMeta?.gstAmountBeforeDiscountInr
-      )
-    );
-    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
-    return round2(taxableAmountBeforeDiscount * gstRate);
-  }, [paymentMeta, taxableAmountBeforeDiscount]);
-  const totalBeforeDiscount = useMemo(() => {
-    const metaAmount = toNumber(
-      pickValue(paymentMeta?.original_amount_inr, paymentMeta?.originalAmountInr)
-    );
-    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
-    return round2(taxableAmountBeforeDiscount + gstAmountBeforeDiscount);
-  }, [gstAmountBeforeDiscount, paymentMeta, taxableAmountBeforeDiscount]);
+  // Static flat-pricing breakdown used for both UI and payment payloads.
+  const service = STATIC_SERVICE_AMOUNT;
+  const gstRate = GST_RATE;
+  const taxableAmountBeforeDiscount = round2(consultationAmount + service);
+  const gstAmountBeforeDiscount = round2(taxableAmountBeforeDiscount * gstRate);
+  const totalBeforeDiscount = round2(
+    taxableAmountBeforeDiscount + gstAmountBeforeDiscount
+  );
   const [isPaying, setIsPaying] = useState(false);
   const [gatewayReady, setGatewayReady] = useState(false);
   const [statusType, setStatusType] = useState("");
@@ -195,45 +159,18 @@ export const PaymentScreen = ({
     };
   }, []);
 
-  const paymentMetaDiscountAmount = toNumber(
-    pickValue(paymentMeta?.offer_discount_inr, paymentMeta?.offerDiscountInr)
+  const discountAmount = round2(
+    Math.min(STATIC_DISCOUNT_AMOUNT, taxableAmountBeforeDiscount)
   );
-  const discountAmount = useMemo(() => {
-    if (paymentMetaDiscountAmount !== undefined) {
-      return round2(Math.max(paymentMetaDiscountAmount, 0));
-    }
-    return round2(Math.min(100, taxableAmountBeforeDiscount));
-  }, [paymentMetaDiscountAmount, taxableAmountBeforeDiscount]);
   const isOfferApplied = discountAmount > 0;
 
-  const taxableAmount = useMemo(() => {
-    const metaAmount = toNumber(
-      pickValue(paymentMeta?.taxable_amount_inr, paymentMeta?.taxableAmountInr)
-    );
-    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
-    return round2(Math.max(taxableAmountBeforeDiscount - discountAmount, 0));
-  }, [discountAmount, paymentMeta, taxableAmountBeforeDiscount]);
-
-  const gstAmount = useMemo(() => {
-    const metaAmount = toNumber(
-      pickValue(paymentMeta?.gst_amount_inr, paymentMeta?.gstAmountInr)
-    );
-    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
-    return round2(taxableAmount * gstRate);
-  }, [paymentMeta, taxableAmount]);
-
-  const total = useMemo(() => {
-    const metaAmount = toNumber(
-      pickValue(paymentMeta?.final_amount_inr, paymentMeta?.finalAmountInr)
-    );
-    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
-    return round2(taxableAmount + gstAmount);
-  }, [gstAmount, paymentMeta, taxableAmount]);
-  const createOrderAmountInr = useMemo(() => toInt(total), [total]);
-  const createOrderAmountPaise = useMemo(
-    () => createOrderAmountInr * 100,
-    [createOrderAmountInr]
+  const taxableAmount = round2(
+    Math.max(taxableAmountBeforeDiscount - discountAmount, 0)
   );
+  const gstAmount = round2(taxableAmount * gstRate);
+  const total = round2(taxableAmount + gstAmount);
+  const createOrderAmountInr = toInt(total);
+  const createOrderAmountPaise = createOrderAmountInr * 100;
 
   const paymentContext = useMemo(() => {
     const orderType =
@@ -244,33 +181,12 @@ export const PaymentScreen = ({
         petDetails?.orderType
       ) || "excell_export_campaign";
 
-    const serviceId =
-      pickValue(
-        paymentMeta?.service_id,
-        paymentMeta?.serviceId,
-        vet?.service_id,
-        vet?.raw?.service_id,
-        petDetails?.service_id,
-        petDetails?.serviceId
-      ) || "consult_basic";
-
-    const vetSlug = pickValue(
-      paymentMeta?.vet_slug,
-      paymentMeta?.vetSlug,
-      vet?.slug,
-      vet?.raw?.slug,
-      vet?.raw?.vet_slug
-    );
-
     const callSessionId = pickValue(
       paymentMeta?.call_session_id,
       paymentMeta?.callSessionId,
       petDetails?.call_session_id,
       petDetails?.callSessionId
     );
-
-const clinicId = 115;
-const doctorId = 116;
 
     const userId = toNumber(
       pickValue(
@@ -331,19 +247,15 @@ const doctorId = 116;
       typeof gstNumberValue === "string" ? gstNumberValue.trim() : gstNumberValue;
     const hasGstNumber = Boolean(gstNumberCleaned);
 
-    // ✅ optional: pass rateType to backend if you want (only if backend supports)
-    // booking_rate_type: rateType,
-
     return stripEmpty({
       order_type: orderType,
-      clinic_id: clinicId,
-      service_id: serviceId,
-      vet_slug: vetSlug,
-      booking_rate_type: rateType,
-      slot_label: slotLabel,
+      clinic_id: STATIC_CLINIC_ID,
+      service_id: STATIC_SERVICE_ID,
+      booking_rate_type: STATIC_RATE_TYPE,
+      slot_label: STATIC_SLOT_LABEL,
       call_session_id: callSessionId,
       pet_id: petId,
-      doctor_id: doctorId,
+      doctor_id: STATIC_DOCTOR_ID,
       user_id: userId,
       gst_number: hasGstNumber ? gstNumberCleaned : undefined,
       gst_number_given: hasGstNumber ? 1 : undefined,
@@ -363,9 +275,6 @@ const doctorId = 116;
   }, [
     paymentMeta,
     petDetails,
-    vet,
-    rateType,
-    slotLabel,
     gstNumber,
     service,
     consultationAmount,
@@ -406,17 +315,16 @@ const doctorId = 116;
       return;
     }
 
-    const latestPricing = getCurrentPricingIST();
+    const latestPricing = {
+      rateType: STATIC_RATE_TYPE,
+      slotLabel: STATIC_SLOT_LABEL,
+    };
 
-    const latestConsultationAmount = round2(
-      Math.max(latestPricing.consultationAmount, 0)
-    );
-    const latestService = 0;
-    const latestTaxableAmountBeforeDiscount = round2(
-      Math.max(latestConsultationAmount + latestService, 0)
-    );
+    const latestConsultationAmount = STATIC_CONSULTATION_AMOUNT;
+    const latestService = STATIC_SERVICE_AMOUNT;
+    const latestTaxableAmountBeforeDiscount = round2(latestConsultationAmount + latestService);
     const latestDiscountAmount = round2(
-      Math.min(100, latestTaxableAmountBeforeDiscount)
+      Math.min(STATIC_DISCOUNT_AMOUNT, latestTaxableAmountBeforeDiscount)
     );
     const latestTaxableAmount = round2(
       Math.max(latestTaxableAmountBeforeDiscount - latestDiscountAmount, 0)
@@ -477,7 +385,7 @@ const doctorId = 116;
         key,
         order_id: orderId,
         name: "Snoutiq Veterinary Consultation",
-        description: `Video consultation with Dr. Shashannk Goyal (${latestPricing.rateType.toUpperCase()} slot)`,
+        description: "Video consultation with Dr. Shashannk Goyal",
         handler: async (response) => {
           updateStatus("info", "Verifying payment...");
           try {
@@ -520,19 +428,19 @@ const doctorId = 116;
       setIsPaying(false);
     }
   };
-const effectiveVet = useMemo(
-  () => ({
-    name: "Dr. Shashannk Goyal",
-    image: vet?.image || "",
-  }),
-  [vet?.image]
-);
+  const effectiveVet = useMemo(
+    () => ({
+      name: STATIC_DOCTOR_NAME,
+      image: "",
+    }),
+    []
+  );
 
-const doctorDisplayName = effectiveVet.name.replace(/^Dr\.?\s*/i, "");
-const imageSrc = useMemo(
-  () => optimizeAvatarUrl(effectiveVet.image),
-  [effectiveVet.image]
-);
+  const doctorDisplayName = effectiveVet.name.replace(/^Dr\.?\s*/i, "");
+  const imageSrc = useMemo(
+    () => optimizeAvatarUrl(effectiveVet.image),
+    [effectiveVet.image]
+  );
 
 
   return (
@@ -649,7 +557,7 @@ const imageSrc = useMemo(
                   </div>
                 </div>
 
-           
+              </div>
 
               <div className="space-y-6 md:sticky md:top-24">
                   <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -670,11 +578,7 @@ const imageSrc = useMemo(
 
                     <div className="mt-4 space-y-3 text-sm text-gray-600">
                       <div className="flex justify-between">
-                        <span>
-                          {rateType === "night"
-                            ? "Night Consultation Charge"
-                            : "Day Consultation Charge"}
-                        </span>
+                        <span>Consultation Charge</span>
                         <span>Rs {formatInr(consultationAmount)}</span>
                       </div>
 
@@ -778,7 +682,6 @@ const imageSrc = useMemo(
                     </div>
                   </div>
                 </label>
-              </div>
 
                   <div className="hidden md:block space-y-3">
                     <Button

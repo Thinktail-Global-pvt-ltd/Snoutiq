@@ -125,16 +125,17 @@ const PRIMARY_FIXED_VET = {
 const cn = (...v) => v.filter(Boolean).join(" ");
 
 function getCurrentPrice() {
-  const h = new Date().getHours();
-  const isDay = h >= 8 && h < 22;
-  return isDay
-    ? { price: "₹499", label: "Day rate · 8AM–10PM", rateType: "day" }
-    : { price: "₹599", label: "Night rate · 10PM–8AM", rateType: "night" };
+  return {
+    amount: PAYMENT_AMOUNTS.standard,
+    discountedAmount: PAYMENT_AMOUNTS.discounted,
+    label: "Online consultation · Available 24/7",
+    rateType: "flat",
+  };
 }
 
 const PAYMENT_AMOUNTS = {
-  day: 499,
-  night: 599,
+  standard: 499,
+  discounted: 399,
 };
 
 const formatInr = (value) => {
@@ -348,7 +349,7 @@ function GetStartedCtaLabel({ amount }) {
   );
 }
 
-function DynamicPriceStrip({ currentPrice, originalPrice, rateType }) {
+function DynamicPriceStrip({ currentPrice, originalPrice }) {
   return (
     <div className="overflow-hidden rounded-[18px] border border-[#f06a2f] bg-[#ece1db] shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
       <div className="flex items-start gap-3 px-4 py-3 sm:items-center sm:px-5">
@@ -371,15 +372,8 @@ function DynamicPriceStrip({ currentPrice, originalPrice, rateType }) {
                 ₹{formatInr(originalPrice)}
               </span>
 
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em]",
-                  rateType === "night"
-                    ? "bg-slate-900 text-white"
-                    : "bg-orange-100 text-orange-700"
-                )}
-              >
-                {rateType === "night" ? "Night" : "Day"}
+              <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-orange-700">
+                Flat pricing
               </span>
             </div>
           </div>
@@ -428,11 +422,10 @@ function ConsultCtaLabel({ amount, prefixText = "Consult Now" }) {
 // --- Main --------------------------------------------------------------------
 export default function VideoConsultLP() {
   const navigate = useNavigate();
-  const { rateType } = getCurrentPrice();
-  const consultAmount = PAYMENT_AMOUNTS[rateType] || PAYMENT_AMOUNTS.day;
-  const discountedConsultAmount = Math.max(consultAmount - 100, 0);
-  const slotLabel =
-    rateType === "day" ? "Day (8 AM - 10 PM)" : "Night (10 PM - 8 AM)";
+  const {
+    amount: consultAmount,
+    discountedAmount: discountedConsultAmount,
+  } = getCurrentPrice();
 
   // ── SIMPLIFIED: single step form, no issue pre-select step ──────────────
   const [selectedIssue, setSelectedIssue] = useState(null);
@@ -530,7 +523,8 @@ export default function VideoConsultLP() {
       priceCurrency: "INR",
       price: "399",
       availability: "https://schema.org/InStock",
-      description: "Day ₹399 (8AM–10PM), Night ₹499 (10PM–8AM)",
+      description:
+        "Standard online consultation fee ₹499. Current payable price ₹399 after ₹100 off. Same pricing applies throughout the day.",
     },
     aggregateRating: {
       "@type": "AggregateRating",
@@ -616,10 +610,14 @@ export default function VideoConsultLP() {
     description: "Talk to a licensed veterinarian online in India via WhatsApp video call within 15 minutes.",
     url: CANONICAL,
     brand: { "@type": "Brand", name: "SnoutiQ" },
-    offers: [
-      { "@type": "Offer", name: "Day Consultation", priceCurrency: "INR", price: "399", availability: "https://schema.org/InStock", url: CANONICAL },
-      { "@type": "Offer", name: "Night Consultation", priceCurrency: "INR", price: "499", availability: "https://schema.org/InStock", url: CANONICAL },
-    ],
+    offers: {
+      "@type": "Offer",
+      name: "Online Vet Consultation",
+      priceCurrency: "INR",
+      price: "399",
+      availability: "https://schema.org/InStock",
+      url: CANONICAL,
+    },
     aggregateRating: {
       "@type": "AggregateRating",
       ratingValue: "4.8",
@@ -963,15 +961,12 @@ const consultFormRef = useRef(null);
             </h1>
             <p className="text-slate-500 text-center text-base mb-7 max-w-3xl mx-auto leading-relaxed">
                Talk to a licensed vet online via video call. Get proper advice and a full care plan for your pet — from anywhere in India, without leaving home.
-                {/* {slotLabel.toLowerCase()} is
-               {" "}₹{formatInr(discountedConsultAmount)} after the ₹100 offer. */}
             </p>
             <section className="bg-white px-4 pb-4 sm:px-6 lg:px-8">
   <div className="mx-auto max-w-6xl">
     <DynamicPriceStrip
       currentPrice={discountedConsultAmount}
       originalPrice={consultAmount}
-      rateType={rateType}
     />
   </div>
 </section>
@@ -1114,7 +1109,7 @@ const consultFormRef = useRef(null);
                 },
                 {
                   n: "02",
-                  title: "Pay securely (₹399 / ₹499)",
+                  title: "Pay securely (₹399)",
                   desc: "UPI, card or netbanking. No hidden charges.",
                   extra: "No subscription. No recurring fee.",
                 },
@@ -1315,7 +1310,7 @@ const consultFormRef = useRef(null);
                 },
                 {
                   q: "How much does it cost?",
-                  a: "Day consultation starts at ₹399, and night emergency (10pm–8am) is ₹499. No hidden fees.",
+                  a: "Online consultation is ₹399 after ₹100 off on the standard ₹499 consultation fee. Same pricing applies throughout the day. No hidden fees.",
                 },
                 {
                   q: "How quickly will the vet connect?",
@@ -1423,7 +1418,7 @@ export const VideoConsultPaymentPage = () => {
           <p className="mt-2 text-sm text-slate-600">Please start the consultation form again so we can generate your payment.</p>
           <button
             type="button"
-            onClick={() => navigate(`${VIDEO_CONSULT_BASE_ROUTE}/owner`, { replace: true })}
+            onClick={() => navigate(VIDEO_CONSULT_BASE_ROUTE, { replace: true })}
             className="mt-5 w-full rounded-2xl bg-accent hover:bg-accent-hover text-white font-extrabold py-3 text-sm shadow-md shadow-orange-200/60 transition-all"
           >
             Start Consultation
@@ -1438,7 +1433,7 @@ export const VideoConsultPaymentPage = () => {
       vet={vet}
       petDetails={petDetails}
       paymentMeta={paymentMeta}
-      onBack={() => navigate(`${VIDEO_CONSULT_BASE_ROUTE}/problem`)}
+      onBack={() => navigate(VIDEO_CONSULT_BASE_ROUTE)}
       onPay={(verify) => {
         fireConversion();
         navigate("/consultation-booked", {
@@ -1464,7 +1459,7 @@ export const VideoConsultThankYou = () => {
           <div className="mt-5 flex flex-col gap-3">
             <button
               type="button"
-              onClick={() => navigate(`${VIDEO_CONSULT_BASE_ROUTE}/owner`, { replace: true })}
+              onClick={() => navigate(VIDEO_CONSULT_BASE_ROUTE, { replace: true })}
               className="w-full rounded-2xl bg-accent hover:bg-accent-hover text-white font-extrabold py-3 text-sm shadow-md shadow-orange-200/60 transition-all"
             >
               Start Consultation
