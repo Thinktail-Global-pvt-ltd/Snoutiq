@@ -521,6 +521,57 @@ class AdminPanelController extends Controller
             ->groupBy('transaction_id');
     }
 
+    private function formatNonNullAttributesForCsv($model, array $exclude = []): array
+    {
+        if (!$model) {
+            return [];
+        }
+
+        $excluded = array_flip($exclude);
+        $result = [];
+
+        foreach ($model->getAttributes() as $key => $value) {
+            if (isset($excluded[$key])) {
+                continue;
+            }
+            if ($value === null) {
+                continue;
+            }
+            if (is_string($value) && trim($value) === '') {
+                continue;
+            }
+            if (is_array($value) && empty($value)) {
+                continue;
+            }
+
+            if (is_bool($value)) {
+                $result[$key] = $value ? 'Yes' : 'No';
+                continue;
+            }
+
+            if (is_array($value) || is_object($value)) {
+                $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $result[$key] = $json !== false ? $json : (string) $value;
+                continue;
+            }
+
+            $result[$key] = (string) $value;
+        }
+
+        return $result;
+    }
+
+    private function jsonEncodeForCsv(array $payload): ?string
+    {
+        if (empty($payload)) {
+            return null;
+        }
+
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return $json !== false ? $json : null;
+    }
+
     private function streamExcellExportTransactionsCsv(Collection $transactions)
     {
         $fileName = 'excel-export-transactions-' . now()->format('Ymd-His') . '.csv';
@@ -543,12 +594,15 @@ class AdminPanelController extends Controller
             'User Name',
             'User Email',
             'User Phone',
+            'User City',
             'Pet ID',
             'Pet Name',
             'Pet Type',
             'Pet Breed',
             'Pet DOB',
             'Reported Symptom',
+            'View Details User Fields (JSON)',
+            'View Details Pet Fields (JSON)',
         ];
 
         return response()->streamDownload(function () use ($transactions, $headers) {
@@ -563,6 +617,17 @@ class AdminPanelController extends Controller
                     $issue = trim((string) ($petRecord->reported_symptom ?? ''));
                 }
                 $petDob = $this->formatExcellExportPetDob($petRecord->pet_dob ?? $petRecord->dob ?? null);
+                $userDetails = $this->formatNonNullAttributesForCsv($transaction->user, [
+                    'password',
+                    'remember_token',
+                    'api_token_hash',
+                    'google_token',
+                    'pet_doc2_blob',
+                    'pet_doc2_mime',
+                ]);
+                $petDetails = $this->formatNonNullAttributesForCsv($petRecord, [
+                    'pet_doc2_blob',
+                ]);
 
                 fputcsv($output, [
                     $transaction->id,
@@ -583,12 +648,15 @@ class AdminPanelController extends Controller
                     $transaction->user->name ?? null,
                     $transaction->user->email ?? null,
                     $transaction->user->phone ?? null,
+                    $transaction->user->city ?? null,
                     $petRecord->id ?? $transaction->pet_id,
                     $petRecord->name ?? null,
                     $petRecord->pet_type ?? $petRecord->type ?? $petRecord->breed ?? null,
                     $petRecord->breed ?? null,
                     $petDob,
                     $issue !== '' ? $issue : null,
+                    $this->jsonEncodeForCsv($userDetails),
+                    $this->jsonEncodeForCsv($petDetails),
                 ]);
             }
 
