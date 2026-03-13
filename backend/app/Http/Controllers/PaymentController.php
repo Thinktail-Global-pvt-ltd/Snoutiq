@@ -26,6 +26,9 @@ use Dompdf\Options;
 
 class PaymentController extends Controller
 {
+    private const FREE_VIDEO_CONSULT_COUPON_CODE = 'FIRST_VIDEO_FREE';
+    private const USER_FREE_VIDEO_CONSULT_FLAG_COLUMN = 'has_used_free_video_consult_coupon';
+
     // Prefer env/config keys; fallback to test keys in dev
     private string $key;
     private string $secret;
@@ -62,17 +65,31 @@ class PaymentController extends Controller
             'call_session' => 'nullable|string',
             'channel_name' => 'nullable|string',
             'pet_id' => 'nullable|integer',
+            'coupon_code' => 'nullable|string|max:100',
+            'couponCode' => 'nullable|string|max:100',
+            'coupon' => 'nullable|string|max:100',
         ]);
 
         $amountInInr = (int) ($request->input('amount', 500));
         $notes = $this->mergeClientNotes($request, [
             'via' => 'snoutiq',
         ]);
+        $transactionType = $this->resolveTransactionType($notes);
+        $notes['order_type'] = $transactionType;
         $context = $this->resolveTransactionContext($request, $notes);
         $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
         $callSession = null;
+        $requestedCouponCode = $this->resolveCouponCode($notes);
 
-        if (($notes['order_type'] ?? null) === 'video_consult') {
+        if ($requestedCouponCode !== null && $requestedCouponCode !== self::FREE_VIDEO_CONSULT_COUPON_CODE) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid coupon code',
+                'details' => 'Only FIRST_VIDEO_FREE coupon is supported on this API.',
+            ], 422);
+        }
+
+        if ($this->isVideoConsultTransactionType($transactionType)) {
             $callSession = $this->createCallSessionIfMissing($context);
             if ($callSession) {
                 $notes['call_session_id'] = $callSession->resolveIdentifier();
@@ -80,6 +97,17 @@ class PaymentController extends Controller
                 $context['call_identifier'] = $callSession->resolveIdentifier();
                 $context['channel_name'] = $callSession->channel_name;
             }
+        }
+
+        $freeCouponResponse = $this->applyFirstVideoConsultCouponIfEligible(
+            request: $request,
+            notes: $notes,
+            context: $context,
+            callSession: $callSession,
+            requestedAmountInInr: $amountInInr
+        );
+        if ($freeCouponResponse !== null) {
+            return response()->json($freeCouponResponse);
         }
 
         try {
@@ -150,6 +178,268 @@ class PaymentController extends Controller
                 'error'   => $e->getMessage(),
             ], 500);
         }
+    }
+
+    protected function applyFirstVideoConsultCouponIfEligible(
+        Request $request,
+        array $notes,
+        array $context,
+        ?CallSession $callSession,
+        int $requestedAmountInInr
+    ): ?array {
+        $transactionType = $this->resolveTransactionType($notes);
+        if (! $this->isVideoConsultTransactionType($transactionType)) {
+            return null;
+        }
+        $requestedCouponCode = $this->resolveCouponCode($notes);
+        if ($requestedCouponCode !== self::FREE_VIDEO_CONSULT_COUPON_CODE) {
+            return null;
+        }
+
+        $userId = $context['user_id'] ?? null;
+        if (! $userId) {
+            return null;
+        }
+
+        if (!Schema::hasTable('users') || !Schema::hasColumn('users', self::USER_FREE_VIDEO_CONSULT_FLAG_COLUMN)) {
+            return null;
+        }
+
+        $result = DB::transaction(function () use (
+            $request,
+            $notes,
+            $context,
+            $callSession,
+            $requestedAmountInInr,
+            $transactionType,
+            $userId
+        ) {
+            $userRow = DB::table('users')
+                ->where('id', $userId)
+                ->lockForUpdate()
+                ->first(['id', self::USER_FREE_VIDEO_CONSULT_FLAG_COLUMN]);
+
+            if (! $userRow) {
+                return ['applied' => false];
+            }
+
+            if ((int) ($userRow->{self::USER_FREE_VIDEO_CONSULT_FLAG_COLUMN} ?? 0) === 1) {
+                return ['applied' => false];
+            }
+
+            if ($this->userAlreadyHasVideoConsultTransactions($userId)) {
+                DB::table('users')
+                    ->where('id', $userId)
+                    ->update([
+                        self::USER_FREE_VIDEO_CONSULT_FLAG_COLUMN => 1,
+                        'updated_at' => now(),
+                    ]);
+
+                return ['applied' => false];
+            }
+
+            $couponReference = 'coupon_free_' . Str::lower(Str::random(20));
+            $originalAmountPaise = max(0, $requestedAmountInInr * 100);
+
+            $context['clinic_id'] = $this->resolveClinicId($request, $notes, $context);
+            $doctorId = $context['doctor_id'] ?? null;
+            $clinicId = $context['clinic_id'] ?? null;
+            $petId = $context['pet_id'] ?? null;
+            $channelName = $context['channel_name'] ?? ($notes['channel_name'] ?? null);
+            $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
+            $payoutColumns = $this->transactionPayoutColumnMap();
+
+            $couponNotes = array_merge($notes, [
+                'coupon_code' => self::FREE_VIDEO_CONSULT_COUPON_CODE,
+                'coupon_applied' => '1',
+                'coupon_discount_paise' => (string) $originalAmountPaise,
+                'coupon_original_amount_paise' => (string) $originalAmountPaise,
+                'coupon_final_amount_paise' => '0',
+            ]);
+
+            $transactionPayload = [
+                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
+                'user_id' => $userId,
+                'pet_id' => $petId,
+                'amount_paise' => 0,
+                'status' => 'captured',
+                'type' => $transactionType,
+                'payment_method' => 'coupon_free',
+                'reference' => $couponReference,
+                'metadata' => [
+                    'order_type' => $transactionType,
+                    'order_id' => $couponReference,
+                    'currency' => 'INR',
+                    'notes' => $couponNotes,
+                    'call_id' => $context['call_identifier'] ?? null,
+                    'channel_name' => $channelName,
+                    'doctor_id' => $doctorId,
+                    'clinic_id' => $clinicId,
+                    'user_id' => $userId,
+                    'pet_id' => $petId,
+                    'is_coupon_payment' => true,
+                    'coupon' => [
+                        'applied' => true,
+                        'code' => self::FREE_VIDEO_CONSULT_COUPON_CODE,
+                        'scope' => 'first_video_consultation',
+                        'original_amount_paise' => $originalAmountPaise,
+                        'discount_paise' => $originalAmountPaise,
+                        'final_amount_paise' => 0,
+                    ],
+                ],
+            ];
+
+            if ($hasChannelNameColumn) {
+                $transactionPayload['channel_name'] = $channelName;
+            }
+
+            foreach ([
+                'actual_amount_paid_by_consumer_paise',
+                'payment_to_snoutiq_paise',
+                'payment_to_doctor_paise',
+            ] as $column) {
+                if ($payoutColumns[$column] ?? false) {
+                    $transactionPayload[$column] = 0;
+                }
+            }
+
+            $transaction = Transaction::create($transactionPayload);
+
+            DB::table('users')
+                ->where('id', $userId)
+                ->update([
+                    self::USER_FREE_VIDEO_CONSULT_FLAG_COLUMN => 1,
+                    'updated_at' => now(),
+                ]);
+
+            if ($callSession) {
+                try {
+                    $callSession->payment_status = 'paid';
+                    $callSession->save();
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+
+            $couponOrder = [
+                'id' => $couponReference,
+                'amount' => 0,
+                'currency' => 'INR',
+                'notes' => $couponNotes,
+            ];
+
+            $videoApointment = $this->recordVideoApointmentOrder(
+                request: $request,
+                order: $couponOrder,
+                context: $context,
+                callSession: $callSession,
+                notes: $couponNotes
+            );
+
+            return [
+                'applied' => true,
+                'coupon_order' => $couponOrder,
+                'coupon_notes' => $couponNotes,
+                'transaction' => $transaction,
+                'video_appointment' => $videoApointment,
+                'context' => $context,
+                'call_session' => $callSession,
+            ];
+        });
+
+        if (! ($result['applied'] ?? false)) {
+            return null;
+        }
+
+        /** @var \App\Models\Transaction $transaction */
+        $transaction = $result['transaction'];
+        $couponOrder = $result['coupon_order'];
+        $couponNotes = $result['coupon_notes'];
+        $couponContext = $result['context'];
+        $videoApointment = $result['video_appointment'] ?? null;
+        $couponCallSession = $result['call_session'] ?? null;
+
+        $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
+            doctorId: $couponContext['doctor_id'] ?? null,
+            notes: $couponNotes,
+            amountInInr: 0
+        );
+
+        return [
+            'success' => true,
+            'payment_required' => false,
+            'coupon_applied' => true,
+            'coupon' => [
+                'code' => self::FREE_VIDEO_CONSULT_COUPON_CODE,
+                'original_amount_inr' => $requestedAmountInInr,
+                'discount_inr' => $requestedAmountInInr,
+                'final_amount_inr' => 0,
+            ],
+            'key' => null,
+            'order' => $couponOrder,
+            'order_id' => $couponOrder['id'],
+            'doctor_push' => $doctorOrderPushMeta,
+            'whatsapp' => null,
+            'vet_whatsapp' => null,
+            'prescription_doc' => null,
+            'transaction' => [
+                'id' => $transaction->id,
+                'reference' => $transaction->reference,
+                'status' => $transaction->status,
+                'type' => $transaction->type,
+                'payment_method' => $transaction->payment_method,
+            ],
+            'video_appointment' => $videoApointment ? [
+                'id' => $videoApointment->id,
+            ] : null,
+            'call_session' => $couponCallSession ? [
+                'id' => $couponCallSession->id,
+                'call_identifier' => $couponCallSession->resolveIdentifier(),
+                'channel_name' => $couponCallSession->channel_name,
+                'doctor_id' => $couponCallSession->doctor_id,
+                'patient_id' => $couponCallSession->patient_id,
+                'status' => $couponCallSession->status,
+                'payment_status' => $couponCallSession->payment_status,
+            ] : null,
+        ];
+    }
+
+    protected function userAlreadyHasVideoConsultTransactions(int $userId): bool
+    {
+        if (!Schema::hasTable('transactions')) {
+            return false;
+        }
+
+        $typeCandidates = $this->firstVideoConsultTransactionTypeCandidates();
+
+        try {
+            return Transaction::query()
+                ->where('user_id', $userId)
+                ->where(function ($q) use ($typeCandidates) {
+                    $q->whereIn('type', $typeCandidates)
+                        ->orWhereIn('metadata->order_type', $typeCandidates);
+                })
+                ->exists();
+        } catch (\Throwable $e) {
+            report($e);
+            return false;
+        }
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    protected function firstVideoConsultTransactionTypeCandidates(): array
+    {
+        return [
+            'video_consult',
+            'video_consultation',
+            'video_call',
+            'video call',
+            'appointment',
+            'excell_export_campaign',
+        ];
     }
 
     protected function notifyDoctorOrderCreated(?int $doctorId, array $notes, int $amountInInr): array
@@ -257,9 +547,21 @@ class PaymentController extends Controller
     {
         $data = $request->validate([
             'razorpay_order_id'   => 'required|string',
-            'razorpay_payment_id' => 'required|string',
-            'razorpay_signature'  => 'required|string',
+            'razorpay_payment_id' => 'nullable|string',
+            'razorpay_signature'  => 'nullable|string',
         ]);
+
+        $couponBypassPayload = $this->buildCouponVerifyBypassPayload($request, $data['razorpay_order_id']);
+        if ($couponBypassPayload !== null) {
+            return response()->json($couponBypassPayload);
+        }
+
+        if (empty($data['razorpay_payment_id']) || empty($data['razorpay_signature'])) {
+            return response()->json([
+                'success' => false,
+                'error' => 'razorpay_payment_id and razorpay_signature are required for non-coupon verification',
+            ], 422);
+        }
 
         try {
             $api = new Api($this->key, $this->secret);
@@ -357,13 +659,15 @@ class PaymentController extends Controller
             $vetPushMeta = null;
             try {
                 // Derive order type from notes or stored payment/transaction data
-                $orderType = $notes['order_type']
+                $orderType = $this->normalizeOrderType(
+                    $notes['order_type']
                     ?? ($record->notes['order_type'] ?? null)
                     ?? ($record->raw_response['notes']['order_type'] ?? null)
                     ?? ($record->raw_response['notes']['orderType'] ?? null)
-                    ?? ($record->raw_response['notes']['type'] ?? null);
+                    ?? ($record->raw_response['notes']['type'] ?? null)
+                );
 
-                if ($orderType === 'video_consult' && $this->isSuccessfulPaymentStatus($status)) {
+                if ($this->isVideoConsultTransactionType($orderType) && $this->isSuccessfulPaymentStatus($status)) {
                     // On successful payment, send all video-consult WhatsApp messages.
                     $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                         context: $context,
@@ -431,6 +735,107 @@ class PaymentController extends Controller
                 'error'   => $e->getMessage(),
             ], 500);
         }
+    }
+
+    protected function buildCouponVerifyBypassPayload(Request $request, string $orderId): ?array
+    {
+        $orderId = trim($orderId);
+        if ($orderId === '' || !Schema::hasTable('transactions')) {
+            return null;
+        }
+
+        $transaction = Transaction::query()
+            ->where('reference', $orderId)
+            ->latest('id')
+            ->first();
+
+        if (! $transaction) {
+            return null;
+        }
+
+        $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
+        $metadataNotes = data_get($metadata, 'notes', []);
+        if (!is_array($metadataNotes)) {
+            $metadataNotes = [];
+        }
+
+        $couponCode = $this->resolveCouponCode([
+            'coupon_code' => data_get($metadata, 'coupon.code')
+                ?? data_get($metadata, 'coupon_code')
+                ?? ($metadataNotes['coupon_code'] ?? null),
+        ]);
+
+        $couponApplied = (bool) data_get($metadata, 'coupon.applied', false)
+            || (bool) data_get($metadata, 'is_coupon_payment', false)
+            || ($this->toBoolInt($metadataNotes['coupon_applied'] ?? 0) === 1);
+        $isCouponPaymentMethod = strtolower(trim((string) ($transaction->payment_method ?? ''))) === 'coupon_free';
+
+        if (! $couponApplied && ! $isCouponPaymentMethod) {
+            return null;
+        }
+        if ($couponCode !== null && $couponCode !== self::FREE_VIDEO_CONSULT_COUPON_CODE) {
+            return null;
+        }
+
+        $updatedMetadata = $metadata;
+        $updatedMetadata['coupon_verify_bypassed_at'] = now()->toIso8601String();
+        $updatedMetadata['coupon_verify_bypassed_via'] = '/api/rzp/verify';
+        if (!isset($updatedMetadata['is_coupon_payment'])) {
+            $updatedMetadata['is_coupon_payment'] = true;
+        }
+        $transaction->metadata = $updatedMetadata;
+
+        if (!$this->isSuccessfulPaymentStatus((string) ($transaction->status ?? ''))) {
+            $transaction->status = 'captured';
+        }
+
+        try {
+            $transaction->save();
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $context = $this->resolveTransactionContext($request, $metadataNotes);
+        $context = $this->enrichVerificationContext($context, $metadataNotes, $orderId, null);
+        $callIdentifier = $context['call_identifier'] ?? $context['channel_name'] ?? null;
+        if ($callIdentifier) {
+            try {
+                $callSession = $this->findCallSession($callIdentifier);
+                if ($callSession && strtolower((string) ($callSession->payment_status ?? '')) !== 'paid') {
+                    $callSession->payment_status = 'paid';
+                    $callSession->save();
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return [
+            'success' => true,
+            'verified' => true,
+            'stored' => true,
+            'verify_bypassed' => true,
+            'coupon_applied' => true,
+            'coupon' => [
+                'code' => self::FREE_VIDEO_CONSULT_COUPON_CODE,
+            ],
+            'payment' => [
+                'id' => null,
+                'rzp_pid' => null,
+                'status' => $transaction->status,
+                'amount' => (int) ($transaction->amount_paise ?? 0),
+                'currency' => 'INR',
+                'db_id' => $transaction->id,
+            ],
+            'transaction' => [
+                'id' => $transaction->id,
+                'reference' => $transaction->reference,
+                'payment_method' => $transaction->payment_method,
+                'type' => $transaction->type,
+                'status' => $transaction->status,
+            ],
+            'message' => 'Coupon order detected. Razorpay verify bypassed.',
+        ];
     }
 
     protected function recordPendingTransaction(Request $request, array $order, array $notes, array $context): void
@@ -731,6 +1136,7 @@ class PaymentController extends Controller
         $mapping = [
             'vet_slug' => ['vet_slug'],
             'order_type' => ['order_type', 'orderType', 'type', 'payment_type'],
+            'coupon_code' => ['coupon_code', 'couponCode', 'coupon'],
             'service_id' => ['service_id'],
             'call_session_id' => ['call_session', 'call_session_id', 'callSessionId', 'call_id', 'callId'],
             'channel_name' => ['channel_name', 'channelName'],
@@ -1669,10 +2075,7 @@ class PaymentController extends Controller
 
     protected function resolveTransactionType(array $notes = []): string
     {
-        $candidate = $notes['order_type'] ?? null;
-        if (is_string($candidate)) {
-            $candidate = trim($candidate);
-        }
+        $candidate = $this->normalizeOrderType($notes['order_type'] ?? null);
 
         if ($candidate !== null && $candidate !== '') {
             return $candidate;
@@ -1683,6 +2086,56 @@ class PaymentController extends Controller
         }
 
         return 'payment';
+    }
+
+    protected function resolveCouponCode(array $notes = []): ?string
+    {
+        return $this->normalizeCouponCode(
+            $notes['coupon_code']
+            ?? $notes['couponCode']
+            ?? $notes['coupon']
+            ?? null
+        );
+    }
+
+    protected function normalizeCouponCode(?string $couponCode): ?string
+    {
+        if (!is_string($couponCode)) {
+            return null;
+        }
+
+        $trimmed = trim($couponCode);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        return strtoupper(str_replace([' ', '-'], '_', $trimmed));
+    }
+
+    protected function normalizeOrderType(?string $orderType): ?string
+    {
+        if (!is_string($orderType)) {
+            return null;
+        }
+
+        $trimmed = trim($orderType);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        $normalized = strtolower(str_replace(['-', ' '], '_', $trimmed));
+
+        return match ($normalized) {
+            'video_consultation', 'video_consult', 'video_call', 'appointment' => 'video_consult',
+            'excel_export_campaign' => 'excell_export_campaign',
+            default => $normalized,
+        };
+    }
+
+    protected function isVideoConsultTransactionType(?string $transactionType): bool
+    {
+        $normalized = $this->normalizeOrderType($transactionType);
+        return $normalized === 'video_consult';
     }
 
     /**

@@ -16,12 +16,15 @@ class User extends Authenticatable
         'name','email','phone','role','referral_code','last_vet_slug','last_vet_id','password',
         'pet_name','pet_gender','pet_age','pet_doc1','pet_doc2','pet_doc2_blob','pet_doc2_mime',
         'api_token_hash','summary','google_token','breed','latitude','longitude',
-        'qr_scanner_id','feedback','city',
+        'qr_scanner_id','feedback','city','has_used_free_video_consult_coupon',
     ];
 
     protected $hidden = ['password','remember_token','api_token_hash','pet_doc2_blob'];
 
-    protected $casts  = ['pet_age' => 'integer'];
+    protected $casts  = [
+        'pet_age' => 'integer',
+        'has_used_free_video_consult_coupon' => 'boolean',
+    ];
 
     protected static function booted(): void
     {
