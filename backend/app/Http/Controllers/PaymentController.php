@@ -227,17 +227,6 @@ class PaymentController extends Controller
                 return ['applied' => false];
             }
 
-            if ($this->userAlreadyHasVideoConsultTransactions($userId)) {
-                DB::table('users')
-                    ->where('id', $userId)
-                    ->update([
-                        self::USER_FREE_VIDEO_CONSULT_FLAG_COLUMN => 1,
-                        'updated_at' => now(),
-                    ]);
-
-                return ['applied' => false];
-            }
-
             $couponReference = 'coupon_free_' . Str::lower(Str::random(20));
             $originalAmountPaise = max(0, $requestedAmountInInr * 100);
 
@@ -402,43 +391,6 @@ class PaymentController extends Controller
                 'status' => $couponCallSession->status,
                 'payment_status' => $couponCallSession->payment_status,
             ] : null,
-        ];
-    }
-
-    protected function userAlreadyHasVideoConsultTransactions(int $userId): bool
-    {
-        if (!Schema::hasTable('transactions')) {
-            return false;
-        }
-
-        $typeCandidates = $this->firstVideoConsultTransactionTypeCandidates();
-
-        try {
-            return Transaction::query()
-                ->where('user_id', $userId)
-                ->where(function ($q) use ($typeCandidates) {
-                    $q->whereIn('type', $typeCandidates)
-                        ->orWhereIn('metadata->order_type', $typeCandidates);
-                })
-                ->exists();
-        } catch (\Throwable $e) {
-            report($e);
-            return false;
-        }
-    }
-
-    /**
-     * @return array<int,string>
-     */
-    protected function firstVideoConsultTransactionTypeCandidates(): array
-    {
-        return [
-            'video_consult',
-            'video_consultation',
-            'video_call',
-            'video call',
-            'appointment',
-            'excell_export_campaign',
         ];
     }
 
