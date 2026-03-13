@@ -1116,14 +1116,19 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'clinic_id' => ['required', 'integer'],
     ]);
 
+    $supportedOrderTypes = ['excell_export_campaign', 'video_consult'];
+
     $baseQuery = Transaction::query()
         ->where('doctor_id', $data['doctor_id'])
         ->where('clinic_id', $data['clinic_id'])
-        ->where(function ($q) {
+        ->where(function ($q) use ($supportedOrderTypes) {
             if (Schema::hasColumn('transactions', 'type')) {
-                $q->where('type', 'excell_export_campaign');
+                $q->whereIn('type', $supportedOrderTypes)
+                    ->orWhereIn('metadata->order_type', $supportedOrderTypes);
+                return;
             }
-            $q->orWhere('metadata->order_type', 'excell_export_campaign');
+
+            $q->whereIn('metadata->order_type', $supportedOrderTypes);
         });
 
     $query = (clone $baseQuery)
@@ -1382,6 +1387,7 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'doctor_id' => $data['doctor_id'],
         'clinic_id' => $data['clinic_id'],
         'order_type' => 'excell_export_campaign',
+        'order_types' => $supportedOrderTypes,
         'deduction_rate' => $deductionRate,
         'total_transactions' => $count,
         'total_amount_paise' => $totalDoctorPayoutPaise,
