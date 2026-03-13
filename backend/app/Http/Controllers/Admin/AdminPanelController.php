@@ -561,21 +561,10 @@ class AdminPanelController extends Controller
         return $result;
     }
 
-    private function jsonEncodeForCsv(array $payload): ?string
-    {
-        if (empty($payload)) {
-            return null;
-        }
-
-        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-        return $json !== false ? $json : null;
-    }
-
     private function streamExcellExportTransactionsCsv(Collection $transactions)
     {
         $fileName = 'excel-export-transactions-' . now()->format('Ymd-His') . '.csv';
-        $headers = [
+        $baseHeaders = [
             'Transaction ID',
             'Created At',
             'Status',
@@ -601,11 +590,46 @@ class AdminPanelController extends Controller
             'Pet Breed',
             'Pet DOB',
             'Reported Symptom',
-            'View Details User Fields (JSON)',
-            'View Details Pet Fields (JSON)',
         ];
 
-        return response()->streamDownload(function () use ($transactions, $headers) {
+        $userFieldExclude = [
+            'password',
+            'remember_token',
+            'api_token_hash',
+            'google_token',
+            'pet_doc2_blob',
+            'pet_doc2_mime',
+        ];
+        $petFieldExclude = ['pet_doc2_blob'];
+
+        $userFieldKeysMap = [];
+        $petFieldKeysMap = [];
+
+        foreach ($transactions as $transaction) {
+            $petRecord = $this->resolveExcellExportPetRecord($transaction);
+            $userDetails = $this->formatNonNullAttributesForCsv($transaction->user, $userFieldExclude);
+            $petDetails = $this->formatNonNullAttributesForCsv($petRecord, $petFieldExclude);
+
+            foreach (array_keys($userDetails) as $key) {
+                $userFieldKeysMap[$key] = true;
+            }
+            foreach (array_keys($petDetails) as $key) {
+                $petFieldKeysMap[$key] = true;
+            }
+        }
+
+        $userFieldKeys = array_keys($userFieldKeysMap);
+        $petFieldKeys = array_keys($petFieldKeysMap);
+        sort($userFieldKeys);
+        sort($petFieldKeys);
+
+        $headers = array_merge(
+            $baseHeaders,
+            array_map(fn (string $key): string => "User Details: {$key}", $userFieldKeys),
+            array_map(fn (string $key): string => "Pet Details: {$key}", $petFieldKeys),
+        );
+
+        return response()->streamDownload(function () use ($transactions, $headers, $userFieldKeys, $petFieldKeys, $userFieldExclude, $petFieldExclude) {
             $output = fopen('php://output', 'w');
             fputcsv($output, $headers);
 
@@ -617,19 +641,10 @@ class AdminPanelController extends Controller
                     $issue = trim((string) ($petRecord->reported_symptom ?? ''));
                 }
                 $petDob = $this->formatExcellExportPetDob($petRecord->pet_dob ?? $petRecord->dob ?? null);
-                $userDetails = $this->formatNonNullAttributesForCsv($transaction->user, [
-                    'password',
-                    'remember_token',
-                    'api_token_hash',
-                    'google_token',
-                    'pet_doc2_blob',
-                    'pet_doc2_mime',
-                ]);
-                $petDetails = $this->formatNonNullAttributesForCsv($petRecord, [
-                    'pet_doc2_blob',
-                ]);
+                $userDetails = $this->formatNonNullAttributesForCsv($transaction->user, $userFieldExclude);
+                $petDetails = $this->formatNonNullAttributesForCsv($petRecord, $petFieldExclude);
 
-                fputcsv($output, [
+                $row = [
                     $transaction->id,
                     optional($transaction->created_at)->format('Y-m-d H:i:s'),
                     strtoupper((string) ($transaction->status ?? '')),
@@ -655,9 +670,16 @@ class AdminPanelController extends Controller
                     $petRecord->breed ?? null,
                     $petDob,
                     $issue !== '' ? $issue : null,
-                    $this->jsonEncodeForCsv($userDetails),
-                    $this->jsonEncodeForCsv($petDetails),
-                ]);
+                ];
+
+                foreach ($userFieldKeys as $key) {
+                    $row[] = $userDetails[$key] ?? null;
+                }
+                foreach ($petFieldKeys as $key) {
+                    $row[] = $petDetails[$key] ?? null;
+                }
+
+                fputcsv($output, $row);
             }
 
             fclose($output);
