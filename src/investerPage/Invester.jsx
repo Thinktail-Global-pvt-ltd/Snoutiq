@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
 import playScreen1 from '../assets/google-play/1.png';
 import playScreen2 from '../assets/google-play/2.png';
 import playScreen3 from '../assets/google-play/3.png';
-import playScreen4 from '../assets/google-play/4.png';
 import playScreen5 from '../assets/google-play/5.png';
 import playScreen6 from '../assets/google-play/6.png';
 import logo from '../assets/images/logo.webp';
 import appIcon from '../assets/snoutiq_app_icon.png';
+import bruno from '../assets/bruno.jpeg';
+import rabbit from '../assets/rabbit.jpeg';
+import dogWinter from '../assets/husky.jpeg';
 import { 
   Stethoscope, 
   Database, 
@@ -74,6 +76,40 @@ const playStoreScreens = [
   { src: playScreen6, alt: 'SnoutIQ Google Play screenshot 6' },
 ];
 
+const problemCases = [
+  {
+    title: 'The Husky Case',
+    image: dogWinter,
+    alt: 'The Husky Case',
+    lines: [
+      'A 2-month old Husky vomiting blood.',
+      'Nearest Vet available: 3 hours driving distance',
+      'Availability of Vet: Very Limited.',
+    ],
+    dateTime: '07 Mar 2026, Time: 23:16',
+  },
+  {
+    title: 'The Khargosh Case',
+    image: rabbit,
+    alt: 'The Khargosh Case',
+    lines: [
+      '3 year old rabbit stops eating',
+      'Nearest Vet available: 2 hours away in city',
+      'Availability of Vets in area: Good, but clinics close at 10:00 PM mostly.',
+    ],
+    dateTime: '26 Feb 2026, Time 18:02',
+  },
+  {
+    title: 'The Bruno Mittal Case',
+    image: bruno,
+    alt: 'The Bruno Mittal Case',
+    lines: [
+      'Ruptured 3 year old lipoma wound ruptured and bleeding.',
+      'Availabilty of vets in area: Good',
+    ],
+  },
+];
+
 const imageProps = {
   loading: 'lazy',
   decoding: 'async',
@@ -83,10 +119,9 @@ const imageProps = {
 
 const initialInvestorForm = {
   fullName: '',
-  email: '',
   phone: '',
-  companyFund: '',
-  ticketSize: '',
+  email: '',
+  linkedin: '',
 };
 
 const Section = ({ children, className = "" }) => (
@@ -103,7 +138,7 @@ const Section = ({ children, className = "" }) => (
 
 const InvestorInput = ({ label, name, value, onChange, type = 'text', error, autoComplete }) => (
   <label className="block">
-    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-600">
       {label}
     </span>
     <input
@@ -189,6 +224,7 @@ const AutoPreviewSlider = ({ screens, activeIndex }) => {
 
 export default function Invester() {
   const [activeScreenIndex, setActiveScreenIndex] = useState(0);
+  const [activeProblemCaseIndex, setActiveProblemCaseIndex] = useState(0);
   const [investorForm, setInvestorForm] = useState(initialInvestorForm);
   const [formErrors, setFormErrors] = useState({});
   const [isSubmittingInvestorForm, setIsSubmittingInvestorForm] = useState(false);
@@ -199,6 +235,14 @@ export default function Invester() {
     const intervalId = window.setInterval(() => {
       setActiveScreenIndex((current) => (current + 1) % playStoreScreens.length);
     }, 3500);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setActiveProblemCaseIndex((current) => (current + 1) % problemCases.length);
+    }, 4200);
 
     return () => window.clearInterval(intervalId);
   }, []);
@@ -235,17 +279,17 @@ export default function Invester() {
     const trimmedPhone = investorForm.phone.trim();
 
     if (!trimmedName) {
-      nextErrors.fullName = 'Full Name is required.';
+      nextErrors.fullName = 'Name is required.';
     }
 
     if (!trimmedEmail) {
-      nextErrors.email = 'Email Address is required.';
+      nextErrors.email = 'Email is required.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       nextErrors.email = 'Enter a valid email address.';
     }
 
     if (!trimmedPhone) {
-      nextErrors.phone = 'Phone Number is required.';
+      nextErrors.phone = 'Phone is required.';
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -265,11 +309,11 @@ export default function Invester() {
           Accept: 'application/json',
         },
         body: JSON.stringify({
+          name: trimmedName,
           full_name: trimmedName,
-          email: trimmedEmail,
           phone: trimmedPhone,
-          company_or_fund: investorForm.companyFund.trim(),
-          expected_ticket_size: investorForm.ticketSize.trim(),
+          email: trimmedEmail,
+          linkedin: investorForm.linkedin.trim(),
         }),
       });
 
@@ -397,17 +441,67 @@ export default function Invester() {
             <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-[0.03]">
               <Activity className="w-32 h-32 sm:w-48 sm:h-48 text-slate-900" />
             </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-50 text-slate-400 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest mb-6 sm:mb-10">
+            <div className="hidden inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-50 text-slate-400 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest mb-6 sm:mb-10">
               <Clock className="w-3 h-3" /> 12th March 2026 · 01:31 AM · Sambalpur, Odisha
             </div>
-            <h3 className="text-2xl sm:text-3xl font-serif italic mb-6 sm:mb-8 text-slate-900">The Husky Case</h3>
-            <p className="text-slate-500 leading-relaxed mb-8 sm:mb-10 text-base sm:text-lg font-light italic">
-              "A 2-month-old Husky vomiting blood. Nearest vet unavailable. The parent was desperate."
-            </p>
-            <div className="bg-slate-900 p-6 sm:p-8 rounded-2xl text-white">
-              <p className="leading-relaxed font-light text-base sm:text-lg">
-                SnoutIQ connected them with a specialist in minutes. <span className="text-slate-400">Digital access saved a life that night.</span>
-              </p>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={problemCases[activeProblemCaseIndex].title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="relative z-10"
+              >
+                <div className="grid gap-5">
+                  <div className="grid grid-cols-[30%_70%] items-start gap-4 sm:gap-6">
+                    <div className="h-full min-h-[210px] overflow-hidden rounded-[1.5rem] bg-slate-100 shadow-inner sm:min-h-[240px]">
+                      <img
+                        src={problemCases[activeProblemCaseIndex].image}
+                        alt={problemCases[activeProblemCaseIndex].alt}
+                        className="h-full w-full object-cover object-center"
+                        width="480"
+                        height="640"
+                        {...imageProps}
+                      />
+                    </div>
+                    <div className="min-w-0 pt-1">
+                      {problemCases[activeProblemCaseIndex].dateTime ? (
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-[8px] font-bold uppercase tracking-widest text-slate-400 sm:text-[10px]">
+                          <Clock className="w-3 h-3" /> {problemCases[activeProblemCaseIndex].dateTime}
+                        </div>
+                      ) : null}
+                      <h3 className="mb-4 text-[clamp(1.9rem,3vw,2.9rem)] font-serif italic leading-[0.96] text-slate-900">
+                        {problemCases[activeProblemCaseIndex].title}
+                      </h3>
+                      <div className="space-y-3 pr-1">
+                        {problemCases[activeProblemCaseIndex].lines.map((line) => (
+                          <p key={line} className="text-[15px] font-light leading-relaxed text-slate-500 sm:text-lg">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-[1.5rem] bg-slate-900 px-5 py-5 text-white sm:px-6 sm:py-6">
+                    <p className="leading-relaxed font-light text-base sm:text-lg">
+                      SnoutIQ connected them with a specialist in minutes. <span className="text-slate-400">Digital access saved a life that night.</span>
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+            <div className="relative z-10 mt-5 flex items-center justify-center gap-2">
+              {problemCases.map((problemCase, index) => (
+                <button
+                  key={problemCase.title}
+                  onClick={() => setActiveProblemCaseIndex(index)}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    index === activeProblemCaseIndex ? 'w-6 bg-slate-900' : 'w-2 bg-slate-300'
+                  }`}
+                  aria-label={`Go to ${problemCase.title}`}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -538,7 +632,7 @@ export default function Invester() {
                 <form onSubmit={handleInvestorFormSubmit} className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <InvestorInput
-                      label="Full Name"
+                      label="Name"
                       name="fullName"
                       value={investorForm.fullName}
                       onChange={handleInvestorInputChange}
@@ -546,16 +640,7 @@ export default function Invester() {
                       autoComplete="name"
                     />
                     <InvestorInput
-                      label="Email Address"
-                      name="email"
-                      type="email"
-                      value={investorForm.email}
-                      onChange={handleInvestorInputChange}
-                      error={formErrors.email}
-                      autoComplete="email"
-                    />
-                    <InvestorInput
-                      label="Phone Number"
+                      label="Phone"
                       name="phone"
                       type="tel"
                       value={investorForm.phone}
@@ -564,20 +649,22 @@ export default function Invester() {
                       autoComplete="tel"
                     />
                     <InvestorInput
-                      label="Company / Fund"
-                      name="companyFund"
-                      value={investorForm.companyFund}
+                      label="Email"
+                      name="email"
+                      type="email"
+                      value={investorForm.email}
                       onChange={handleInvestorInputChange}
-                      autoComplete="organization"
+                      error={formErrors.email}
+                      autoComplete="email"
                     />
-                    <div className="sm:col-span-2">
-                      <InvestorInput
-                        label="Expected Ticket Size"
-                        name="ticketSize"
-                        value={investorForm.ticketSize}
-                        onChange={handleInvestorInputChange}
-                      />
-                    </div>
+                    <InvestorInput
+                      label="Linkedin"
+                      name="linkedin"
+                      type="url"
+                      value={investorForm.linkedin}
+                      onChange={handleInvestorInputChange}
+                      autoComplete="url"
+                    />
                   </div>
 
                   {investorFormError ? (
@@ -608,7 +695,7 @@ export default function Invester() {
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(253,252,251,0.72)_0%,rgba(255,255,255,0.28)_38%,rgba(253,252,251,0.8)_100%)]" />
             <div className="absolute inset-x-0 top-6 px-4 sm:px-6">
               <div className="mx-auto max-w-xl rounded-[1.75rem] border border-white/80 bg-white/85 px-5 py-4 text-center shadow-xl shadow-slate-200/40 backdrop-blur">
-                <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Investor Access</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Investor Access</div>
                 <p className="mt-2 text-sm font-light text-slate-500">
                   Submit the form above to unlock the rest of the brief.
                 </p>
