@@ -1,6 +1,14 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
+import playScreen1 from '../assets/google-play/1.png';
+import playScreen2 from '../assets/google-play/2.png';
+import playScreen3 from '../assets/google-play/3.png';
+import playScreen4 from '../assets/google-play/4.png';
+import playScreen5 from '../assets/google-play/5.png';
+import playScreen6 from '../assets/google-play/6.png';
+import logo from '../assets/images/logo.webp';
+import appIcon from '../assets/snoutiq_app_icon.png';
 import { 
   Stethoscope, 
   Database, 
@@ -57,6 +65,15 @@ const advisors = [
   }
 ];
 
+const playStoreScreens = [
+  { src: playScreen1, alt: 'SnoutIQ Google Play screenshot 1' },
+  { src: playScreen2, alt: 'SnoutIQ Google Play screenshot 2' },
+  { src: playScreen3, alt: 'SnoutIQ Google Play screenshot 3' },
+  { src: playScreen4, alt: 'SnoutIQ Google Play screenshot 4' },
+  { src: playScreen5, alt: 'SnoutIQ Google Play screenshot 5' },
+  { src: playScreen6, alt: 'SnoutIQ Google Play screenshot 6' },
+];
+
 const imageProps = {
   loading: 'lazy',
   decoding: 'async',
@@ -65,18 +82,93 @@ const imageProps = {
 };
 
 const Section = ({ children, className = "" }) => (
-  <motion.section 
-    initial={{ opacity: 0, y: 20 }}
+  <motion.section
+    initial={{ opacity: 0, y: 40 }}
     whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true }}
-    transition={{ duration: 0.6 }}
+    viewport={{ once: true, amount: 0.18 }}
+    transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
     className={`py-6 sm:py-8 px-4 sm:px-6 max-w-7xl mx-auto ${className}`}
   >
     {children}
   </motion.section>
 );
 
+const AutoPreviewSlider = ({ screens, activeIndex }) => {
+  const containerRef = useRef(null);
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ['start end', 'end start'],
+  });
+
+  const yLeft = useTransform(scrollYProgress, [0, 1], [60, -60]);
+  const yRight = useTransform(scrollYProgress, [0, 1], [-40, 40]);
+  const rotateLeft = useTransform(scrollYProgress, [0, 1], [-4, 4]);
+  const rotateRight = useTransform(scrollYProgress, [0, 1], [4, -4]);
+
+  const leftScreen = screens[activeIndex];
+  const rightScreen = screens[(activeIndex + 1) % screens.length];
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="grid grid-cols-2 gap-4 sm:gap-6">
+        <motion.div
+          style={{ y: yLeft, rotate: rotateLeft }}
+          transition={{ type: 'spring', stiffness: 80, damping: 18 }}
+          className="aspect-[9/19] bg-slate-200 rounded-[2rem] border-4 border-white shadow-2xl overflow-hidden"
+        >
+          <motion.img
+            key={leftScreen.src}
+            src={leftScreen.src}
+            alt={leftScreen.alt}
+            initial={{ opacity: 0.4, scale: 1.04 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0.4, scale: 0.98 }}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+            className="w-full h-full object-cover object-top"
+            width="432"
+            height="768"
+            loading="lazy"
+            decoding="async"
+          />
+        </motion.div>
+
+        <motion.div
+          style={{ y: yRight, rotate: rotateRight }}
+          transition={{ type: 'spring', stiffness: 80, damping: 18 }}
+          className="aspect-[9/19] bg-slate-200 rounded-[2rem] border-4 border-white shadow-2xl mt-8 overflow-hidden"
+        >
+          <motion.img
+            key={rightScreen.src}
+            src={rightScreen.src}
+            alt={rightScreen.alt}
+            initial={{ opacity: 0.4, scale: 1.04 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0.4, scale: 0.98 }}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+            className="w-full h-full object-cover object-top"
+            width="432"
+            height="768"
+            loading="lazy"
+            decoding="async"
+          />
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
 export default function Invester() {
+  const [activeScreenIndex, setActiveScreenIndex] = useState(0);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setActiveScreenIndex((current) => (current + 1) % playStoreScreens.length);
+    }, 3500);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   return (
     <div className="min-h-screen font-sans selection:bg-slate-900 selection:text-white">
       <Helmet>
@@ -85,28 +177,46 @@ export default function Invester() {
       </Helmet>
 
       {/* Slide 1: Title */}
-      <section className="relative min-h-[60vh] py-12 flex items-center justify-center overflow-hidden bg-[#fdfcfb]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(15,23,42,0.03),transparent_70%)]" />
-        
-        {/* Vertical Rail Text */}
-        <div className="absolute left-10 top-1/2 -translate-y-1/2 hidden lg:block">
-          <div className="writing-mode-vertical-rl  text-[10px] uppercase tracking-[0.4em] font-bold text-slate-300">
-            Digital Health Infrastructure · 2026
+      <section className="relative overflow-hidden bg-[#fdfcfb]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(15,23,42,0.03),transparent_70%)]" />
+        <div className="relative z-20 px-4 pt-4 sm:px-6 sm:pt-6">
+          <div className="mx-auto flex max-w-7xl items-center justify-between rounded-[1.25rem] border border-slate-200/70 bg-white/90 px-4 py-3 shadow-md shadow-slate-200/40 backdrop-blur-sm sm:px-5 sm:py-3.5">
+            <img
+              src={logo}
+              alt="SnoutIQ logo"
+              className="h-5 w-auto sm:h-5 md:h-5"
+              width="80"
+              height="32"
+              decoding="async"
+              fetchPriority="high"
+            />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 shadow-md shadow-slate-300/40 sm:h-12 sm:w-12">
+              <img
+                src={appIcon}
+                alt="SnoutIQ app icon"
+                className="h-6 w-6 rounded-xl object-cover sm:h-7 sm:w-7"
+                width="64"
+                height="64"
+                decoding="async"
+                fetchPriority="high"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="relative z-10 text-center px-6">
+        <div className="relative z-10 flex min-h-[calc(60vh-72px)] items-center justify-center px-6 py-14 sm:py-16 md:min-h-[70vh]">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+            className="text-center"
           >
-    <h1 className="text-[12vw] sm:text-[10vw] md:text-[12vw] font-serif font-light tracking-tight mb-2 text-slate-900 leading-[0.8] uppercase break-words">
-      SnoutIQ
-    </h1>
-    <p className="text-lg sm:text-xl md:text-2xl text-slate-800 font-medium mb-6 max-w-2xl mx-auto tracking-tight px-4">
-      Digital Health Infrastructure for Pet Healthcare
-    </p>
+            <h1 className="text-[15vw] sm:text-[12vw] md:text-[10vw] lg:text-[8rem] font-serif font-light tracking-tight mb-3 text-slate-900 leading-[0.82] uppercase">
+              SnoutIQ
+            </h1>
+            <p className="text-base sm:text-xl md:text-2xl text-slate-800 font-medium mb-6 max-w-3xl mx-auto tracking-tight px-4">
+              Digital Health Infrastructure for Pet Healthcare
+            </p>
             <div className="w-16 h-px bg-slate-300 mx-auto mb-6" />
             <div className="text-sm md:text-base text-slate-500 font-light mb-10 tracking-wide">
               PMF Bridge Investment Brief · March 2026
@@ -247,15 +357,21 @@ export default function Invester() {
               </div>
             </div>
             <div className="relative">
-              <div className="grid grid-cols-2 gap-4 sm:gap-6">
-                <div className="aspect-[9/19] bg-slate-200 rounded-[2rem] border-4 border-white shadow-2xl flex items-center justify-center text-slate-400 text-[10px] uppercase font-bold tracking-widest overflow-hidden">
-                  <img src="https://picsum.photos/seed/app1/400/800" alt="App Screenshot 1" className="w-full h-full object-cover opacity-50" width="400" height="800" {...imageProps} />
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/10">Screenshot 1</div>
-                </div>
-                <div className="aspect-[9/19] bg-slate-200 rounded-[2rem] border-4 border-white shadow-2xl flex items-center justify-center text-slate-400 text-[10px] uppercase font-bold tracking-widest mt-8 overflow-hidden">
-                  <img src="https://picsum.photos/seed/app2/400/800" alt="App Screenshot 2" className="w-full h-full object-cover opacity-50" width="400" height="800" {...imageProps} />
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/10">Screenshot 2</div>
-                </div>
+              <AutoPreviewSlider
+                screens={playStoreScreens}
+                activeIndex={activeScreenIndex}
+              />
+              <div className="flex items-center justify-center gap-2 mt-6">
+                {playStoreScreens.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setActiveScreenIndex(index)}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      index === activeScreenIndex ? 'w-6 bg-slate-900' : 'w-2 bg-slate-300'
+                    }`}
+                    aria-label={`Go to screen ${index + 1}`}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -474,42 +590,50 @@ export default function Invester() {
         <div className="grid md:grid-cols-3 gap-3 mb-6">
           {team.map((member, i) => (
             <div key={i} className="bg-white p-5 rounded-[1.5rem] border border-slate-100 hover:shadow-xl transition-all duration-500 group">
-              <div className="w-14 h-14 rounded-xl bg-slate-50 overflow-hidden mb-4 group-hover:scale-105 transition-transform duration-500">
-                {member.image ? (
-                  <img src={member.image} alt={member.name} className="w-full h-full object-cover" width="400" height="400" {...imageProps} />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-300 group-hover:bg-slate-900 group-hover:text-white transition-colors">
-                    {React.cloneElement(member.icon, { className: "w-6 h-6" })}
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="w-full sm:w-[30%] sm:max-w-[110px]">
+                  <div className="aspect-square rounded-xl bg-slate-50 overflow-hidden group-hover:scale-105 transition-transform duration-500">
+                    {member.image ? (
+                      <img src={member.image} alt={member.name} className="w-full h-full object-cover" width="400" height="400" {...imageProps} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                        {React.cloneElement(member.icon, { className: "w-6 h-6" })}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+                <div className="w-full sm:w-[70%]">
+                  <h3 className="text-xl font-serif italic mb-2 text-slate-900 leading-tight">{member.name}</h3>
+                  <p className="text-slate-500 mb-4 leading-relaxed font-light text-sm">{member.desc}</p>
+                  {member.exp && (
+                    <p className="text-[10px] text-slate-300 uppercase tracking-widest font-bold border-t border-slate-50 pt-4">{member.exp}</p>
+                  )}
+                </div>
               </div>
-              <h3 className="text-xl font-serif italic mb-2 text-slate-900 leading-tight">{member.name}</h3>
-              <p className="text-slate-500 mb-4 leading-relaxed font-light text-sm">{member.desc}</p>
-              {member.exp && (
-                <p className="text-[10px] text-slate-300 uppercase tracking-widest font-bold border-t border-slate-50 pt-4">{member.exp}</p>
-              )}
             </div>
           ))}
         </div>
         <div className="grid md:grid-cols-2 gap-3">
           {advisors.map((advisor, i) => (
-            <div key={i} className="bg-slate-50 p-6 rounded-[1.5rem] flex flex-col gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-white overflow-hidden flex-shrink-0 shadow-sm">
-                  {advisor.image ? (
-                    <img src={advisor.image} alt={advisor.name} className="w-full h-full object-cover" width="400" height="400" {...imageProps} />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400">
-                      {React.cloneElement(advisor.icon, { className: "w-5 h-5" })}
-                    </div>
-                  )}
+            <div key={i} className="bg-slate-50 p-6 rounded-[1.5rem]">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="w-full sm:w-[30%] sm:max-w-[120px]">
+                  <div className="aspect-square rounded-xl bg-white overflow-hidden shadow-sm">
+                    {advisor.image ? (
+                      <img src={advisor.image} alt={advisor.name} className="w-full h-full object-cover" width="400" height="400" {...imageProps} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-400">
+                        {React.cloneElement(advisor.icon, { className: "w-5 h-5" })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div>
+                <div className="w-full sm:w-[70%]">
                   <h3 className="text-xl font-serif italic text-slate-900">{advisor.name}</h3>
                   <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{advisor.role}</div>
+                  <p className="text-slate-500 leading-relaxed font-light italic mt-4">{advisor.desc}</p>
                 </div>
               </div>
-              <p className="text-slate-500 leading-relaxed font-light italic">{advisor.desc}</p>
             </div>
           ))}
         </div>
