@@ -81,6 +81,14 @@ const imageProps = {
   referrerPolicy: 'no-referrer',
 };
 
+const initialInvestorForm = {
+  fullName: '',
+  email: '',
+  phone: '',
+  companyFund: '',
+  ticketSize: '',
+};
+
 const Section = ({ children, className = "" }) => (
   <motion.section
     initial={{ opacity: 0, y: 40 }}
@@ -91,6 +99,27 @@ const Section = ({ children, className = "" }) => (
   >
     {children}
   </motion.section>
+);
+
+const InvestorInput = ({ label, name, value, onChange, type = 'text', error, autoComplete }) => (
+  <label className="block">
+    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+      {label}
+    </span>
+    <input
+      type={type}
+      name={name}
+      value={value}
+      onChange={onChange}
+      autoComplete={autoComplete}
+      className={`w-full rounded-2xl border bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-300 ${
+        error
+          ? 'border-red-200 focus:border-red-300'
+          : 'border-slate-200 focus:border-slate-300'
+      }`}
+    />
+    {error ? <span className="mt-2 block text-xs text-red-500">{error}</span> : null}
+  </label>
 );
 
 const AutoPreviewSlider = ({ screens, activeIndex }) => {
@@ -160,6 +189,11 @@ const AutoPreviewSlider = ({ screens, activeIndex }) => {
 
 export default function Invester() {
   const [activeScreenIndex, setActiveScreenIndex] = useState(0);
+  const [investorForm, setInvestorForm] = useState(initialInvestorForm);
+  const [formErrors, setFormErrors] = useState({});
+  const [isSubmittingInvestorForm, setIsSubmittingInvestorForm] = useState(false);
+  const [investorFormError, setInvestorFormError] = useState('');
+  const [isInvestorAccessGranted, setIsInvestorAccessGranted] = useState(false);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -168,6 +202,103 @@ export default function Invester() {
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  const handleInvestorInputChange = (event) => {
+    const { name, value } = event.target;
+
+    setInvestorForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+
+    setFormErrors((current) => {
+      if (!current[name]) {
+        return current;
+      }
+
+      const nextErrors = { ...current };
+      delete nextErrors[name];
+      return nextErrors;
+    });
+
+    if (investorFormError) {
+      setInvestorFormError('');
+    }
+  };
+
+  const handleInvestorFormSubmit = async (event) => {
+    event.preventDefault();
+
+    const nextErrors = {};
+    const trimmedName = investorForm.fullName.trim();
+    const trimmedEmail = investorForm.email.trim();
+    const trimmedPhone = investorForm.phone.trim();
+
+    if (!trimmedName) {
+      nextErrors.fullName = 'Full Name is required.';
+    }
+
+    if (!trimmedEmail) {
+      nextErrors.email = 'Email Address is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
+
+    if (!trimmedPhone) {
+      nextErrors.phone = 'Phone Number is required.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFormErrors(nextErrors);
+      return;
+    }
+
+    setFormErrors({});
+    setInvestorFormError('');
+    setIsSubmittingInvestorForm(true);
+
+    try {
+      const response = await fetch('https://snoutiq.com/backend/api/invester-form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          full_name: trimmedName,
+          email: trimmedEmail,
+          phone: trimmedPhone,
+          company_or_fund: investorForm.companyFund.trim(),
+          expected_ticket_size: investorForm.ticketSize.trim(),
+        }),
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      let responseBody = null;
+
+      if (contentType.includes('application/json')) {
+        responseBody = await response.json();
+      } else {
+        const responseText = await response.text();
+        responseBody = responseText ? { message: responseText } : null;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          responseBody?.message || responseBody?.error || 'Unable to submit the form right now.'
+        );
+      }
+
+      setIsInvestorAccessGranted(true);
+      setInvestorForm(initialInvestorForm);
+    } catch (error) {
+      setInvestorFormError(
+        error instanceof Error ? error.message : 'Unable to submit the form right now.'
+      );
+    } finally {
+      setIsSubmittingInvestorForm(false);
+    }
+  };
 
   return (
     <div className="min-h-screen font-sans selection:bg-slate-900 selection:text-white">
@@ -378,6 +509,118 @@ export default function Invester() {
         </div>
       </Section>
 
+      <Section>
+        <div className="overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white shadow-xl shadow-slate-200/30">
+          <div className="grid lg:grid-cols-[0.9fr,1.1fr]">
+            <div className="border-b border-slate-100 bg-slate-50 p-6 sm:p-8 md:p-10 lg:border-b-0 lg:border-r">
+              <span className="section-label">Investor Access</span>
+              <h2 className="mb-4 text-3xl font-serif italic text-slate-900 sm:text-4xl">
+                Unlock the <span className="not-italic font-normal">Full Investment Brief.</span>
+              </h2>
+              <p className="max-w-xl text-base font-light leading-relaxed text-slate-500 sm:text-lg">
+                Share your details to continue reading the rest of the deck.
+              </p>
+            </div>
+
+            <div className="p-6 sm:p-8 md:p-10">
+              {isInvestorAccessGranted ? (
+                <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50/70 p-6 sm:p-8">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-600">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Access Granted
+                  </div>
+                  <h3 className="mt-4 text-2xl font-serif italic text-slate-900">Thank you.</h3>
+                  <p className="mt-3 max-w-2xl text-base font-light leading-relaxed text-slate-500">
+                    The full investment brief is now unlocked.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleInvestorFormSubmit} className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <InvestorInput
+                      label="Full Name"
+                      name="fullName"
+                      value={investorForm.fullName}
+                      onChange={handleInvestorInputChange}
+                      error={formErrors.fullName}
+                      autoComplete="name"
+                    />
+                    <InvestorInput
+                      label="Email Address"
+                      name="email"
+                      type="email"
+                      value={investorForm.email}
+                      onChange={handleInvestorInputChange}
+                      error={formErrors.email}
+                      autoComplete="email"
+                    />
+                    <InvestorInput
+                      label="Phone Number"
+                      name="phone"
+                      type="tel"
+                      value={investorForm.phone}
+                      onChange={handleInvestorInputChange}
+                      error={formErrors.phone}
+                      autoComplete="tel"
+                    />
+                    <InvestorInput
+                      label="Company / Fund"
+                      name="companyFund"
+                      value={investorForm.companyFund}
+                      onChange={handleInvestorInputChange}
+                      autoComplete="organization"
+                    />
+                    <div className="sm:col-span-2">
+                      <InvestorInput
+                        label="Expected Ticket Size"
+                        name="ticketSize"
+                        value={investorForm.ticketSize}
+                        onChange={handleInvestorInputChange}
+                      />
+                    </div>
+                  </div>
+
+                  {investorFormError ? (
+                    <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500">
+                      {investorFormError}
+                    </div>
+                  ) : null}
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingInvestorForm}
+                      className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      {isSubmittingInvestorForm ? 'Submitting...' : 'Unlock Access'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <div className="relative">
+        {!isInvestorAccessGranted ? (
+          <div className="pointer-events-none absolute inset-0 z-20">
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(253,252,251,0.72)_0%,rgba(255,255,255,0.28)_38%,rgba(253,252,251,0.8)_100%)]" />
+            <div className="absolute inset-x-0 top-6 px-4 sm:px-6">
+              <div className="mx-auto max-w-xl rounded-[1.75rem] border border-white/80 bg-white/85 px-5 py-4 text-center shadow-xl shadow-slate-200/40 backdrop-blur">
+                <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Investor Access</div>
+                <p className="mt-2 text-sm font-light text-slate-500">
+                  Submit the form above to unlock the rest of the brief.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div
+          aria-hidden={!isInvestorAccessGranted}
+          className={isInvestorAccessGranted ? '' : 'pointer-events-none select-none blur-[10px] opacity-70 transition duration-300'}
+        >
       {/* Slide 6: Market Opportunity */}
       <Section className="bg-white">
         <div className="grid lg:grid-cols-12 gap-12 items-center">
@@ -747,6 +990,8 @@ export default function Invester() {
           <div className="text-[8px] sm:text-[10px] text-slate-300 font-mono tracking-[0.3em] uppercase px-4">© 2026 ThinkTail Global Pvt. Ltd. · snoutiq.com</div>
         </div>
       </footer>
+        </div>
+      </div>
     </div>
   );
 }
