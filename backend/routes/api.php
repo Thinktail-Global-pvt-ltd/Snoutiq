@@ -173,6 +173,7 @@ Route::get('/admin/doctors/export/csv', [DoctorCsvExportController::class, 'expo
 // Financials (clinic dashboard KPIs + charts + transactions)
 Route::get('/financials', [ClinicFinancialsController::class, 'show'])->name('api.clinic.financials');
 Route::get('/pets/consult-timeline', [PetConsultTimelineController::class, 'index'])->name('api.pets.consult-timeline');
+Route::get('/pets/lifeline-timeline', [PetConsultTimelineController::class, 'lifeline'])->name('api.pets.lifeline-timeline');
 
 
 Route::get('/agora/appid', function () {
