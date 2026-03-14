@@ -71,7 +71,6 @@ const playStoreScreens = [
   { src: playScreen1, alt: 'SnoutIQ Google Play screenshot 1' },
   { src: playScreen2, alt: 'SnoutIQ Google Play screenshot 2' },
   { src: playScreen3, alt: 'SnoutIQ Google Play screenshot 3' },
-  { src: playScreen4, alt: 'SnoutIQ Google Play screenshot 4' },
   { src: playScreen5, alt: 'SnoutIQ Google Play screenshot 5' },
   { src: playScreen6, alt: 'SnoutIQ Google Play screenshot 6' },
 ];
