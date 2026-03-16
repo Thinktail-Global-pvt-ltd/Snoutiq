@@ -175,6 +175,17 @@ class ClinicsController extends Controller
             return response()->json(['success' => false, 'error' => 'Clinic not found'], 404);
         }
 
+        if (
+            ! Schema::hasTable('transactions')
+            || ! Schema::hasColumn('transactions', 'clinic_id')
+            || ! Schema::hasColumn('transactions', 'user_id')
+        ) {
+            return response()->json([
+                'success' => false,
+                'error' => 'transactions.clinic_id/user_id columns are required',
+            ], 500);
+        }
+
         $recordStats = DB::table('medical_records')
             ->select(
                 'user_id',
@@ -184,12 +195,25 @@ class ClinicsController extends Controller
             ->where('vet_registeration_id', $clinicId)
             ->groupBy('user_id');
 
+        $transactionStats = DB::table('transactions')
+            ->select(
+                'user_id',
+                DB::raw('COUNT(*) as total_transactions'),
+                DB::raw('MAX(created_at) as last_transaction_at')
+            )
+            ->where('clinic_id', $clinicId)
+            ->whereNotNull('user_id')
+            ->where('user_id', '>', 0)
+            ->groupBy('user_id');
+
         $patients = DB::table('users as u')
+            ->joinSub($transactionStats, 'tx', function ($join) {
+                $join->on('tx.user_id', '=', 'u.id');
+            })
             ->leftJoinSub($recordStats, 'mr', function ($join) {
                 $join->on('mr.user_id', '=', 'u.id');
             })
-            ->where('u.last_vet_id', $clinicId)
-            ->orderByDesc('u.updated_at')
+            ->orderByDesc('tx.last_transaction_at')
             ->limit(500)
             ->select(
                 'u.id',
@@ -197,6 +221,8 @@ class ClinicsController extends Controller
                 'u.email',
                 'u.phone',
                 'u.updated_at',
+                DB::raw('COALESCE(tx.total_transactions, 0) as transactions_count'),
+                'tx.last_transaction_at',
                 DB::raw('COALESCE(mr.total_records, 0) as records_count'),
                 'mr.last_record_at'
             )
