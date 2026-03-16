@@ -199,6 +199,242 @@ class PetOverviewController extends Controller
         ]);
     }
 
+    /**
+     * POST /api/pets/deworming-vaccination
+     * Input: pet_id, last_deworming_date, vaccination_json (or vaccinations_json / vaccination)
+     * Saves: last_deworming_date, next_deworming_date, dog_disease_payload.vaccination
+     */
+    public function updateDewormingVaccination(Request $request)
+    {
+        $rawPetId = $request->input('pet_id', $request->query('pet_id'));
+        $petId = is_numeric($rawPetId) ? (int) $rawPetId : 0;
+
+        if ($petId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_id is required',
+            ], 422);
+        }
+
+        $normalizedLastDewormingDate = $this->normalizeDateOnly($request->input('last_deworming_date'));
+        if ($normalizedLastDewormingDate === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'last_deworming_date is required and must be a valid date',
+            ], 422);
+        }
+
+        [$hasVaccinationInput, $vaccinationPayload, $vaccinationError] = $this->extractVaccinationPayloadFromRequest($request);
+        if (! $hasVaccinationInput) {
+            return response()->json([
+                'success' => false,
+                'message' => 'vaccination_json is required',
+            ], 422);
+        }
+        if ($vaccinationError !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => $vaccinationError,
+            ], 422);
+        }
+
+        if (! Schema::hasTable('pets')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets table is missing',
+            ], 500);
+        }
+
+        foreach (['dog_disease_payload', 'last_deworming_date', 'next_deworming_date'] as $requiredColumn) {
+            if (! Schema::hasColumn('pets', $requiredColumn)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "pets.{$requiredColumn} column is missing",
+                ], 500);
+            }
+        }
+
+        $petSelectColumns = ['id', 'dog_disease_payload'];
+        if (Schema::hasColumn('pets', 'pet_dob')) {
+            $petSelectColumns[] = 'pet_dob';
+        }
+        if (Schema::hasColumn('pets', 'dob')) {
+            $petSelectColumns[] = 'dob';
+        }
+
+        $pet = DB::table('pets')
+            ->select($petSelectColumns)
+            ->where('id', $petId)
+            ->first();
+
+        if (! $pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found',
+            ], 404);
+        }
+
+        $dogDiseasePayload = $this->decodeDogDiseasePayload($pet->dog_disease_payload ?? null) ?? [];
+        $dogDiseasePayload['vaccination'] = $vaccinationPayload;
+
+        $petDob = property_exists($pet, 'pet_dob')
+            ? $pet->pet_dob
+            : (property_exists($pet, 'dob') ? $pet->dob : null);
+        $dewormingSchedule = $this->resolveDewormingScheduleFromDob(
+            is_string($petDob) ? $petDob : null,
+            $normalizedLastDewormingDate
+        );
+
+        $updates = [
+            'last_deworming_date' => $normalizedLastDewormingDate,
+            'next_deworming_date' => $dewormingSchedule['next_deworming_date'],
+            'dog_disease_payload' => json_encode($dogDiseasePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ];
+        if (Schema::hasColumn('pets', 'deworming_status')) {
+            $updates['deworming_status'] = $dewormingSchedule['deworming_status'];
+        }
+        if (Schema::hasColumn('pets', 'updated_at')) {
+            $updates['updated_at'] = now();
+        }
+
+        DB::table('pets')->where('id', $petId)->update($updates);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'pet_id' => $petId,
+                'last_deworming_date' => $normalizedLastDewormingDate,
+                'next_deworming_date' => $dewormingSchedule['next_deworming_date'],
+                'deworming_status' => $dewormingSchedule['deworming_status'],
+                'vaccination' => $vaccinationPayload,
+            ],
+        ]);
+    }
+
+    private function normalizeDateOnly($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse((string) $value)->toDateString();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function decodeDogDiseasePayload($value): ?array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_object($value)) {
+            return json_decode(json_encode($value), true);
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $decoded = json_decode($value, true);
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
+            return null;
+        }
+
+        return $decoded;
+    }
+
+    private function extractVaccinationPayloadFromRequest(Request $request): array
+    {
+        $candidateKeys = ['vaccination_json', 'vaccinations_json', 'vaccination'];
+        $inputKey = null;
+        $rawValue = null;
+
+        foreach ($candidateKeys as $key) {
+            if ($request->exists($key)) {
+                $inputKey = $key;
+                $rawValue = $request->input($key);
+                break;
+            }
+        }
+
+        if ($inputKey === null) {
+            return [false, null, null];
+        }
+
+        if (is_string($rawValue)) {
+            $trimmed = trim($rawValue);
+            if ($trimmed === '') {
+                return [true, null, null];
+            }
+
+            $decoded = json_decode($trimmed, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return [true, null, "{$inputKey} must be valid JSON"];
+            }
+
+            return [true, $decoded, null];
+        }
+
+        if (is_object($rawValue)) {
+            return [true, json_decode(json_encode($rawValue), true), null];
+        }
+
+        if (is_array($rawValue) || is_null($rawValue) || is_bool($rawValue) || is_numeric($rawValue)) {
+            return [true, $rawValue, null];
+        }
+
+        return [true, null, "{$inputKey} format is not supported"];
+    }
+
+    private function resolveDewormingScheduleFromDob(?string $petDob, ?string $lastDewormingDate): array
+    {
+        $normalizedDob = $this->normalizeDateOnly($petDob);
+        if ($normalizedDob === null) {
+            return [
+                'deworming_status' => null,
+                'next_deworming_date' => null,
+            ];
+        }
+
+        try {
+            $dob = Carbon::parse($normalizedDob)->startOfDay();
+        } catch (\Throwable $e) {
+            return [
+                'deworming_status' => null,
+                'next_deworming_date' => null,
+            ];
+        }
+
+        $today = Carbon::today();
+        $ageInMonths = max(0, $dob->diffInMonths($today, false));
+        $isUnderSixMonths = $ageInMonths < 6;
+        $status = $isUnderSixMonths ? 'every_15_days' : 'every_3_months';
+
+        $normalizedLastDewormingDate = $this->normalizeDateOnly($lastDewormingDate);
+        $baseDate = $normalizedLastDewormingDate
+            ? Carbon::parse($normalizedLastDewormingDate)->startOfDay()
+            : $dob->copy();
+
+        $nextDate = $baseDate->copy();
+        if ($isUnderSixMonths) {
+            do {
+                $nextDate->addDays(15);
+            } while ($nextDate->lte($today));
+        } else {
+            do {
+                $nextDate->addMonthsNoOverflow(3);
+            } while ($nextDate->lte($today));
+        }
+
+        return [
+            'deworming_status' => $status,
+            'next_deworming_date' => $nextDate->toDateString(),
+        ];
+    }
+
     private function normalizeYesNoFlag($value): ?int
     {
         if ($value === null || $value === '') {

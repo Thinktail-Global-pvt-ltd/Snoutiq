@@ -2413,6 +2413,7 @@ Route::get('/users/{userId}/pets',  [AdminController::class, 'listPets']);
 Route::post('/users/{userId}/pets', [AdminController::class, 'addPet']);
 Route::get('/pets/check/vaccination-deworming-null', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationDewormingNullStatus']);
 Route::post('/pets/check/vaccination-deworming-null', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationDewormingNullStatus']);
+Route::post('/pets/deworming-vaccination', [\App\Http\Controllers\Api\PetOverviewController::class, 'updateDewormingVaccination']);
 Route::get('/pets/{petId}',         [AdminController::class, 'getPet']);
 Route::post('/pets/{petId}/dog-disease', [AdminController::class, 'suggestDogDisease']);
 Route::post('/pets/{petId}/summary', [AdminController::class, 'summarizePet']);
