@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeviceToken;
 use App\Models\Doctor;
 use App\Models\DoctorChatMessage;
 use App\Models\DoctorChatRoom;
 use App\Models\User;
+use App\Services\Push\FcmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Throwable;
 
 class DoctorChatController extends Controller
 {
@@ -174,11 +178,13 @@ class DoctorChatController extends Controller
         ]);
 
         $room->update(['last_message_at' => $message->created_at]);
+        $push = $this->sendRecipientPushViaTestApi($room, $message, $actor);
 
         return response()->json([
             'success' => true,
             'message' => 'Message sent.',
             'data' => $this->formatMessage($message),
+            'push' => $push,
         ], 201);
     }
 
@@ -219,6 +225,182 @@ class DoctorChatController extends Controller
             'message' => 'Messages marked as read.',
             'updated_count' => $updatedCount,
         ]);
+    }
+
+    private function sendRecipientPushViaTestApi(DoctorChatRoom $room, DoctorChatMessage $message, array $sender): array
+    {
+        $recipient = $this->resolveRecipient($room, $sender);
+        if (!$recipient) {
+            return [
+                'sent' => false,
+                'reason' => 'recipient_not_found',
+            ];
+        }
+
+        $tokens = $this->recipientTokens($recipient['type'], $recipient['id']);
+        if (empty($tokens)) {
+            return [
+                'sent' => false,
+                'reason' => 'token_missing',
+                'recipient_type' => $recipient['type'],
+                'recipient_id' => $recipient['id'],
+                'token_count' => 0,
+            ];
+        }
+
+        $senderName = $this->senderDisplayName($sender['type'], $sender['id']);
+        $preview = Str::limit(trim((string) $message->message), 120, '...');
+
+        $title = $sender['type'] === 'doctor'
+            ? ('Message from Dr ' . $senderName)
+            : 'New message from pet parent';
+        $body = $sender['type'] === 'doctor'
+            ? $preview
+            : ($senderName . ': ' . $preview);
+
+        $data = [
+            'type' => 'doctor_chat_message',
+            'room_id' => (string) $room->id,
+            'message_id' => (string) $message->id,
+            'sender_type' => (string) $sender['type'],
+            'sender_id' => (string) $sender['id'],
+            'recipient_type' => (string) $recipient['type'],
+            'recipient_id' => (string) $recipient['id'],
+            'created_at' => optional($message->created_at)->toIso8601String() ?? '',
+        ];
+
+        $fcm = app(FcmService::class);
+        $controller = app(PushController::class);
+
+        $successCount = 0;
+        $failureCount = 0;
+        $errors = [];
+
+        foreach ($tokens as $token) {
+            $pushRequest = Request::create('/api/push/test', 'POST', [
+                'token' => $token,
+                'title' => $title,
+                'body' => $body,
+                'data' => $data,
+            ]);
+
+            try {
+                $response = $controller->testToToken($pushRequest, $fcm);
+                $status = method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 500;
+                $payload = method_exists($response, 'getData') ? (array) $response->getData(true) : [];
+                $ok = $status >= 200 && $status < 300 && (bool) ($payload['sent'] ?? $payload['success'] ?? false);
+
+                if ($ok) {
+                    $successCount++;
+                    continue;
+                }
+
+                $failureCount++;
+                $errors[] = [
+                    'status' => $status,
+                    'details' => $payload['error'] ?? $payload['details'] ?? 'unknown_error',
+                ];
+            } catch (Throwable $e) {
+                $failureCount++;
+                $errors[] = [
+                    'status' => 500,
+                    'details' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return [
+            'sent' => $successCount > 0,
+            'recipient_type' => $recipient['type'],
+            'recipient_id' => $recipient['id'],
+            'token_count' => count($tokens),
+            'success_count' => $successCount,
+            'failure_count' => $failureCount,
+            'errors' => array_slice($errors, 0, 5),
+        ];
+    }
+
+    private function resolveRecipient(DoctorChatRoom $room, array $sender): ?array
+    {
+        if (($sender['type'] ?? null) === 'user') {
+            return [
+                'type' => 'doctor',
+                'id' => (int) $room->doctor_id,
+            ];
+        }
+
+        if (($sender['type'] ?? null) === 'doctor') {
+            return [
+                'type' => 'user',
+                'id' => (int) $room->user_id,
+            ];
+        }
+
+        return null;
+    }
+
+    private function recipientTokens(string $recipientType, int $recipientId): array
+    {
+        $ownerModel = $recipientType === 'doctor' ? Doctor::class : User::class;
+
+        $query = DeviceToken::query()
+            ->where('user_id', $recipientId)
+            ->whereNotNull('token')
+            ->where('token', '!=', '')
+            ->where(function ($inner) use ($ownerModel, $recipientType) {
+                $inner->where('meta->owner_model', $ownerModel)
+                    ->orWhere('meta->owner_model', $recipientType);
+            })
+            ->orderByRaw('COALESCE(last_seen_at, updated_at, created_at) DESC')
+            ->limit(20);
+
+        $tokens = $query->pluck('token')
+            ->filter(fn ($token) => is_string($token) && trim($token) !== '')
+            ->map(fn ($token) => trim((string) $token))
+            ->unique()
+            ->values()
+            ->all();
+
+        if (!empty($tokens) || $recipientType === 'doctor') {
+            return $tokens;
+        }
+
+        // Backward compatibility for older user tokens that may not carry owner_model.
+        return DeviceToken::query()
+            ->where('user_id', $recipientId)
+            ->whereNotNull('token')
+            ->where('token', '!=', '')
+            ->where(function ($inner) {
+                $inner->whereNull('meta')
+                    ->orWhereNull('meta->owner_model');
+            })
+            ->orderByRaw('COALESCE(last_seen_at, updated_at, created_at) DESC')
+            ->limit(20)
+            ->pluck('token')
+            ->filter(fn ($token) => is_string($token) && trim($token) !== '')
+            ->map(fn ($token) => trim((string) $token))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function senderDisplayName(string $senderType, int $senderId): string
+    {
+        if ($senderType === 'doctor') {
+            $name = Doctor::query()->whereKey($senderId)->value('doctor_name');
+            if (is_string($name) && trim($name) !== '') {
+                return trim($name);
+            }
+
+            return 'Doctor';
+        }
+
+        $name = User::query()->whereKey($senderId)->value('name');
+        if (is_string($name) && trim($name) !== '') {
+            return trim($name);
+        }
+
+        return 'User';
     }
 
     private function resolveActor(Request $request): ?array
