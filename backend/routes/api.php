@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\ClinicServicePresetController;
 use App\Http\Controllers\Api\VetRegistrationReportController;
 use App\Http\Controllers\Api\DoctorCsvExportController;
+use App\Http\Controllers\Api\DoctorChatController;
 use App\Http\Controllers\Api\VaccinationBookingController;
 use App\Models\User;
 use App\Models\DeviceToken;
@@ -116,6 +117,14 @@ Route::prefix('calls')->group(function () {
     Route::post('/{call}/reject', [NewCallController::class, 'reject']);
     Route::post('/{call}/end', [NewCallController::class, 'end']);
     Route::post('/{call}/cancel', [NewCallController::class, 'cancel']);
+});
+
+Route::prefix('doctor-chats')->group(function () {
+    Route::post('/rooms', [DoctorChatController::class, 'storeRoom']);
+    Route::get('/rooms', [DoctorChatController::class, 'indexRooms']);
+    Route::get('/rooms/{room}/messages', [DoctorChatController::class, 'messages'])->whereNumber('room');
+    Route::post('/rooms/{room}/messages', [DoctorChatController::class, 'storeMessage'])->whereNumber('room');
+    Route::patch('/rooms/{room}/read', [DoctorChatController::class, 'markRead'])->whereNumber('room');
 });
 
 Route::prefix('v1')->group(function () {
