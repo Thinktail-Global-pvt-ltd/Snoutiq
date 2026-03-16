@@ -23,9 +23,8 @@ class TransactionInvoiceController extends Controller
             ? $this->formatThinktailInvoiceNumber((int) $transaction->id)
             : 'INV-TXN-' . $transaction->id;
 
-        $invoiceDate = optional($transaction->created_at)->format(
-            $isExcellExportCampaign ? 'F j, Y' : 'd M Y, h:i A'
-        ) ?: now()->format($isExcellExportCampaign ? 'F j, Y' : 'd M Y, h:i A');
+        $invoiceDate = optional($transaction->created_at)->format('F j, Y')
+            ?: now()->format('F j, Y');
 
         $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
         $payout = is_array($metadata['payout_breakup'] ?? null) ? $metadata['payout_breakup'] : [];
@@ -54,19 +53,19 @@ class TransactionInvoiceController extends Controller
             );
         } else {
             $lineItemLabel = $this->resolveLineItemLabel((string) ($transaction->type ?? ''));
-            $status = strtoupper((string) ($transaction->status ?? 'pending'));
-            $reference = (string) ($transaction->reference ?? '');
 
-            $html = $this->buildDefaultHtml(
+            $cgstPaise = (int) round(max($gstPaise, 0) / 2);
+            $sgstPaise = max((int) $gstPaise - $cgstPaise, 0);
+
+            $html = $this->buildExcellExportCampaignHtml(
                 transaction: $transaction,
                 invoiceNumber: $invoiceNumber,
                 invoiceDate: $invoiceDate,
-                lineItemLabel: $lineItemLabel,
-                status: $status,
-                reference: $reference,
-                grossPaise: $grossPaise,
-                taxablePaise: $taxablePaise,
-                gstPaise: $gstPaise
+                totalPaise: max($grossPaise, 0),
+                taxablePaise: max($taxablePaise, 0),
+                cgstPaise: max($cgstPaise, 0),
+                sgstPaise: max($sgstPaise, 0),
+                serviceLabel: $lineItemLabel
             );
         }
 
@@ -217,7 +216,7 @@ class TransactionInvoiceController extends Controller
         }
 
         return match ($normalized) {
-            'video_consult', 'video_call', 'video call', 'appointment' => 'Video Consultation',
+            'video_consult', 'video_call', 'video call', 'appointment' => 'Online Vet Consultation',
             'excell_export_campaign' => 'Consultation (Excel Export Campaign)',
             default => ucwords(str_replace(['_', '-'], ' ', $normalized)),
         };
@@ -230,7 +229,8 @@ class TransactionInvoiceController extends Controller
         int $totalPaise,
         int $taxablePaise,
         int $cgstPaise,
-        int $sgstPaise
+        int $sgstPaise,
+        string $serviceLabel = 'Online Vet Consultation'
     ): string {
         $customerName = strtoupper(trim((string) ($transaction->user->name ?? 'PET PARENT NAME')));
         if ($customerName === '') {
@@ -540,7 +540,7 @@ CSS;
             </thead>
             <tbody>
                 <tr>
-                    <td>Online Vet Consultation</td>
+                    <td>{$this->e($serviceLabel)}</td>
                     <td>{$this->e($taxableDisplay)}</td>
                 </tr>
             </tbody>
