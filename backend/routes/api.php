@@ -2301,6 +2301,7 @@ Route::prefix('public')->group(function(){
 
     Route::get('/groomers', [PublicController::class, 'groomers']);
     Route::get('/single_groomer/{id}', [PublicController::class, 'single_groomer']);
+    Route::get('/profile/completion', [UserController::class, 'profileCompletion']);
 
       Route::post('/chats/startChat', [ChatController::class, 'startChat']);
       Route::post('/chats/myMessages', [ChatController::class, 'myMessages']);

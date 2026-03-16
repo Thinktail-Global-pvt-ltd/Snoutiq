@@ -460,18 +460,56 @@ public function pet_update(Request $request, $id)
     /**
      * GET /api/user/profile/completion
      * Returns completion percent + missing fields using users + pets tables.
+     * Preferred input: pet_id (owner is auto-resolved from pet.user_id).
      */
     public function profileCompletion(Request $request)
     {
         $payload = $request->validate([
-            'user_id' => 'sometimes|integer|exists:users,id',
             'pet_id'  => 'sometimes|integer',
+            'user_id' => 'sometimes|integer|exists:users,id',
         ]);
 
-        // Resolve user from auth → explicit param → header/query (matches other endpoints)
-        $user = $request->user();
+        $hasPetsTable = Schema::hasTable('pets');
+        $hasUserPetsTable = Schema::hasTable('user_pets');
+
+        $pet = null;
+        $legacyUserPet = null;
+        $user = null;
+
+        if (!empty($payload['pet_id'])) {
+            $petId = (int) $payload['pet_id'];
+
+            if ($hasPetsTable) {
+                $pet = Pet::find($petId);
+            }
+
+            if (!$pet && $hasUserPetsTable) {
+                $legacyUserPet = UserPet::find($petId);
+            }
+
+            if (!$pet && !$legacyUserPet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pet not found for provided pet_id.',
+                ], 404);
+            }
+
+            $resolvedUserId = (int) ($pet->user_id ?? $legacyUserPet->user_id ?? 0);
+            $user = $resolvedUserId ? User::find($resolvedUserId) : null;
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Owner user not found for provided pet_id.',
+                ], 404);
+            }
+        }
+
+        // Backward compatibility path: auth/user_id/header when pet_id is not supplied
+        if (!$user) {
+            $user = $request->user();
+        }
         if (!$user && isset($payload['user_id'])) {
-            $user = User::find($payload['user_id']);
+            $user = User::find((int) $payload['user_id']);
         }
         if (!$user) {
             $fallbackId = (int) ($request->header('X-Session-User') ?? $request->query('user_id', 0));
@@ -480,16 +518,14 @@ public function pet_update(Request $request, $id)
         if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Not authenticated. Provide user_id or login first.',
-            ], 401);
+                'message' => 'Provide pet_id (preferred) or user_id.',
+            ], 422);
         }
 
         $userColumns = Schema::hasTable('users') ? Schema::getColumnListing('users') : [];
-        $hasPetsTable = Schema::hasTable('pets');
         $petColumns = $hasPetsTable ? Schema::getColumnListing('pets') : [];
 
-        $pet = null;
-        if ($hasPetsTable) {
+        if (!$pet && $hasPetsTable) {
             $petQuery = Pet::query()->where('user_id', $user->id);
             if (!empty($payload['pet_id'])) {
                 $petQuery->where('id', (int) $payload['pet_id']);
@@ -510,7 +546,7 @@ public function pet_update(Request $request, $id)
             ->filter(fn($v) => $this->profileValueFilled($v))
             ->isNotEmpty();
 
-        $petSource = $pet ?: ($legacyPetHasData ? $legacyPet : null);
+        $petSource = $pet ?: ($legacyUserPet ?: ($legacyPetHasData ? $legacyPet : null));
 
         $pets = collect();
         if ($hasPetsTable) {
@@ -574,8 +610,8 @@ public function pet_update(Request $request, $id)
             } else {
                 // Prefer pets table
                 if ($petSource) {
-                    // Ensure the column exists on pets table or we're using legacy object
-                    if ($pet || in_array($field['column'], $petColumns, true)) {
+                    // Ensure the column exists on pets table or we're using a legacy source object
+                    if ($pet || $legacyUserPet || in_array($field['column'], $petColumns, true)) {
                         $value = data_get($petSource, $field['column']);
                     }
                 }
@@ -583,7 +619,7 @@ public function pet_update(Request $request, $id)
                 // Alternates on pets table (e.g., type/gender/dob variants)
                 if (!$this->profileValueFilled($value) && !empty($field['alternates'])) {
                     foreach ($field['alternates'] as $alt) {
-                        if ($petSource && ($pet || in_array($alt, $petColumns, true))) {
+                        if ($petSource && ($pet || $legacyUserPet || in_array($alt, $petColumns, true))) {
                             $altValue = data_get($petSource, $alt);
                             if ($this->profileValueFilled($altValue)) {
                                 $value = $altValue;
@@ -645,7 +681,7 @@ public function pet_update(Request $request, $id)
         $fieldsTotal   = $fieldsFilled + $fieldsMissing;
         $completionPercent = $fieldsTotal ? round(($fieldsFilled / $fieldsTotal) * 100) : 0;
 
-        $petDobValue = $pet?->pet_dob ?? $pet?->dob ?? null;
+        $petDobValue = $pet?->pet_dob ?? $pet?->dob ?? $legacyUserPet?->pet_dob ?? $legacyUserPet?->dob ?? null;
         $petDob = $this->normalizeDateString($petDobValue);
 
         $petsPayload = $pets->map(function (Pet $item) {
@@ -665,7 +701,21 @@ public function pet_update(Request $request, $id)
             ];
         })->values();
 
-        if ($petsPayload->isEmpty() && $legacyPetHasData) {
+        if ($petsPayload->isEmpty() && $legacyUserPet) {
+            $legacyDob = $this->normalizeDateString($legacyUserPet->pet_dob ?? $legacyUserPet->dob ?? null);
+            $legacyDerivedAge = $this->deriveAgeYearsFromDob($legacyDob);
+
+            $petsPayload = collect([[
+                'id' => $legacyUserPet->id,
+                'name' => $legacyUserPet->name ?? null,
+                'pet_type' => $legacyUserPet->pet_type ?? $legacyUserPet->type ?? null,
+                'breed' => $legacyUserPet->breed ?? null,
+                'pet_gender' => $legacyUserPet->pet_gender ?? $legacyUserPet->gender ?? null,
+                'pet_age' => $legacyUserPet->pet_age ?? $legacyDerivedAge,
+                'pet_age_months' => $legacyUserPet->pet_age_months ?? null,
+                'pet_dob' => $legacyDob,
+            ]]);
+        } elseif ($petsPayload->isEmpty() && $legacyPetHasData) {
             $petsPayload = collect([[
                 'id' => null,
                 'name' => $user->pet_name ?? null,
@@ -682,7 +732,7 @@ public function pet_update(Request $request, $id)
             'success' => true,
             'data' => [
                 'user_id' => $user->id,
-                'pet_id' => $pet?->id,
+                'pet_id' => $pet?->id ?? $legacyUserPet?->id,
                 'pet_dob' => $petDob,
                 'fields_total' => $fieldsTotal,
                 'fields_filled' => $fieldsFilled,
