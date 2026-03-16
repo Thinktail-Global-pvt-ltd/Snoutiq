@@ -174,6 +174,7 @@ Route::get('/admin/doctors/export/csv', [DoctorCsvExportController::class, 'expo
 Route::get('/financials', [ClinicFinancialsController::class, 'show'])->name('api.clinic.financials');
 Route::get('/pets/consult-timeline', [PetConsultTimelineController::class, 'index'])->name('api.pets.consult-timeline');
 Route::get('/pets/lifeline-timeline', [PetConsultTimelineController::class, 'lifeline'])->name('api.pets.lifeline-timeline');
+Route::get('/pets/lifeline-timeline/pdf', [PetConsultTimelineController::class, 'lifelinePdf'])->name('api.pets.lifeline-timeline.pdf');
 
 
 Route::get('/agora/appid', function () {
