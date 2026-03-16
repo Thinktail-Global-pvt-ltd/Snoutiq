@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use App\Services\PetDiseaseInferenceService;
+use Carbon\Carbon;
 
 class AdminController extends Controller
 {
@@ -184,32 +185,48 @@ class AdminController extends Controller
 
     /**
      * ADD PET:
-     * Insert requested pet with ON DUPLICATE KEY UPDATE (no duplicates)
-     * Body: { name, breed, pet_age, pet_gender, pet_type?, pet_dob?, microchip_number?, mcd_registration_number?, weight?, is_neutered?, pet_doc1?, pet_doc2? }
+     * Supports both legacy pet fields and register-style payload keys.
      */
     public function addPet(Request $request, $userId)
     {
-        // minimal required checks
-        foreach (['name','breed','pet_gender','pet_age'] as $f) {
-            if (!$request->filled($f)) {
-                return response()->json(['status'=>'error','message'=>"$f is required"], 422);
-            }
+        if (! Schema::hasTable('pets')) {
+            return response()->json(['status' => 'error', 'message' => 'pets table not found'], 500);
         }
-        $name       = $request->input('name');
-        $breed      = $request->input('breed');
-        $pet_age    = (int)$request->input('pet_age');
-        $pet_gender = $request->input('pet_gender');
+
+        $effectiveUserId = $this->resolvePetUserId($request, $userId);
+        if ($effectiveUserId <= 0) {
+            return response()->json(['status' => 'error', 'message' => 'user_id is required'], 422);
+        }
+
+        $petName = $this->firstNonEmptyInput($request, ['pet_name', 'name']);
+        $breed = $request->input('breed');
+        $petGender = $request->input('pet_gender');
+        $petAgeRaw = $request->input('pet_age');
+
+        if ($petName === null || $petName === '') {
+            return response()->json(['status' => 'error', 'message' => 'pet_name or name is required'], 422);
+        }
+        if ($breed === null || $breed === '') {
+            return response()->json(['status' => 'error', 'message' => 'breed is required'], 422);
+        }
+        if ($petGender === null || $petGender === '') {
+            return response()->json(['status' => 'error', 'message' => 'pet_gender is required'], 422);
+        }
+        if ($petAgeRaw === null || $petAgeRaw === '') {
+            return response()->json(['status' => 'error', 'message' => 'pet_age is required'], 422);
+        }
+
+        $petAge = (int) $petAgeRaw;
         $petType = $request->filled('pet_type') ? $request->input('pet_type') : null;
-        $petDob = $request->filled('pet_dob') ? $request->input('pet_dob') : null;
+        $petDob = $request->has('pet_dob') ? $this->normalizeDateInput($request->input('pet_dob')) : null;
         $microchipNumber = $request->input('microchip_number');
         $mcdRegistration = $request->input('mcd_registration_number');
-        $weight = $request->filled('weight') ? (float)$request->input('weight') : null;
+        $weightRaw = $request->filled('pet_weight') ? $request->input('pet_weight') : $request->input('weight');
+        $weight = ($weightRaw !== null && $weightRaw !== '' && is_numeric($weightRaw)) ? (float) $weightRaw : null;
 
-        try {
-            $isNeutered = $this->normalizeNeuteredFlag($request->input('is_neutered'));
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
-        }
+        $isNeutered = $this->normalizeNullableBoolInt($request->input('is_nuetered', $request->input('is_neutered')));
+        $dewormingYesNo = $this->normalizeNullableBoolInt($request->input('deworming_yes_no', $request->input('deworming')));
+        $lastDewormingDate = $this->normalizeDateInput($request->input('last_deworming_date'));
 
         $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
         [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
@@ -217,87 +234,128 @@ class AdminController extends Controller
         $uploadedDoc1 = $this->storePetDocument($request, 'pet_doc1');
         $uploadedDoc2 = $this->storePetDocument($request, 'pet_doc2');
 
-        $pet_doc1   = $uploadedDoc1 ?? $request->input('pet_doc1');
-        $pet_doc2   = $uploadedDoc2 ?? $request->input('pet_doc2');
-        if (($pet_doc2 === null || $pet_doc2 === '') && ($pet_doc1 !== null && $pet_doc1 !== '')) {
-            $pet_doc2 = $pet_doc1;
+        $petDoc1 = $uploadedDoc1 ?? $request->input('pet_doc1');
+        $petDoc2 = $uploadedDoc2 ?? $request->input('pet_doc2');
+        if (($petDoc2 === null || $petDoc2 === '') && ($petDoc1 !== null && $petDoc1 !== '')) {
+            $petDoc2 = $petDoc1;
         }
 
         return DB::transaction(function () use (
-            $userId,
-            $name,
+            $request,
+            $effectiveUserId,
+            $petName,
             $breed,
-            $pet_age,
-            $pet_gender,
+            $petAge,
+            $petGender,
             $petType,
             $petDob,
             $microchipNumber,
             $mcdRegistration,
             $weight,
             $isNeutered,
-            $pet_doc1,
-            $pet_doc2,
+            $dewormingYesNo,
+            $lastDewormingDate,
+            $petDoc1,
+            $petDoc2,
             $blobColumnsReady,
             $petDocBlob,
             $petDocMime
         ) {
-            // Insert the new pet (idempotent)
-            DB::statement(
-                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_type, pet_dob, microchip_number, mcd_registration_number, weight, is_neutered, pet_doc1, pet_doc2, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-                 ON DUPLICATE KEY UPDATE
-                  name = VALUES(name),
-                  breed = VALUES(breed),
-                  pet_age = VALUES(pet_age),
-                  pet_gender = VALUES(pet_gender),
-                  pet_type = COALESCE(VALUES(pet_type), pet_type),
-                  pet_dob = COALESCE(VALUES(pet_dob), pet_dob),
-                  microchip_number = COALESCE(VALUES(microchip_number), microchip_number),
-                  mcd_registration_number = COALESCE(VALUES(mcd_registration_number), mcd_registration_number),
-                  weight = COALESCE(VALUES(weight), weight),
-                  is_neutered = COALESCE(VALUES(is_neutered), is_neutered),
-                   pet_doc1 = COALESCE(VALUES(pet_doc1), pet_doc1),
-                   pet_doc2 = COALESCE(VALUES(pet_doc2), pet_doc2),
-                   updated_at = CURRENT_TIMESTAMP',
-                [
-                    $userId,
-                    $name,
-                    $breed,
-                    $pet_age,
-                    $pet_gender,
-                    $petType,
-                    $petDob,
-                    $microchipNumber,
-                    $mcdRegistration,
-                    $weight,
-                    $isNeutered,
-                    $pet_doc1,
-                    $pet_doc2,
-                ]
-            );
+            $petColumns = $this->tableColumns('pets');
+            $petPayload = [];
 
-            $pet = DB::table('pets')
-                ->select($this->safePetSelectColumns())
-                ->where('user_id', $userId)
-                ->where('name', $name)
-                ->where('breed', $breed)
-                ->where('pet_age', $pet_age)
-                ->where('pet_gender', $pet_gender)
-                ->orderByDesc('id')
-                ->first();
+            if (isset($petColumns['user_id'])) {
+                $petPayload['user_id'] = $effectiveUserId;
+            } elseif (isset($petColumns['owner_id'])) {
+                $petPayload['owner_id'] = $effectiveUserId;
+            }
 
-            if ($pet && $blobColumnsReady && $petDocBlob !== null) {
-                DB::table('pets')->where('id', (int) $pet->id)->update([
+            $this->setColumnValue($petPayload, $petColumns, 'name', $petName, true);
+            $this->setColumnValue($petPayload, $petColumns, 'breed', $breed, true);
+            $this->setColumnValue($petPayload, $petColumns, 'pet_age', $petAge, true);
+            $this->setColumnValue($petPayload, $petColumns, 'pet_gender', $petGender, true);
+            $this->setColumnValue($petPayload, $petColumns, 'pet_type', $petType);
+            $this->setColumnValue($petPayload, $petColumns, 'type', $petType);
+            $this->setColumnValue($petPayload, $petColumns, 'pet_dob', $petDob);
+            $this->setColumnValue($petPayload, $petColumns, 'dob', $petDob);
+            $this->setColumnValue($petPayload, $petColumns, 'microchip_number', $microchipNumber);
+            $this->setColumnValue($petPayload, $petColumns, 'mcd_registration_number', $mcdRegistration);
+            $this->setColumnValue($petPayload, $petColumns, 'weight', $weight);
+            $this->setColumnValue($petPayload, $petColumns, 'pet_doc1', $petDoc1);
+            $this->setColumnValue($petPayload, $petColumns, 'pet_doc2', $petDoc2);
+            $this->setColumnValue($petPayload, $petColumns, 'deworming_yes_no', $dewormingYesNo);
+            $this->setColumnValue($petPayload, $petColumns, 'last_deworming_date', $lastDewormingDate);
+            $this->setColumnValue($petPayload, $petColumns, 'role', $request->input('role'));
+
+            if ($isNeutered !== null) {
+                if (isset($petColumns['is_nuetered'])) {
+                    $petPayload['is_nuetered'] = $this->neuteredValueForPetColumn('is_nuetered', $isNeutered);
+                }
+                if (isset($petColumns['is_neutered'])) {
+                    $petPayload['is_neutered'] = $this->neuteredValueForPetColumn('is_neutered', $isNeutered);
+                }
+            }
+
+            $existingPetId = null;
+            $hasUserKey = isset($petColumns['user_id']) || isset($petColumns['owner_id']);
+            $canLookupDuplicate = $hasUserKey
+                && isset($petColumns['name'], $petColumns['breed'], $petColumns['pet_age'], $petColumns['pet_gender']);
+
+            if ($canLookupDuplicate) {
+                $duplicateQuery = DB::table('pets');
+                if (isset($petColumns['user_id'])) {
+                    $duplicateQuery->where('user_id', $effectiveUserId);
+                } else {
+                    $duplicateQuery->where('owner_id', $effectiveUserId);
+                }
+                $duplicateQuery
+                    ->where('name', $petName)
+                    ->where('breed', $breed)
+                    ->where('pet_age', $petAge)
+                    ->where('pet_gender', $petGender);
+
+                $existingPetId = $duplicateQuery->orderByDesc('id')->value('id');
+            }
+
+            if ($existingPetId) {
+                if (isset($petColumns['updated_at'])) {
+                    $petPayload['updated_at'] = now();
+                }
+                DB::table('pets')->where('id', (int) $existingPetId)->update($petPayload);
+                $petId = (int) $existingPetId;
+            } else {
+                if (isset($petColumns['created_at'])) {
+                    $petPayload['created_at'] = now();
+                }
+                if (isset($petColumns['updated_at'])) {
+                    $petPayload['updated_at'] = now();
+                }
+                $petId = (int) DB::table('pets')->insertGetId($petPayload);
+            }
+
+            if ($blobColumnsReady && $petDocBlob !== null) {
+                DB::table('pets')->where('id', $petId)->update([
                     'pet_doc2_blob' => $petDocBlob,
                     'pet_doc2_mime' => $petDocMime,
                     'updated_at' => now(),
                 ]);
-
-                $pet = DB::table('pets')
-                    ->select($this->safePetSelectColumns())
-                    ->where('id', (int) $pet->id)
-                    ->first();
             }
+
+            $this->syncUserFromRegisterPetFields($effectiveUserId, [
+                'pet_owner_name' => $request->input('pet_owner_name'),
+                'pet_name' => $petName,
+                'pet_gender' => $petGender,
+                'pet_age' => $petAge,
+                'breed' => $breed,
+                'role' => $request->input('role'),
+                'pet_doc1' => $petDoc1,
+                'pet_doc2' => $petDoc2,
+            ]);
+
+            $pet = DB::table('pets')
+                ->select($this->safePetSelectColumns())
+                ->where('id', $petId)
+                ->first();
 
             if ($pet) {
                 $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
@@ -310,21 +368,95 @@ class AdminController extends Controller
     // update pet
     public function updatePet(Request $request, $petId)
     {
-        $scalarCols = ['name','breed','pet_age','pet_gender','pet_type','pet_dob','microchip_number','mcd_registration_number','weight'];
-        $sets = [];
-        $params = [];
-        foreach ($scalarCols as $c) {
-            if ($request->has($c)) { $sets[] = "`$c` = ?"; $params[] = $request->input($c); }
+        if (! Schema::hasTable('pets')) {
+            return response()->json(['status' => 'error', 'message' => 'pets table not found'], 500);
         }
 
-        if ($request->has('is_neutered')) {
-            try {
-                $neuteredFlag = $this->normalizeNeuteredFlag($request->input('is_neutered'));
-            } catch (\InvalidArgumentException $e) {
-                return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
+        $pet = DB::table('pets')
+            ->select($this->safePetSelectColumns())
+            ->where('id', $petId)
+            ->first();
+
+        if (! $pet) {
+            return response()->json(['status' => 'error', 'message' => 'Pet not found'], 404);
+        }
+
+        $petColumns = $this->tableColumns('pets');
+        $updatePayload = [];
+
+        if ($request->has('pet_name') || $request->has('name')) {
+            $petName = $this->firstNonEmptyInput($request, ['pet_name', 'name']);
+            if ($petName !== null) {
+                $this->setColumnValue($updatePayload, $petColumns, 'name', $petName, true);
             }
-            $sets[] = "`is_neutered` = ?";
-            $params[] = $neuteredFlag;
+        }
+        if ($request->has('breed')) {
+            $this->setColumnValue($updatePayload, $petColumns, 'breed', $request->input('breed'));
+        }
+        if ($request->has('pet_age')) {
+            $petAgeRaw = $request->input('pet_age');
+            if ($petAgeRaw !== null && $petAgeRaw !== '') {
+                $this->setColumnValue($updatePayload, $petColumns, 'pet_age', (int) $petAgeRaw, true);
+            }
+        }
+        if ($request->has('pet_gender')) {
+            $this->setColumnValue($updatePayload, $petColumns, 'pet_gender', $request->input('pet_gender'));
+        }
+        if ($request->has('pet_type')) {
+            $petType = $request->input('pet_type');
+            $this->setColumnValue($updatePayload, $petColumns, 'pet_type', $petType);
+            $this->setColumnValue($updatePayload, $petColumns, 'type', $petType);
+        }
+        if ($request->has('pet_dob')) {
+            $petDobRaw = $request->input('pet_dob');
+            $petDob = $this->normalizeDateInput($petDobRaw);
+            if ($petDob !== null || $petDobRaw === null || trim((string) $petDobRaw) === '') {
+                $this->setColumnValue($updatePayload, $petColumns, 'pet_dob', $petDob, true);
+                $this->setColumnValue($updatePayload, $petColumns, 'dob', $petDob, true);
+            }
+        }
+        if ($request->has('microchip_number')) {
+            $this->setColumnValue($updatePayload, $petColumns, 'microchip_number', $request->input('microchip_number'));
+        }
+        if ($request->has('mcd_registration_number')) {
+            $this->setColumnValue($updatePayload, $petColumns, 'mcd_registration_number', $request->input('mcd_registration_number'));
+        }
+        if ($request->has('weight') || $request->has('pet_weight')) {
+            $weightRaw = $request->has('pet_weight') ? $request->input('pet_weight') : $request->input('weight');
+            if ($weightRaw === null || trim((string) $weightRaw) === '') {
+                $this->setColumnValue($updatePayload, $petColumns, 'weight', null, true);
+            } elseif (is_numeric($weightRaw)) {
+                $this->setColumnValue($updatePayload, $petColumns, 'weight', (float) $weightRaw, true);
+            }
+        }
+        if ($request->has('deworming_yes_no') || $request->has('deworming')) {
+            $dewormingYesNo = $this->normalizeNullableBoolInt($request->input('deworming_yes_no', $request->input('deworming')));
+            if ($dewormingYesNo !== null) {
+                $this->setColumnValue($updatePayload, $petColumns, 'deworming_yes_no', $dewormingYesNo, true);
+            }
+        }
+        if ($request->has('last_deworming_date')) {
+            $lastDewormingRaw = $request->input('last_deworming_date');
+            $lastDewormingDate = $this->normalizeDateInput($lastDewormingRaw);
+            if ($lastDewormingDate !== null || $lastDewormingRaw === null || trim((string) $lastDewormingRaw) === '') {
+                $this->setColumnValue($updatePayload, $petColumns, 'last_deworming_date', $lastDewormingDate, true);
+            }
+        }
+
+        if ($request->has('is_nuetered') || $request->has('is_neutered')) {
+            $isNeutered = $this->normalizeNullableBoolInt($request->input('is_nuetered', $request->input('is_neutered')));
+            if ($isNeutered !== null) {
+                if (isset($petColumns['is_nuetered'])) {
+                    $updatePayload['is_nuetered'] = $this->neuteredValueForPetColumn('is_nuetered', $isNeutered);
+                }
+                if (isset($petColumns['is_neutered'])) {
+                    $updatePayload['is_neutered'] = $this->neuteredValueForPetColumn('is_neutered', $isNeutered);
+                }
+            }
+        }
+
+        if ($request->has('role')) {
+            $this->setColumnValue($updatePayload, $petColumns, 'role', $request->input('role'));
         }
 
         $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
@@ -346,45 +478,63 @@ class AdminController extends Controller
         } elseif ($request->has('pet_doc2')) {
             $petDoc2Value = $request->input('pet_doc2');
         } elseif ($petDoc1Value !== null && $petDoc1Value !== '') {
-            // Keep pet_doc2 in sync when only pet_doc1 is provided.
             $petDoc2Value = $petDoc1Value;
         }
 
         if ($petDoc1Value !== null) {
-            $sets[] = "`pet_doc1` = ?";
-            $params[] = $petDoc1Value;
+            $this->setColumnValue($updatePayload, $petColumns, 'pet_doc1', $petDoc1Value, true);
         }
-
         if ($petDoc2Value !== null) {
-            $sets[] = "`pet_doc2` = ?";
-            $params[] = $petDoc2Value;
+            $this->setColumnValue($updatePayload, $petColumns, 'pet_doc2', $petDoc2Value, true);
         }
-
         if ($this->petDoc2BlobColumnsReady() && $petDocBlob !== null) {
-            $sets[] = "`pet_doc2_blob` = ?";
-            $params[] = $petDocBlob;
-            $sets[] = "`pet_doc2_mime` = ?";
-            $params[] = $petDocMime;
+            $updatePayload['pet_doc2_blob'] = $petDocBlob;
+            $updatePayload['pet_doc2_mime'] = $petDocMime;
         }
 
-        if (!$sets) return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
+        $userIdFromPet = isset($pet->user_id) ? (int) $pet->user_id : 0;
+        if ($userIdFromPet <= 0 && isset($pet->owner_id)) {
+            $userIdFromPet = (int) $pet->owner_id;
+        }
+        $effectiveUserId = $this->resolvePetUserId($request, $userIdFromPet);
 
-        $sql = 'UPDATE pets SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
-        $params[] = $petId;
-
-        $n = DB::update($sql, $params);
-        if (!$n) return response()->json(['status'=>'error','message'=>'Pet not found or unchanged'], 404);
-
-        $pet = DB::table('pets')
-            ->select($this->safePetSelectColumns())
-            ->where('id', $petId)
-            ->first();
-
-        if ($pet) {
-            $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
+        $userUpdated = false;
+        if ($effectiveUserId > 0) {
+            $userUpdated = $this->syncUserFromRegisterPetFields($effectiveUserId, [
+                'pet_owner_name' => $request->input('pet_owner_name'),
+                'pet_name' => $this->firstNonEmptyInput($request, ['pet_name', 'name']),
+                'pet_gender' => $request->input('pet_gender'),
+                'pet_age' => $request->input('pet_age'),
+                'breed' => $request->input('breed'),
+                'role' => $request->input('role'),
+                'pet_doc1' => $petDoc1Value,
+                'pet_doc2' => $petDoc2Value,
+            ]);
         }
 
-        return response()->json(['status' => 'success', 'data' => $pet]);
+        if (!$updatePayload && ! $userUpdated) {
+            return response()->json(['status' => 'error', 'message' => 'No fields to update'], 422);
+        }
+
+        return DB::transaction(function () use ($petId, $updatePayload) {
+            if ($updatePayload) {
+                if (Schema::hasColumn('pets', 'updated_at')) {
+                    $updatePayload['updated_at'] = now();
+                }
+                DB::table('pets')->where('id', $petId)->update($updatePayload);
+            }
+
+            $updatedPet = DB::table('pets')
+                ->select($this->safePetSelectColumns())
+                ->where('id', $petId)
+                ->first();
+
+            if ($updatedPet) {
+                $updatedPet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $updatedPet->id);
+            }
+
+            return response()->json(['status' => 'success', 'data' => $updatedPet]);
+        });
     }
 
     // delete pet
@@ -487,6 +637,191 @@ class AdminController extends Controller
 
         $users = User::all();
         return response()->json(['status' => 'success', 'data' => $users]);
+    }
+
+    private function resolvePetUserId(Request $request, $routeUserId): int
+    {
+        $routeId = is_numeric($routeUserId) ? (int) $routeUserId : 0;
+        $bodyId = $request->filled('user_id') && is_numeric($request->input('user_id'))
+            ? (int) $request->input('user_id')
+            : 0;
+
+        if ($routeId > 0) {
+            return $routeId;
+        }
+
+        return $bodyId;
+    }
+
+    private function firstNonEmptyInput(Request $request, array $keys): ?string
+    {
+        foreach ($keys as $key) {
+            if (! $request->has($key)) {
+                continue;
+            }
+            $value = $request->input($key);
+            if ($value === null) {
+                continue;
+            }
+            $text = trim((string) $value);
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeNullableBoolInt($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+
+        if (is_numeric($value)) {
+            return ((int) $value) === 1 ? 1 : 0;
+        }
+
+        $normalized = strtolower(trim((string) $value, " \t\n\r\0\x0B\"'"));
+        if (in_array($normalized, ['1', 'true', 'yes', 'y'], true)) {
+            return 1;
+        }
+        if (in_array($normalized, ['0', 'false', 'no', 'n'], true)) {
+            return 0;
+        }
+
+        return null;
+    }
+
+    private function normalizeDateInput($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function tableColumns(string $table): array
+    {
+        if (! Schema::hasTable($table)) {
+            return [];
+        }
+
+        $columns = Schema::getColumnListing($table);
+        return array_fill_keys($columns, true);
+    }
+
+    private function setColumnValue(array &$payload, array $columns, string $column, $value, bool $allowNull = false): void
+    {
+        if (! isset($columns[$column])) {
+            return;
+        }
+        if (! $allowNull && ($value === null || $value === '')) {
+            return;
+        }
+        $payload[$column] = $value;
+    }
+
+    private function petColumnUsesEnumStyle(string $column): bool
+    {
+        if (! Schema::hasTable('pets') || ! Schema::hasColumn('pets', $column)) {
+            return false;
+        }
+
+        $columnType = null;
+        try {
+            $columnType = Schema::getColumnType('pets', $column);
+        } catch (\Throwable $e) {
+            $columnType = null;
+        }
+
+        $columnTypeNormalized = strtolower(trim((string) $columnType));
+        if (str_contains($columnTypeNormalized, 'enum')
+            || in_array($columnTypeNormalized, ['string', 'char', 'varchar'], true)) {
+            return true;
+        }
+
+        if ($columnTypeNormalized === '' || $columnTypeNormalized === 'unknown') {
+            try {
+                $columnMeta = DB::selectOne("SHOW COLUMNS FROM `pets` LIKE ?", [$column]);
+                $rawType = strtolower((string) ($columnMeta->Type ?? $columnMeta->type ?? ''));
+                if (str_contains($rawType, 'enum(')) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // Use non-enum fallback when metadata lookup fails.
+            }
+        }
+
+        return false;
+    }
+
+    private function neuteredValueForPetColumn(string $column, int $value)
+    {
+        if ($this->petColumnUsesEnumStyle($column)) {
+            return $value === 1 ? 'Y' : 'N';
+        }
+
+        return $value === 1 ? 1 : 0;
+    }
+
+    private function syncUserFromRegisterPetFields(int $userId, array $data): bool
+    {
+        if ($userId <= 0 || ! Schema::hasTable('users')) {
+            return false;
+        }
+
+        $userColumns = $this->tableColumns('users');
+        if (! $userColumns) {
+            return false;
+        }
+
+        $updates = [];
+
+        if (isset($userColumns['name']) && ! empty($data['pet_owner_name'])) {
+            $updates['name'] = trim((string) $data['pet_owner_name']);
+        }
+        if (isset($userColumns['pet_name']) && ! empty($data['pet_name'])) {
+            $updates['pet_name'] = trim((string) $data['pet_name']);
+        }
+        if (isset($userColumns['pet_gender']) && ! empty($data['pet_gender'])) {
+            $updates['pet_gender'] = trim((string) $data['pet_gender']);
+        }
+        if (isset($userColumns['pet_age']) && ($data['pet_age'] ?? null) !== null && $data['pet_age'] !== '') {
+            $updates['pet_age'] = (int) $data['pet_age'];
+        }
+        if (isset($userColumns['breed']) && ! empty($data['breed'])) {
+            $updates['breed'] = trim((string) $data['breed']);
+        }
+        if (isset($userColumns['role']) && ! empty($data['role'])) {
+            $updates['role'] = trim((string) $data['role']);
+        }
+        if (isset($userColumns['pet_doc1']) && ! empty($data['pet_doc1'])) {
+            $updates['pet_doc1'] = trim((string) $data['pet_doc1']);
+        }
+        if (isset($userColumns['pet_doc2']) && ! empty($data['pet_doc2'])) {
+            $updates['pet_doc2'] = trim((string) $data['pet_doc2']);
+        }
+
+        if (! $updates) {
+            return false;
+        }
+
+        if (isset($userColumns['updated_at'])) {
+            $updates['updated_at'] = now();
+        }
+
+        DB::table('users')->where('id', $userId)->update($updates);
+        return true;
     }
 
     private function normalizeNeuteredFlag($value): ?string
