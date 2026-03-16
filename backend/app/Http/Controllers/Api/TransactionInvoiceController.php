@@ -53,18 +53,20 @@ class TransactionInvoiceController extends Controller
             );
         } else {
             $lineItemLabel = $this->resolveLineItemLabel((string) ($transaction->type ?? ''));
-
-            $cgstPaise = (int) round(max($gstPaise, 0) / 2);
-            $sgstPaise = max((int) $gstPaise - $cgstPaise, 0);
+            $breakup = $this->resolveStandardGstBreakup(
+                grossPaise: $grossPaise,
+                taxablePaise: $taxablePaise,
+                gstPaise: $gstPaise
+            );
 
             $html = $this->buildExcellExportCampaignHtml(
                 transaction: $transaction,
                 invoiceNumber: $invoiceNumber,
                 invoiceDate: $invoiceDate,
-                totalPaise: max($grossPaise, 0),
-                taxablePaise: max($taxablePaise, 0),
-                cgstPaise: max($cgstPaise, 0),
-                sgstPaise: max($sgstPaise, 0),
+                totalPaise: $breakup['total_paise'],
+                taxablePaise: $breakup['taxable_paise'],
+                cgstPaise: $breakup['cgst_paise'],
+                sgstPaise: $breakup['sgst_paise'],
                 serviceLabel: $lineItemLabel
             );
         }
@@ -205,6 +207,34 @@ class TransactionInvoiceController extends Controller
             'taxable_paise' => max($taxablePaise, 0),
             'cgst_paise' => max($cgstPaise, 0),
             'sgst_paise' => max($sgstPaise, 0),
+        ];
+    }
+
+    protected function resolveStandardGstBreakup(
+        int $grossPaise,
+        int $taxablePaise,
+        int $gstPaise
+    ): array {
+        $taxable = max($taxablePaise, 0);
+        $gst = max($gstPaise, 0);
+
+        // Enforce GST split at 9% + 9% when GST is missing.
+        if ($gst <= 0) {
+            $taxable = max($grossPaise, 0);
+            $gst = (int) round($taxable * 0.18);
+        } elseif ($taxable <= 0) {
+            $taxable = max($grossPaise, 0);
+        }
+
+        $cgst = (int) round($gst / 2);
+        $sgst = max($gst - $cgst, 0);
+        $total = $taxable + $gst;
+
+        return [
+            'total_paise' => max($total, 0),
+            'taxable_paise' => max($taxable, 0),
+            'cgst_paise' => max($cgst, 0),
+            'sgst_paise' => max($sgst, 0),
         ];
     }
 
