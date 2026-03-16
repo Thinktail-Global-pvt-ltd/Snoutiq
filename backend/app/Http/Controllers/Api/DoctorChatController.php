@@ -28,7 +28,7 @@ class DoctorChatController extends Controller
         $room->load([
             'user:id,name,email,phone',
             'doctor:id,doctor_name,doctor_email,doctor_mobile',
-            'latestMessage:id,doctor_chat_room_id,sender_type,sender_id,message,read_at,created_at',
+            'latestMessage',
         ]);
 
         return response()->json([
@@ -61,7 +61,7 @@ class DoctorChatController extends Controller
             ->with([
                 'user:id,name,email,phone',
                 'doctor:id,doctor_name,doctor_email,doctor_mobile',
-                'latestMessage:id,doctor_chat_room_id,sender_type,sender_id,message,read_at,created_at',
+                'latestMessage',
             ])
             ->orderByDesc('last_message_at')
             ->orderByDesc('id');
