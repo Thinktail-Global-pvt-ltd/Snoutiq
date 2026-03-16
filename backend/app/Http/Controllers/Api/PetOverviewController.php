@@ -132,6 +132,73 @@ class PetOverviewController extends Controller
         ]);
     }
 
+    /**
+     * GET|POST /api/pets/check/vaccination-deworming-null
+     * Input: pet_id (query or body)
+     * Output: vaccination_is_null, deworming_is_null
+     */
+    public function vaccinationDewormingNullStatus(Request $request)
+    {
+        $rawPetId = $request->input('pet_id', $request->query('pet_id'));
+        $petId = is_numeric($rawPetId) ? (int) $rawPetId : 0;
+
+        if ($petId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_id is required',
+            ], 422);
+        }
+
+        if (!Schema::hasTable('pets')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets table is missing',
+            ], 500);
+        }
+
+        $columns = ['id'];
+        if (Schema::hasColumn('pets', 'last_deworming_date')) {
+            $columns[] = 'last_deworming_date';
+        }
+        if (Schema::hasColumn('pets', 'dog_disease_payload')) {
+            $columns[] = 'dog_disease_payload';
+        }
+
+        $pet = DB::table('pets')->select($columns)->where('id', $petId)->first();
+        if (!$pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found',
+            ], 404);
+        }
+
+        $dogDiseasePayload = property_exists($pet, 'dog_disease_payload')
+            ? $pet->dog_disease_payload
+            : null;
+        if (is_string($dogDiseasePayload)) {
+            $dogDiseasePayload = json_decode($dogDiseasePayload, true);
+        } elseif (is_object($dogDiseasePayload)) {
+            $dogDiseasePayload = json_decode(json_encode($dogDiseasePayload), true);
+        }
+        if (!is_array($dogDiseasePayload)) {
+            $dogDiseasePayload = null;
+        }
+
+        $vaccinationValue = is_array($dogDiseasePayload) && array_key_exists('vaccination', $dogDiseasePayload)
+            ? $dogDiseasePayload['vaccination']
+            : null;
+        $lastDewormingDate = property_exists($pet, 'last_deworming_date')
+            ? $pet->last_deworming_date
+            : null;
+
+        return response()->json([
+            'success' => true,
+            'pet_id' => $petId,
+            'vaccination_is_null' => $vaccinationValue === null,
+            'deworming_is_null' => $lastDewormingDate === null || trim((string) $lastDewormingDate) === '',
+        ]);
+    }
+
     private function normalizeYesNoFlag($value): ?int
     {
         if ($value === null || $value === '') {
