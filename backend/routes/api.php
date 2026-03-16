@@ -2704,6 +2704,8 @@ Route::get('/video/slots/doctor-test', function (\Illuminate\Http\Request $reque
 Route::get('/transactions/with-user-data', [\App\Http\Controllers\Api\TransactionController::class, 'index']);
 Route::get('/transactions/by-user', [\App\Http\Controllers\Api\TransactionController::class, 'byUser']);
 Route::get('/transactions/video-consult/by-pet-user', [\App\Http\Controllers\Api\TransactionController::class, 'videoConsultByPetUser']);
+Route::get('/transactions/invoice/pdf', [\App\Http\Controllers\Api\TransactionInvoiceController::class, 'showByPetAndTransaction'])
+    ->name('api.transactions.invoice.by-pet.pdf');
 Route::get('/transactions/{transaction}/invoice/pdf', [\App\Http\Controllers\Api\TransactionInvoiceController::class, 'show'])
     ->whereNumber('transaction')
     ->name('api.transactions.invoice.pdf');

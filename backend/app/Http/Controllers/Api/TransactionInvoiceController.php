@@ -81,6 +81,39 @@ class TransactionInvoiceController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/transactions/invoice/pdf?pet_id=&transaction_id=&download=
+     */
+    public function showByPetAndTransaction(Request $request)
+    {
+        $data = $request->validate([
+            'pet_id' => ['required', 'integer', 'exists:pets,id'],
+            'transaction_id' => ['required', 'integer', 'exists:transactions,id'],
+            'download' => ['nullable', 'boolean'],
+        ]);
+
+        $transaction = Transaction::query()
+            ->whereKey((int) $data['transaction_id'])
+            ->where('pet_id', (int) $data['pet_id'])
+            ->first();
+
+        if (! $transaction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No transaction found for the provided pet_id and transaction_id.',
+            ], 404);
+        }
+
+        if (! $request->query->has('download')) {
+            $request->query->set(
+                'download',
+                filter_var($data['download'] ?? true, FILTER_VALIDATE_BOOL) ? '1' : '0'
+            );
+        }
+
+        return $this->show($request, $transaction);
+    }
+
     protected function isExcellExportCampaign(Transaction $transaction): bool
     {
         return strtolower(trim((string) ($transaction->type ?? ''))) === 'excell_export_campaign';
