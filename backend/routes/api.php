@@ -1989,6 +1989,33 @@ Route::get('/test-cors', function (Request $request) {
 
 Route::get('/chats', [GeminiChatController::class, 'history']); 
 Route::post('/contact-request', [ContactRequestController::class, 'store']);
+Route::post('/invester-form', function (Request $request) {
+    $payload = $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'full_name' => ['required', 'string', 'max:255'],
+        'phone' => ['required', 'string', 'max:32'],
+        'email' => ['required', 'string', 'email', 'max:255'],
+        'linkedin' => ['nullable', 'string', 'max:500'],
+    ]);
+
+    $submission = DB::table('invester_form_submissions')->insertGetId([
+        'name' => $payload['name'],
+        'full_name' => $payload['full_name'],
+        'phone' => $payload['phone'],
+        'email' => $payload['email'],
+        'linkedin' => $payload['linkedin'] ?? null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Investor form submitted successfully',
+        'data' => [
+            'id' => $submission,
+        ],
+    ], 201);
+});
 Route::post('/referrals/download', [ReferralController::class, 'sendDownloadLink'])->name('api.referrals.download');
 Route::get('/referrals/{code}', [ReferralController::class, 'showByCode'])->name('api.referrals.lookup');
 Route::post('/downloads/track', [ReferralController::class, 'trackDownload'])->name('api.downloads.track');
