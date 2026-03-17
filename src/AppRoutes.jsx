@@ -110,6 +110,7 @@ const VetInsightsHub = lazy(() => import("./newflow/VetInsightsHub"));
 const DrSharmaInterview = lazy(() => import("./newflow/DrSharmaInterview"));
 const DogVomitingPage = lazy(() => import("./newflow/DogVomitingPage"));
 const InvesterPage = lazy(()=> import("./investerPage/Invester.jsx"))
+const OnlineVetConsultationApp = lazy(() => import("./newflow/OnlineVetConsultationApp"));
 
 export default function AppRoutes() {
   return (
@@ -138,6 +139,7 @@ export default function AppRoutes() {
         <Route path="/online-vet-consultation" element={<VideoConsultLP />} />
         <Route path="/talk-to-vet-online" element={<TalkToVet />} />
         <Route path="/pet-doctor-online" element={<PetDoctorOnline/>}/>
+        <Route path="/vet-consultation" element={<OnlineVetConsultationApp/>}/>
 
         <Route path="/investor-relations" element={<InvesterPage/>}/>
 
