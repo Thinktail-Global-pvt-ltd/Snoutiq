@@ -52,6 +52,7 @@ class DoctorChatController extends Controller
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
+        $petParentVisibilityCutoff = now()->subDays(3);
         $actor = $this->resolveActor($request);
         if (!$actor) {
             if (!empty($data['user_id']) && empty($data['doctor_id'])) {
@@ -72,13 +73,15 @@ class DoctorChatController extends Controller
 
         if ($actor) {
             if ($actor['type'] === 'user') {
-                $query->where('user_id', $actor['id']);
+                $query->where('user_id', $actor['id'])
+                    ->where('created_at', '>=', $petParentVisibilityCutoff);
             } else {
                 $query->where('doctor_id', $actor['id']);
             }
         } else {
             if (!empty($data['user_id'])) {
-                $query->where('user_id', (int) $data['user_id']);
+                $query->where('user_id', (int) $data['user_id'])
+                    ->where('created_at', '>=', $petParentVisibilityCutoff);
             }
             if (!empty($data['doctor_id'])) {
                 $query->where('doctor_id', (int) $data['doctor_id']);
