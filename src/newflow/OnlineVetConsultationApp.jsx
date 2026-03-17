@@ -375,6 +375,21 @@ export default function OnlineVetConsultationApp() {
   };
 
   useEffect(() => {
+    const key = "snoutiq_web_first_open_v1";
+    const alreadyTracked = localStorage.getItem(key);
+
+    if (!alreadyTracked) {
+      if (typeof window.gtag === "function") {
+        window.gtag("event", "web_first_open", {
+          page_name: "online_vet_consultation_app",
+          platform: "web",
+        });
+      }
+      localStorage.setItem(key, "1");
+    }
+  }, []);
+
+  useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         setShowStickyCta(!entry.isIntersecting);
