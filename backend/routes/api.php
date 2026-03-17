@@ -2361,6 +2361,10 @@ Route::get('/razorpay-ping', function () {
 
   Route::post('/chats/{chat_id}/feedback', [GeminiChatController::class, 'setFeedback']);
   Route::post('/users/feedback', [UserFeedbackController::class, 'store']);
+  Route::get('/vet-feedback', [\App\Http\Controllers\Api\VetFeedbackController::class, 'index']);
+  Route::post('/vet-feedback', [\App\Http\Controllers\Api\VetFeedbackController::class, 'store']);
+  Route::get('/pet-feedback', [\App\Http\Controllers\Api\PetFeedbackController::class, 'index']);
+  Route::post('/pet-feedback', [\App\Http\Controllers\Api\PetFeedbackController::class, 'store']);
 
 
 Route::prefix('unified')->group(function () {
