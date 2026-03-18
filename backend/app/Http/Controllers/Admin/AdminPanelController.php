@@ -188,6 +188,405 @@ class AdminPanelController extends Controller
         return view('admin.pincode-heatmap');
     }
 
+    public function consultationLifecycleAnalytics(Request $request): View
+    {
+        $filters = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'type' => ['nullable', 'string', 'in:all,video_consult,excell_export_campaign'],
+        ]);
+
+        $limit = (int) ($filters['limit'] ?? 200);
+        $typeFilter = strtolower((string) ($filters['type'] ?? 'all'));
+
+        $supportsTransactionChannel = Schema::hasTable('transactions')
+            && Schema::hasColumn('transactions', 'channel_name');
+
+        $joinAvailability = [
+            'call_sessions' => $supportsTransactionChannel
+                && Schema::hasTable('call_sessions')
+                && Schema::hasColumn('call_sessions', 'channel_name'),
+            'calls' => $supportsTransactionChannel
+                && Schema::hasTable('calls')
+                && (Schema::hasColumn('calls', 'channel_name') || Schema::hasColumn('calls', 'channel')),
+            'prescriptions' => $supportsTransactionChannel
+                && Schema::hasTable('prescriptions')
+                && Schema::hasColumn('prescriptions', 'call_session'),
+            'whatsapp_notifications' => Schema::hasTable('whatsapp_notifications')
+                && Schema::hasColumn('whatsapp_notifications', 'recipient'),
+            'fcm_notifications' => Schema::hasTable('fcm_notifications')
+                && Schema::hasColumn('fcm_notifications', 'user_id'),
+            'reviews' => Schema::hasTable('reviews')
+                || Schema::hasTable('vet_feedback')
+                || Schema::hasTable('pet_feedback'),
+        ];
+
+        $query = $this->appointmentTransactionsQuery()
+            ->select('transactions.*')
+            ->with([
+                'clinic:id,name',
+                'doctor:id,doctor_name,doctor_email,doctor_mobile',
+                'user:id,name,email,phone,city',
+                'pet:id,user_id,name,pet_type,breed',
+            ]);
+
+        if ($typeFilter !== 'all') {
+            $query->where(function (Builder $builder) use ($typeFilter) {
+                $builder->where('transactions.type', $typeFilter)
+                    ->orWhere('transactions.metadata->order_type', $typeFilter);
+            });
+        }
+
+        if ($joinAvailability['call_sessions']) {
+            $latestCallSessionsByChannel = DB::table('call_sessions as cs')
+                ->selectRaw('MAX(cs.id) as latest_call_session_id, cs.channel_name, COUNT(*) as call_session_count')
+                ->whereNotNull('cs.channel_name')
+                ->where('cs.channel_name', '!=', '')
+                ->groupBy('cs.channel_name');
+
+            $query
+                ->leftJoinSub($latestCallSessionsByChannel, 'latest_call_session_by_channel', function ($join) {
+                    $join->on('latest_call_session_by_channel.channel_name', '=', 'transactions.channel_name');
+                })
+                ->leftJoin('call_sessions as joined_call_session', 'joined_call_session.id', '=', 'latest_call_session_by_channel.latest_call_session_id')
+                ->addSelect([
+                    'latest_call_session_by_channel.call_session_count as joined_call_session_count',
+                ]);
+
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'id', 'joined_call_session_id');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'doctor_id', 'joined_call_session_doctor_id');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'patient_id', 'joined_call_session_patient_id');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'status', 'joined_call_session_status');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'payment_status', 'joined_call_session_payment_status');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'accepted_at', 'joined_call_session_accepted_at');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'started_at', 'joined_call_session_started_at');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'ended_at', 'joined_call_session_ended_at');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'duration_seconds', 'joined_call_session_duration_seconds');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'payment_id', 'joined_call_session_payment_id');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'amount_paid', 'joined_call_session_amount_paid');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'currency', 'joined_call_session_currency');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'call_identifier', 'joined_call_session_call_identifier');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'doctor_join_url', 'joined_call_session_doctor_join_url');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'patient_payment_url', 'joined_call_session_patient_payment_url');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'is_completed', 'joined_call_session_is_completed');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'created_at', 'joined_call_session_created_at');
+            $this->addJoinedSelectIfColumnExists($query, 'call_sessions', 'joined_call_session', 'updated_at', 'joined_call_session_updated_at');
+        }
+
+        if ($joinAvailability['calls']) {
+            $callChannelColumn = Schema::hasColumn('calls', 'channel_name') ? 'channel_name' : 'channel';
+
+            $latestCallsByChannel = DB::table('calls as c')
+                ->selectRaw("MAX(c.id) as latest_call_id, c.{$callChannelColumn} as call_channel_key, COUNT(*) as call_count")
+                ->whereNotNull("c.{$callChannelColumn}")
+                ->where("c.{$callChannelColumn}", '!=', '')
+                ->groupBy("c.{$callChannelColumn}");
+
+            $query
+                ->leftJoinSub($latestCallsByChannel, 'latest_call_by_channel', function ($join) {
+                    $join->on('latest_call_by_channel.call_channel_key', '=', 'transactions.channel_name');
+                })
+                ->leftJoin('calls as joined_call', 'joined_call.id', '=', 'latest_call_by_channel.latest_call_id')
+                ->addSelect([
+                    'latest_call_by_channel.call_count as joined_call_count',
+                    'latest_call_by_channel.call_channel_key as joined_call_channel_key',
+                ]);
+
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'id', 'joined_call_id');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'doctor_id', 'joined_call_doctor_id');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'patient_id', 'joined_call_patient_id');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'status', 'joined_call_status');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'channel_name', 'joined_call_channel_name');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'channel', 'joined_call_channel');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'accepted_at', 'joined_call_accepted_at');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'rejected_at', 'joined_call_rejected_at');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'ended_at', 'joined_call_ended_at');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'cancelled_at', 'joined_call_cancelled_at');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'missed_at', 'joined_call_missed_at');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'rtc', 'joined_call_rtc');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'created_at', 'joined_call_created_at');
+            $this->addJoinedSelectIfColumnExists($query, 'calls', 'joined_call', 'updated_at', 'joined_call_updated_at');
+        }
+
+        if ($joinAvailability['prescriptions']) {
+            $latestPrescriptionsByChannel = DB::table('prescriptions as p')
+                ->selectRaw('MAX(p.id) as latest_prescription_id, p.call_session as call_session_key, COUNT(*) as prescription_count')
+                ->whereNotNull('p.call_session')
+                ->where('p.call_session', '!=', '')
+                ->groupBy('p.call_session');
+
+            $query
+                ->leftJoinSub($latestPrescriptionsByChannel, 'latest_prescription_by_channel', function ($join) {
+                    $join->on('latest_prescription_by_channel.call_session_key', '=', 'transactions.channel_name');
+                })
+                ->leftJoin('prescriptions as joined_prescription', 'joined_prescription.id', '=', 'latest_prescription_by_channel.latest_prescription_id')
+                ->addSelect([
+                    'latest_prescription_by_channel.prescription_count as joined_prescription_count',
+                    'latest_prescription_by_channel.call_session_key as joined_prescription_call_session_key',
+                ]);
+
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'id', 'joined_prescription_id');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'doctor_id', 'joined_prescription_doctor_id');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'user_id', 'joined_prescription_user_id');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'pet_id', 'joined_prescription_pet_id');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'call_session', 'joined_prescription_call_session');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'video_inclinic', 'joined_prescription_video_inclinic');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'visit_category', 'joined_prescription_visit_category');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'case_severity', 'joined_prescription_case_severity');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'diagnosis', 'joined_prescription_diagnosis');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'disease_name', 'joined_prescription_disease_name');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'prognosis', 'joined_prescription_prognosis');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'follow_up_required', 'joined_prescription_follow_up_required');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'follow_up_date', 'joined_prescription_follow_up_date');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'follow_up_notification_sent_at', 'joined_prescription_follow_up_notification_sent_at');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'image_path', 'joined_prescription_image_path');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'created_at', 'joined_prescription_created_at');
+            $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'updated_at', 'joined_prescription_updated_at');
+        }
+
+        $transactions = $query
+            ->orderByDesc('transactions.created_at')
+            ->orderByDesc('transactions.id')
+            ->limit($limit)
+            ->get();
+
+        $latestAssignmentLogs = $this->latestTransactionDoctorAssignmentLogs($transactions);
+        $notificationLookup = $this->notificationLookupsForTransactions($transactions);
+        $reviewSubmissionLookup = $this->reviewSubmissionLookupForTransactions($transactions);
+
+        $enriched = $transactions->map(function (Transaction $transaction) use ($latestAssignmentLogs, $notificationLookup, $reviewSubmissionLookup) {
+            $createdAt = $this->normalizeLifecycleTimestamp($transaction->created_at);
+            $assignmentLog = $latestAssignmentLogs->get($transaction->id);
+            $assignmentLoggedAt = $assignmentLog?->created_at ?? null;
+
+            $assignedCandidates = [
+                [
+                    'timestamp' => $assignmentLoggedAt,
+                    'source' => 'transaction_doctor_assignment_logs.created_at',
+                    'secure' => true,
+                ],
+                [
+                    'timestamp' => ($transaction->doctor_id ? $transaction->created_at : null),
+                    'source' => 'transactions.doctor_id + transactions.created_at',
+                    'secure' => true,
+                ],
+                [
+                    'timestamp' => ($transaction->getAttribute('joined_call_session_doctor_id')
+                        ? $transaction->getAttribute('joined_call_session_created_at')
+                        : null),
+                    'source' => 'call_sessions.doctor_id + call_sessions.created_at',
+                    'secure' => true,
+                ],
+                [
+                    'timestamp' => ($transaction->getAttribute('joined_call_doctor_id')
+                        ? $transaction->getAttribute('joined_call_created_at')
+                        : null),
+                    'source' => 'calls.doctor_id + calls.created_at',
+                    'secure' => true,
+                ],
+            ];
+
+            $consultationAssignedAt = null;
+            $consultationAssignedSource = null;
+            $consultationAssignedSecure = false;
+            foreach ($assignedCandidates as $candidate) {
+                $timestamp = $this->normalizeLifecycleTimestamp($candidate['timestamp']);
+                if (!$timestamp) {
+                    continue;
+                }
+                $consultationAssignedAt = $timestamp;
+                $consultationAssignedSource = $candidate['source'];
+                $consultationAssignedSecure = (bool) $candidate['secure'];
+                break;
+            }
+
+            $callStartedAt = $this->firstLifecycleTimestamp([
+                $transaction->getAttribute('joined_call_session_started_at'),
+                $transaction->getAttribute('joined_call_accepted_at'),
+            ]);
+            $callStartedSource = $callStartedAt
+                ? ($this->normalizeLifecycleTimestamp($transaction->getAttribute('joined_call_session_started_at'))
+                    ? 'call_sessions.started_at'
+                    : 'calls.accepted_at')
+                : null;
+
+            $callCompletedAt = $this->firstLifecycleTimestamp([
+                $transaction->getAttribute('joined_call_session_ended_at'),
+                $transaction->getAttribute('joined_call_ended_at'),
+            ]);
+            $callCompletedSource = $callCompletedAt
+                ? ($this->normalizeLifecycleTimestamp($transaction->getAttribute('joined_call_session_ended_at'))
+                    ? 'call_sessions.ended_at'
+                    : 'calls.ended_at')
+                : null;
+
+            if (!$callCompletedAt) {
+                $callSessionStatus = strtolower((string) ($transaction->getAttribute('joined_call_session_status') ?? ''));
+                $callStatus = strtolower((string) ($transaction->getAttribute('joined_call_status') ?? ''));
+                $callSessionCompleted = filter_var($transaction->getAttribute('joined_call_session_is_completed'), FILTER_VALIDATE_BOOLEAN);
+
+                if ($callSessionStatus === 'ended' || $callSessionCompleted) {
+                    $callCompletedAt = $this->firstLifecycleTimestamp([
+                        $transaction->getAttribute('joined_call_session_updated_at'),
+                        $transaction->getAttribute('joined_call_session_created_at'),
+                    ]);
+                    $callCompletedSource = $callSessionCompleted
+                        ? 'call_sessions.is_completed + call_sessions.updated_at'
+                        : 'call_sessions.status=ended + call_sessions.updated_at';
+                } elseif ($callStatus === 'ended') {
+                    $callCompletedAt = $this->firstLifecycleTimestamp([
+                        $transaction->getAttribute('joined_call_updated_at'),
+                        $transaction->getAttribute('joined_call_created_at'),
+                    ]);
+                    $callCompletedSource = 'calls.status=ended + calls.updated_at';
+                }
+            }
+
+            $prescriptionUploadedAt = $this->normalizeLifecycleTimestamp(
+                $transaction->getAttribute('joined_prescription_created_at')
+            );
+            $prescriptionUploadedSource = $prescriptionUploadedAt ? 'prescriptions.created_at' : null;
+
+            $userPhoneNormalized = $this->normalizePhoneForLookup($transaction->user?->phone);
+            $whatsAppNotificationSentAt = $userPhoneNormalized
+                ? ($notificationLookup['whatsapp_any_by_phone'][$userPhoneNormalized] ?? null)
+                : null;
+            $whatsAppFeedbackRequestSentAt = $userPhoneNormalized
+                ? ($notificationLookup['whatsapp_feedback_by_phone'][$userPhoneNormalized] ?? null)
+                : null;
+            $fcmNotificationSentAt = is_numeric($transaction->user_id)
+                ? ($notificationLookup['fcm_by_user'][(int) $transaction->user_id] ?? null)
+                : null;
+
+            $notificationSentAt = $this->latestLifecycleTimestampOnOrAfter(
+                [
+                    $transaction->getAttribute('joined_prescription_follow_up_notification_sent_at'),
+                    $whatsAppNotificationSentAt,
+                    $fcmNotificationSentAt,
+                ],
+                $transaction->created_at
+            );
+
+            $notificationSentSource = null;
+            if ($notificationSentAt) {
+                if ($this->normalizeLifecycleTimestampOnOrAfter($transaction->getAttribute('joined_prescription_follow_up_notification_sent_at'), $transaction->created_at) === $notificationSentAt) {
+                    $notificationSentSource = 'prescriptions.follow_up_notification_sent_at';
+                } elseif ($this->normalizeLifecycleTimestampOnOrAfter($whatsAppNotificationSentAt, $transaction->created_at) === $notificationSentAt) {
+                    $notificationSentSource = 'whatsapp_notifications.sent_at';
+                } else {
+                    $notificationSentSource = 'fcm_notifications.sent_at';
+                }
+            }
+
+            $reviewRequestedAt = $this->latestLifecycleTimestampOnOrAfter(
+                [
+                    $whatsAppFeedbackRequestSentAt,
+                    $transaction->getAttribute('joined_prescription_follow_up_notification_sent_at'),
+                ],
+                $transaction->created_at
+            );
+            $reviewRequestedSource = null;
+            if ($reviewRequestedAt) {
+                if ($this->normalizeLifecycleTimestampOnOrAfter($whatsAppFeedbackRequestSentAt, $transaction->created_at) === $reviewRequestedAt) {
+                    $reviewRequestedSource = 'whatsapp_notifications.template_name=pp_consultation_feedback';
+                } else {
+                    $reviewRequestedSource = 'prescriptions.follow_up_notification_sent_at (inferred)';
+                }
+            }
+
+            $reviewSubmittedAt = $reviewSubmissionLookup[(int) $transaction->id] ?? null;
+            $reviewSubmittedSource = $reviewSubmittedAt ? 'reviews/vet_feedback/pet_feedback.created_at' : null;
+
+            $transaction->setAttribute('event_consultation_created_at', $createdAt);
+            $transaction->setAttribute('event_consultation_created_source', 'transactions.created_at');
+            $transaction->setAttribute('event_consultation_created_captured', $createdAt !== null);
+            $transaction->setAttribute('event_consultation_created_secure', $createdAt !== null);
+
+            $transaction->setAttribute('event_consultation_assigned_to_vet_at', $consultationAssignedAt);
+            $transaction->setAttribute('event_consultation_assigned_to_vet_source', $consultationAssignedSource);
+            $transaction->setAttribute('event_consultation_assigned_to_vet_captured', $consultationAssignedAt !== null);
+            $transaction->setAttribute('event_consultation_assigned_to_vet_secure', $consultationAssignedSecure && $consultationAssignedAt !== null);
+
+            $transaction->setAttribute('event_call_started_at', $callStartedAt);
+            $transaction->setAttribute('event_call_started_source', $callStartedSource);
+            $transaction->setAttribute('event_call_started_captured', $callStartedAt !== null);
+            $transaction->setAttribute('event_call_started_secure', $callStartedAt !== null);
+
+            $transaction->setAttribute('event_call_completed_at', $callCompletedAt);
+            $transaction->setAttribute('event_call_completed_source', $callCompletedSource);
+            $transaction->setAttribute('event_call_completed_captured', $callCompletedAt !== null);
+            $transaction->setAttribute('event_call_completed_secure', $callCompletedAt !== null);
+
+            $transaction->setAttribute('event_prescription_uploaded_at', $prescriptionUploadedAt);
+            $transaction->setAttribute('event_prescription_uploaded_source', $prescriptionUploadedSource);
+            $transaction->setAttribute('event_prescription_uploaded_captured', $prescriptionUploadedAt !== null);
+            $transaction->setAttribute('event_prescription_uploaded_secure', $prescriptionUploadedAt !== null);
+
+            $transaction->setAttribute('event_notification_sent_at', $notificationSentAt);
+            $transaction->setAttribute('event_notification_sent_source', $notificationSentSource);
+            $transaction->setAttribute('event_notification_sent_captured', $notificationSentAt !== null);
+            $transaction->setAttribute('event_notification_sent_secure', $notificationSentAt !== null);
+
+            $transaction->setAttribute('event_review_requested_at', $reviewRequestedAt);
+            $transaction->setAttribute('event_review_requested_source', $reviewRequestedSource);
+            $transaction->setAttribute('event_review_requested_captured', $reviewRequestedAt !== null);
+            $transaction->setAttribute('event_review_requested_secure', $reviewRequestedAt !== null && !str_contains((string) $reviewRequestedSource, 'inferred'));
+
+            $transaction->setAttribute('event_review_submitted_at', $reviewSubmittedAt);
+            $transaction->setAttribute('event_review_submitted_source', $reviewSubmittedSource);
+            $transaction->setAttribute('event_review_submitted_captured', $reviewSubmittedAt !== null);
+            $transaction->setAttribute('event_review_submitted_secure', $reviewSubmittedAt !== null);
+
+            $transaction->setAttribute(
+                'joined_call_session_details',
+                $this->joinedAttributesForPrefix($transaction, 'joined_call_session_')
+            );
+            $transaction->setAttribute(
+                'joined_call_details',
+                $this->joinedAttributesForPrefix($transaction, 'joined_call_')
+            );
+            $transaction->setAttribute(
+                'joined_prescription_details',
+                $this->joinedAttributesForPrefix($transaction, 'joined_prescription_')
+            );
+
+            return $transaction;
+        });
+
+        $eventDefinitions = [
+            'consultation_created' => 'Consultation Created',
+            'consultation_assigned_to_vet' => 'Consultation Assigned To Vet',
+            'call_started' => 'Call Started',
+            'call_completed' => 'Call Completed',
+            'prescription_uploaded' => 'Prescription Uploaded',
+            'notification_sent' => 'Notification Sent',
+            'review_requested' => 'Review Requested',
+            'review_submitted' => 'Review Submitted',
+        ];
+
+        $eventSummary = [];
+        foreach ($eventDefinitions as $eventKey => $label) {
+            $captured = $enriched->filter(fn (Transaction $transaction) => (bool) $transaction->getAttribute("event_{$eventKey}_captured"))->count();
+            $secure = $enriched->filter(fn (Transaction $transaction) => (bool) $transaction->getAttribute("event_{$eventKey}_secure"))->count();
+
+            $eventSummary[$eventKey] = [
+                'label' => $label,
+                'captured' => $captured,
+                'secure' => $secure,
+            ];
+        }
+
+        return view('admin.consultation-lifecycle-analytics', [
+            'transactions' => $enriched,
+            'eventSummary' => $eventSummary,
+            'eventDefinitions' => $eventDefinitions,
+            'joinAvailability' => $joinAvailability,
+            'filters' => [
+                'limit' => $limit,
+                'type' => $typeFilter,
+            ],
+        ]);
+    }
+
     public function whatsappTemplates(): View
     {
         $templates = [
@@ -863,6 +1262,484 @@ class AdminPanelController extends Controller
 
         return in_array($type, ['video_consult', 'excell_export_campaign'], true)
             || in_array($orderType, ['video_consult', 'excell_export_campaign'], true);
+    }
+
+    private function addJoinedSelectIfColumnExists(
+        Builder $query,
+        string $tableName,
+        string $tableAlias,
+        string $column,
+        string $asAlias
+    ): void {
+        if (!Schema::hasTable($tableName) || !Schema::hasColumn($tableName, $column)) {
+            return;
+        }
+
+        $query->addSelect(DB::raw("{$tableAlias}.{$column} as {$asAlias}"));
+    }
+
+    private function notificationLookupsForTransactions(Collection $transactions): array
+    {
+        $lookup = [
+            'whatsapp_any_by_phone' => [],
+            'whatsapp_feedback_by_phone' => [],
+            'fcm_by_user' => [],
+        ];
+
+        if ($transactions->isEmpty()) {
+            return $lookup;
+        }
+
+        $phones = $transactions
+            ->map(fn (Transaction $transaction) => $transaction->user?->phone)
+            ->filter(fn ($phone) => is_string($phone) && trim($phone) !== '')
+            ->map(fn (string $phone) => trim($phone))
+            ->unique()
+            ->values();
+
+        if (Schema::hasTable('whatsapp_notifications') && Schema::hasColumn('whatsapp_notifications', 'recipient')) {
+            $recipientCandidates = $phones
+                ->flatMap(fn (string $phone) => $this->phoneLookupCandidates($phone))
+                ->filter(fn ($phone) => is_string($phone) && trim($phone) !== '')
+                ->unique()
+                ->values();
+
+            if ($recipientCandidates->isNotEmpty()) {
+                $query = DB::table('whatsapp_notifications')
+                    ->whereIn('recipient', $recipientCandidates->all())
+                    ->select(['recipient']);
+
+                if (Schema::hasColumn('whatsapp_notifications', 'template_name')) {
+                    $query->addSelect('template_name');
+                }
+                if (Schema::hasColumn('whatsapp_notifications', 'status')) {
+                    $query->where('status', 'sent');
+                    $query->addSelect('status');
+                }
+
+                $whatsAppTimestampColumns = [];
+                if (Schema::hasColumn('whatsapp_notifications', 'sent_at')) {
+                    $whatsAppTimestampColumns[] = 'sent_at';
+                    $query->addSelect('sent_at');
+                }
+                if (Schema::hasColumn('whatsapp_notifications', 'created_at')) {
+                    $whatsAppTimestampColumns[] = 'created_at';
+                    $query->addSelect('created_at');
+                }
+
+                $rows = $query->get();
+                foreach ($rows as $row) {
+                    $normalizedPhone = $this->normalizePhoneForLookup((string) ($row->recipient ?? ''));
+                    if (!$normalizedPhone) {
+                        continue;
+                    }
+
+                    $timeCandidate = null;
+                    foreach ($whatsAppTimestampColumns as $column) {
+                        $timeCandidate = $this->latestLifecycleTimestamp([$timeCandidate, data_get($row, $column)]);
+                    }
+                    if (!$timeCandidate) {
+                        continue;
+                    }
+
+                    $lookup['whatsapp_any_by_phone'][$normalizedPhone] = $this->latestLifecycleTimestamp([
+                        $lookup['whatsapp_any_by_phone'][$normalizedPhone] ?? null,
+                        $timeCandidate,
+                    ]);
+
+                    $template = strtolower(trim((string) (data_get($row, 'template_name') ?? '')));
+                    if ($template === 'pp_consultation_feedback' || str_contains($template, 'feedback')) {
+                        $lookup['whatsapp_feedback_by_phone'][$normalizedPhone] = $this->latestLifecycleTimestamp([
+                            $lookup['whatsapp_feedback_by_phone'][$normalizedPhone] ?? null,
+                            $timeCandidate,
+                        ]);
+                    }
+                }
+            }
+        }
+
+        if (Schema::hasTable('fcm_notifications') && Schema::hasColumn('fcm_notifications', 'user_id')) {
+            $userIds = $transactions->pluck('user_id')
+                ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            if ($userIds->isNotEmpty()) {
+                $fcmQuery = DB::table('fcm_notifications')
+                    ->whereIn('user_id', $userIds->all())
+                    ->select(['user_id']);
+
+                if (Schema::hasColumn('fcm_notifications', 'status')) {
+                    $fcmQuery->where('status', 'sent');
+                    $fcmQuery->addSelect('status');
+                }
+
+                $fcmTimestampColumns = [];
+                if (Schema::hasColumn('fcm_notifications', 'sent_at')) {
+                    $fcmTimestampColumns[] = 'sent_at';
+                    $fcmQuery->addSelect('sent_at');
+                }
+                if (Schema::hasColumn('fcm_notifications', 'created_at')) {
+                    $fcmTimestampColumns[] = 'created_at';
+                    $fcmQuery->addSelect('created_at');
+                }
+
+                $fcmRows = $fcmQuery->get();
+                foreach ($fcmRows as $row) {
+                    $userId = (int) ($row->user_id ?? 0);
+                    if ($userId <= 0) {
+                        continue;
+                    }
+
+                    $timeCandidate = null;
+                    foreach ($fcmTimestampColumns as $column) {
+                        $timeCandidate = $this->latestLifecycleTimestamp([$timeCandidate, data_get($row, $column)]);
+                    }
+                    if (!$timeCandidate) {
+                        continue;
+                    }
+
+                    $lookup['fcm_by_user'][$userId] = $this->latestLifecycleTimestamp([
+                        $lookup['fcm_by_user'][$userId] ?? null,
+                        $timeCandidate,
+                    ]);
+                }
+            }
+        }
+
+        return $lookup;
+    }
+
+    private function reviewSubmissionLookupForTransactions(Collection $transactions): array
+    {
+        if ($transactions->isEmpty()) {
+            return [];
+        }
+
+        $userIds = $transactions->pluck('user_id')
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $doctorIds = $transactions->pluck('doctor_id')
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $petIds = $transactions->pluck('pet_id')
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $userDoctorLookup = [];
+        $userDoctorPetLookup = [];
+
+        if (Schema::hasTable('reviews') && $userIds->isNotEmpty() && $doctorIds->isNotEmpty()) {
+            $reviewRows = DB::table('reviews')
+                ->whereIn('user_id', $userIds->all())
+                ->whereIn('doctor_id', $doctorIds->all())
+                ->select(['user_id', 'doctor_id', 'created_at'])
+                ->get();
+
+            foreach ($reviewRows as $row) {
+                $key = (int) $row->user_id . ':' . (int) $row->doctor_id;
+                $userDoctorLookup[$key] = $this->latestLifecycleTimestamp([
+                    $userDoctorLookup[$key] ?? null,
+                    $row->created_at ?? null,
+                ]);
+            }
+        }
+
+        if (Schema::hasTable('vet_feedback') && $doctorIds->isNotEmpty()) {
+            $hasVetFeedbackPetId = Schema::hasColumn('vet_feedback', 'pet_id');
+            $vetFeedbackQuery = DB::table('vet_feedback')
+                ->whereIn('vet_id', $doctorIds->all())
+                ->select(['vet_id', 'user_id', 'pet_id', 'created_at']);
+
+            if ($userIds->isNotEmpty() || ($hasVetFeedbackPetId && $petIds->isNotEmpty())) {
+                $vetFeedbackQuery->where(function ($inner) use ($userIds, $petIds, $hasVetFeedbackPetId) {
+                    if ($userIds->isNotEmpty()) {
+                        $inner->whereIn('user_id', $userIds->all());
+                    }
+
+                    if ($hasVetFeedbackPetId && $petIds->isNotEmpty()) {
+                        if ($userIds->isNotEmpty()) {
+                            $inner->orWhereIn('pet_id', $petIds->all());
+                        } else {
+                            $inner->whereIn('pet_id', $petIds->all());
+                        }
+                    }
+                });
+            }
+
+            $vetFeedbackRows = $vetFeedbackQuery->get();
+            foreach ($vetFeedbackRows as $row) {
+                $userId = is_numeric($row->user_id ?? null) ? (int) $row->user_id : null;
+                $doctorId = is_numeric($row->vet_id ?? null) ? (int) $row->vet_id : null;
+                $petId = is_numeric($row->pet_id ?? null) ? (int) $row->pet_id : null;
+                $createdAt = $row->created_at ?? null;
+
+                if ($userId && $doctorId) {
+                    $pairKey = $userId . ':' . $doctorId;
+                    $userDoctorLookup[$pairKey] = $this->latestLifecycleTimestamp([
+                        $userDoctorLookup[$pairKey] ?? null,
+                        $createdAt,
+                    ]);
+                }
+
+                if ($userId && $doctorId && $petId) {
+                    $tripletKey = $userId . ':' . $doctorId . ':' . $petId;
+                    $userDoctorPetLookup[$tripletKey] = $this->latestLifecycleTimestamp([
+                        $userDoctorPetLookup[$tripletKey] ?? null,
+                        $createdAt,
+                    ]);
+                }
+            }
+        }
+
+        if (Schema::hasTable('pet_feedback') && $petIds->isNotEmpty()) {
+            $petFeedbackQuery = DB::table('pet_feedback')
+                ->whereIn('pet_id', $petIds->all())
+                ->select(['pet_id', 'vet_id', 'user_id', 'created_at']);
+
+            if ($doctorIds->isNotEmpty()) {
+                $petFeedbackQuery->whereIn('vet_id', $doctorIds->all());
+            }
+            if ($userIds->isNotEmpty()) {
+                $petFeedbackQuery->whereIn('user_id', $userIds->all());
+            }
+
+            $petFeedbackRows = $petFeedbackQuery->get();
+            foreach ($petFeedbackRows as $row) {
+                $userId = is_numeric($row->user_id ?? null) ? (int) $row->user_id : null;
+                $doctorId = is_numeric($row->vet_id ?? null) ? (int) $row->vet_id : null;
+                $petId = is_numeric($row->pet_id ?? null) ? (int) $row->pet_id : null;
+                $createdAt = $row->created_at ?? null;
+
+                if ($userId && $doctorId) {
+                    $pairKey = $userId . ':' . $doctorId;
+                    $userDoctorLookup[$pairKey] = $this->latestLifecycleTimestamp([
+                        $userDoctorLookup[$pairKey] ?? null,
+                        $createdAt,
+                    ]);
+                }
+
+                if ($userId && $doctorId && $petId) {
+                    $tripletKey = $userId . ':' . $doctorId . ':' . $petId;
+                    $userDoctorPetLookup[$tripletKey] = $this->latestLifecycleTimestamp([
+                        $userDoctorPetLookup[$tripletKey] ?? null,
+                        $createdAt,
+                    ]);
+                }
+            }
+        }
+
+        $result = [];
+
+        foreach ($transactions as $transaction) {
+            $pairKey = (int) ($transaction->user_id ?? 0) . ':' . (int) ($transaction->doctor_id ?? 0);
+            $tripletKey = (int) ($transaction->user_id ?? 0) . ':' . (int) ($transaction->doctor_id ?? 0) . ':' . (int) ($transaction->pet_id ?? 0);
+
+            $result[(int) $transaction->id] = $this->latestLifecycleTimestampOnOrAfter(
+                [
+                    $userDoctorLookup[$pairKey] ?? null,
+                    $userDoctorPetLookup[$tripletKey] ?? null,
+                ],
+                $transaction->created_at
+            );
+        }
+
+        return $result;
+    }
+
+    private function joinedAttributesForPrefix(Transaction $transaction, string $prefix): array
+    {
+        $details = [];
+        $prefixLength = strlen($prefix);
+
+        foreach ($transaction->getAttributes() as $key => $value) {
+            if (!str_starts_with($key, $prefix)) {
+                continue;
+            }
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $normalizedKey = substr($key, $prefixLength);
+            if ($normalizedKey === false || $normalizedKey === '') {
+                continue;
+            }
+
+            if (is_bool($value)) {
+                $details[$normalizedKey] = $value ? true : false;
+                continue;
+            }
+
+            if (is_numeric($value)) {
+                $details[$normalizedKey] = $value + 0;
+                continue;
+            }
+
+            if (is_array($value) || is_object($value)) {
+                $details[$normalizedKey] = $value;
+                continue;
+            }
+
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $details[$normalizedKey] = $decoded;
+                    continue;
+                }
+            }
+
+            $details[$normalizedKey] = (string) $value;
+        }
+
+        ksort($details);
+
+        return $details;
+    }
+
+    private function normalizePhoneForLookup(?string $phone): ?string
+    {
+        if (!$phone) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (!is_string($digits) || $digits === '') {
+            return null;
+        }
+
+        if (strlen($digits) >= 10) {
+            return substr($digits, -10);
+        }
+
+        return $digits;
+    }
+
+    private function phoneLookupCandidates(string $phone): array
+    {
+        $raw = trim($phone);
+        $digits = preg_replace('/\D+/', '', $raw);
+        if (!is_string($digits)) {
+            $digits = '';
+        }
+
+        $normalized = $this->normalizePhoneForLookup($raw);
+        $candidates = collect([$raw, $digits]);
+
+        if ($normalized) {
+            $candidates->push($normalized);
+            $candidates->push('+91' . $normalized);
+            $candidates->push('91' . $normalized);
+            $candidates->push('0' . $normalized);
+        }
+
+        return $candidates
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '')
+            ->map(fn (string $value) => trim($value))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function normalizeLifecycleTimestamp(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return \Illuminate\Support\Carbon::instance($value)->toDateTimeString();
+        }
+
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->toDateTimeString();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function normalizeLifecycleTimestampOnOrAfter(mixed $value, mixed $baseline): ?string
+    {
+        $normalized = $this->normalizeLifecycleTimestamp($value);
+        if (!$normalized) {
+            return null;
+        }
+
+        $baselineNormalized = $this->normalizeLifecycleTimestamp($baseline);
+        if (!$baselineNormalized) {
+            return $normalized;
+        }
+
+        return strtotime($normalized) >= strtotime($baselineNormalized)
+            ? $normalized
+            : null;
+    }
+
+    private function firstLifecycleTimestamp(array $values): ?string
+    {
+        foreach ($values as $value) {
+            $normalized = $this->normalizeLifecycleTimestamp($value);
+            if ($normalized) {
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private function latestLifecycleTimestamp(array $values): ?string
+    {
+        $latest = null;
+        $latestTs = null;
+
+        foreach ($values as $value) {
+            $normalized = $this->normalizeLifecycleTimestamp($value);
+            if (!$normalized) {
+                continue;
+            }
+
+            $ts = strtotime($normalized);
+            if ($latestTs === null || $ts > $latestTs) {
+                $latest = $normalized;
+                $latestTs = $ts;
+            }
+        }
+
+        return $latest;
+    }
+
+    private function latestLifecycleTimestampOnOrAfter(array $values, mixed $baseline): ?string
+    {
+        $normalizedBaseline = $this->normalizeLifecycleTimestamp($baseline);
+        $baselineTs = $normalizedBaseline ? strtotime($normalizedBaseline) : null;
+
+        $latest = null;
+        $latestTs = null;
+
+        foreach ($values as $value) {
+            $normalized = $this->normalizeLifecycleTimestamp($value);
+            if (!$normalized) {
+                continue;
+            }
+
+            $ts = strtotime($normalized);
+            if ($baselineTs !== null && $ts < $baselineTs) {
+                continue;
+            }
+
+            if ($latestTs === null || $ts > $latestTs) {
+                $latest = $normalized;
+                $latestTs = $ts;
+            }
+        }
+
+        return $latest;
     }
 
     private function latestTransactionDoctorAssignmentLogs(Collection $transactions): Collection

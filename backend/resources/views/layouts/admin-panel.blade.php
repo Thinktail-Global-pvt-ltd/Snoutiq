@@ -134,6 +134,7 @@
             <a href="{{ route('admin.whatsapp.templates') }}" class="{{ request()->routeIs('admin.whatsapp.templates') ? 'active' : '' }}">WhatsApp Templates</a>
             <a href="{{ route('admin.supports') }}" class="{{ request()->routeIs('admin.supports') ? 'active' : '' }}">Supports</a>
             <a href="{{ route('admin.video.slot-overview') }}" class="{{ request()->routeIs('admin.video.slot-overview') ? 'active' : '' }}">Video Slot Overview</a>
+            <a href="{{ route('admin.analytics.consultation-lifecycle') }}" class="{{ request()->routeIs('admin.analytics.consultation-lifecycle') ? 'active' : '' }}">Consultation Lifecycle Analytics</a>
             <a href="{{ route('admin.analytics.pincode-heatmap') }}" class="{{ request()->routeIs('admin.analytics.pincode-heatmap') ? 'active' : '' }}">Pincode Heatmap</a>
         </nav>
         @hasSection('sidebar-secondary')
