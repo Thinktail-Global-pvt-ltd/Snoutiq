@@ -89,7 +89,10 @@ class PaymentController extends Controller
             ], 422);
         }
 
-        if ($this->isVideoConsultTransactionType($transactionType)) {
+        if (
+            $this->isVideoConsultTransactionType($transactionType)
+            || $transactionType === 'excell_export_campaign'
+        ) {
             $callSession = $this->createCallSessionIfMissing($context);
             if ($callSession) {
                 $notes['call_session_id'] = $callSession->resolveIdentifier();
@@ -107,7 +110,10 @@ class PaymentController extends Controller
             requestedAmountInInr: $amountInInr
         );
         if ($freeCouponResponse !== null) {
-            return response()->json($freeCouponResponse);
+            $statusCode = (int) ($freeCouponResponse['status_code'] ?? 200);
+            unset($freeCouponResponse['status_code']);
+
+            return response()->json($freeCouponResponse, $statusCode);
         }
 
         try {
@@ -224,7 +230,10 @@ class PaymentController extends Controller
             }
 
             if ((int) ($userRow->{self::USER_FREE_VIDEO_CONSULT_FLAG_COLUMN} ?? 0) === 1) {
-                return ['applied' => false];
+                return [
+                    'applied' => false,
+                    'rejection_reason' => 'coupon_already_used',
+                ];
             }
 
             $couponReference = 'coupon_free_' . Str::lower(Str::random(20));
@@ -338,6 +347,16 @@ class PaymentController extends Controller
         });
 
         if (! ($result['applied'] ?? false)) {
+            if (($result['rejection_reason'] ?? null) === 'coupon_already_used') {
+                return [
+                    'success' => false,
+                    'coupon_applied' => false,
+                    'error' => 'Coupon expired/used',
+                    'details' => 'FIRST_VIDEO_FREE can be used only once per user.',
+                    'status_code' => 422,
+                ];
+            }
+
             return null;
         }
 
