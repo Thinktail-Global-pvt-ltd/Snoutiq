@@ -342,6 +342,43 @@ class AdminPanelController extends Controller
             $this->addJoinedSelectIfColumnExists($query, 'prescriptions', 'joined_prescription', 'updated_at', 'joined_prescription_updated_at');
         }
 
+        if ($supportsTransactionChannel && $joinAvailability['whatsapp_notifications']) {
+            $latestSentWhatsAppByChannel = DB::table('whatsapp_notifications as wn')
+                ->selectRaw('MAX(wn.id) as latest_whatsapp_notification_id, wn.channel_name, COUNT(*) as whatsapp_notification_count')
+                ->whereNotNull('wn.channel_name')
+                ->where('wn.channel_name', '!=', '');
+
+            if (Schema::hasColumn('whatsapp_notifications', 'status')) {
+                $latestSentWhatsAppByChannel->where('wn.status', 'sent');
+            } elseif (Schema::hasColumn('whatsapp_notifications', 'sent_at')) {
+                $latestSentWhatsAppByChannel->whereNotNull('wn.sent_at');
+            }
+
+            $latestSentWhatsAppByChannel->groupBy('wn.channel_name');
+
+            $query
+                ->leftJoinSub($latestSentWhatsAppByChannel, 'latest_whatsapp_notification_by_channel', function ($join) {
+                    $join->on('latest_whatsapp_notification_by_channel.channel_name', '=', 'transactions.channel_name');
+                })
+                ->leftJoin('whatsapp_notifications as joined_whatsapp_notification', 'joined_whatsapp_notification.id', '=', 'latest_whatsapp_notification_by_channel.latest_whatsapp_notification_id')
+                ->addSelect([
+                    'latest_whatsapp_notification_by_channel.whatsapp_notification_count as joined_whatsapp_notification_count',
+                ]);
+
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'id', 'joined_whatsapp_notification_id');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'channel_name', 'joined_whatsapp_notification_channel_name');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'status', 'joined_whatsapp_notification_status');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'template_name', 'joined_whatsapp_notification_template_name');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'message_type', 'joined_whatsapp_notification_message_type');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'recipient', 'joined_whatsapp_notification_recipient');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'http_status', 'joined_whatsapp_notification_http_status');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'provider_message_id', 'joined_whatsapp_notification_provider_message_id');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'error_message', 'joined_whatsapp_notification_error_message');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'sent_at', 'joined_whatsapp_notification_sent_at');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'created_at', 'joined_whatsapp_notification_created_at');
+            $this->addJoinedSelectIfColumnExists($query, 'whatsapp_notifications', 'joined_whatsapp_notification', 'updated_at', 'joined_whatsapp_notification_updated_at');
+        }
+
         $transactions = $query
             ->orderByDesc('transactions.created_at')
             ->orderByDesc('transactions.id')
@@ -350,9 +387,9 @@ class AdminPanelController extends Controller
 
         $latestAssignmentLogs = $this->latestTransactionDoctorAssignmentLogs($transactions);
         $notificationLookup = $this->notificationLookupsForTransactions($transactions);
-        $reviewSubmissionLookup = $this->reviewSubmissionLookupForTransactions($transactions);
+        $feedbackLookup = $this->feedbackSubmissionLookupForTransactions($transactions);
 
-        $enriched = $transactions->map(function (Transaction $transaction) use ($latestAssignmentLogs, $notificationLookup, $reviewSubmissionLookup) {
+        $enriched = $transactions->map(function (Transaction $transaction) use ($latestAssignmentLogs, $notificationLookup, $feedbackLookup) {
             $createdAt = $this->normalizeLifecycleTimestamp($transaction->created_at);
             $assignmentLog = $latestAssignmentLogs->get($transaction->id);
             $assignmentLoggedAt = $assignmentLog?->created_at ?? null;
@@ -449,14 +486,25 @@ class AdminPanelController extends Controller
             $whatsAppRows = $channelName !== ''
                 ? ($notificationLookup['whatsapp_rows_by_channel'][$channelName] ?? [])
                 : [];
-            $whatsAppNotificationSentAt = $channelName !== ''
+            $joinedWhatsAppSentAt = $this->latestLifecycleTimestamp([
+                $transaction->getAttribute('joined_whatsapp_notification_sent_at'),
+                $transaction->getAttribute('joined_whatsapp_notification_created_at'),
+            ]);
+            $lookupWhatsAppSentAt = $channelName !== ''
                 ? ($notificationLookup['whatsapp_sent_by_channel'][$channelName] ?? null)
                 : null;
-            $whatsAppFeedbackRequestSentAt = $channelName !== ''
-                ? ($notificationLookup['whatsapp_feedback_by_channel'][$channelName] ?? null)
-                : null;
+            $whatsAppNotificationSentAt = $this->latestLifecycleTimestamp([
+                $joinedWhatsAppSentAt,
+                $lookupWhatsAppSentAt,
+            ]);
             $whatsAppLastAttemptAt = $channelName !== ''
                 ? ($notificationLookup['whatsapp_last_attempt_by_channel'][$channelName] ?? null)
+                : null;
+            $doctorFeedbackSubmittedAt = $channelName !== ''
+                ? ($feedbackLookup['doctor_feedback_by_channel'][$channelName] ?? null)
+                : null;
+            $petFeedbackSubmittedAt = $channelName !== ''
+                ? ($feedbackLookup['pet_feedback_by_channel'][$channelName] ?? null)
                 : null;
             $whatsAppStatusSummary = collect($whatsAppRows)
                 ->countBy(fn (array $row) => strtolower(trim((string) ($row['status'] ?? 'unknown'))))
@@ -481,31 +529,26 @@ class AdminPanelController extends Controller
             if ($notificationSentAt) {
                 if ($this->normalizeLifecycleTimestampOnOrAfter($transaction->getAttribute('joined_prescription_follow_up_notification_sent_at'), $transaction->created_at) === $notificationSentAt) {
                     $notificationSentSource = 'prescriptions.follow_up_notification_sent_at';
+                } elseif ($this->normalizeLifecycleTimestampOnOrAfter($joinedWhatsAppSentAt, $transaction->created_at) === $notificationSentAt) {
+                    $notificationSentSource = 'transactions.channel_name = whatsapp_notifications.channel_name (joined sent row)';
                 } elseif ($this->normalizeLifecycleTimestampOnOrAfter($whatsAppNotificationSentAt, $transaction->created_at) === $notificationSentAt) {
-                    $notificationSentSource = 'whatsapp_notifications.channel_name + status=sent + sent_at';
+                    $notificationSentSource = 'whatsapp_notifications.channel_name lookup + status=sent + sent_at';
                 } else {
                     $notificationSentSource = 'fcm_notifications.sent_at';
                 }
             }
 
-            $reviewRequestedAt = $this->latestLifecycleTimestampOnOrAfter(
-                [
-                    $whatsAppFeedbackRequestSentAt,
-                    $transaction->getAttribute('joined_prescription_follow_up_notification_sent_at'),
-                ],
+            $reviewRequestedAt = $this->normalizeLifecycleTimestampOnOrAfter(
+                $doctorFeedbackSubmittedAt,
                 $transaction->created_at
             );
-            $reviewRequestedSource = null;
-            if ($reviewRequestedAt) {
-                if ($this->normalizeLifecycleTimestampOnOrAfter($whatsAppFeedbackRequestSentAt, $transaction->created_at) === $reviewRequestedAt) {
-                    $reviewRequestedSource = 'whatsapp_notifications.channel_name + template_name=pp_consultation_feedback';
-                } else {
-                    $reviewRequestedSource = 'prescriptions.follow_up_notification_sent_at (inferred)';
-                }
-            }
+            $reviewRequestedSource = $reviewRequestedAt ? 'vet_feedback.channel_name' : null;
 
-            $reviewSubmittedAt = $reviewSubmissionLookup[(int) $transaction->id] ?? null;
-            $reviewSubmittedSource = $reviewSubmittedAt ? 'pet_feedback.channel_name / vet_feedback.channel_name' : null;
+            $reviewSubmittedAt = $this->normalizeLifecycleTimestampOnOrAfter(
+                $petFeedbackSubmittedAt,
+                $transaction->created_at
+            );
+            $reviewSubmittedSource = $reviewSubmittedAt ? 'pet_feedback.channel_name' : null;
 
             $transaction->setAttribute('event_consultation_created_at', $createdAt);
             $transaction->setAttribute('event_consultation_created_source', 'transactions.created_at');
@@ -545,7 +588,7 @@ class AdminPanelController extends Controller
             $transaction->setAttribute('event_review_requested_at', $reviewRequestedAt);
             $transaction->setAttribute('event_review_requested_source', $reviewRequestedSource);
             $transaction->setAttribute('event_review_requested_captured', $reviewRequestedAt !== null);
-            $transaction->setAttribute('event_review_requested_secure', $reviewRequestedAt !== null && !str_contains((string) $reviewRequestedSource, 'inferred'));
+            $transaction->setAttribute('event_review_requested_secure', $reviewRequestedAt !== null);
 
             $transaction->setAttribute('event_review_submitted_at', $reviewSubmittedAt);
             $transaction->setAttribute('event_review_submitted_source', $reviewSubmittedSource);
@@ -575,8 +618,8 @@ class AdminPanelController extends Controller
             'call_completed' => 'Call Completed',
             'prescription_uploaded' => 'Prescription Uploaded',
             'notification_sent' => 'Notification Sent',
-            'review_requested' => 'Review Requested',
-            'review_submitted' => 'Review Submitted',
+            'review_requested' => 'Doctor Feedback',
+            'review_submitted' => 'Pet Feedback',
         ];
 
         $eventSummary = [];
@@ -1476,10 +1519,15 @@ class AdminPanelController extends Controller
         return $lookup;
     }
 
-    private function reviewSubmissionLookupForTransactions(Collection $transactions): array
+    private function feedbackSubmissionLookupForTransactions(Collection $transactions): array
     {
+        $lookup = [
+            'doctor_feedback_by_channel' => [],
+            'pet_feedback_by_channel' => [],
+        ];
+
         if ($transactions->isEmpty()) {
-            return [];
+            return $lookup;
         }
 
         $channels = $transactions->pluck('channel_name')
@@ -1488,70 +1536,63 @@ class AdminPanelController extends Controller
             ->unique()
             ->values();
 
-        $channelLookup = [];
-        if ($channels->isNotEmpty()) {
-            foreach (['vet_feedback', 'pet_feedback'] as $table) {
-                if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'channel_name')) {
+        if ($channels->isEmpty()) {
+            return $lookup;
+        }
+
+        $tableMap = [
+            'vet_feedback' => 'doctor_feedback_by_channel',
+            'pet_feedback' => 'pet_feedback_by_channel',
+        ];
+
+        foreach ($tableMap as $table => $lookupKey) {
+            if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'channel_name')) {
+                continue;
+            }
+
+            $timestampColumns = collect(['submitted_at', 'created_at', 'updated_at'])
+                ->filter(fn (string $column) => Schema::hasColumn($table, $column))
+                ->values()
+                ->all();
+
+            if (empty($timestampColumns)) {
+                continue;
+            }
+
+            $query = DB::table($table)
+                ->whereIn('channel_name', $channels->all())
+                ->select(['channel_name']);
+
+            foreach ($timestampColumns as $timestampColumn) {
+                $query->addSelect($timestampColumn);
+            }
+
+            $rows = $query->get();
+            foreach ($rows as $row) {
+                $channelName = trim((string) ($row->channel_name ?? ''));
+                if ($channelName === '') {
                     continue;
                 }
 
-                $timestampColumns = collect(['submitted_at', 'created_at', 'updated_at'])
-                    ->filter(fn (string $column) => Schema::hasColumn($table, $column))
-                    ->values()
-                    ->all();
-
-                if (empty($timestampColumns)) {
-                    continue;
-                }
-
-                $query = DB::table($table)
-                    ->whereIn('channel_name', $channels->all())
-                    ->select(['channel_name']);
-
+                $timeCandidate = null;
                 foreach ($timestampColumns as $timestampColumn) {
-                    $query->addSelect($timestampColumn);
-                }
-
-                $rows = $query->get();
-                foreach ($rows as $row) {
-                    $channelName = trim((string) ($row->channel_name ?? ''));
-                    if ($channelName === '') {
-                        continue;
-                    }
-
-                    $timeCandidate = null;
-                    foreach ($timestampColumns as $timestampColumn) {
-                        $timeCandidate = $this->latestLifecycleTimestamp([
-                            $timeCandidate,
-                            data_get($row, $timestampColumn),
-                        ]);
-                    }
-                    if (!$timeCandidate) {
-                        continue;
-                    }
-
-                    $channelLookup[$channelName] = $this->latestLifecycleTimestamp([
-                        $channelLookup[$channelName] ?? null,
+                    $timeCandidate = $this->latestLifecycleTimestamp([
                         $timeCandidate,
+                        data_get($row, $timestampColumn),
                     ]);
                 }
+                if (!$timeCandidate) {
+                    continue;
+                }
+
+                $lookup[$lookupKey][$channelName] = $this->latestLifecycleTimestamp([
+                    $lookup[$lookupKey][$channelName] ?? null,
+                    $timeCandidate,
+                ]);
             }
         }
 
-        $result = [];
-
-        foreach ($transactions as $transaction) {
-            $channelName = trim((string) ($transaction->channel_name ?? ''));
-
-            $result[(int) $transaction->id] = $this->latestLifecycleTimestampOnOrAfter(
-                [
-                    $channelName !== '' ? ($channelLookup[$channelName] ?? null) : null,
-                ],
-                $transaction->created_at
-            );
-        }
-
-        return $result;
+        return $lookup;
     }
 
     private function joinedAttributesForPrefix(Transaction $transaction, string $prefix): array
