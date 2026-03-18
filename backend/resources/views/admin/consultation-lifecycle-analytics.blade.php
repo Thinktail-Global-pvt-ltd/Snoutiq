@@ -18,13 +18,6 @@
     .event-block:last-child {
         margin-bottom: 0;
     }
-    .event-summary-card .card-body {
-        padding: 0.85rem;
-    }
-    .event-summary-card h3 {
-        font-size: 0.92rem;
-        margin-bottom: 0.6rem;
-    }
     .wa-attempt {
         border: 1px solid #e5e7eb;
         border-radius: 0.55rem;
@@ -97,7 +90,6 @@
 
 @section('content')
 @php
-    $total = $transactions->count();
     $formatTimestamp = static function ($value) {
         if (empty($value)) {
             return '—';
@@ -112,32 +104,6 @@
 @endphp
 
 <div class="row g-4">
-    @foreach($eventSummary as $eventKey => $summary)
-        @php
-            $captured = (int) data_get($summary, 'captured', 0);
-            $secure = (int) data_get($summary, 'secure', 0);
-            $capturedPct = $total > 0 ? round(($captured / $total) * 100, 1) : 0;
-            $securePct = $total > 0 ? round(($secure / $total) * 100, 1) : 0;
-        @endphp
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card border-0 shadow-sm event-summary-card h-100">
-                <div class="card-body">
-                    <h3 class="fw-semibold mb-2">{{ data_get($summary, 'label', $eventKey) }}</h3>
-                    <div class="small">
-                        <div class="mb-1">
-                            <span class="badge text-bg-primary-subtle text-primary-emphasis">{{ number_format($captured) }} / {{ number_format($total) }}</span>
-                            <span class="text-muted">Captured ({{ $capturedPct }}%)</span>
-                        </div>
-                        <div>
-                            <span class="badge text-bg-success-subtle text-success-emphasis">{{ number_format($secure) }} / {{ number_format($total) }}</span>
-                            <span class="text-muted">Secure ({{ $securePct }}%)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endforeach
-
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
