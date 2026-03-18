@@ -212,7 +212,7 @@ class AdminPanelController extends Controller
                 && Schema::hasTable('prescriptions')
                 && Schema::hasColumn('prescriptions', 'call_session'),
             'whatsapp_notifications' => Schema::hasTable('whatsapp_notifications')
-                && Schema::hasColumn('whatsapp_notifications', 'recipient'),
+                && Schema::hasColumn('whatsapp_notifications', 'channel_name'),
             'fcm_notifications' => Schema::hasTable('fcm_notifications')
                 && Schema::hasColumn('fcm_notifications', 'user_id'),
             'reviews' => Schema::hasTable('reviews')
@@ -446,12 +446,24 @@ class AdminPanelController extends Controller
             );
             $prescriptionUploadedSource = $prescriptionUploadedAt ? 'prescriptions.created_at' : null;
 
-            $userPhoneNormalized = $this->normalizePhoneForLookup($transaction->user?->phone);
-            $whatsAppNotificationSentAt = $userPhoneNormalized
-                ? ($notificationLookup['whatsapp_any_by_phone'][$userPhoneNormalized] ?? null)
+            $channelName = trim((string) ($transaction->channel_name ?? ''));
+            $whatsAppRows = $channelName !== ''
+                ? ($notificationLookup['whatsapp_rows_by_channel'][$channelName] ?? [])
+                : [];
+            $whatsAppNotificationSentAt = $channelName !== ''
+                ? ($notificationLookup['whatsapp_sent_by_channel'][$channelName] ?? null)
                 : null;
-            $whatsAppFeedbackRequestSentAt = $userPhoneNormalized
-                ? ($notificationLookup['whatsapp_feedback_by_phone'][$userPhoneNormalized] ?? null)
+            $whatsAppFeedbackRequestSentAt = $channelName !== ''
+                ? ($notificationLookup['whatsapp_feedback_by_channel'][$channelName] ?? null)
+                : null;
+            $whatsAppLastAttemptAt = $channelName !== ''
+                ? ($notificationLookup['whatsapp_last_attempt_by_channel'][$channelName] ?? null)
+                : null;
+            $whatsAppStatusSummary = collect($whatsAppRows)
+                ->countBy(fn (array $row) => strtolower(trim((string) ($row['status'] ?? 'unknown'))))
+                ->all();
+            $whatsAppLastStatus = !empty($whatsAppRows)
+                ? strtolower(trim((string) ($whatsAppRows[0]['status'] ?? '')))
                 : null;
             $fcmNotificationSentAt = is_numeric($transaction->user_id)
                 ? ($notificationLookup['fcm_by_user'][(int) $transaction->user_id] ?? null)
@@ -471,7 +483,7 @@ class AdminPanelController extends Controller
                 if ($this->normalizeLifecycleTimestampOnOrAfter($transaction->getAttribute('joined_prescription_follow_up_notification_sent_at'), $transaction->created_at) === $notificationSentAt) {
                     $notificationSentSource = 'prescriptions.follow_up_notification_sent_at';
                 } elseif ($this->normalizeLifecycleTimestampOnOrAfter($whatsAppNotificationSentAt, $transaction->created_at) === $notificationSentAt) {
-                    $notificationSentSource = 'whatsapp_notifications.sent_at';
+                    $notificationSentSource = 'whatsapp_notifications.channel_name + status=sent + sent_at';
                 } else {
                     $notificationSentSource = 'fcm_notifications.sent_at';
                 }
@@ -487,7 +499,7 @@ class AdminPanelController extends Controller
             $reviewRequestedSource = null;
             if ($reviewRequestedAt) {
                 if ($this->normalizeLifecycleTimestampOnOrAfter($whatsAppFeedbackRequestSentAt, $transaction->created_at) === $reviewRequestedAt) {
-                    $reviewRequestedSource = 'whatsapp_notifications.template_name=pp_consultation_feedback';
+                    $reviewRequestedSource = 'whatsapp_notifications.channel_name + template_name=pp_consultation_feedback';
                 } else {
                     $reviewRequestedSource = 'prescriptions.follow_up_notification_sent_at (inferred)';
                 }
@@ -525,6 +537,11 @@ class AdminPanelController extends Controller
             $transaction->setAttribute('event_notification_sent_source', $notificationSentSource);
             $transaction->setAttribute('event_notification_sent_captured', $notificationSentAt !== null);
             $transaction->setAttribute('event_notification_sent_secure', $notificationSentAt !== null);
+            $transaction->setAttribute('whatsapp_notifications_for_channel', $whatsAppRows);
+            $transaction->setAttribute('whatsapp_notification_status_summary', $whatsAppStatusSummary);
+            $transaction->setAttribute('whatsapp_notification_last_status', $whatsAppLastStatus);
+            $transaction->setAttribute('whatsapp_notification_last_attempt_at', $whatsAppLastAttemptAt);
+            $transaction->setAttribute('whatsapp_notification_sent_at', $whatsAppNotificationSentAt);
 
             $transaction->setAttribute('event_review_requested_at', $reviewRequestedAt);
             $transaction->setAttribute('event_review_requested_source', $reviewRequestedSource);
@@ -1281,8 +1298,10 @@ class AdminPanelController extends Controller
     private function notificationLookupsForTransactions(Collection $transactions): array
     {
         $lookup = [
-            'whatsapp_any_by_phone' => [],
-            'whatsapp_feedback_by_phone' => [],
+            'whatsapp_sent_by_channel' => [],
+            'whatsapp_feedback_by_channel' => [],
+            'whatsapp_last_attempt_by_channel' => [],
+            'whatsapp_rows_by_channel' => [],
             'fcm_by_user' => [],
         ];
 
@@ -1290,71 +1309,118 @@ class AdminPanelController extends Controller
             return $lookup;
         }
 
-        $phones = $transactions
-            ->map(fn (Transaction $transaction) => $transaction->user?->phone)
-            ->filter(fn ($phone) => is_string($phone) && trim($phone) !== '')
-            ->map(fn (string $phone) => trim($phone))
+        $channels = $transactions
+            ->pluck('channel_name')
+            ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+            ->map(fn (string $channel) => trim($channel))
             ->unique()
             ->values();
 
-        if (Schema::hasTable('whatsapp_notifications') && Schema::hasColumn('whatsapp_notifications', 'recipient')) {
-            $recipientCandidates = $phones
-                ->flatMap(fn (string $phone) => $this->phoneLookupCandidates($phone))
-                ->filter(fn ($phone) => is_string($phone) && trim($phone) !== '')
-                ->unique()
-                ->values();
+        if (
+            $channels->isNotEmpty()
+            && Schema::hasTable('whatsapp_notifications')
+            && Schema::hasColumn('whatsapp_notifications', 'channel_name')
+        ) {
+            $query = DB::table('whatsapp_notifications')
+                ->whereIn('channel_name', $channels->all())
+                ->select(['id', 'channel_name']);
 
-            if ($recipientCandidates->isNotEmpty()) {
-                $query = DB::table('whatsapp_notifications')
-                    ->whereIn('recipient', $recipientCandidates->all())
-                    ->select(['recipient']);
+            if (Schema::hasColumn('whatsapp_notifications', 'status')) {
+                $query->addSelect('status');
+            }
+            if (Schema::hasColumn('whatsapp_notifications', 'template_name')) {
+                $query->addSelect('template_name');
+            }
+            if (Schema::hasColumn('whatsapp_notifications', 'message_type')) {
+                $query->addSelect('message_type');
+            }
+            if (Schema::hasColumn('whatsapp_notifications', 'recipient')) {
+                $query->addSelect('recipient');
+            }
+            if (Schema::hasColumn('whatsapp_notifications', 'http_status')) {
+                $query->addSelect('http_status');
+            }
+            if (Schema::hasColumn('whatsapp_notifications', 'provider_message_id')) {
+                $query->addSelect('provider_message_id');
+            }
+            if (Schema::hasColumn('whatsapp_notifications', 'error_message')) {
+                $query->addSelect('error_message');
+            }
+            if (Schema::hasColumn('whatsapp_notifications', 'sent_at')) {
+                $query->addSelect('sent_at');
+            }
+            if (Schema::hasColumn('whatsapp_notifications', 'created_at')) {
+                $query->addSelect('created_at');
+            }
 
-                if (Schema::hasColumn('whatsapp_notifications', 'template_name')) {
-                    $query->addSelect('template_name');
+            $rows = $query
+                ->orderByDesc('id')
+                ->get();
+
+            foreach ($rows as $row) {
+                $channel = trim((string) ($row->channel_name ?? ''));
+                if ($channel === '') {
+                    continue;
                 }
-                if (Schema::hasColumn('whatsapp_notifications', 'status')) {
-                    $query->where('status', 'sent');
-                    $query->addSelect('status');
-                }
 
-                $whatsAppTimestampColumns = [];
-                if (Schema::hasColumn('whatsapp_notifications', 'sent_at')) {
-                    $whatsAppTimestampColumns[] = 'sent_at';
-                    $query->addSelect('sent_at');
-                }
-                if (Schema::hasColumn('whatsapp_notifications', 'created_at')) {
-                    $whatsAppTimestampColumns[] = 'created_at';
-                    $query->addSelect('created_at');
-                }
+                $rawStatus = strtolower(trim((string) (data_get($row, 'status') ?? '')));
+                $template = strtolower(trim((string) (data_get($row, 'template_name') ?? '')));
+                $attemptedAt = $this->latestLifecycleTimestamp([
+                    data_get($row, 'sent_at'),
+                    data_get($row, 'created_at'),
+                ]);
+                $isSent = $rawStatus === 'sent'
+                    || ($rawStatus === '' && $this->normalizeLifecycleTimestamp(data_get($row, 'sent_at')) !== null);
+                $status = $rawStatus !== '' ? $rawStatus : ($isSent ? 'sent' : 'unknown');
 
-                $rows = $query->get();
-                foreach ($rows as $row) {
-                    $normalizedPhone = $this->normalizePhoneForLookup((string) ($row->recipient ?? ''));
-                    if (!$normalizedPhone) {
-                        continue;
-                    }
+                $entry = [
+                    'id' => (int) ($row->id ?? 0),
+                    'status' => $status !== '' ? $status : 'unknown',
+                    'template_name' => data_get($row, 'template_name'),
+                    'message_type' => data_get($row, 'message_type'),
+                    'recipient' => data_get($row, 'recipient'),
+                    'http_status' => data_get($row, 'http_status'),
+                    'provider_message_id' => data_get($row, 'provider_message_id'),
+                    'error_message' => data_get($row, 'error_message'),
+                    'sent_at' => $this->normalizeLifecycleTimestamp(data_get($row, 'sent_at')),
+                    'created_at' => $this->normalizeLifecycleTimestamp(data_get($row, 'created_at')),
+                    'attempted_at' => $attemptedAt,
+                ];
 
-                    $timeCandidate = null;
-                    foreach ($whatsAppTimestampColumns as $column) {
-                        $timeCandidate = $this->latestLifecycleTimestamp([$timeCandidate, data_get($row, $column)]);
-                    }
-                    if (!$timeCandidate) {
-                        continue;
-                    }
+                $lookup['whatsapp_rows_by_channel'][$channel][] = $entry;
 
-                    $lookup['whatsapp_any_by_phone'][$normalizedPhone] = $this->latestLifecycleTimestamp([
-                        $lookup['whatsapp_any_by_phone'][$normalizedPhone] ?? null,
-                        $timeCandidate,
+                $lookup['whatsapp_last_attempt_by_channel'][$channel] = $this->latestLifecycleTimestamp([
+                    $lookup['whatsapp_last_attempt_by_channel'][$channel] ?? null,
+                    $attemptedAt,
+                ]);
+
+                if ($isSent) {
+                    $lookup['whatsapp_sent_by_channel'][$channel] = $this->latestLifecycleTimestamp([
+                        $lookup['whatsapp_sent_by_channel'][$channel] ?? null,
+                        $attemptedAt,
                     ]);
-
-                    $template = strtolower(trim((string) (data_get($row, 'template_name') ?? '')));
-                    if ($template === 'pp_consultation_feedback' || str_contains($template, 'feedback')) {
-                        $lookup['whatsapp_feedback_by_phone'][$normalizedPhone] = $this->latestLifecycleTimestamp([
-                            $lookup['whatsapp_feedback_by_phone'][$normalizedPhone] ?? null,
-                            $timeCandidate,
-                        ]);
-                    }
                 }
+
+                if ($isSent && ($template === 'pp_consultation_feedback' || str_contains($template, 'feedback'))) {
+                    $lookup['whatsapp_feedback_by_channel'][$channel] = $this->latestLifecycleTimestamp([
+                        $lookup['whatsapp_feedback_by_channel'][$channel] ?? null,
+                        $attemptedAt,
+                    ]);
+                }
+            }
+
+            foreach ($lookup['whatsapp_rows_by_channel'] as $channel => $channelRows) {
+                usort($channelRows, function (array $a, array $b): int {
+                    $aTs = strtotime((string) ($a['attempted_at'] ?? '1970-01-01 00:00:00'));
+                    $bTs = strtotime((string) ($b['attempted_at'] ?? '1970-01-01 00:00:00'));
+
+                    if ($aTs === $bTs) {
+                        return (int) ($b['id'] ?? 0) <=> (int) ($a['id'] ?? 0);
+                    }
+
+                    return $bTs <=> $aTs;
+                });
+                $lookup['whatsapp_rows_by_channel'][$channel] = array_values($channelRows);
             }
         }
 

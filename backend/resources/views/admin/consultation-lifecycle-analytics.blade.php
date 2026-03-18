@@ -38,6 +38,16 @@
         font-size: 0.92rem;
         margin-bottom: 0.6rem;
     }
+    .wa-attempt {
+        border: 1px solid #e5e7eb;
+        border-radius: 0.55rem;
+        padding: 0.5rem 0.6rem;
+        margin-bottom: 0.45rem;
+        background: #f8fafc;
+    }
+    .wa-attempt:last-child {
+        margin-bottom: 0;
+    }
     @media (max-width: 991.98px) {
         .lifecycle-table thead {
             display: none;
@@ -229,6 +239,9 @@
                                         $callSessionDetails = $txn->getAttribute('joined_call_session_details') ?? [];
                                         $callDetails = $txn->getAttribute('joined_call_details') ?? [];
                                         $prescriptionDetails = $txn->getAttribute('joined_prescription_details') ?? [];
+                                        $whatsAppRows = $txn->getAttribute('whatsapp_notifications_for_channel') ?? [];
+                                        $whatsAppStatusSummary = $txn->getAttribute('whatsapp_notification_status_summary') ?? [];
+                                        $whatsAppLastStatus = strtolower((string) ($txn->getAttribute('whatsapp_notification_last_status') ?? ''));
                                     @endphp
                                     <tr>
                                         <td data-label="Transaction">
@@ -330,6 +343,67 @@
                                                     <div class="text-muted small mt-1">No joined prescription data.</div>
                                                 @endif
                                             </details>
+
+                                            <details class="mt-2">
+                                                <summary class="fw-semibold">
+                                                    whatsapp_notifications
+                                                    <span class="text-muted small">(count: {{ count($whatsAppRows) }})</span>
+                                                </summary>
+                                                <div class="mt-1">
+                                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                                        @foreach(collect($whatsAppStatusSummary)->sortKeys() as $statusKey => $statusCount)
+                                                            @php
+                                                                $normalizedStatus = strtolower(trim((string) $statusKey));
+                                                                $summaryBadgeClass = match ($normalizedStatus) {
+                                                                    'sent' => 'text-bg-success-subtle text-success-emphasis',
+                                                                    'failed' => 'text-bg-danger-subtle text-danger-emphasis',
+                                                                    'pending', 'queued' => 'text-bg-warning-subtle text-warning-emphasis',
+                                                                    default => 'text-bg-secondary-subtle text-secondary-emphasis',
+                                                                };
+                                                            @endphp
+                                                            <span class="badge {{ $summaryBadgeClass }}">
+                                                                {{ strtoupper($normalizedStatus !== '' ? $normalizedStatus : 'unknown') }}: {{ (int) $statusCount }}
+                                                            </span>
+                                                        @endforeach
+                                                        @if($whatsAppLastStatus !== '')
+                                                            <span class="badge {{ $whatsAppLastStatus === 'sent' ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-secondary-subtle text-secondary-emphasis' }}">
+                                                                Last status: {{ strtoupper($whatsAppLastStatus) }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+
+                                                    @if(!empty($whatsAppRows))
+                                                        @foreach($whatsAppRows as $whatsAppRow)
+                                                            @php
+                                                                $rowStatus = strtolower((string) ($whatsAppRow['status'] ?? 'unknown'));
+                                                                $rowStatusBadge = match ($rowStatus) {
+                                                                    'sent' => 'text-bg-success-subtle text-success-emphasis',
+                                                                    'failed' => 'text-bg-danger-subtle text-danger-emphasis',
+                                                                    'pending', 'queued' => 'text-bg-warning-subtle text-warning-emphasis',
+                                                                    default => 'text-bg-secondary-subtle text-secondary-emphasis',
+                                                                };
+                                                            @endphp
+                                                            <div class="wa-attempt">
+                                                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                                                    <span class="badge {{ $rowStatusBadge }}">{{ strtoupper($rowStatus) }}</span>
+                                                                    <span class="small text-muted">Template: <code>{{ $whatsAppRow['template_name'] ?? '—' }}</code></span>
+                                                                    <span class="small text-muted">Type: <code>{{ $whatsAppRow['message_type'] ?? '—' }}</code></span>
+                                                                </div>
+                                                                <div class="small text-muted">
+                                                                    <div>Attempted: {{ $formatTimestamp($whatsAppRow['attempted_at'] ?? null) }}</div>
+                                                                    <div>Sent At: {{ $formatTimestamp($whatsAppRow['sent_at'] ?? null) }}</div>
+                                                                    <div>HTTP Status: <code>{{ $whatsAppRow['http_status'] ?? '—' }}</code></div>
+                                                                    @if(!empty($whatsAppRow['error_message']))
+                                                                        <div>Error: <code>{{ $whatsAppRow['error_message'] }}</code></div>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    @else
+                                                        <div class="text-muted small">No WhatsApp notifications found for this channel.</div>
+                                                    @endif
+                                                </div>
+                                            </details>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -342,4 +416,3 @@
     </div>
 </div>
 @endsection
-
