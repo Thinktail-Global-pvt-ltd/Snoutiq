@@ -482,30 +482,36 @@ class AdminPanelController extends Controller
             );
             $prescriptionUploadedSource = $prescriptionUploadedAt ? 'prescriptions.created_at' : null;
 
-            $channelName = trim((string) ($transaction->channel_name ?? ''));
-            $whatsAppRows = $channelName !== ''
-                ? ($notificationLookup['whatsapp_rows_by_channel'][$channelName] ?? [])
+            $channelKey = $this->normalizedLifecycleChannelKey($transaction->channel_name);
+            $whatsAppRows = $channelKey !== null
+                ? ($notificationLookup['whatsapp_rows_by_channel'][$channelKey] ?? [])
                 : [];
             $joinedWhatsAppSentAt = $this->latestLifecycleTimestamp([
                 $transaction->getAttribute('joined_whatsapp_notification_sent_at'),
                 $transaction->getAttribute('joined_whatsapp_notification_created_at'),
             ]);
-            $lookupWhatsAppSentAt = $channelName !== ''
-                ? ($notificationLookup['whatsapp_sent_by_channel'][$channelName] ?? null)
+            $lookupWhatsAppSentAt = $channelKey !== null
+                ? ($notificationLookup['whatsapp_sent_by_channel'][$channelKey] ?? null)
                 : null;
             $whatsAppNotificationSentAt = $this->latestLifecycleTimestamp([
                 $joinedWhatsAppSentAt,
                 $lookupWhatsAppSentAt,
             ]);
-            $whatsAppLastAttemptAt = $channelName !== ''
-                ? ($notificationLookup['whatsapp_last_attempt_by_channel'][$channelName] ?? null)
+            $whatsAppLastAttemptAt = $channelKey !== null
+                ? ($notificationLookup['whatsapp_last_attempt_by_channel'][$channelKey] ?? null)
                 : null;
-            $doctorFeedbackSubmittedAt = $channelName !== ''
-                ? ($feedbackLookup['doctor_feedback_by_channel'][$channelName] ?? null)
+            $doctorFeedbackSubmittedAt = $channelKey !== null
+                ? ($feedbackLookup['doctor_feedback_by_channel'][$channelKey] ?? null)
                 : null;
-            $petFeedbackSubmittedAt = $channelName !== ''
-                ? ($feedbackLookup['pet_feedback_by_channel'][$channelName] ?? null)
+            $petFeedbackSubmittedAt = $channelKey !== null
+                ? ($feedbackLookup['pet_feedback_by_channel'][$channelKey] ?? null)
                 : null;
+            $doctorFeedbackExists = $channelKey !== null
+                ? (bool) ($feedbackLookup['doctor_feedback_exists_by_channel'][$channelKey] ?? false)
+                : false;
+            $petFeedbackExists = $channelKey !== null
+                ? (bool) ($feedbackLookup['pet_feedback_exists_by_channel'][$channelKey] ?? false)
+                : false;
             $whatsAppStatusSummary = collect($whatsAppRows)
                 ->countBy(fn (array $row) => strtolower(trim((string) ($row['status'] ?? 'unknown'))))
                 ->all();
@@ -538,17 +544,32 @@ class AdminPanelController extends Controller
                 }
             }
 
-            $reviewRequestedAt = $this->normalizeLifecycleTimestampOnOrAfter(
-                $doctorFeedbackSubmittedAt,
-                $transaction->created_at
-            );
-            $reviewRequestedSource = $reviewRequestedAt ? 'vet_feedback.channel_name' : null;
+            $reviewRequestedAt = $this->normalizeLifecycleTimestamp($doctorFeedbackSubmittedAt);
+            if (!$reviewRequestedAt && $doctorFeedbackExists) {
+                $reviewRequestedAt = $createdAt;
+            }
+            $reviewRequestedSource = null;
+            if ($reviewRequestedAt) {
+                $reviewRequestedSource = $doctorFeedbackSubmittedAt
+                    ? 'vet_feedback.channel_name + feedback timestamp'
+                    : 'vet_feedback.channel_name (timestamp fallback: transactions.created_at)';
+            }
 
-            $reviewSubmittedAt = $this->normalizeLifecycleTimestampOnOrAfter(
-                $petFeedbackSubmittedAt,
-                $transaction->created_at
-            );
-            $reviewSubmittedSource = $reviewSubmittedAt ? 'pet_feedback.channel_name' : null;
+            $reviewSubmittedAt = $this->normalizeLifecycleTimestamp($petFeedbackSubmittedAt);
+            if (!$reviewSubmittedAt && $petFeedbackExists) {
+                $reviewSubmittedAt = $createdAt;
+            }
+            $reviewSubmittedSource = null;
+            if ($reviewSubmittedAt) {
+                $reviewSubmittedSource = $petFeedbackSubmittedAt
+                    ? 'pet_feedback.channel_name + feedback timestamp'
+                    : 'pet_feedback.channel_name (timestamp fallback: transactions.created_at)';
+            }
+
+            $reviewRequestedCaptured = $reviewRequestedAt !== null || $doctorFeedbackExists;
+            $reviewRequestedSecure = $doctorFeedbackExists;
+            $reviewSubmittedCaptured = $reviewSubmittedAt !== null || $petFeedbackExists;
+            $reviewSubmittedSecure = $petFeedbackExists;
 
             $transaction->setAttribute('event_consultation_created_at', $createdAt);
             $transaction->setAttribute('event_consultation_created_source', 'transactions.created_at');
@@ -587,13 +608,13 @@ class AdminPanelController extends Controller
 
             $transaction->setAttribute('event_review_requested_at', $reviewRequestedAt);
             $transaction->setAttribute('event_review_requested_source', $reviewRequestedSource);
-            $transaction->setAttribute('event_review_requested_captured', $reviewRequestedAt !== null);
-            $transaction->setAttribute('event_review_requested_secure', $reviewRequestedAt !== null);
+            $transaction->setAttribute('event_review_requested_captured', $reviewRequestedCaptured);
+            $transaction->setAttribute('event_review_requested_secure', $reviewRequestedSecure);
 
             $transaction->setAttribute('event_review_submitted_at', $reviewSubmittedAt);
             $transaction->setAttribute('event_review_submitted_source', $reviewSubmittedSource);
-            $transaction->setAttribute('event_review_submitted_captured', $reviewSubmittedAt !== null);
-            $transaction->setAttribute('event_review_submitted_secure', $reviewSubmittedAt !== null);
+            $transaction->setAttribute('event_review_submitted_captured', $reviewSubmittedCaptured);
+            $transaction->setAttribute('event_review_submitted_secure', $reviewSubmittedSecure);
 
             $transaction->setAttribute(
                 'joined_call_session_details',
@@ -1357,6 +1378,10 @@ class AdminPanelController extends Controller
             ->map(fn (string $channel) => trim($channel))
             ->unique()
             ->values();
+        $normalizedChannels = $channels
+            ->map(fn (string $channel) => strtolower($channel))
+            ->unique()
+            ->values();
 
         if (
             $channels->isNotEmpty()
@@ -1364,7 +1389,12 @@ class AdminPanelController extends Controller
             && Schema::hasColumn('whatsapp_notifications', 'channel_name')
         ) {
             $query = DB::table('whatsapp_notifications')
-                ->whereIn('channel_name', $channels->all())
+                ->where(function ($inner) use ($channels, $normalizedChannels) {
+                    $inner->whereIn('channel_name', $channels->all());
+                    if ($normalizedChannels->isNotEmpty()) {
+                        $inner->orWhereIn(DB::raw('LOWER(channel_name)'), $normalizedChannels->all());
+                    }
+                })
                 ->select(['id', 'channel_name']);
 
             if (Schema::hasColumn('whatsapp_notifications', 'status')) {
@@ -1401,7 +1431,8 @@ class AdminPanelController extends Controller
 
             foreach ($rows as $row) {
                 $channel = trim((string) ($row->channel_name ?? ''));
-                if ($channel === '') {
+                $channelKey = $this->normalizedLifecycleChannelKey($channel);
+                if ($channelKey === null) {
                     continue;
                 }
 
@@ -1429,23 +1460,23 @@ class AdminPanelController extends Controller
                     'attempted_at' => $attemptedAt,
                 ];
 
-                $lookup['whatsapp_rows_by_channel'][$channel][] = $entry;
+                $lookup['whatsapp_rows_by_channel'][$channelKey][] = $entry;
 
-                $lookup['whatsapp_last_attempt_by_channel'][$channel] = $this->latestLifecycleTimestamp([
-                    $lookup['whatsapp_last_attempt_by_channel'][$channel] ?? null,
+                $lookup['whatsapp_last_attempt_by_channel'][$channelKey] = $this->latestLifecycleTimestamp([
+                    $lookup['whatsapp_last_attempt_by_channel'][$channelKey] ?? null,
                     $attemptedAt,
                 ]);
 
                 if ($isSent) {
-                    $lookup['whatsapp_sent_by_channel'][$channel] = $this->latestLifecycleTimestamp([
-                        $lookup['whatsapp_sent_by_channel'][$channel] ?? null,
+                    $lookup['whatsapp_sent_by_channel'][$channelKey] = $this->latestLifecycleTimestamp([
+                        $lookup['whatsapp_sent_by_channel'][$channelKey] ?? null,
                         $attemptedAt,
                     ]);
                 }
 
                 if ($isSent && ($template === 'pp_consultation_feedback' || str_contains($template, 'feedback'))) {
-                    $lookup['whatsapp_feedback_by_channel'][$channel] = $this->latestLifecycleTimestamp([
-                        $lookup['whatsapp_feedback_by_channel'][$channel] ?? null,
+                    $lookup['whatsapp_feedback_by_channel'][$channelKey] = $this->latestLifecycleTimestamp([
+                        $lookup['whatsapp_feedback_by_channel'][$channelKey] ?? null,
                         $attemptedAt,
                     ]);
                 }
@@ -1524,6 +1555,8 @@ class AdminPanelController extends Controller
         $lookup = [
             'doctor_feedback_by_channel' => [],
             'pet_feedback_by_channel' => [],
+            'doctor_feedback_exists_by_channel' => [],
+            'pet_feedback_exists_by_channel' => [],
         ];
 
         if ($transactions->isEmpty()) {
@@ -1535,20 +1568,37 @@ class AdminPanelController extends Controller
             ->map(fn (string $channel) => trim($channel))
             ->unique()
             ->values();
+        $normalizedChannels = $channels
+            ->map(fn (string $channel) => strtolower($channel))
+            ->unique()
+            ->values();
 
         if ($channels->isEmpty()) {
             return $lookup;
         }
 
         $tableMap = [
-            'vet_feedback' => 'doctor_feedback_by_channel',
-            'pet_feedback' => 'pet_feedback_by_channel',
+            'vet_feedback' => [
+                'timestamp_lookup' => 'doctor_feedback_by_channel',
+                'exists_lookup' => 'doctor_feedback_exists_by_channel',
+            ],
+            'pet_feedback' => [
+                'timestamp_lookup' => 'pet_feedback_by_channel',
+                'exists_lookup' => 'pet_feedback_exists_by_channel',
+            ],
         ];
 
-        foreach ($tableMap as $table => $lookupKey) {
+        foreach ($tableMap as $table => $lookupKeys) {
             if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'channel_name')) {
                 continue;
             }
+
+            $timestampLookupKey = (string) data_get($lookupKeys, 'timestamp_lookup');
+            $existsLookupKey = (string) data_get($lookupKeys, 'exists_lookup');
+            if ($timestampLookupKey === '' || $existsLookupKey === '') {
+                continue;
+            }
+
             $hasMetaColumn = Schema::hasColumn($table, 'meta');
             $dbDriver = DB::connection()->getDriverName();
             $supportsJsonExtract = in_array($dbDriver, ['mysql', 'mariadb'], true);
@@ -1563,11 +1613,18 @@ class AdminPanelController extends Controller
             }
 
             $query = DB::table($table)
-                ->where(function ($inner) use ($channels, $hasMetaColumn, $supportsJsonExtract) {
+                ->where(function ($inner) use ($channels, $normalizedChannels, $hasMetaColumn, $supportsJsonExtract) {
                     $inner->whereIn('channel_name', $channels->all());
+                    if ($normalizedChannels->isNotEmpty()) {
+                        $inner->orWhereIn(DB::raw('LOWER(channel_name)'), $normalizedChannels->all());
+                    }
                     if ($hasMetaColumn && $supportsJsonExtract) {
                         $inner->orWhereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(meta, '$.channel_name'))"), $channels->all());
                         $inner->orWhereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(meta, '$.channelName'))"), $channels->all());
+                        if ($normalizedChannels->isNotEmpty()) {
+                            $inner->orWhereIn(DB::raw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.channel_name')))"), $normalizedChannels->all());
+                            $inner->orWhereIn(DB::raw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.channelName')))"), $normalizedChannels->all());
+                        }
                     }
                 })
                 ->select(['channel_name']);
@@ -1597,9 +1654,11 @@ class AdminPanelController extends Controller
                     ?? data_get($rowMeta, 'channelName')
                     ?? ''
                 ));
-                if ($channelName === '') {
+                $channelKey = $this->normalizedLifecycleChannelKey($channelName);
+                if ($channelKey === null) {
                     continue;
                 }
+                $lookup[$existsLookupKey][$channelKey] = true;
 
                 $timeCandidate = null;
                 foreach ($timestampColumns as $timestampColumn) {
@@ -1612,8 +1671,8 @@ class AdminPanelController extends Controller
                     continue;
                 }
 
-                $lookup[$lookupKey][$channelName] = $this->latestLifecycleTimestamp([
-                    $lookup[$lookupKey][$channelName] ?? null,
+                $lookup[$timestampLookupKey][$channelKey] = $this->latestLifecycleTimestamp([
+                    $lookup[$timestampLookupKey][$channelKey] ?? null,
                     $timeCandidate,
                 ]);
             }
@@ -1713,6 +1772,20 @@ class AdminPanelController extends Controller
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function normalizedLifecycleChannelKey(mixed $channel): ?string
+    {
+        if (!is_string($channel)) {
+            return null;
+        }
+
+        $normalized = trim($channel);
+        if ($normalized === '') {
+            return null;
+        }
+
+        return strtolower($normalized);
     }
 
     private function normalizeLifecycleTimestamp(mixed $value): ?string
