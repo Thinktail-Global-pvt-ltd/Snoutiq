@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\WhatsAppNotification;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use Throwable;
 
@@ -14,6 +15,7 @@ class WhatsAppService
     private const STATUS_FAILED = 'failed';
 
     private static ?bool $notificationTableExists = null;
+    private static ?bool $notificationChannelNameColumnExists = null;
 
     public function __construct(
         private readonly ?string $phoneNumberId,
@@ -28,7 +30,13 @@ class WhatsAppService
         return !empty($this->phoneNumberId) && !empty($this->accessToken);
     }
 
-    public function sendTemplate(string $to, ?string $template = null, array $components = [], ?string $language = null): void
+    public function sendTemplate(
+        string $to,
+        ?string $template = null,
+        array $components = [],
+        ?string $language = null,
+        ?string $channelName = null
+    ): void
     {
         $this->dispatch([
             'messaging_product' => 'whatsapp',
@@ -39,10 +47,10 @@ class WhatsAppService
                 'language' => ['code' => $language ?: $this->defaultLanguage],
                 'components' => $components ?: null,
             ]),
-        ]);
+        ], false, $channelName);
     }
 
-    public function sendText(string $to, string $body): void
+    public function sendText(string $to, string $body, ?string $channelName = null): void
     {
         $this->dispatch([
             'messaging_product' => 'whatsapp',
@@ -52,10 +60,10 @@ class WhatsAppService
                 'preview_url' => false,
                 'body' => $body,
             ],
-        ]);
+        ], false, $channelName);
     }
 
-    public function sendTextWithResult(string $to, string $body): array
+    public function sendTextWithResult(string $to, string $body, ?string $channelName = null): array
     {
         return $this->dispatch([
             'messaging_product' => 'whatsapp',
@@ -65,10 +73,16 @@ class WhatsAppService
                 'preview_url' => false,
                 'body' => $body,
             ],
-        ], true);
+        ], true, $channelName);
     }
 
-    public function sendTemplateWithResult(string $to, ?string $template = null, array $components = [], ?string $language = null): array
+    public function sendTemplateWithResult(
+        string $to,
+        ?string $template = null,
+        array $components = [],
+        ?string $language = null,
+        ?string $channelName = null
+    ): array
     {
         return $this->dispatch([
             'messaging_product' => 'whatsapp',
@@ -79,10 +93,10 @@ class WhatsAppService
                 'language' => ['code' => $language ?: $this->defaultLanguage],
                 'components' => $components ?: null,
             ]),
-        ], true);
+        ], true, $channelName);
     }
 
-    public function sendDocument(string $to, string $link, ?string $filename = null): array
+    public function sendDocument(string $to, string $link, ?string $filename = null, ?string $channelName = null): array
     {
         return $this->dispatch([
             'messaging_product' => 'whatsapp',
@@ -92,7 +106,7 @@ class WhatsAppService
                 'link' => $link,
                 'filename' => $filename,
             ]),
-        ], true);
+        ], true, $channelName);
     }
 
     public function sendOtpTemplate(string $to, string $otp, string $template = 'whatsapp_authentication', string $language = 'en'): void
@@ -117,7 +131,7 @@ class WhatsAppService
         $this->sendTemplate($to, $template, $components, $language);
     }
 
-    private function dispatch(array $payload, bool $returnResponse = false): array
+    private function dispatch(array $payload, bool $returnResponse = false, ?string $channelName = null): array
     {
         if (!$this->isConfigured()) {
             $this->storeDispatchLog(
@@ -127,7 +141,8 @@ class WhatsAppService
                 null,
                 'WhatsApp credentials missing',
                 null,
-                null
+                null,
+                $channelName
             );
             throw new RuntimeException('WhatsApp credentials missing');
         }
@@ -174,7 +189,8 @@ class WhatsAppService
                 $responsePayload,
                 is_string($errorMessage) ? $errorMessage : (string) $errorMessage,
                 $errorDetailsText,
-                $responseBody
+                $responseBody,
+                $channelName
             );
 
             throw new RuntimeException($message);
@@ -187,7 +203,8 @@ class WhatsAppService
             $responsePayload,
             null,
             null,
-            $responseBody
+            $responseBody,
+            $channelName
         );
 
         return $returnResponse ? ($responsePayload ?? []) : [];
@@ -200,7 +217,8 @@ class WhatsAppService
         ?array $responsePayload,
         ?string $errorMessage,
         ?string $errorDetails,
-        ?string $responseBody
+        ?string $responseBody,
+        ?string $channelName = null
     ): void {
         // Skip only when we already know table is unavailable.
         if (self::$notificationTableExists === false) {
@@ -213,7 +231,7 @@ class WhatsAppService
         $languageCode = data_get($template, 'language.code');
 
         try {
-            WhatsAppNotification::query()->create([
+            $logPayload = [
                 'recipient' => is_string($payload['to'] ?? null) ? $payload['to'] : null,
                 'message_type' => is_string($payload['type'] ?? null) ? $payload['type'] : null,
                 'template_name' => $this->truncate($templateName, 120),
@@ -235,7 +253,16 @@ class WhatsAppService
                 'source_file' => $this->truncate($sourceFile, 255),
                 'source_line' => $sourceLine,
                 'sent_at' => $status === self::STATUS_SENT ? now() : null,
-            ]);
+            ];
+
+            if ($this->supportsChannelNameColumn()) {
+                $logPayload['channel_name'] = $this->truncate(
+                    $this->resolveChannelNameForLog($channelName, $payload),
+                    191
+                );
+            }
+
+            WhatsAppNotification::query()->create($logPayload);
         } catch (Throwable $e) {
             if ($this->isMissingTableError($e)) {
                 self::$notificationTableExists = false;
@@ -276,6 +303,32 @@ class WhatsAppService
         }
 
         return [null, null, null];
+    }
+
+    private function supportsChannelNameColumn(): bool
+    {
+        if (self::$notificationChannelNameColumnExists === null) {
+            self::$notificationChannelNameColumnExists = Schema::hasTable('whatsapp_notifications')
+                && Schema::hasColumn('whatsapp_notifications', 'channel_name');
+        }
+
+        return self::$notificationChannelNameColumnExists;
+    }
+
+    private function resolveChannelNameForLog(?string $channelName, array $payload): ?string
+    {
+        $candidate = trim((string) ($channelName ?? ''));
+        if ($candidate !== '') {
+            return $candidate;
+        }
+
+        // Optional fallback if caller places any contextual metadata in payload.
+        $fallback = trim((string) (data_get($payload, 'context.channel_name')
+            ?? data_get($payload, 'metadata.channel_name')
+            ?? data_get($payload, 'channel_name')
+            ?? ''));
+
+        return $fallback !== '' ? $fallback : null;
     }
 
     private function truncate(?string $value, int $length): ?string

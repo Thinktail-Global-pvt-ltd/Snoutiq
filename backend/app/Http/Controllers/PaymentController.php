@@ -1173,6 +1173,7 @@ class PaymentController extends Controller
             }
 
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
+            $channelName = $this->resolveChannelNameForWhatsApp($context, $notes);
 
             // Use approved template: pp_video_consult_booked (language: en)
             $components = [
@@ -1193,7 +1194,8 @@ class PaymentController extends Controller
                 $this->normalizePhone($user->phone),
                 'pp_video_consult_booked',
                 $components,
-                'en'
+                'en',
+                $channelName
             );
             return [
                 'sent' => true,
@@ -1233,6 +1235,7 @@ class PaymentController extends Controller
             $petType = $pet?->pet_type ?? $pet?->type ?? 'Pet';
 
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
+            $channelName = $this->resolveChannelNameForWhatsApp($context, $notes);
 
             // Template: pp_booking_confirmed (language: en)
             // {{1}} Pet parent name
@@ -1261,7 +1264,8 @@ class PaymentController extends Controller
                 $this->normalizePhone($user->phone),
                 'pp_booking_confirmed',
                 $components,
-                'en'
+                'en',
+                $channelName
             );
 
             return [
@@ -1351,6 +1355,7 @@ class PaymentController extends Controller
 
             $issue = $notes['issue'] ?? $notes['concern'] ?? $pet?->reported_symptom ?? 'N/A';
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
+            $channelName = $this->resolveChannelNameForWhatsApp($context, $notes);
 
             // Keep old template as last fallback; primary path uses the currently approved template family.
             $requestedTemplate = strtolower(trim((string) ($notes['vet_template'] ?? '')));
@@ -1423,7 +1428,8 @@ class PaymentController extends Controller
                             $normalizedDoctorPhone,
                             $tpl,
                             $components,
-                            $lang
+                            $lang,
+                            $channelName
                         );
 
                         return [
@@ -1520,6 +1526,7 @@ class PaymentController extends Controller
             $parentName = $user?->name ?? 'Pet Parent';
             $issue = $notes['summary'] ?? $notes['reason'] ?? $notes['concern'] ?? 'Video consult';
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 20));
+            $channelName = $this->resolveChannelNameForWhatsApp($context, $notes);
 
             $requestedTemplate = strtolower(trim((string) ($notes['vet_template'] ?? '')));
             if (in_array($requestedTemplate, ['vet_new_video_consult', 'vet_new_consultation_assigned'], true)) {
@@ -1562,7 +1569,8 @@ class PaymentController extends Controller
                             $this->normalizePhone($doctorPhone),
                             $tpl,
                             $components,
-                            $lang
+                            $lang,
+                            $channelName
                         );
 
                         return [
@@ -2165,13 +2173,66 @@ class PaymentController extends Controller
             $text = "Prescription PDF: " . $url;
 
             $to = $this->normalizePhone($doctorPhone);
-            $result = $this->whatsApp->sendTextWithResult($to, $text);
+            $channelName = $this->resolveChannelNameForWhatsApp($context);
+            $result = $this->whatsApp->sendTextWithResult($to, $text, $channelName);
 
             return ['sent' => true, 'to' => $to, 'url' => $url, 'meta' => $result];
         } catch (\Throwable $e) {
             report($e);
             return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
         }
+    }
+
+    protected function resolveChannelNameForWhatsApp(array $context, array $notes = []): ?string
+    {
+        $candidate = trim((string) (
+            $context['channel_name']
+            ?? $notes['channel_name']
+            ?? $notes['call_session_id']
+            ?? $notes['call_session']
+            ?? ''
+        ));
+
+        if ($candidate !== '') {
+            if (str_starts_with($candidate, 'channel_')) {
+                return $candidate;
+            }
+
+            try {
+                $session = $this->findCallSession($candidate);
+                if ($session && !empty($session->channel_name)) {
+                    return trim((string) $session->channel_name);
+                }
+            } catch (\Throwable $e) {
+                // Best-effort resolver; ignore and return raw candidate.
+            }
+
+            return $candidate;
+        }
+
+        $userId = $context['user_id'] ?? null;
+        $doctorId = $context['doctor_id'] ?? null;
+        if (!Schema::hasTable('call_sessions') || !$userId || !$doctorId) {
+            return null;
+        }
+
+        try {
+            $row = DB::table('call_sessions')
+                ->where('patient_id', (int) $userId)
+                ->where('doctor_id', (int) $doctorId)
+                ->whereNotNull('channel_name')
+                ->where('channel_name', '!=', '')
+                ->orderByDesc('id')
+                ->value('channel_name');
+
+            if (is_string($row) && trim($row) !== '') {
+                return trim($row);
+            }
+        } catch (\Throwable $e) {
+            // Best-effort resolver.
+        }
+
+        return null;
     }
 
     private function buildPrescriptionHtml($prescription, $user, $pet, $doctor): string

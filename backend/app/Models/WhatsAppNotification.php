@@ -13,6 +13,7 @@ class WhatsAppNotification extends Model
 
     protected $fillable = [
         'recipient',
+        'channel_name',
         'message_type',
         'template_name',
         'language_code',
