@@ -3309,7 +3309,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
         prescriptionForm.followUpNotes,
       );
     }
-    fd.append("follow_up_required", String(followUpRequired));
+    fd.append("follow_up_required", followUpRequired ? "1" : "0");
     fd.append("medications_json", JSON.stringify(medsPayload));
     if (prescriptionForm.recordFile) {
       fd.append("record_file", prescriptionForm.recordFile);
