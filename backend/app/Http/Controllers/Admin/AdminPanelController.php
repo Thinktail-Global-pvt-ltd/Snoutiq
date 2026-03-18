@@ -215,8 +215,7 @@ class AdminPanelController extends Controller
                 && Schema::hasColumn('whatsapp_notifications', 'channel_name'),
             'fcm_notifications' => Schema::hasTable('fcm_notifications')
                 && Schema::hasColumn('fcm_notifications', 'user_id'),
-            'reviews' => Schema::hasTable('reviews')
-                || Schema::hasTable('vet_feedback')
+            'reviews' => Schema::hasTable('vet_feedback')
                 || Schema::hasTable('pet_feedback'),
         ];
 
@@ -506,7 +505,7 @@ class AdminPanelController extends Controller
             }
 
             $reviewSubmittedAt = $reviewSubmissionLookup[(int) $transaction->id] ?? null;
-            $reviewSubmittedSource = $reviewSubmittedAt ? 'reviews/vet_feedback/pet_feedback.created_at' : null;
+            $reviewSubmittedSource = $reviewSubmittedAt ? 'pet_feedback.channel_name / vet_feedback.channel_name' : null;
 
             $transaction->setAttribute('event_consultation_created_at', $createdAt);
             $transaction->setAttribute('event_consultation_created_source', 'transactions.created_at');
@@ -1483,120 +1482,57 @@ class AdminPanelController extends Controller
             return [];
         }
 
-        $userIds = $transactions->pluck('user_id')
-            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-        $doctorIds = $transactions->pluck('doctor_id')
-            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-        $petIds = $transactions->pluck('pet_id')
-            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
-            ->map(fn ($id) => (int) $id)
+        $channels = $transactions->pluck('channel_name')
+            ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+            ->map(fn (string $channel) => trim($channel))
             ->unique()
             ->values();
 
-        $userDoctorLookup = [];
-        $userDoctorPetLookup = [];
+        $channelLookup = [];
+        if ($channels->isNotEmpty()) {
+            foreach (['vet_feedback', 'pet_feedback'] as $table) {
+                if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'channel_name')) {
+                    continue;
+                }
 
-        if (Schema::hasTable('reviews') && $userIds->isNotEmpty() && $doctorIds->isNotEmpty()) {
-            $reviewRows = DB::table('reviews')
-                ->whereIn('user_id', $userIds->all())
-                ->whereIn('doctor_id', $doctorIds->all())
-                ->select(['user_id', 'doctor_id', 'created_at'])
-                ->get();
+                $timestampColumns = collect(['submitted_at', 'created_at', 'updated_at'])
+                    ->filter(fn (string $column) => Schema::hasColumn($table, $column))
+                    ->values()
+                    ->all();
 
-            foreach ($reviewRows as $row) {
-                $key = (int) $row->user_id . ':' . (int) $row->doctor_id;
-                $userDoctorLookup[$key] = $this->latestLifecycleTimestamp([
-                    $userDoctorLookup[$key] ?? null,
-                    $row->created_at ?? null,
-                ]);
-            }
-        }
+                if (empty($timestampColumns)) {
+                    continue;
+                }
 
-        if (Schema::hasTable('vet_feedback') && $doctorIds->isNotEmpty()) {
-            $hasVetFeedbackPetId = Schema::hasColumn('vet_feedback', 'pet_id');
-            $vetFeedbackQuery = DB::table('vet_feedback')
-                ->whereIn('vet_id', $doctorIds->all())
-                ->select(['vet_id', 'user_id', 'pet_id', 'created_at']);
+                $query = DB::table($table)
+                    ->whereIn('channel_name', $channels->all())
+                    ->select(['channel_name']);
 
-            if ($userIds->isNotEmpty() || ($hasVetFeedbackPetId && $petIds->isNotEmpty())) {
-                $vetFeedbackQuery->where(function ($inner) use ($userIds, $petIds, $hasVetFeedbackPetId) {
-                    if ($userIds->isNotEmpty()) {
-                        $inner->whereIn('user_id', $userIds->all());
+                foreach ($timestampColumns as $timestampColumn) {
+                    $query->addSelect($timestampColumn);
+                }
+
+                $rows = $query->get();
+                foreach ($rows as $row) {
+                    $channelName = trim((string) ($row->channel_name ?? ''));
+                    if ($channelName === '') {
+                        continue;
                     }
 
-                    if ($hasVetFeedbackPetId && $petIds->isNotEmpty()) {
-                        if ($userIds->isNotEmpty()) {
-                            $inner->orWhereIn('pet_id', $petIds->all());
-                        } else {
-                            $inner->whereIn('pet_id', $petIds->all());
-                        }
+                    $timeCandidate = null;
+                    foreach ($timestampColumns as $timestampColumn) {
+                        $timeCandidate = $this->latestLifecycleTimestamp([
+                            $timeCandidate,
+                            data_get($row, $timestampColumn),
+                        ]);
                     }
-                });
-            }
+                    if (!$timeCandidate) {
+                        continue;
+                    }
 
-            $vetFeedbackRows = $vetFeedbackQuery->get();
-            foreach ($vetFeedbackRows as $row) {
-                $userId = is_numeric($row->user_id ?? null) ? (int) $row->user_id : null;
-                $doctorId = is_numeric($row->vet_id ?? null) ? (int) $row->vet_id : null;
-                $petId = is_numeric($row->pet_id ?? null) ? (int) $row->pet_id : null;
-                $createdAt = $row->created_at ?? null;
-
-                if ($userId && $doctorId) {
-                    $pairKey = $userId . ':' . $doctorId;
-                    $userDoctorLookup[$pairKey] = $this->latestLifecycleTimestamp([
-                        $userDoctorLookup[$pairKey] ?? null,
-                        $createdAt,
-                    ]);
-                }
-
-                if ($userId && $doctorId && $petId) {
-                    $tripletKey = $userId . ':' . $doctorId . ':' . $petId;
-                    $userDoctorPetLookup[$tripletKey] = $this->latestLifecycleTimestamp([
-                        $userDoctorPetLookup[$tripletKey] ?? null,
-                        $createdAt,
-                    ]);
-                }
-            }
-        }
-
-        if (Schema::hasTable('pet_feedback') && $petIds->isNotEmpty()) {
-            $petFeedbackQuery = DB::table('pet_feedback')
-                ->whereIn('pet_id', $petIds->all())
-                ->select(['pet_id', 'vet_id', 'user_id', 'created_at']);
-
-            if ($doctorIds->isNotEmpty()) {
-                $petFeedbackQuery->whereIn('vet_id', $doctorIds->all());
-            }
-            if ($userIds->isNotEmpty()) {
-                $petFeedbackQuery->whereIn('user_id', $userIds->all());
-            }
-
-            $petFeedbackRows = $petFeedbackQuery->get();
-            foreach ($petFeedbackRows as $row) {
-                $userId = is_numeric($row->user_id ?? null) ? (int) $row->user_id : null;
-                $doctorId = is_numeric($row->vet_id ?? null) ? (int) $row->vet_id : null;
-                $petId = is_numeric($row->pet_id ?? null) ? (int) $row->pet_id : null;
-                $createdAt = $row->created_at ?? null;
-
-                if ($userId && $doctorId) {
-                    $pairKey = $userId . ':' . $doctorId;
-                    $userDoctorLookup[$pairKey] = $this->latestLifecycleTimestamp([
-                        $userDoctorLookup[$pairKey] ?? null,
-                        $createdAt,
-                    ]);
-                }
-
-                if ($userId && $doctorId && $petId) {
-                    $tripletKey = $userId . ':' . $doctorId . ':' . $petId;
-                    $userDoctorPetLookup[$tripletKey] = $this->latestLifecycleTimestamp([
-                        $userDoctorPetLookup[$tripletKey] ?? null,
-                        $createdAt,
+                    $channelLookup[$channelName] = $this->latestLifecycleTimestamp([
+                        $channelLookup[$channelName] ?? null,
+                        $timeCandidate,
                     ]);
                 }
             }
@@ -1605,13 +1541,11 @@ class AdminPanelController extends Controller
         $result = [];
 
         foreach ($transactions as $transaction) {
-            $pairKey = (int) ($transaction->user_id ?? 0) . ':' . (int) ($transaction->doctor_id ?? 0);
-            $tripletKey = (int) ($transaction->user_id ?? 0) . ':' . (int) ($transaction->doctor_id ?? 0) . ':' . (int) ($transaction->pet_id ?? 0);
+            $channelName = trim((string) ($transaction->channel_name ?? ''));
 
             $result[(int) $transaction->id] = $this->latestLifecycleTimestampOnOrAfter(
                 [
-                    $userDoctorLookup[$pairKey] ?? null,
-                    $userDoctorPetLookup[$tripletKey] ?? null,
+                    $channelName !== '' ? ($channelLookup[$channelName] ?? null) : null,
                 ],
                 $transaction->created_at
             );

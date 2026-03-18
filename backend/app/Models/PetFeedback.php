@@ -12,6 +12,7 @@ class PetFeedback extends Model
         'pet_id',
         'vet_id',
         'user_id',
+        'channel_name',
         'rating',
         'feedback',
         'source',

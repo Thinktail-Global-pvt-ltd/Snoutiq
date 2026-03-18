@@ -18,6 +18,9 @@ class VetFeedbackController extends Controller
                 $query->where($filter, (int) $request->query($filter));
             }
         }
+        if ($request->filled('channel_name')) {
+            $query->where('channel_name', (string) $request->query('channel_name'));
+        }
 
         $perPage = (int) $request->query('per_page', 20);
         $perPage = max(1, min($perPage, 100));
@@ -31,6 +34,7 @@ class VetFeedbackController extends Controller
             'vet_id' => ['required', 'integer', 'exists:doctors,id'],
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'pet_id' => ['nullable', 'integer', 'exists:pets,id'],
+            'channel_name' => ['nullable', 'string', 'max:191'],
             'rating' => ['nullable', 'integer', 'min:1', 'max:5'],
             'feedback' => ['nullable', 'string', 'max:2000'],
             'source' => ['nullable', 'string', 'max:50'],
