@@ -2663,6 +2663,19 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     };
   };
 
+  const resolveTransactionChannelName = (transaction) => {
+    const metadata = transaction?.metadata || {};
+    const notes = metadata?.notes || {};
+    return (
+      normalizeOptionalText(transaction?.channel_name) ||
+      normalizeOptionalText(metadata?.channel_name) ||
+      normalizeOptionalText(notes?.channel_name) ||
+      normalizeOptionalText(metadata?.call_id) ||
+      normalizeOptionalText(notes?.call_session_id) ||
+      ""
+    );
+  };
+
   const clearPetDocBlobUrl = () => {
     const objectUrl = petDocBlobUrlRef.current;
     if (!objectUrl) return;
@@ -3174,6 +3187,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
     const { userId, petId, doctorId, clinicId } =
       resolveTransactionIds(activeTransaction);
+    const transactionChannelName =
+      resolveTransactionChannelName(activeTransaction);
     if (!userId || !clinicId) {
       setPrescriptionError(
         "Missing patient or clinic data. Please refresh and try again.",
@@ -3238,6 +3253,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     fd.append("case_severity", prescriptionForm.caseSeverity);
     fd.append("prognosis", prescriptionForm.prognosis);
     fd.append("notes", prescriptionForm.notes.trim());
+    if (transactionChannelName) {
+      fd.append("call_session", transactionChannelName);
+    }
     appendOptionalPrescriptionField("history_snapshot", historySnapshotValue);
     appendOptionalPrescriptionField(
       "system_affected_id",
@@ -3627,9 +3645,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     activeTransaction?.licence_number ||
     "Not available";
   const consultCallId =
-    activeTransaction?.metadata?.call_id ||
-    activeTransaction?.metadata?.notes?.call_session_id ||
-    "";
+    resolveTransactionChannelName(activeTransaction);
   const assignedDoctorName =
     activeTransaction?.doctor?.doctor_name ||
     doctorName ||

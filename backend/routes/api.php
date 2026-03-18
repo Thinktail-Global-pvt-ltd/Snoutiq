@@ -1374,6 +1374,9 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'payment_method' => $t->payment_method,
                 'type' => $t->type ?? ($t->metadata['order_type'] ?? null),
                 'metadata' => $t->metadata,
+                'channel_name' => $t->channel_name
+                    ?? data_get($t->metadata, 'channel_name')
+                    ?? data_get($t->metadata, 'notes.channel_name'),
                 'created_at' => optional($t->created_at)->toIso8601String(),
                 'updated_at' => optional($t->updated_at)->toIso8601String(),
                 'user' => $user,
