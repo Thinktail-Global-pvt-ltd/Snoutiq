@@ -18,19 +18,6 @@
     .event-block:last-child {
         margin-bottom: 0;
     }
-    .json-preview {
-        max-height: 180px;
-        overflow: auto;
-        background: #0f172a;
-        color: #e2e8f0;
-        border-radius: 0.55rem;
-        padding: 0.65rem;
-        font-size: 0.75rem;
-        margin-bottom: 0.5rem;
-    }
-    .json-preview:last-child {
-        margin-bottom: 0;
-    }
     .event-summary-card .card-body {
         padding: 0.85rem;
     }
@@ -111,8 +98,6 @@
 @section('content')
 @php
     $total = $transactions->count();
-    $typeFilter = data_get($filters, 'type', 'all');
-    $limitFilter = (int) data_get($filters, 'limit', 200);
     $formatTimestamp = static function ($value) {
         if (empty($value)) {
             return '—';
@@ -127,56 +112,6 @@
 @endphp
 
 <div class="row g-4">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-4">
-                <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
-                    <div>
-                        <h2 class="h5 mb-1">Consultation Lifecycle Event Tracking</h2>
-                        <p class="text-muted mb-0">
-                            Base dataset: <code>transactions</code> where <code>type</code> or <code>metadata.order_type</code> is
-                            <strong>video_consult</strong> or <strong>excell_export_campaign</strong>.
-                            Joins used: <code>transactions.channel_name = call_sessions.channel_name</code>,
-                            then to <code>calls</code> and <code>prescriptions.call_session</code>.
-                        </p>
-                    </div>
-                    <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">{{ number_format($total) }} records</span>
-                </div>
-
-                <form method="GET" action="{{ route('admin.analytics.consultation-lifecycle') }}" class="row g-2 align-items-end mb-3">
-                    <div class="col-12 col-md-3">
-                        <label class="form-label mb-1">Type</label>
-                        <select name="type" class="form-select form-select-sm">
-                            <option value="all" @selected($typeFilter === 'all')>All (video_consult + excell_export_campaign)</option>
-                            <option value="video_consult" @selected($typeFilter === 'video_consult')>video_consult</option>
-                            <option value="excell_export_campaign" @selected($typeFilter === 'excell_export_campaign')>excell_export_campaign</option>
-                        </select>
-                    </div>
-                    <div class="col-12 col-md-2">
-                        <label class="form-label mb-1">Limit</label>
-                        <input type="number" name="limit" min="1" max="500" class="form-control form-control-sm" value="{{ $limitFilter }}">
-                    </div>
-                    <div class="col-12 col-md-3 d-flex gap-2">
-                        <button type="submit" class="btn btn-sm btn-primary">Apply</button>
-                        <a href="{{ route('admin.analytics.consultation-lifecycle') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
-                    </div>
-                </form>
-
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                    @foreach($joinAvailability as $joinKey => $isAvailable)
-                        <span class="badge {{ $isAvailable ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-danger-subtle text-danger-emphasis' }}">
-                            {{ $joinKey }}: {{ $isAvailable ? 'available' : 'missing' }}
-                        </span>
-                    @endforeach
-                </div>
-                <p class="text-muted small mb-0">
-                    <strong>Note:</strong> <code>notification_sent</code>, <code>review_requested</code>, and <code>review_submitted</code>
-                    combine direct joins and log/feedback lookups. Rows marked <code>Not Secure</code> are inferred.
-                </p>
-            </div>
-        </div>
-    </div>
-
     @foreach($eventSummary as $eventKey => $summary)
         @php
             $captured = (int) data_get($summary, 'captured', 0);
@@ -220,7 +155,7 @@
                                     <th>User / Pet</th>
                                     <th>Consultation Assigned To Vet</th>
                                     <th>Lifecycle Events</th>
-                                    <th>Joined Data</th>
+                                    <th>WhatsApp Notifications</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -236,9 +171,6 @@
                                             'review_requested',
                                             'review_submitted',
                                         ];
-                                        $callSessionDetails = $txn->getAttribute('joined_call_session_details') ?? [];
-                                        $callDetails = $txn->getAttribute('joined_call_details') ?? [];
-                                        $prescriptionDetails = $txn->getAttribute('joined_prescription_details') ?? [];
                                         $whatsAppRows = $txn->getAttribute('whatsapp_notifications_for_channel') ?? [];
                                         $whatsAppStatusSummary = $txn->getAttribute('whatsapp_notification_status_summary') ?? [];
                                         $whatsAppLastStatus = strtolower((string) ($txn->getAttribute('whatsapp_notification_last_status') ?? ''));
@@ -247,19 +179,15 @@
                                         <td data-label="Transaction">
                                             <div class="fw-semibold">#{{ $txn->id }}</div>
                                             <div class="text-muted small">
-                                                <div>Type: {{ $txn->type ?? data_get($txn->metadata, 'order_type', 'n/a') }}</div>
-                                                <div>Status: {{ strtoupper((string) ($txn->status ?? 'n/a')) }}</div>
                                                 <div>Created: {{ $formatTimestamp($txn->created_at) }}</div>
-                                                <div>Channel: <code>{{ $txn->channel_name ?? '—' }}</code></div>
                                             </div>
                                         </td>
                                         <td data-label="User / Pet">
                                             <div class="fw-semibold">{{ $txn->user->name ?? '—' }}</div>
                                             <div class="text-muted small">
-                                                <div>User ID: {{ $txn->user_id ?? '—' }}</div>
                                                 <div>Phone: {{ $txn->user->phone ?? '—' }}</div>
-                                                <div>Pet: {{ $txn->pet->name ?? '—' }} (ID: {{ $txn->pet_id ?? '—' }})</div>
-                                                <div>Doctor: {{ $txn->doctor->doctor_name ?? '—' }} (ID: {{ $txn->doctor_id ?? '—' }})</div>
+                                                <div>Pet: {{ $txn->pet->name ?? '—' }}</div>
+                                                <div>Doctor: {{ $txn->doctor->doctor_name ?? '—' }}</div>
                                             </div>
                                         </td>
                                         <td data-label="Consultation Assigned To Vet">
@@ -278,7 +206,6 @@
                                             </div>
                                             <div class="text-muted small">
                                                 <div>Timestamp: {{ $formatTimestamp($assignedAt) }}</div>
-                                                <div>Source: <code>{{ $txn->getAttribute('event_consultation_assigned_to_vet_source') ?? '—' }}</code></div>
                                             </div>
                                         </td>
                                         <td data-label="Lifecycle Events">
@@ -286,7 +213,6 @@
                                                 @php
                                                     $eventLabel = data_get($eventDefinitions, $eventKey, $eventKey);
                                                     $eventAt = $txn->getAttribute("event_{$eventKey}_at");
-                                                    $eventSource = $txn->getAttribute("event_{$eventKey}_source");
                                                     $eventCaptured = (bool) $txn->getAttribute("event_{$eventKey}_captured");
                                                     $eventSecure = (bool) $txn->getAttribute("event_{$eventKey}_secure");
                                                 @endphp
@@ -302,49 +228,12 @@
                                                     </div>
                                                     <div class="text-muted small">
                                                         <div>Timestamp: {{ $formatTimestamp($eventAt) }}</div>
-                                                        <div>Source: <code>{{ $eventSource ?? '—' }}</code></div>
                                                     </div>
                                                 </div>
                                             @endforeach
                                         </td>
-                                        <td data-label="Joined Data">
-                                            <details class="mb-2">
-                                                <summary class="fw-semibold">
-                                                    call_sessions
-                                                    <span class="text-muted small">(count: {{ (int) ($txn->getAttribute('joined_call_session_count') ?? 0) }})</span>
-                                                </summary>
-                                                @if(!empty($callSessionDetails))
-                                                    <pre class="json-preview">{{ json_encode($callSessionDetails, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                                @else
-                                                    <div class="text-muted small mt-1">No joined call_session data.</div>
-                                                @endif
-                                            </details>
-
-                                            <details class="mb-2">
-                                                <summary class="fw-semibold">
-                                                    calls
-                                                    <span class="text-muted small">(count: {{ (int) ($txn->getAttribute('joined_call_count') ?? 0) }})</span>
-                                                </summary>
-                                                @if(!empty($callDetails))
-                                                    <pre class="json-preview">{{ json_encode($callDetails, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                                @else
-                                                    <div class="text-muted small mt-1">No joined call data.</div>
-                                                @endif
-                                            </details>
-
+                                        <td data-label="WhatsApp Notifications">
                                             <details>
-                                                <summary class="fw-semibold">
-                                                    prescriptions
-                                                    <span class="text-muted small">(count: {{ (int) ($txn->getAttribute('joined_prescription_count') ?? 0) }})</span>
-                                                </summary>
-                                                @if(!empty($prescriptionDetails))
-                                                    <pre class="json-preview">{{ json_encode($prescriptionDetails, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                                @else
-                                                    <div class="text-muted small mt-1">No joined prescription data.</div>
-                                                @endif
-                                            </details>
-
-                                            <details class="mt-2">
                                                 <summary class="fw-semibold">
                                                     whatsapp_notifications
                                                     <span class="text-muted small">(count: {{ count($whatsAppRows) }})</span>
