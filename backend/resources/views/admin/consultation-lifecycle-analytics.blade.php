@@ -40,6 +40,20 @@
         color: #334155;
         border-color: #e5e7eb;
     }
+    .wa-attempt {
+        border: 1px solid #e5e7eb;
+        border-radius: 0.55rem;
+        padding: 0.5rem 0.6rem;
+        margin-bottom: 0.45rem;
+        background: #ffffff;
+    }
+    .wa-attempt.done {
+        background: #ecfdf3;
+        border-color: #86efac;
+    }
+    .wa-attempt:last-child {
+        margin-bottom: 0;
+    }
     @media (max-width: 991.98px) {
         .lifecycle-table thead {
             display: none;
@@ -131,15 +145,27 @@
                                 <tr>
                                     <th>Transaction</th>
                                     <th>User / Pet</th>
-                                    <th>Review Submitted</th>
+                                    <th>Consultation Assigned To Vet</th>
+                                    <th>Lifecycle Events</th>
+                                    <th>WhatsApp Notifications</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($transactions as $txn)
                                     @php
-                                        $reviewSubmittedAt = $txn->getAttribute('event_review_submitted_at');
-                                        $reviewSubmittedCaptured = (bool) $txn->getAttribute('event_review_submitted_captured');
-                                        $reviewSubmittedSecure = (bool) $txn->getAttribute('event_review_submitted_secure');
+                                        $eventKeys = [
+                                            'consultation_created',
+                                            'consultation_assigned_to_vet',
+                                            'call_started',
+                                            'call_completed',
+                                            'prescription_uploaded',
+                                            'notification_sent',
+                                            'review_requested',
+                                            'review_submitted',
+                                        ];
+                                        $whatsAppRows = $txn->getAttribute('whatsapp_notifications_for_channel') ?? [];
+                                        $whatsAppStatusSummary = $txn->getAttribute('whatsapp_notification_status_summary') ?? [];
+                                        $whatsAppLastStatus = strtolower((string) ($txn->getAttribute('whatsapp_notification_last_status') ?? ''));
                                     @endphp
                                     <tr>
                                         <td data-label="Transaction">
@@ -156,21 +182,105 @@
                                                 <div>Doctor: {{ $txn->doctor->doctor_name ?? '—' }}</div>
                                             </div>
                                         </td>
-                                        <td data-label="Review Submitted">
-                                            <div class="event-block {{ $reviewSubmittedCaptured ? 'done' : '' }}">
-                                                <div class="d-flex flex-wrap gap-2 mb-1">
-                                                    <span class="fw-semibold small">Review Submitted</span>
-                                                    <span class="status-badge {{ $reviewSubmittedCaptured ? 'done' : 'pending' }}">
-                                                        {{ $reviewSubmittedCaptured ? 'Submitted' : 'Not Submitted' }}
-                                                    </span>
-                                                    <span class="status-badge {{ $reviewSubmittedSecure ? 'done' : 'pending' }}">
-                                                        {{ $reviewSubmittedSecure ? 'Secure' : 'Not Secure' }}
-                                                    </span>
-                                                </div>
-                                                <div class="text-muted small">
-                                                    <div>Timestamp: {{ $formatTimestamp($reviewSubmittedAt) }}</div>
-                                                </div>
+                                        <td data-label="Consultation Assigned To Vet">
+                                            @php
+                                                $assignedAt = $txn->getAttribute('event_consultation_assigned_to_vet_at');
+                                                $assignedCaptured = (bool) $txn->getAttribute('event_consultation_assigned_to_vet_captured');
+                                                $assignedSecure = (bool) $txn->getAttribute('event_consultation_assigned_to_vet_secure');
+                                            @endphp
+                                            <div class="d-flex flex-wrap gap-2 mb-1">
+                                                <span class="status-badge {{ $assignedCaptured ? 'done' : 'pending' }}">
+                                                    {{ $assignedCaptured ? 'Captured' : 'Missing' }}
+                                                </span>
+                                                <span class="status-badge {{ $assignedSecure ? 'done' : 'pending' }}">
+                                                    {{ $assignedSecure ? 'Secure' : 'Not Secure' }}
+                                                </span>
                                             </div>
+                                            <div class="text-muted small">
+                                                <div>Timestamp: {{ $formatTimestamp($assignedAt) }}</div>
+                                            </div>
+                                        </td>
+                                        <td data-label="Lifecycle Events">
+                                            @foreach($eventKeys as $eventKey)
+                                                @php
+                                                    $eventLabel = data_get($eventDefinitions, $eventKey, $eventKey);
+                                                    $eventAt = $txn->getAttribute("event_{$eventKey}_at");
+                                                    $eventCaptured = (bool) $txn->getAttribute("event_{$eventKey}_captured");
+                                                    $eventSecure = (bool) $txn->getAttribute("event_{$eventKey}_secure");
+                                                @endphp
+                                                <div class="event-block {{ $eventCaptured ? 'done' : '' }}">
+                                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                                        <span class="fw-semibold small">{{ $eventLabel }}</span>
+                                                        <span class="status-badge {{ $eventCaptured ? 'done' : 'pending' }}">
+                                                            {{ $eventCaptured ? 'Captured' : 'Missing' }}
+                                                        </span>
+                                                        <span class="status-badge {{ $eventSecure ? 'done' : 'pending' }}">
+                                                            {{ $eventSecure ? 'Secure' : 'Not Secure' }}
+                                                        </span>
+                                                    </div>
+                                                    <div class="text-muted small">
+                                                        <div>Timestamp: {{ $formatTimestamp($eventAt) }}</div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </td>
+                                        <td data-label="WhatsApp Notifications">
+                                            <details>
+                                                <summary class="fw-semibold">
+                                                    whatsapp_notifications
+                                                    <span class="text-muted small">(count: {{ count($whatsAppRows) }})</span>
+                                                </summary>
+                                                <div class="mt-1">
+                                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                                        @foreach(collect($whatsAppStatusSummary)->sortKeys() as $statusKey => $statusCount)
+                                                            @php
+                                                                $normalizedStatus = strtolower(trim((string) $statusKey));
+                                                                $summaryBadgeClass = match ($normalizedStatus) {
+                                                                    'sent' => 'status-badge done',
+                                                                    default => 'status-badge pending',
+                                                                };
+                                                            @endphp
+                                                            <span class="{{ $summaryBadgeClass }}">
+                                                                {{ strtoupper($normalizedStatus !== '' ? $normalizedStatus : 'unknown') }}: {{ (int) $statusCount }}
+                                                            </span>
+                                                        @endforeach
+                                                        @if($whatsAppLastStatus !== '')
+                                                            <span class="status-badge {{ $whatsAppLastStatus === 'sent' ? 'done' : 'pending' }}">
+                                                                Last status: {{ strtoupper($whatsAppLastStatus) }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+
+                                                    @if(!empty($whatsAppRows))
+                                                        @foreach($whatsAppRows as $whatsAppRow)
+                                                            @php
+                                                                $rowStatus = strtolower((string) ($whatsAppRow['status'] ?? 'unknown'));
+                                                                $rowStatusBadge = match ($rowStatus) {
+                                                                    'sent' => 'status-badge done',
+                                                                    default => 'status-badge pending',
+                                                                };
+                                                            @endphp
+                                                            <div class="wa-attempt {{ $rowStatus === 'sent' ? 'done' : '' }}">
+                                                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                                                    <span class="{{ $rowStatusBadge }}">{{ strtoupper($rowStatus) }}</span>
+                                                                    <span class="small text-muted">Template: <code>{{ $whatsAppRow['template_name'] ?? '—' }}</code></span>
+                                                                    <span class="small text-muted">Type: <code>{{ $whatsAppRow['message_type'] ?? '—' }}</code></span>
+                                                                </div>
+                                                                <div class="small text-muted">
+                                                                    <div>Attempted: {{ $formatTimestamp($whatsAppRow['attempted_at'] ?? null) }}</div>
+                                                                    <div>Sent At: {{ $formatTimestamp($whatsAppRow['sent_at'] ?? null) }}</div>
+                                                                    <div>HTTP Status: <code>{{ $whatsAppRow['http_status'] ?? '—' }}</code></div>
+                                                                    @if(!empty($whatsAppRow['error_message']))
+                                                                        <div>Error: <code>{{ $whatsAppRow['error_message'] }}</code></div>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    @else
+                                                        <div class="text-muted small">No WhatsApp notifications found for this channel.</div>
+                                                    @endif
+                                                </div>
+                                            </details>
                                         </td>
                                     </tr>
                                 @endforeach
