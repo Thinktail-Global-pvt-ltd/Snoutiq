@@ -9,24 +9,36 @@
         vertical-align: top;
     }
     .event-block {
-        border: 1px solid #e2e8f0;
+        border: 1px solid #e5e7eb;
         border-radius: 0.65rem;
         padding: 0.55rem 0.65rem;
         margin-bottom: 0.5rem;
-        background: #f8fafc;
+        background: #ffffff;
     }
     .event-block:last-child {
         margin-bottom: 0;
     }
-    .wa-attempt {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.55rem;
-        padding: 0.5rem 0.6rem;
-        margin-bottom: 0.45rem;
-        background: #f8fafc;
+    .event-block.done {
+        background: #ecfdf3;
+        border-color: #86efac;
     }
-    .wa-attempt:last-child {
-        margin-bottom: 0;
+    .status-badge {
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.22rem 0.52rem;
+        line-height: 1.2;
+    }
+    .status-badge.done {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #86efac;
+    }
+    .status-badge.pending {
+        background: #ffffff;
+        color: #334155;
+        border-color: #e5e7eb;
     }
     @media (max-width: 991.98px) {
         .lifecycle-table thead {
@@ -119,27 +131,15 @@
                                 <tr>
                                     <th>Transaction</th>
                                     <th>User / Pet</th>
-                                    <th>Consultation Assigned To Vet</th>
-                                    <th>Lifecycle Events</th>
-                                    <th>WhatsApp Notifications</th>
+                                    <th>Review Submitted</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($transactions as $txn)
                                     @php
-                                        $eventKeys = [
-                                            'consultation_created',
-                                            'consultation_assigned_to_vet',
-                                            'call_started',
-                                            'call_completed',
-                                            'prescription_uploaded',
-                                            'notification_sent',
-                                            'review_requested',
-                                            'review_submitted',
-                                        ];
-                                        $whatsAppRows = $txn->getAttribute('whatsapp_notifications_for_channel') ?? [];
-                                        $whatsAppStatusSummary = $txn->getAttribute('whatsapp_notification_status_summary') ?? [];
-                                        $whatsAppLastStatus = strtolower((string) ($txn->getAttribute('whatsapp_notification_last_status') ?? ''));
+                                        $reviewSubmittedAt = $txn->getAttribute('event_review_submitted_at');
+                                        $reviewSubmittedCaptured = (bool) $txn->getAttribute('event_review_submitted_captured');
+                                        $reviewSubmittedSecure = (bool) $txn->getAttribute('event_review_submitted_secure');
                                     @endphp
                                     <tr>
                                         <td data-label="Transaction">
@@ -156,109 +156,21 @@
                                                 <div>Doctor: {{ $txn->doctor->doctor_name ?? '—' }}</div>
                                             </div>
                                         </td>
-                                        <td data-label="Consultation Assigned To Vet">
-                                            @php
-                                                $assignedAt = $txn->getAttribute('event_consultation_assigned_to_vet_at');
-                                                $assignedCaptured = (bool) $txn->getAttribute('event_consultation_assigned_to_vet_captured');
-                                                $assignedSecure = (bool) $txn->getAttribute('event_consultation_assigned_to_vet_secure');
-                                            @endphp
-                                            <div class="d-flex flex-wrap gap-2 mb-1">
-                                                <span class="badge {{ $assignedCaptured ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-danger-subtle text-danger-emphasis' }}">
-                                                    {{ $assignedCaptured ? 'Captured' : 'Missing' }}
-                                                </span>
-                                                <span class="badge {{ $assignedSecure ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-warning-subtle text-warning-emphasis' }}">
-                                                    {{ $assignedSecure ? 'Secure' : 'Not Secure' }}
-                                                </span>
-                                            </div>
-                                            <div class="text-muted small">
-                                                <div>Timestamp: {{ $formatTimestamp($assignedAt) }}</div>
-                                            </div>
-                                        </td>
-                                        <td data-label="Lifecycle Events">
-                                            @foreach($eventKeys as $eventKey)
-                                                @php
-                                                    $eventLabel = data_get($eventDefinitions, $eventKey, $eventKey);
-                                                    $eventAt = $txn->getAttribute("event_{$eventKey}_at");
-                                                    $eventCaptured = (bool) $txn->getAttribute("event_{$eventKey}_captured");
-                                                    $eventSecure = (bool) $txn->getAttribute("event_{$eventKey}_secure");
-                                                @endphp
-                                                <div class="event-block">
-                                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                                        <span class="fw-semibold small">{{ $eventLabel }}</span>
-                                                        <span class="badge {{ $eventCaptured ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-danger-subtle text-danger-emphasis' }}">
-                                                            {{ $eventCaptured ? 'Captured' : 'Missing' }}
-                                                        </span>
-                                                        <span class="badge {{ $eventSecure ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-warning-subtle text-warning-emphasis' }}">
-                                                            {{ $eventSecure ? 'Secure' : 'Not Secure' }}
-                                                        </span>
-                                                    </div>
-                                                    <div class="text-muted small">
-                                                        <div>Timestamp: {{ $formatTimestamp($eventAt) }}</div>
-                                                    </div>
+                                        <td data-label="Review Submitted">
+                                            <div class="event-block {{ $reviewSubmittedCaptured ? 'done' : '' }}">
+                                                <div class="d-flex flex-wrap gap-2 mb-1">
+                                                    <span class="fw-semibold small">Review Submitted</span>
+                                                    <span class="status-badge {{ $reviewSubmittedCaptured ? 'done' : 'pending' }}">
+                                                        {{ $reviewSubmittedCaptured ? 'Submitted' : 'Not Submitted' }}
+                                                    </span>
+                                                    <span class="status-badge {{ $reviewSubmittedSecure ? 'done' : 'pending' }}">
+                                                        {{ $reviewSubmittedSecure ? 'Secure' : 'Not Secure' }}
+                                                    </span>
                                                 </div>
-                                            @endforeach
-                                        </td>
-                                        <td data-label="WhatsApp Notifications">
-                                            <details>
-                                                <summary class="fw-semibold">
-                                                    whatsapp_notifications
-                                                    <span class="text-muted small">(count: {{ count($whatsAppRows) }})</span>
-                                                </summary>
-                                                <div class="mt-1">
-                                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                                                        @foreach(collect($whatsAppStatusSummary)->sortKeys() as $statusKey => $statusCount)
-                                                            @php
-                                                                $normalizedStatus = strtolower(trim((string) $statusKey));
-                                                                $summaryBadgeClass = match ($normalizedStatus) {
-                                                                    'sent' => 'text-bg-success-subtle text-success-emphasis',
-                                                                    'failed' => 'text-bg-danger-subtle text-danger-emphasis',
-                                                                    'pending', 'queued' => 'text-bg-warning-subtle text-warning-emphasis',
-                                                                    default => 'text-bg-secondary-subtle text-secondary-emphasis',
-                                                                };
-                                                            @endphp
-                                                            <span class="badge {{ $summaryBadgeClass }}">
-                                                                {{ strtoupper($normalizedStatus !== '' ? $normalizedStatus : 'unknown') }}: {{ (int) $statusCount }}
-                                                            </span>
-                                                        @endforeach
-                                                        @if($whatsAppLastStatus !== '')
-                                                            <span class="badge {{ $whatsAppLastStatus === 'sent' ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-secondary-subtle text-secondary-emphasis' }}">
-                                                                Last status: {{ strtoupper($whatsAppLastStatus) }}
-                                                            </span>
-                                                        @endif
-                                                    </div>
-
-                                                    @if(!empty($whatsAppRows))
-                                                        @foreach($whatsAppRows as $whatsAppRow)
-                                                            @php
-                                                                $rowStatus = strtolower((string) ($whatsAppRow['status'] ?? 'unknown'));
-                                                                $rowStatusBadge = match ($rowStatus) {
-                                                                    'sent' => 'text-bg-success-subtle text-success-emphasis',
-                                                                    'failed' => 'text-bg-danger-subtle text-danger-emphasis',
-                                                                    'pending', 'queued' => 'text-bg-warning-subtle text-warning-emphasis',
-                                                                    default => 'text-bg-secondary-subtle text-secondary-emphasis',
-                                                                };
-                                                            @endphp
-                                                            <div class="wa-attempt">
-                                                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                                                    <span class="badge {{ $rowStatusBadge }}">{{ strtoupper($rowStatus) }}</span>
-                                                                    <span class="small text-muted">Template: <code>{{ $whatsAppRow['template_name'] ?? '—' }}</code></span>
-                                                                    <span class="small text-muted">Type: <code>{{ $whatsAppRow['message_type'] ?? '—' }}</code></span>
-                                                                </div>
-                                                                <div class="small text-muted">
-                                                                    <div>Attempted: {{ $formatTimestamp($whatsAppRow['attempted_at'] ?? null) }}</div>
-                                                                    <div>Sent At: {{ $formatTimestamp($whatsAppRow['sent_at'] ?? null) }}</div>
-                                                                    <div>HTTP Status: <code>{{ $whatsAppRow['http_status'] ?? '—' }}</code></div>
-                                                                    @if(!empty($whatsAppRow['error_message']))
-                                                                        <div>Error: <code>{{ $whatsAppRow['error_message'] }}</code></div>
-                                                                    @endif
-                                                                </div>
-                                                            </div>
-                                                        @endforeach
-                                                    @else
-                                                        <div class="text-muted small">No WhatsApp notifications found for this channel.</div>
-                                                    @endif
+                                                <div class="text-muted small">
+                                                    <div>Timestamp: {{ $formatTimestamp($reviewSubmittedAt) }}</div>
                                                 </div>
-                                            </details>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach
