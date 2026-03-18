@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\RazorpayController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
+use App\Http\Controllers\Api\UserCouponController;
 use App\Http\Controllers\Api\UserFeedbackController;
 use App\Http\Controllers\Api\UserObservationController;
 use App\Http\Controllers\Api\ReferralController;
@@ -2359,6 +2360,7 @@ Route::get('/razorpay-ping', function () {
   Route::get('/rzp-test', [PaymentController::class, 'testView']); // view render
 
   Route::post('/create-order', [PaymentController::class, 'createOrder']);
+  Route::post('/coupon/apply', [UserCouponController::class, 'apply'])->name('api.coupon.apply');
 
   Route::get('/user-chats/{user_id}', [GeminiChatController::class, 'getUserChats']);
 
