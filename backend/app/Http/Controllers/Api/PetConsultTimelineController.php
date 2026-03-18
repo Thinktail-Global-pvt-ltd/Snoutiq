@@ -48,6 +48,10 @@ class PetConsultTimelineController extends Controller
                 $query->whereIn('type', $consultTypes)
                     ->orWhereIn('metadata->order_type', $consultTypes);
             })
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhereRaw('LOWER(TRIM(status)) <> ?', ['pending']);
+            })
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->get();
@@ -953,12 +957,6 @@ HTML;
         } elseif ($eventType === 'appointment') {
             $title = 'Clinic Appointment';
 
-            $appointmentDate = trim((string) ($record['appointment_date'] ?? ''));
-            $appointmentTime = trim((string) ($record['appointment_time'] ?? ''));
-            if ($appointmentDate !== '' || $appointmentTime !== '') {
-                $metaParts[] = 'Scheduled: '.trim($appointmentDate.' '.$appointmentTime);
-            }
-
             $status = trim((string) ($record['status'] ?? ''));
             if ($status !== '') {
                 $metaParts[] = 'Status: '.ucwords(str_replace(['_', '-'], ' ', $status));
@@ -986,11 +984,6 @@ HTML;
             $doctor = $record['doctor_name'] ?? $record['doctor_id'] ?? null;
             if ($doctor !== null && $doctor !== '') {
                 $metaParts[] = 'Doctor: '.$doctor;
-            }
-
-            $followUp = $this->formatPdfDate($record['follow_up_date'] ?? null, '');
-            if ($followUp !== '') {
-                $metaParts[] = 'Follow-up: '.$followUp;
             }
 
             foreach (['prescription', 'prescription_text', 'diagnosis', 'advice', 'notes'] as $key) {

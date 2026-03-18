@@ -1549,6 +1549,9 @@ class AdminPanelController extends Controller
             if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'channel_name')) {
                 continue;
             }
+            $hasMetaColumn = Schema::hasColumn($table, 'meta');
+            $dbDriver = DB::connection()->getDriverName();
+            $supportsJsonExtract = in_array($dbDriver, ['mysql', 'mariadb'], true);
 
             $timestampColumns = collect(['submitted_at', 'created_at', 'updated_at'])
                 ->filter(fn (string $column) => Schema::hasColumn($table, $column))
@@ -1560,8 +1563,18 @@ class AdminPanelController extends Controller
             }
 
             $query = DB::table($table)
-                ->whereIn('channel_name', $channels->all())
+                ->where(function ($inner) use ($channels, $hasMetaColumn, $supportsJsonExtract) {
+                    $inner->whereIn('channel_name', $channels->all());
+                    if ($hasMetaColumn && $supportsJsonExtract) {
+                        $inner->orWhereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(meta, '$.channel_name'))"), $channels->all());
+                        $inner->orWhereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(meta, '$.channelName'))"), $channels->all());
+                    }
+                })
                 ->select(['channel_name']);
+
+            if ($hasMetaColumn) {
+                $query->addSelect('meta');
+            }
 
             foreach ($timestampColumns as $timestampColumn) {
                 $query->addSelect($timestampColumn);
@@ -1569,7 +1582,21 @@ class AdminPanelController extends Controller
 
             $rows = $query->get();
             foreach ($rows as $row) {
-                $channelName = trim((string) ($row->channel_name ?? ''));
+                $rowMeta = data_get($row, 'meta');
+                if (is_string($rowMeta)) {
+                    $decodedMeta = json_decode($rowMeta, true);
+                    $rowMeta = is_array($decodedMeta) ? $decodedMeta : [];
+                }
+                if (!is_array($rowMeta)) {
+                    $rowMeta = [];
+                }
+
+                $channelName = trim((string) (
+                    $row->channel_name
+                    ?? data_get($rowMeta, 'channel_name')
+                    ?? data_get($rowMeta, 'channelName')
+                    ?? ''
+                ));
                 if ($channelName === '') {
                     continue;
                 }
