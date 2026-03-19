@@ -2,7 +2,6 @@
 
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -52,6 +51,7 @@ use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\Admin\VetUserConnectionReportPageController;
 use App\Http\Controllers\Admin\VetClinicConnectionsExportController;
 use App\Http\Controllers\ClinicWebsiteContentController;
+use App\Services\RagSnouticSymptomService;
 
 
 // Public routes
@@ -339,19 +339,22 @@ Route::get('/payment/{callId}', function (string $callId) {
 Route::match(['get', 'post'], '/vetcompass/diseases', [VetcompassDiseaseSearchController::class, '__invoke'])
     ->name('vetcompass.disease-search');
 
-Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request $request) {
-    $apiUrl = 'http://82.25.104.75:5050/query';
-    $defaultPayload = [
-        'name' => 'Bruno',
-        'species' => 'Dog',
-        'breed' => 'Labrador',
-        'age' => '3 years',
-        'weight' => '28 kg',
-        'sex' => 'Male',
-        'vaccination_summary' => 'All core vaccines up to date',
-        'medical_history' => 'No known issues',
-        'query' => 'He is vomiting yellow foam and not eating since morning, kind of weak',
-    ];
+Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request $request, RagSnouticSymptomService $symptomService) {
+    $defaultPayload = $symptomService->defaultPayload();
+    $rawPetId = $request->input('pet_id', $request->query('pet_id'));
+    $prefillPetId = is_numeric($rawPetId) ? (int) $rawPetId : null;
+
+    $prefillData = null;
+    $prefillError = null;
+
+    if ($prefillPetId !== null && $prefillPetId > 0) {
+        $prefillData = $symptomService->prefillPayloadByPetId($prefillPetId);
+        if ($prefillData) {
+            $defaultPayload = array_merge($defaultPayload, $prefillData['payload'] ?? []);
+        } else {
+            $prefillError = 'Pet not found for pet_id '.$prefillPetId.'.';
+        }
+    }
 
     $formValues = $defaultPayload;
     $responseData = null;
@@ -360,21 +363,11 @@ Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request 
 
     if ($request->isMethod('post')) {
         $formValues = array_merge($defaultPayload, $request->only(array_keys($defaultPayload)));
-        $requestPayload = array_map(function ($value) {
-            return is_string($value) ? trim($value) : $value;
-        }, $formValues);
+        $requestPayload = $symptomService->normalizePayload($formValues);
 
-        try {
-            $response = Http::timeout(10)->post($apiUrl, $requestPayload);
-
-            $responseData = $response->json();
-
-            if (! $response->successful()) {
-                $error = 'Unable to fetch symptom checker data right now.';
-            }
-        } catch (\Throwable $th) {
-            $error = 'Failed to contact the symptom checker service.';
-        }
+        $queryResult = $symptomService->queryExternal($requestPayload);
+        $responseData = $queryResult['response_data'] ?? null;
+        $error = $queryResult['success'] ? null : ($queryResult['error'] ?? 'Unable to fetch symptom checker data right now.');
     }
 
     return view('snoutiq.rag-snoutic-symptom-checker', [
@@ -382,6 +375,9 @@ Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request 
         'requestPayload' => $requestPayload,
         'formValues' => $formValues,
         'error' => $error,
+        'prefillPetId' => $prefillPetId,
+        'prefillData' => $prefillData,
+        'prefillError' => $prefillError,
     ]);
 })->name('snoutiq.rag-snoutic-symptom-checker');
 

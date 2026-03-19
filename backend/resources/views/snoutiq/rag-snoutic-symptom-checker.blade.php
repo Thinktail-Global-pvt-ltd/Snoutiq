@@ -30,9 +30,42 @@
 <p class="muted">Fill in the details below and submit to fetch guidance from the remote RAG symptom checker API.</p>
 
 <fieldset>
+    <legend>Prefill By Pet ID</legend>
+    <form method="GET" class="symptom-form">
+        <div class="row">
+            <div>
+                <label for="pet_id">Pet ID</label>
+                <input type="number" id="pet_id" name="pet_id" min="1" value="{{ old('pet_id', $prefillPetId ?? '') }}" placeholder="Enter pet id">
+            </div>
+            <div>
+                <label>&nbsp;</label>
+                <button type="submit">Load Pet Data</button>
+            </div>
+        </div>
+    </form>
+
+    @if($prefillError)
+        <div class="error"><strong>Prefill:</strong> {{ $prefillError }}</div>
+    @endif
+
+    @if($prefillData)
+        <div class="callout">
+            <strong>Prefill Loaded:</strong> Pet ID {{ $prefillData['pet_id'] ?? $prefillPetId }}.
+        </div>
+        <details>
+            <summary>View pets.dog_disease_payload.vaccination</summary>
+            <pre>{{ json_encode($prefillData['vaccination'] ?? null, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+        </details>
+    @endif
+</fieldset>
+
+<fieldset>
     <legend>Symptom Input</legend>
     <form method="POST" class="symptom-form">
         @csrf
+        @if(!empty($prefillPetId))
+            <input type="hidden" name="pet_id" value="{{ $prefillPetId }}">
+        @endif
         <div class="row">
             <div>
                 <label for="name">Pet Name</label>

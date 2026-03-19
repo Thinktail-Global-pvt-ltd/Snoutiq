@@ -82,6 +82,7 @@ use App\Http\Controllers\Api\V1\VaccinationBookingController as V1VaccinationBoo
 use App\Http\Controllers\Api\V1\VaccinationPaymentController as V1VaccinationPaymentController;
 use App\Http\Controllers\Api\ClinicFinancialsController;
 use App\Http\Controllers\Api\PetConsultTimelineController;
+use App\Http\Controllers\Api\RagSnouticSymptomController;
 use App\Services\PetDiseaseInferenceService;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
@@ -2461,6 +2462,8 @@ Route::post('/users/{userId}/pets', [AdminController::class, 'addPet']);
 Route::get('/pets/check/vaccination-deworming-null', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationDewormingNullStatus']);
 Route::post('/pets/check/vaccination-deworming-null', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationDewormingNullStatus']);
 Route::post('/pets/deworming-vaccination', [\App\Http\Controllers\Api\PetOverviewController::class, 'updateDewormingVaccination']);
+Route::get('/rag-snoutic-symptom-checker/prefill', [RagSnouticSymptomController::class, 'prefill']);
+Route::post('/rag-snoutic-symptom-checker/query', [RagSnouticSymptomController::class, 'query']);
 Route::get('/pets/{petId}',         [AdminController::class, 'getPet']);
 Route::post('/pets/{petId}/dog-disease', [AdminController::class, 'suggestDogDisease']);
 Route::post('/pets/{petId}/summary', [AdminController::class, 'summarizePet']);
