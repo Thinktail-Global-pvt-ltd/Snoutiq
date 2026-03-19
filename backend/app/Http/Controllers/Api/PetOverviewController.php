@@ -520,27 +520,100 @@ class PetOverviewController extends Controller
 
         $rows = $query->get();
 
-        $doneCount = (int) $rows->where('is_completed', 1)->count();
-        $totalCount = (int) $rows->count();
+        $bundleRow = $rows->first(function ($row) {
+            return ($row->task_key ?? null) === '__daily_bundle__';
+        });
+        if ($bundleRow) {
+            $bundleItems = $this->decodeDailyCareBundleItems($bundleRow->notes ?? null);
+            if ($bundleItems !== null) {
+                return $this->buildDailyCarePayload($date, $bundleItems);
+            }
+        }
+
+        $legacyItems = $rows->map(function ($row) {
+            return [
+                'id' => $row->id,
+                'task_key' => $row->task_key ?? null,
+                'title' => $row->title,
+                'scheduled_time' => $row->scheduled_time,
+                'icon' => $row->icon,
+                'is_completed' => (bool) ($row->is_completed ?? false),
+                'completed_at' => $row->completed_at,
+                'sort_order' => (int) ($row->sort_order ?? 0),
+                'notes' => $row->notes,
+            ];
+        })->values()->all();
+
+        return $this->buildDailyCarePayload($date, $legacyItems);
+    }
+
+    private function decodeDailyCareBundleItems($notes): ?array
+    {
+        if (!is_string($notes) || trim($notes) === '') {
+            return null;
+        }
+
+        $decoded = json_decode($notes, true);
+        if (!is_array($decoded) || !isset($decoded['items']) || !is_array($decoded['items'])) {
+            return null;
+        }
+
+        $normalized = [];
+        foreach ($decoded['items'] as $index => $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $normalized[] = [
+                'id' => isset($item['id']) && is_numeric($item['id']) ? (int) $item['id'] : null,
+                'task_key' => isset($item['task_key']) && $item['task_key'] !== ''
+                    ? trim((string) $item['task_key'])
+                    : null,
+                'title' => trim((string) ($item['title'] ?? '')),
+                'scheduled_time' => isset($item['scheduled_time']) && $item['scheduled_time'] !== ''
+                    ? trim((string) $item['scheduled_time'])
+                    : null,
+                'icon' => isset($item['icon']) && $item['icon'] !== '' ? trim((string) $item['icon']) : null,
+                'is_completed' => (bool) ($item['is_completed'] ?? false),
+                'completed_at' => isset($item['completed_at']) && $item['completed_at'] !== ''
+                    ? (string) $item['completed_at']
+                    : null,
+                'sort_order' => isset($item['sort_order']) ? (int) $item['sort_order'] : (int) $index,
+                'notes' => isset($item['notes']) && $item['notes'] !== '' ? trim((string) $item['notes']) : null,
+                '_index' => $index,
+            ];
+        }
+
+        usort($normalized, function (array $a, array $b): int {
+            $sortCompare = ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0);
+            if ($sortCompare !== 0) {
+                return $sortCompare;
+            }
+
+            return ($a['_index'] ?? 0) <=> ($b['_index'] ?? 0);
+        });
+
+        foreach ($normalized as &$item) {
+            unset($item['_index']);
+        }
+        unset($item);
+
+        return $normalized;
+    }
+
+    private function buildDailyCarePayload(string $careDate, array $items): array
+    {
+        $doneCount = count(array_filter($items, function (array $item): bool {
+            return (bool) ($item['is_completed'] ?? false);
+        }));
+        $totalCount = count($items);
 
         return [
-            'care_date' => $date,
+            'care_date' => $careDate,
             'done_count' => $doneCount,
             'total_count' => $totalCount,
             'progress_text' => "{$doneCount}/{$totalCount} done",
-            'items' => $rows->map(function ($row) {
-                return [
-                    'id' => $row->id,
-                    'task_key' => $row->task_key ?? null,
-                    'title' => $row->title,
-                    'scheduled_time' => $row->scheduled_time,
-                    'icon' => $row->icon,
-                    'is_completed' => (bool) ($row->is_completed ?? false),
-                    'completed_at' => $row->completed_at,
-                    'sort_order' => (int) ($row->sort_order ?? 0),
-                    'notes' => $row->notes,
-                ];
-            })->values(),
+            'items' => array_values($items),
         ];
     }
 
