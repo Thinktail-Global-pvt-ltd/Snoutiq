@@ -7,6 +7,9 @@ import React, {
 import { Link, useNavigate } from "react-router-dom";
 
 const HOME_LOGO_SRC = "/logo.webp";
+const CERTIFICATION_PDF = "/Startup-certificate.pdf";
+const DPIIT_LOGO_SRC = "/DPIIT.jpeg";
+const MSME_LOGO_SRC = "/MSME.jpeg";
 
 const cx = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -576,12 +579,15 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
   );
 }
 
+
+
 export function Footer() {
   return (
     <footer className="border-t border-slate-200 bg-white py-10 text-slate-600 sm:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
-          <div className="col-span-1">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-5 md:items-start">
+          {/* 1. Brand */}
+          <div>
             <a
               href="https://www.snoutiq.com"
               target="_blank"
@@ -604,12 +610,15 @@ export function Footer() {
               <span className="sr-only">SnoutIQ</span>
             </a>
 
-            <p className="mb-4 text-sm">India&apos;s trusted pet healthcare platform.</p>
+            <p className="mb-4 text-sm">
+              India&apos;s trusted pet healthcare platform.
+            </p>
 
             <div className="flex gap-4">
               <a
                 href="#"
                 className="text-slate-400 transition-colors hover:text-brand"
+                aria-label="Facebook"
               >
                 <span className="sr-only">Facebook</span>
                 <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
@@ -620,6 +629,7 @@ export function Footer() {
               <a
                 href="#"
                 className="text-slate-400 transition-colors hover:text-brand"
+                aria-label="Instagram"
               >
                 <span className="sr-only">Instagram</span>
                 <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
@@ -629,45 +639,193 @@ export function Footer() {
             </div>
           </div>
 
+          {/* 2. Services */}
           <div>
             <h3 className="mb-4 font-semibold text-slate-900">Services</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/veterinary-doctor-online-india" className="transition-colors hover:text-brand">Video Consultation</Link></li>
-              <li><Link to="/puppy-vaccination-delhi" className="transition-colors hover:text-brand">Puppy Vaccination</Link></li>
-              <li><Link to="/kitten-vaccination-delhi" className="transition-colors hover:text-brand">Kitten Vaccination</Link></li>
-              <li><Link to="/dog-neutering-delhi" className="transition-colors hover:text-brand">Dog Neutering</Link></li>
-              <li><Link to="/cat-neutering-delhi" className="transition-colors hover:text-brand">Cat Neutering</Link></li>
+              <li>
+                <Link
+                  to="/veterinary-doctor-online-india"
+                  className="transition-colors hover:text-brand"
+                >
+                  Video Consultation
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/puppy-vaccination-delhi"
+                  className="transition-colors hover:text-brand"
+                >
+                  Puppy Vaccination
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/kitten-vaccination-delhi"
+                  className="transition-colors hover:text-brand"
+                >
+                  Kitten Vaccination
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/dog-neutering-delhi"
+                  className="transition-colors hover:text-brand"
+                >
+                  Dog Neutering
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/cat-neutering-delhi"
+                  className="transition-colors hover:text-brand"
+                >
+                  Cat Neutering
+                </Link>
+              </li>
             </ul>
           </div>
 
+          {/* 3. Resources */}
           <div>
             <h3 className="mb-4 font-semibold text-slate-900">Resources</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/symptoms" className="transition-colors hover:text-brand">Symptom Checker</Link></li>
-              <li><Link to="/vet-insights" className="transition-colors hover:text-brand">Vet Insights</Link></li>
-              <li><Link to="/blog" className="transition-colors hover:text-brand">Blog</Link></li>
-              <li><Link to="/vet-insights/interview-dr-sharma-emergency-care" className="transition-colors hover:text-brand">Emergency Care Guide</Link></li>
-              <li><Link to="/dog-vomiting-treatment-india" className="transition-colors hover:text-brand">Dog Vomiting Guide</Link></li>
+              <li>
+                <Link to="/symptoms" className="transition-colors hover:text-brand">
+                  Symptom Checker
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/vet-insights"
+                  className="transition-colors hover:text-brand"
+                >
+                  Vet Insights
+                </Link>
+              </li>
+              <li>
+                <Link to="/blog" className="transition-colors hover:text-brand">
+                  Blog
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/vet-insights/interview-dr-sharma-emergency-care"
+                  className="transition-colors hover:text-brand"
+                >
+                  Emergency Care Guide
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/dog-vomiting-treatment-india"
+                  className="transition-colors hover:text-brand"
+                >
+                  Dog Vomiting Guide
+                </Link>
+              </li>
             </ul>
           </div>
 
+          {/* 4. Company */}
           <div>
             <h3 className="mb-4 font-semibold text-slate-900">Company</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/about" className="transition-colors hover:text-brand">About Us</Link></li>
-              <li><Link to="/privacy-policy" className="transition-colors hover:text-brand">Privacy Policy</Link></li>
-              <li><Link to="/terms-of-service" className="transition-colors hover:text-brand">Terms</Link></li>
+              <li>
+                <Link to="/about" className="transition-colors hover:text-brand">
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/privacy-policy"
+                  className="transition-colors hover:text-brand"
+                >
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/terms-of-service"
+                  className="transition-colors hover:text-brand"
+                >
+                  Terms
+                </Link>
+              </li>
               <li className="pt-2 leading-relaxed">
                 Email:{" "}
-                <a href="mailto:snoutiq@gmail.com" className="text-blue-600 underline hover:text-blue-800">
+                <a
+                  href="mailto:snoutiq@gmail.com"
+                  className="text-blue-600 underline hover:text-blue-800"
+                >
                   snoutiq@gmail.com
                 </a>{" "}
                 or{" "}
-                <a href="mailto:info@snoutiq.com" className="text-blue-600 underline hover:text-blue-800">
+                <a
+                  href="mailto:info@snoutiq.com"
+                  className="text-blue-600 underline hover:text-blue-800"
+                >
                   info@snoutiq.com
                 </a>
               </li>
             </ul>
+          </div>
+
+          {/* 5. Certifications */}
+          <div>
+            <div className="rounded-2xl bg-[#2450D6] p-5 text-white shadow-sm">
+              <h3 className="mb-5 text-center text-[18px] font-semibold leading-tight">
+                We Are Certified By
+              </h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                <a
+                  href={CERTIFICATION_PDF}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center text-center transition-transform hover:-translate-y-0.5"
+                  aria-label="Open Startup India certificate PDF"
+                >
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+                    <img
+                      src={DPIIT_LOGO_SRC}
+                      alt="Startup India"
+                      className="h-10 w-10 object-contain"
+                      loading="lazy"
+                      draggable={false}
+                      onDragStart={(event) => event.preventDefault()}
+                      onContextMenu={(event) => event.preventDefault()}
+                    />
+                  </div>
+                  <span className="mt-3 text-sm font-semibold leading-5">
+                    Startup India
+                  </span>
+                </a>
+
+                <a
+                  href={CERTIFICATION_PDF}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center text-center transition-transform hover:-translate-y-0.5"
+                  aria-label="Open MSME certificate PDF"
+                >
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+                    <img
+                      src={MSME_LOGO_SRC}
+                      alt="MSME"
+                      className="h-10 w-10 object-contain"
+                      loading="lazy"
+                      draggable={false}
+                      onDragStart={(event) => event.preventDefault()}
+                      onContextMenu={(event) => event.preventDefault()}
+                    />
+                  </div>
+                  <span className="mt-3 text-sm font-semibold leading-5">
+                    MSME
+                  </span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
