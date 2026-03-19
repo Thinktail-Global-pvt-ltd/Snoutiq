@@ -35,6 +35,7 @@ class PetDailyCareController extends Controller
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'care_date' => ['nullable', 'date'],
             'replace_for_date' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.task_key' => ['nullable', 'string', 'max:100'],
             'items.*.title' => ['required', 'string', 'max:255'],
@@ -43,7 +44,6 @@ class PetDailyCareController extends Controller
             'items.*.is_completed' => ['nullable', 'boolean'],
             'items.*.completed_at' => ['nullable', 'date'],
             'items.*.sort_order' => ['nullable', 'integer', 'min:0'],
-            'items.*.notes' => ['nullable', 'string'],
         ]);
 
         $userId = (int) $payload['user_id'];
@@ -55,13 +55,19 @@ class PetDailyCareController extends Controller
         }
 
         $careDate = $this->normalizeDate($payload['care_date'] ?? null) ?? Carbon::today()->toDateString();
+        $dailyNotes = isset($payload['notes']) && trim((string) $payload['notes']) !== ''
+            ? trim((string) $payload['notes'])
+            : null;
         $items = $this->normalizeItems($payload['items']);
         $doneCount = count(array_filter($items, fn (array $item): bool => (bool) ($item['is_completed'] ?? false)));
         $totalCount = count($items);
         $allCompleted = $totalCount > 0 && $doneCount === $totalCount;
-        $itemsJson = json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+        $itemsJson = json_encode([
+            'notes' => $dailyNotes,
+            'items' => $items,
+        ], JSON_UNESCAPED_UNICODE);
         if (!is_string($itemsJson)) {
-            $itemsJson = '{"items":[]}';
+            $itemsJson = '{"notes":null,"items":[]}';
         }
 
         DB::transaction(function () use ($petId, $userId, $careDate, $itemsJson, $allCompleted) {
@@ -95,11 +101,11 @@ class PetDailyCareController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Daily care saved successfully.',
-            'data' => $this->formatCarePayload($petId, $userId, $careDate, $items),
+            'data' => $this->formatCarePayload($petId, $userId, $careDate, $items, $dailyNotes),
         ]);
     }
 
-    private function formatCarePayload(int $petId, int $userId, string $careDate, array $items): array
+    private function formatCarePayload(int $petId, int $userId, string $careDate, array $items, ?string $dailyNotes): array
     {
         $doneCount = count(array_filter($items, fn (array $item): bool => (bool) ($item['is_completed'] ?? false)));
         $totalCount = count($items);
@@ -111,6 +117,7 @@ class PetDailyCareController extends Controller
             'done_count' => $doneCount,
             'total_count' => $totalCount,
             'progress_text' => "{$doneCount}/{$totalCount} done",
+            'notes' => $dailyNotes,
             'items' => array_values($items),
         ];
     }
@@ -138,7 +145,7 @@ class PetDailyCareController extends Controller
                 'is_completed' => $isCompleted,
                 'completed_at' => $completedAt?->toDateTimeString(),
                 'sort_order' => isset($item['sort_order']) ? (int) $item['sort_order'] : $index,
-                'notes' => isset($item['notes']) && $item['notes'] !== '' ? trim((string) $item['notes']) : null,
+                'notes' => null,
                 '_index' => $index,
             ];
         }
@@ -154,6 +161,11 @@ class PetDailyCareController extends Controller
 
         foreach ($normalized as &$item) {
             unset($item['_index']);
+        }
+        unset($item);
+
+        foreach ($normalized as $index => &$item) {
+            $item['id'] = $index + 1;
         }
         unset($item);
 

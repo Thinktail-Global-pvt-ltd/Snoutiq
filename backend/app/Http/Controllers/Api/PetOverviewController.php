@@ -526,9 +526,13 @@ class PetOverviewController extends Controller
             return ($row->task_key ?? null) === '__daily_bundle__';
         });
         if ($bundleRow) {
-            $bundleItems = $this->decodeDailyCareBundleItems($bundleRow->notes ?? null);
-            if ($bundleItems !== null) {
-                return $this->buildDailyCarePayload($date, $bundleItems);
+            $bundleData = $this->decodeDailyCareBundleData($bundleRow->notes ?? null);
+            if ($bundleData !== null) {
+                return $this->buildDailyCarePayload(
+                    $date,
+                    $bundleData['items'] ?? [],
+                    $bundleData['notes'] ?? null
+                );
             }
         }
 
@@ -542,11 +546,16 @@ class PetOverviewController extends Controller
                 'is_completed' => (bool) ($row->is_completed ?? false),
                 'completed_at' => $row->completed_at,
                 'sort_order' => (int) ($row->sort_order ?? 0),
-                'notes' => $row->notes,
+                'notes' => null,
             ];
         })->values()->all();
 
-        return $this->buildDailyCarePayload($date, $legacyItems);
+        foreach ($legacyItems as $index => &$item) {
+            $item['id'] = $index + 1;
+        }
+        unset($item);
+
+        return $this->buildDailyCarePayload($date, $legacyItems, null);
     }
 
     private function loadDailyCareRowsForDate(int $petId, string $date)
@@ -559,7 +568,7 @@ class PetOverviewController extends Controller
             ->get();
     }
 
-    private function decodeDailyCareBundleItems($notes): ?array
+    private function decodeDailyCareBundleData($notes): ?array
     {
         if (!is_string($notes) || trim($notes) === '') {
             return null;
@@ -569,6 +578,11 @@ class PetOverviewController extends Controller
         if (!is_array($decoded) || !isset($decoded['items']) || !is_array($decoded['items'])) {
             return null;
         }
+
+        $rawDailyNotes = $decoded['notes'] ?? ($decoded['daily_notes'] ?? null);
+        $dailyNotes = is_string($rawDailyNotes) && trim($rawDailyNotes) !== ''
+            ? trim($rawDailyNotes)
+            : null;
 
         $normalized = [];
         foreach ($decoded['items'] as $index => $item) {
@@ -591,7 +605,7 @@ class PetOverviewController extends Controller
                     ? (string) $item['completed_at']
                     : null,
                 'sort_order' => isset($item['sort_order']) ? (int) $item['sort_order'] : (int) $index,
-                'notes' => isset($item['notes']) && $item['notes'] !== '' ? trim((string) $item['notes']) : null,
+                'notes' => null,
                 '_index' => $index,
             ];
         }
@@ -610,10 +624,18 @@ class PetOverviewController extends Controller
         }
         unset($item);
 
-        return $normalized;
+        foreach ($normalized as $index => &$item) {
+            $item['id'] = $index + 1;
+        }
+        unset($item);
+
+        return [
+            'notes' => $dailyNotes,
+            'items' => $normalized,
+        ];
     }
 
-    private function buildDailyCarePayload(string $careDate, array $items): array
+    private function buildDailyCarePayload(string $careDate, array $items, ?string $dailyNotes = null): array
     {
         $doneCount = count(array_filter($items, function (array $item): bool {
             return (bool) ($item['is_completed'] ?? false);
@@ -625,6 +647,7 @@ class PetOverviewController extends Controller
             'done_count' => $doneCount,
             'total_count' => $totalCount,
             'progress_text' => "{$doneCount}/{$totalCount} done",
+            'notes' => $dailyNotes,
             'items' => array_values($items),
         ];
     }
