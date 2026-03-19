@@ -229,10 +229,26 @@ class ClinicsController extends Controller
             ->get();
 
         $petMap = collect();
+        $transactionMap = collect();
+        $userIds = collect();
 
-        if ($patients->isNotEmpty() && Schema::hasTable('pets')) {
+        if ($patients->isNotEmpty()) {
             $userIds = $patients->pluck('id');
 
+            $transactionRows = DB::table('transactions')
+                ->select('transactions.*')
+                ->where('clinic_id', $clinicId)
+                ->whereIn('user_id', $userIds)
+                ->whereNotNull('user_id')
+                ->where('user_id', '>', 0)
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->get();
+
+            $transactionMap = $transactionRows->groupBy('user_id');
+        }
+
+        if ($patients->isNotEmpty() && Schema::hasTable('pets')) {
             $userColumn = Schema::hasColumn('pets', 'user_id')
                 ? 'user_id'
                 : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
@@ -277,8 +293,9 @@ class ClinicsController extends Controller
             }
         }
 
-        $patients = $patients->map(function ($patient) use ($petMap) {
+        $patients = $patients->map(function ($patient) use ($petMap, $transactionMap) {
             $patient->pets = ($petMap[$patient->id] ?? collect())->values();
+            $patient->transactions = ($transactionMap[$patient->id] ?? collect())->values();
             return $patient;
         });
 
