@@ -158,7 +158,6 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOC_ZOOM_MIN = 1;
 const DOC_ZOOM_MAX = 4;
 const DOC_ZOOM_STEP = 0.25;
-const PRESCRIPTION_MEDICAL_STATUS_OPTIONS = ["Ongoing", "Resolved", "Chronic"];
 const PRESCRIPTION_PROGNOSIS_OPTIONS = [
   { value: "good", label: "Good" },
   { value: "fair", label: "Fair" },
@@ -209,28 +208,49 @@ const PRESCRIPTION_AUSCULTATION_OPTIONS = [
 ];
 const FALLBACK_AFFECTED_SYSTEMS = [
   {
-    id: 13,
-    code: "auditory_vestibular",
-    name: "Auditory & vestibular system (Ear)",
-  },
-  { id: 11, code: "cardiovascular", name: "Cardiovascular system" },
-  { id: 14, code: "dental", name: "Dental system" },
-  { id: 8, code: "endocrine", name: "Endocrine system" },
-  { id: 2, code: "gastrointestinal", name: "Gastrointestinal system" },
-  { id: 5, code: "genital", name: "Genital system" },
-  { id: 3, code: "hepatobiliary", name: "Hepatobiliary system" },
-  {
     id: 1,
     code: "integumentary",
     name: "Integumentary system (skin & nails)",
   },
-  { id: 9, code: "muscular", name: "Muscular system" },
-  { id: 7, code: "musculoskeletal", name: "Musculoskeletal system" },
-  { id: 6, code: "nervous", name: "Nervous system" },
-  { id: 10, code: "respiratory", name: "Respiratory system" },
+  { id: 2, code: "gastrointestinal", name: "Gastrointestinal system" },
+  { id: 3, code: "hepatobiliary", name: "Hepatobiliary system" },
   { id: 4, code: "urinary", name: "Urinary system" },
+  { id: 5, code: "genital", name: "Genital system" },
+  { id: 6, code: "nervous", name: "Nervous system" },
+  { id: 7, code: "musculoskeletal", name: "Musculoskeletal system" },
+  { id: 8, code: "endocrine", name: "Endocrine system" },
+  { id: 9, code: "muscular", name: "Muscular system" },
+  { id: 10, code: "respiratory", name: "Respiratory system" },
+  { id: 11, code: "cardiovascular", name: "Cardiovascular system" },
   { id: 12, code: "visual", name: "Visual system (Eyes)" },
+  {
+    id: 13,
+    code: "auditory_vestibular",
+    name: "Auditory & vestibular system (Ear)",
+  },
+  { id: 14, code: "dental", name: "Dental system" },
 ];
+const AFFECTED_SYSTEM_ORDER = new Map(
+  FALLBACK_AFFECTED_SYSTEMS.flatMap((item, index) => [
+    [String(item.code || "").trim().toLowerCase(), index],
+    [String(item.name || "").trim().toLowerCase(), index],
+  ]),
+);
+
+const sortAffectedSystems = (systems) =>
+  [...systems].sort((a, b) => {
+    const aIndex =
+      AFFECTED_SYSTEM_ORDER.get(String(a?.code || "").trim().toLowerCase()) ??
+      AFFECTED_SYSTEM_ORDER.get(String(a?.name || "").trim().toLowerCase()) ??
+      Number.MAX_SAFE_INTEGER;
+    const bIndex =
+      AFFECTED_SYSTEM_ORDER.get(String(b?.code || "").trim().toLowerCase()) ??
+      AFFECTED_SYSTEM_ORDER.get(String(b?.name || "").trim().toLowerCase()) ??
+      Number.MAX_SAFE_INTEGER;
+
+    if (aIndex !== bIndex) return aIndex - bIndex;
+    return String(a?.name || "").localeCompare(String(b?.name || ""));
+  });
 
 const normalizeId = (value) => {
   const num = Number(value);
@@ -336,10 +356,11 @@ const getTransactionWeightInput = (transaction) => {
 
 const normalizeVisitCategory = (value) => {
   switch (String(value || "").trim()) {
+     case "Online Consultation":
+      return "online_consultation";
     case "General Consultation":
       return "general_consultation";
-    case "Online Consultation":
-      return "online_consultation";
+   
     case "Follow-up":
       return "followup";
     case "Emergency":
@@ -348,6 +369,9 @@ const normalizeVisitCategory = (value) => {
       return String(value || "").trim();
   }
 };
+
+const isInClinicConsultationCategory = (value) =>
+  String(value || "").trim() === "General Consultation";
 
 /* -------------- Image + Validation Helpers -------------- */
 
@@ -2334,10 +2358,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const refreshTimerRef = useRef(null);
   const isFirstLoadRef = useRef(true);
   const createPrescriptionForm = (transaction = null) => ({
-    visitCategory: "General Consultation",
-    consultationCategory: "General Consultation",
+    visitCategory: "Online Consultation",
+    consultationCategory: "Online Consultation",
     consultMode: "video",
-    medicalStatus: "Ongoing",
+    medicalStatus: "",
     caseSeverity: "general",
     prognosis: "fair",
     notes: getTransactionReportedSymptoms(transaction),
@@ -2376,8 +2400,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     createPrescriptionForm(),
   );
   const [activeMedicationIndex, setActiveMedicationIndex] = useState(0);
-  const [affectedSystems, setAffectedSystems] = useState(
-    FALLBACK_AFFECTED_SYSTEMS,
+  const [affectedSystems, setAffectedSystems] = useState(() =>
+    sortAffectedSystems(FALLBACK_AFFECTED_SYSTEMS),
   );
   const [affectedSystemsLoading, setAffectedSystemsLoading] = useState(false);
   const [affectedSystemQuery, setAffectedSystemQuery] = useState("");
@@ -2441,7 +2465,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           : [];
 
         if (!active || nextSystems.length === 0) return;
-        setAffectedSystems(nextSystems);
+        setAffectedSystems(sortAffectedSystems(nextSystems));
       })
       .catch((error) => {
         if (error?.name === "AbortError") return;
@@ -3025,6 +3049,13 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     setPrescriptionForm((prev) => ({ ...prev, [key]: event.target.value }));
   };
 
+  const toggleChronicMedicalStatus = (event) => {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      medicalStatus: event.target.checked ? "Chronic" : "",
+    }));
+  };
+
   const updateMedication = (index, key) => (event) => {
     const value = event.target.value;
     setPrescriptionForm((prev) => ({
@@ -3181,6 +3212,61 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     event.preventDefault();
     if (!activeTransaction || prescriptionSubmitting) return;
 
+    const followUpRequired = prescriptionForm.followUpRequired === "yes";
+    const shouldIncludePhysicalExamination =
+      isInClinicConsultationCategory(prescriptionForm.consultationCategory) ||
+      prescriptionForm.consultMode === "in_clinic";
+    const missingFields = [];
+
+    if (!prescriptionForm.consultationCategory) {
+      missingFields.push("Consultation category");
+    }
+    if (!prescriptionForm.diagnosis.trim()) {
+      missingFields.push("Clinical notes / tentative diagnosis");
+    }
+    if (!prescriptionForm.prognosis) {
+      missingFields.push("Prognosis");
+    }
+    if (!prescriptionForm.homeCare.trim()) {
+      missingFields.push("Vet advice / home care tips");
+    }
+    if (!prescriptionForm.systemAffectedId) {
+      missingFields.push("System affected");
+    }
+    if (followUpRequired && !prescriptionForm.followUpDate) {
+      missingFields.push("Follow-up date");
+    }
+    if (shouldIncludePhysicalExamination) {
+      if (!String(prescriptionForm.temperature || "").trim()) {
+        missingFields.push("Temperature");
+      }
+      if (!String(prescriptionForm.weight || "").trim()) {
+        missingFields.push("Weight");
+      }
+      if (!prescriptionForm.mucousMembrane) {
+        missingFields.push("Mucous membrane");
+      }
+      if (!prescriptionForm.dehydrationLevel) {
+        missingFields.push("Dehydration level");
+      }
+      if (!prescriptionForm.abdominalPainReaction) {
+        missingFields.push("Abdominal pain reaction");
+      }
+      if (!prescriptionForm.auscultation) {
+        missingFields.push("Auscultation");
+      }
+      if (!prescriptionForm.physicalExamOther.trim()) {
+        missingFields.push("Physical exam notes");
+      }
+    }
+
+    if (missingFields.length > 0) {
+      setPrescriptionError(
+        `Please complete these required fields:\n${missingFields.join("\n")}`,
+      );
+      return;
+    }
+
     setPrescriptionSubmitting(true);
     setPrescriptionError("");
     setPrescriptionSuccess(false);
@@ -3233,7 +3319,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       if (!normalizedValue) return;
       fd.append(key, normalizedValue);
     };
-    const followUpRequired = prescriptionForm.followUpRequired === "yes";
     const historySnapshotValue = (
       prescriptionForm.historySnapshot || prescriptionForm.notes
     ).trim();
@@ -3249,7 +3334,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       normalizeVisitCategory(prescriptionForm.visitCategory),
     );
     fd.append("consultation_category", prescriptionForm.consultationCategory);
-    fd.append("medical_status", prescriptionForm.medicalStatus);
+    appendOptionalPrescriptionField("medical_status", prescriptionForm.medicalStatus);
     fd.append("case_severity", prescriptionForm.caseSeverity);
     fd.append("prognosis", prescriptionForm.prognosis);
     fd.append("notes", prescriptionForm.notes.trim());
@@ -3265,25 +3350,33 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       "system_affected",
       selectedAffectedSystem?.code || selectedAffectedSystem?.name || "",
     );
-    appendOptionalPrescriptionField("temperature", prescriptionForm.temperature);
-    appendOptionalPrescriptionField("weight", prescriptionForm.weight);
-    appendOptionalPrescriptionField(
-      "mucous_membrane",
-      prescriptionForm.mucousMembrane,
-    );
-    appendOptionalPrescriptionField(
-      "dehydration_level",
-      prescriptionForm.dehydrationLevel,
-    );
-    appendOptionalPrescriptionField(
-      "abdominal_pain_reaction",
-      prescriptionForm.abdominalPainReaction,
-    );
-    appendOptionalPrescriptionField("auscultation", prescriptionForm.auscultation);
-    appendOptionalPrescriptionField(
-      "physical_exam_other",
-      prescriptionForm.physicalExamOther,
-    );
+    if (shouldIncludePhysicalExamination) {
+      appendOptionalPrescriptionField(
+        "temperature",
+        prescriptionForm.temperature,
+      );
+      appendOptionalPrescriptionField("weight", prescriptionForm.weight);
+      appendOptionalPrescriptionField(
+        "mucous_membrane",
+        prescriptionForm.mucousMembrane,
+      );
+      appendOptionalPrescriptionField(
+        "dehydration_level",
+        prescriptionForm.dehydrationLevel,
+      );
+      appendOptionalPrescriptionField(
+        "abdominal_pain_reaction",
+        prescriptionForm.abdominalPainReaction,
+      );
+      appendOptionalPrescriptionField(
+        "auscultation",
+        prescriptionForm.auscultation,
+      );
+      appendOptionalPrescriptionField(
+        "physical_exam_other",
+        prescriptionForm.physicalExamOther,
+      );
+    }
     if (prescriptionForm.doctorTreatment.trim()) {
       fd.append("doctor_treatment", prescriptionForm.doctorTreatment.trim());
     }
@@ -3702,12 +3795,16 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   }, [affectedSystemQuery, affectedSystems]);
   const historySnapshotLabel =
     prescriptionForm.historySnapshot || prescriptionForm.notes || "No history added.";
+  const isGeneralConsultation =
+    isInClinicConsultationCategory(prescriptionForm.consultationCategory) ||
+    prescriptionForm.consultMode === "in_clinic";
 
   useEffect(() => {
     if (!isAffectedSystemMenuOpen) {
       setAffectedSystemQuery("");
     }
   }, [isAffectedSystemMenuOpen]);
+
   const isPrescriptionPage = Boolean(
     showPrescriptionModal && activeTransaction,
   );
@@ -4534,9 +4631,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                 <p className="mt-1 text-sm font-semibold text-gray-800">
                                   {consultationLocationLabel}
                                 </p>
-                                <p className="mt-1 text-xs text-gray-500">
-                                  Clinic: {clinicNameLabel} ({clinicCityLabel})
-                                </p>
                               </div>
                             </div>
                           </div>
@@ -4569,34 +4663,41 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           <FileText size={16} className="text-[#0B4D67]" />
                           Consultation Details
                         </h4>
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                          <div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1">
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Consultation Category
+                              Consultation Category{" "}
+                              <span className="text-rose-500">*</span>
                             </label>
                             <select
                               value={prescriptionForm.consultationCategory}
                               onChange={(event) => {
                                 const nextCategory = event.target.value;
+                                const nextConsultMode =
+                                  isInClinicConsultationCategory(nextCategory)
+                                    ? "in_clinic"
+                                    : "video";
                                 setPrescriptionForm((prev) => ({
                                   ...prev,
                                   consultationCategory: nextCategory,
                                   visitCategory: nextCategory,
+                                  consultMode: nextConsultMode,
                                 }));
                               }}
                               className={INPUT_BASE_CLASS}
                             >
-                              <option value="General Consultation">
-                                General Consultation
-                              </option>
-                              <option value="Online Consultation">
+                               <option value="Online Consultation">
                                 Online Consultation
                               </option>
-                              <option value="Follow-up">Follow-up</option>
-                              <option value="Emergency">Emergency</option>
+                              <option value="General Consultation">
+                                In-Clinic Consultation
+                              </option>
+                             
+                              {/* <option value="Follow-up">Follow-up</option>
+                              <option value="Emergency">Emergency</option> */}
                             </select>
                           </div>
-                          <div>
+                          {/* <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
                               Consult Mode
                             </label>
@@ -4621,30 +4722,26 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                 </button>
                               ))}
                             </div>
-                          </div>
-                          <div>
+                          </div> */}
+                          <div className="space-y-1">
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Medical Status
+                             Tag this case as chronic
                             </label>
-                            <select
-                              value={prescriptionForm.medicalStatus}
-                              onChange={updatePrescriptionField(
-                                "medicalStatus",
-                              )}
-                              className={INPUT_BASE_CLASS}
-                            >
-                              {PRESCRIPTION_MEDICAL_STATUS_OPTIONS.map(
-                                (status) => (
-                                  <option key={status} value={status}>
-                                    {status}
-                                  </option>
-                                ),
-                              )}
-                            </select>
+                            <label className="flex w-full min-h-[44px] items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-700 transition hover:border-[#0B4D67]/30 hover:bg-white md:min-h-[46px] md:px-4 md:rounded-xl">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  prescriptionForm.medicalStatus === "Chronic"
+                                }
+                                onChange={toggleChronicMedicalStatus}
+                                className="h-4 w-4 rounded border-gray-300 text-[#0B4D67] focus:ring-[#0B4D67]/30"
+                              />
+                              <span>Chronic</span>
+                            </label>
                           </div>
                         </div>
 
-                        <div>
+                        {/* <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">
                             Notes for medical record
                           </label>
@@ -4668,11 +4765,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             placeholder="Owner reported vomiting + low appetite during booking..."
                             className={`${INPUT_BASE_CLASS} resize-none text-xs`}
                           />
-                        </div>
+                        </div> */}
 
                         <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3">
                           <label className="block text-xs font-semibold text-blue-700 mb-1">
-                            Clinical Notes / Tentative Diagnosis by Vet
+                            Clinical Notes / Tentative Diagnosis by Vet{" "}
+                            <span className="text-rose-500">*</span>
                           </label>
                           <textarea
                             value={prescriptionForm.diagnosis}
@@ -4687,7 +4785,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           </p>
                         </div>
                         <div className="grid sm:grid-cols-2 gap-3 rounded-xl border border-blue-200 bg-blue-50/50 p-3">
-                          <div>
+                          {/* <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
                               Case Severity
                             </label>
@@ -4700,10 +4798,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                               <option value="moderate">Moderate</option>
                               <option value="critical">Critical</option>
                             </select>
-                          </div>
+                          </div> */}
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Prognosis
+                              Prognosis{" "}
+                              <span className="text-rose-500">*</span>
                             </label>
                             <select
                               value={prescriptionForm.prognosis}
@@ -4720,7 +4819,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         </div>
                         <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
                           <label className="block text-xs font-semibold text-emerald-700 mb-1">
-                            Vet Advice / Home Care Tips
+                            Vet Advice / Home Care Tips{" "}
+                            <span className="text-rose-500">*</span>
                           </label>
                           <textarea
                             value={prescriptionForm.homeCare}
@@ -4736,7 +4836,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         </div>
                       </div>
 
-                      <div className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-3">
+                      {isGeneralConsultation ? (
+                        <div className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-3">
                         <h4 className="font-medium text-gray-900 flex items-center gap-2">
                           <Stethoscope size={16} className="text-[#0B4D67]" />
                           Physical Examination
@@ -4744,118 +4845,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              System Affected
-                            </label>
-                            <div className="relative" ref={affectedSystemMenuRef}>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setIsAffectedSystemMenuOpen((prev) => !prev)
-                                }
-                                className={`${INPUT_BASE_CLASS} flex items-center justify-between gap-3 text-left`}
-                              >
-                                <span
-                                  className={
-                                    selectedAffectedSystem
-                                      ? "text-gray-700"
-                                      : "text-gray-400"
-                                  }
-                                >
-                                  {selectedAffectedSystem?.name ||
-                                    (affectedSystemsLoading
-                                      ? "Loading systems..."
-                                      : "Select affected system")}
-                                </span>
-                                <ChevronDown
-                                  size={16}
-                                  className={`shrink-0 text-gray-400 transition-transform ${
-                                    isAffectedSystemMenuOpen
-                                      ? "rotate-180"
-                                      : ""
-                                  }`}
-                                />
-                              </button>
-
-                              {isAffectedSystemMenuOpen ? (
-                                <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
-                                  <div className="border-b border-gray-100 p-2">
-                                    <div className="relative">
-                                      <Search
-                                        size={14}
-                                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                      />
-                                      <input
-                                        type="text"
-                                        value={affectedSystemQuery}
-                                        onChange={(event) =>
-                                          setAffectedSystemQuery(
-                                            event.target.value,
-                                          )
-                                        }
-                                        placeholder="Search system affected..."
-                                        autoFocus
-                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-700 outline-none transition focus:border-[#0B4D67] focus:bg-white focus:ring-2 focus:ring-[#0B4D67]/20"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="max-h-56 overflow-y-auto p-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setPrescriptionForm((prev) => ({
-                                          ...prev,
-                                          systemAffectedId: "",
-                                        }));
-                                        setIsAffectedSystemMenuOpen(false);
-                                      }}
-                                      className={`flex w-full items-start rounded-lg px-3 py-2 text-left text-sm transition ${
-                                        !prescriptionForm.systemAffectedId
-                                          ? "bg-blue-50 text-blue-700"
-                                          : "text-gray-600 hover:bg-gray-50"
-                                      }`}
-                                    >
-                                      Select affected system
-                                    </button>
-
-                                    {filteredAffectedSystems.length > 0 ? (
-                                      filteredAffectedSystems.map((system) => (
-                                        <button
-                                          key={system.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setPrescriptionForm((prev) => ({
-                                              ...prev,
-                                              systemAffectedId: String(
-                                                system.id,
-                                              ),
-                                            }));
-                                            setIsAffectedSystemMenuOpen(false);
-                                          }}
-                                          className={`flex w-full items-start rounded-lg px-3 py-2 text-left text-sm transition ${
-                                            String(
-                                              prescriptionForm.systemAffectedId,
-                                            ) === String(system.id)
-                                              ? "bg-blue-50 text-blue-700"
-                                              : "text-gray-700 hover:bg-gray-50"
-                                          }`}
-                                        >
-                                          {system.name}
-                                        </button>
-                                      ))
-                                    ) : (
-                                      <div className="px-3 py-2 text-sm text-gray-500">
-                                        No matching systems
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Temperature (F)
+                              Temperature (F){" "}
+                              <span className="text-rose-500">*</span>
                             </label>
                             <input
                               type="number"
@@ -4870,7 +4861,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Weight (kg)
+                              Weight (kg){" "}
+                              <span className="text-rose-500">*</span>
                             </label>
                             <input
                               type="number"
@@ -4885,7 +4877,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Mucous Membrane
+                              Mucous Membrane{" "}
+                              <span className="text-rose-500">*</span>
                             </label>
                             <select
                               value={prescriptionForm.mucousMembrane}
@@ -4902,7 +4895,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Dehydration Level
+                              Dehydration Level{" "}
+                              <span className="text-rose-500">*</span>
                             </label>
                             <select
                               value={prescriptionForm.dehydrationLevel}
@@ -4921,7 +4915,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Abdominal Pain Reaction
+                              Abdominal Pain Reaction{" "}
+                              <span className="text-rose-500">*</span>
                             </label>
                             <select
                               value={prescriptionForm.abdominalPainReaction}
@@ -4938,7 +4933,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                              Auscultation
+                              Auscultation{" "}
+                              <span className="text-rose-500">*</span>
                             </label>
                             <select
                               value={prescriptionForm.auscultation}
@@ -4956,7 +4952,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">
-                            Physical exam notes
+                            Physical exam notes{" "}
+                            <span className="text-rose-500">*</span>
                           </label>
                           <textarea
                             value={prescriptionForm.physicalExamOther}
@@ -4966,7 +4963,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             className={`${INPUT_BASE_CLASS} resize-none text-xs`}
                           />
                         </div>
-                      </div>
+                        </div>
+                      ) : null}
 
                       {/* Medications */}
                       <div className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-3">
@@ -5264,6 +5262,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
                               Follow-up Date
+                              {prescriptionForm.followUpRequired === "yes" ? (
+                                <>
+                                  {" "}
+                                  <span className="text-rose-500">*</span>
+                                </>
+                              ) : null}
                             </label>
                             <input
                               type="date"
@@ -5316,7 +5320,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             ))}
                           </div>
                         </div>
-                        <div>
+                        {/* <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">
                             Follow-up Notes
                           </label>
@@ -5332,9 +5336,118 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                 : ""
                             }`}
                           />
+                        </div> */}
+                      </div>
+                      <div className="rounded-xl border border-stone-100 bg-white p-3.5 space-y-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
+                          <FileText size={16} className="text-[#0B4D67]" />
+                          System Affected
+                        </div>
+                        <div className="relative" ref={affectedSystemMenuRef}>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            Select system affected{" "}
+                            <span className="text-rose-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setIsAffectedSystemMenuOpen((prev) => !prev)
+                            }
+                            className={`${INPUT_BASE_CLASS} flex items-center justify-between gap-3 text-left`}
+                          >
+                            <span
+                              className={
+                                selectedAffectedSystem
+                                  ? "text-gray-700"
+                                  : "text-gray-400"
+                              }
+                            >
+                              {selectedAffectedSystem?.name ||
+                                (affectedSystemsLoading
+                                  ? "Loading systems..."
+                                  : "Select system affected")}
+                            </span>
+                            <ChevronDown
+                              size={16}
+                              className={`shrink-0 text-gray-400 transition-transform ${
+                                isAffectedSystemMenuOpen ? "rotate-180" : ""
+                              }`}
+                            />
+                          </button>
+
+                          {isAffectedSystemMenuOpen ? (
+                            <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                              <div className="border-b border-gray-100 p-2">
+                                <div className="relative">
+                                  <Search
+                                    size={14}
+                                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={affectedSystemQuery}
+                                    onChange={(event) =>
+                                      setAffectedSystemQuery(event.target.value)
+                                    }
+                                    placeholder="Search system affected..."
+                                    autoFocus
+                                    className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-700 outline-none transition focus:border-[#0B4D67] focus:bg-white focus:ring-2 focus:ring-[#0B4D67]/20"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="max-h-56 overflow-y-auto p-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPrescriptionForm((prev) => ({
+                                      ...prev,
+                                      systemAffectedId: "",
+                                    }));
+                                    setIsAffectedSystemMenuOpen(false);
+                                  }}
+                                  className={`flex w-full items-start rounded-lg px-3 py-2 text-left text-sm transition ${
+                                    !prescriptionForm.systemAffectedId
+                                      ? "bg-blue-50 text-blue-700"
+                                      : "text-gray-600 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  Select system affected
+                                </button>
+
+                                {filteredAffectedSystems.length > 0 ? (
+                                  filteredAffectedSystems.map((system) => (
+                                    <button
+                                      key={system.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setPrescriptionForm((prev) => ({
+                                          ...prev,
+                                          systemAffectedId: String(system.id),
+                                        }));
+                                        setIsAffectedSystemMenuOpen(false);
+                                      }}
+                                      className={`flex w-full items-start rounded-lg px-3 py-2 text-left text-sm transition ${
+                                        String(
+                                          prescriptionForm.systemAffectedId,
+                                        ) === String(system.id)
+                                          ? "bg-blue-50 text-blue-700"
+                                          : "text-gray-700 hover:bg-gray-50"
+                                      }`}
+                                    >
+                                      {system.name}
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="px-3 py-2 text-sm text-gray-500">
+                                    No matching systems
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
-
                       <div className="rounded-xl border border-stone-100 bg-white p-3.5 space-y-3 shadow-sm">
                         <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
                           <Upload size={16} /> Attach Record (optional)
@@ -5355,6 +5468,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           </span>
                         </label>
                       </div>
+
+              
                     </div>
 
                     <aside className="space-y-3 self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
@@ -5565,14 +5680,16 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                               Clinical Summary
                             </p>
                             <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                  Medical Status
-                                </p>
-                                <p className="mt-1 font-semibold text-slate-900">
-                                  {prescriptionForm.medicalStatus || "Ongoing"}
-                                </p>
-                              </div>
+                              {prescriptionForm.medicalStatus === "Chronic" ? (
+                                <div>
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                    Medical Status
+                                  </p>
+                                  <p className="mt-1 font-semibold text-slate-900">
+                                    {prescriptionForm.medicalStatus}
+                                  </p>
+                                </div>
+                              ) : null}
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                                   Case Severity
@@ -5617,65 +5734,68 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                   {consultModeLabel}
                                 </p>
                               </div>
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                  System Affected
-                                </p>
-                                <p className="mt-1 font-semibold text-slate-900">
-                                  {selectedAffectedSystem?.name ||
-                                    "Not specified"}
-                                </p>
-                              </div>
+                              {selectedAffectedSystem ? (
+                                <div>
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                    System Affected
+                                  </p>
+                                  <p className="mt-1 font-semibold text-slate-900">
+                                    {selectedAffectedSystem.name}
+                                  </p>
+                                </div>
+                              ) : null}
                             </div>
                           </div>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                            Physical Examination
-                          </p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {prescriptionForm.temperature ? (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
-                                Temp: {prescriptionForm.temperature} F
-                              </span>
-                            ) : null}
-                            {prescriptionForm.weight ? (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
-                                Weight: {prescriptionForm.weight} kg
-                              </span>
-                            ) : null}
-                            {prescriptionForm.mucousMembrane ? (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
-                                Mucous membrane: {mucousMembraneLabel}
-                              </span>
-                            ) : null}
-                            {prescriptionForm.dehydrationLevel ? (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
-                                Dehydration: {dehydrationLevelLabel}
-                              </span>
-                            ) : null}
-                            {prescriptionForm.abdominalPainReaction ? (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
-                                Abdominal pain: {abdominalPainLabel}
-                              </span>
-                            ) : null}
-                            {prescriptionForm.auscultation ? (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
-                                Auscultation: {auscultationLabel}
-                              </span>
-                            ) : null}
+                        {isGeneralConsultation ? (
+                          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                              Physical Examination
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {prescriptionForm.temperature ? (
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                                  Temp: {prescriptionForm.temperature} F
+                                </span>
+                              ) : null}
+                              {prescriptionForm.weight ? (
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                                  Weight: {prescriptionForm.weight} kg
+                                </span>
+                              ) : null}
+                              {prescriptionForm.mucousMembrane ? (
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                                  Mucous membrane: {mucousMembraneLabel}
+                                </span>
+                              ) : null}
+                              {prescriptionForm.dehydrationLevel ? (
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                                  Dehydration: {dehydrationLevelLabel}
+                                </span>
+                              ) : null}
+                              {prescriptionForm.abdominalPainReaction ? (
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                                  Abdominal pain: {abdominalPainLabel}
+                                </span>
+                              ) : null}
+                              {prescriptionForm.auscultation ? (
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                                  Auscultation: {auscultationLabel}
+                                </span>
+                              ) : null}
+                            </div>
+                            {prescriptionForm.physicalExamOther ? (
+                              <p className="mt-3 text-sm leading-relaxed text-slate-700">
+                                {prescriptionForm.physicalExamOther}
+                              </p>
+                            ) : (
+                              <p className="mt-3 text-sm leading-relaxed text-slate-500">
+                                No additional physical examination notes added.
+                              </p>
+                            )}
                           </div>
-                          {prescriptionForm.physicalExamOther ? (
-                            <p className="mt-3 text-sm leading-relaxed text-slate-700">
-                              {prescriptionForm.physicalExamOther}
-                            </p>
-                          ) : (
-                            <p className="mt-3 text-sm leading-relaxed text-slate-500">
-                              No additional physical examination notes added.
-                            </p>
-                          )}
-                        </div>
+                        ) : null}
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-4">
                           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
