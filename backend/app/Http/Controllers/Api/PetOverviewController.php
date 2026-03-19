@@ -499,7 +499,8 @@ class PetOverviewController extends Controller
 
         $todayDate = Carbon::today()->toDateString();
         $date = $todayDate;
-        if ($careDate !== null && trim($careDate) !== '') {
+        $hasRequestedDate = $careDate !== null && trim($careDate) !== '';
+        if ($hasRequestedDate) {
             try {
                 $date = Carbon::parse($careDate)->toDateString();
             } catch (\Throwable $e) {
@@ -507,18 +508,19 @@ class PetOverviewController extends Controller
             }
         }
 
-        $query = DB::table('pet_daily_cares')
-            ->where('pet_id', $petId)
-            ->whereDate('care_date', $date)
-            ->orderBy('sort_order')
-            ->orderBy('id');
+        $rows = $this->loadDailyCareRowsForDate($petId, $date);
 
-        // For today's care, only show tasks created today.
-        if ($date === $todayDate) {
-            $query->whereDate('created_at', $todayDate);
+        // If no specific date was requested, fallback to latest saved daily care.
+        if (! $hasRequestedDate && $rows->isEmpty()) {
+            $latestDate = DB::table('pet_daily_cares')
+                ->where('pet_id', $petId)
+                ->max('care_date');
+
+            if (is_string($latestDate) && trim($latestDate) !== '') {
+                $date = Carbon::parse($latestDate)->toDateString();
+                $rows = $this->loadDailyCareRowsForDate($petId, $date);
+            }
         }
-
-        $rows = $query->get();
 
         $bundleRow = $rows->first(function ($row) {
             return ($row->task_key ?? null) === '__daily_bundle__';
@@ -545,6 +547,16 @@ class PetOverviewController extends Controller
         })->values()->all();
 
         return $this->buildDailyCarePayload($date, $legacyItems);
+    }
+
+    private function loadDailyCareRowsForDate(int $petId, string $date)
+    {
+        return DB::table('pet_daily_cares')
+            ->where('pet_id', $petId)
+            ->whereDate('care_date', $date)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
     }
 
     private function decodeDailyCareBundleItems($notes): ?array
