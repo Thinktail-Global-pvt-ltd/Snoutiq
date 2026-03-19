@@ -326,16 +326,35 @@ const getTransactionReportedSymptoms = (transaction) => {
   const candidates = [
     transaction?.pet?.reported_symptom,
     transaction?.pet?.reportedSymptoms,
+    transaction?.pet?.disease,
+    transaction?.pet?.diseases,
+    transaction?.pet?.medical_history,
+    transaction?.pet?.history,
     transaction?.reported_symptom,
     transaction?.reportedSymptoms,
+    transaction?.problemText,
+    transaction?.disease,
+    transaction?.diseases,
+    transaction?.medical_history,
+    transaction?.history,
     transaction?.metadata?.reported_symptom,
     transaction?.metadata?.reportedSymptoms,
     transaction?.metadata?.symptom,
     transaction?.metadata?.symptoms,
+    transaction?.metadata?.problemText,
+    transaction?.metadata?.disease,
+    transaction?.metadata?.diseases,
+    transaction?.metadata?.medical_history,
+    transaction?.metadata?.history,
     transaction?.metadata?.notes?.reported_symptom,
     transaction?.metadata?.notes?.reportedSymptoms,
     transaction?.metadata?.notes?.symptom,
     transaction?.metadata?.notes?.symptoms,
+    transaction?.metadata?.notes?.problemText,
+    transaction?.metadata?.notes?.disease,
+    transaction?.metadata?.notes?.diseases,
+    transaction?.metadata?.notes?.medical_history,
+    transaction?.metadata?.notes?.history,
   ];
 
   return candidates.map(normalizeOptionalText).find(Boolean) || "";
@@ -4741,31 +4760,21 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           </div>
                         </div>
 
-                        {/* <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">
-                            Notes for medical record
-                          </label>
-                          <textarea
-                            value={prescriptionForm.notes}
-                            onChange={updatePrescriptionField("notes")}
-                            rows={2}
-                            placeholder="Reduced appetite, vomiting, lethargy..."
-                            className={`${INPUT_BASE_CLASS} resize-none text-xs`}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">
-                            History snapshot from booking
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            History
                           </label>
                           <textarea
                             value={prescriptionForm.historySnapshot}
                             onChange={updatePrescriptionField("historySnapshot")}
                             rows={2}
-                            placeholder="Owner reported vomiting + low appetite during booking..."
-                            className={`${INPUT_BASE_CLASS} resize-none text-xs`}
+                            placeholder="Pet parent-reported history or concern..."
+                            className={`${INPUT_BASE_CLASS} resize-none border-slate-200 bg-white text-xs focus:border-slate-400 focus:ring-slate-200`}
                           />
-                        </div> */}
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            Prefilled from the pet parent details and editable by the vet.
+                          </p>
+                        </div>
 
                         <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3">
                           <label className="block text-xs font-semibold text-blue-700 mb-1">
@@ -5719,7 +5728,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             </div>
                             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                               <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                History (as reported by pet parent)
+                                History
                               </p>
                               <p className="mt-1 text-sm font-medium text-slate-800">
                                 {historySnapshotLabel}
