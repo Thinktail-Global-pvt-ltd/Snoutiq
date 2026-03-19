@@ -8,6 +8,7 @@ use App\Models\PetDailyCare;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class PetDailyCareController extends Controller
@@ -53,61 +54,56 @@ class PetDailyCareController extends Controller
         }
 
         $careDate = $this->normalizeDate($payload['care_date'] ?? null) ?? Carbon::today()->toDateString();
-        $replaceForDate = filter_var($payload['replace_for_date'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        // `replace_for_date` is accepted for backward compatibility, but this
+        // endpoint now always treats the payload as the full daily state.
+        $records = collect();
 
-        if ($replaceForDate) {
+        DB::transaction(function () use ($payload, $petId, $userId, $careDate, &$records) {
+            // Serialize writes per pet to avoid overlapping save requests.
+            Pet::query()->whereKey($petId)->lockForUpdate()->first();
+
             PetDailyCare::query()
                 ->where('pet_id', $petId)
                 ->where('user_id', $userId)
                 ->whereDate('care_date', $careDate)
                 ->delete();
-        }
 
-        foreach ($payload['items'] as $index => $item) {
-            $title = trim((string) ($item['title'] ?? ''));
-            $scheduledTime = isset($item['scheduled_time']) && $item['scheduled_time'] !== ''
-                ? trim((string) $item['scheduled_time'])
-                : null;
-            $taskKey = isset($item['task_key']) && $item['task_key'] !== ''
-                ? trim((string) $item['task_key'])
-                : null;
-            $isCompleted = $this->toBool($item['is_completed'] ?? false);
-            $completedAt = $isCompleted
-                ? ($this->normalizeDateTime($item['completed_at'] ?? null) ?? now())
-                : null;
+            foreach ($payload['items'] as $index => $item) {
+                $title = trim((string) ($item['title'] ?? ''));
+                $scheduledTime = isset($item['scheduled_time']) && $item['scheduled_time'] !== ''
+                    ? trim((string) $item['scheduled_time'])
+                    : null;
+                $taskKey = isset($item['task_key']) && $item['task_key'] !== ''
+                    ? trim((string) $item['task_key'])
+                    : null;
+                $isCompleted = $this->toBool($item['is_completed'] ?? false);
+                $completedAt = $isCompleted
+                    ? ($this->normalizeDateTime($item['completed_at'] ?? null) ?? now())
+                    : null;
 
-            $lookup = [
-                'pet_id' => $petId,
-                'user_id' => $userId,
-                'care_date' => $careDate,
-            ];
-
-            if ($taskKey !== null) {
-                $lookup['task_key'] = $taskKey;
-            } else {
-                $lookup['title'] = $title;
-                $lookup['scheduled_time'] = $scheduledTime;
+                PetDailyCare::query()->create([
+                    'pet_id' => $petId,
+                    'user_id' => $userId,
+                    'care_date' => $careDate,
+                    'task_key' => $taskKey,
+                    'title' => $title,
+                    'scheduled_time' => $scheduledTime,
+                    'icon' => isset($item['icon']) && $item['icon'] !== '' ? trim((string) $item['icon']) : null,
+                    'is_completed' => $isCompleted,
+                    'completed_at' => $completedAt,
+                    'sort_order' => isset($item['sort_order']) ? (int) $item['sort_order'] : $index,
+                    'notes' => isset($item['notes']) && $item['notes'] !== '' ? trim((string) $item['notes']) : null,
+                ]);
             }
 
-            PetDailyCare::query()->updateOrCreate($lookup, [
-                'task_key' => $taskKey,
-                'title' => $title,
-                'scheduled_time' => $scheduledTime,
-                'icon' => isset($item['icon']) && $item['icon'] !== '' ? trim((string) $item['icon']) : null,
-                'is_completed' => $isCompleted,
-                'completed_at' => $completedAt,
-                'sort_order' => isset($item['sort_order']) ? (int) $item['sort_order'] : $index,
-                'notes' => isset($item['notes']) && $item['notes'] !== '' ? trim((string) $item['notes']) : null,
-            ]);
-        }
-
-        $records = PetDailyCare::query()
-            ->where('pet_id', $petId)
-            ->where('user_id', $userId)
-            ->whereDate('care_date', $careDate)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
+            $records = PetDailyCare::query()
+                ->where('pet_id', $petId)
+                ->where('user_id', $userId)
+                ->whereDate('care_date', $careDate)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get();
+        });
 
         return response()->json([
             'success' => true,
