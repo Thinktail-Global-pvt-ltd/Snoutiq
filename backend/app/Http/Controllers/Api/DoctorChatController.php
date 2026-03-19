@@ -22,12 +22,32 @@ class DoctorChatController extends Controller
         $data = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
+            'channel_name' => ['nullable', 'string', 'max:191'],
+            'channelName' => ['nullable', 'string', 'max:191'],
         ]);
+
+        $channelName = $this->normalizeChannelName(
+            $data['channel_name']
+                ?? $data['channelName']
+                ?? $request->input('channel_name')
+                ?? $request->input('channelName')
+                ?? null
+        );
 
         $room = DoctorChatRoom::firstOrCreate([
             'user_id' => $data['user_id'],
             'doctor_id' => $data['doctor_id'],
         ]);
+
+        if (
+            $channelName !== null
+            && Schema::hasColumn('doctor_chat_rooms', 'channel_name')
+            && trim((string) $room->channel_name) !== $channelName
+        ) {
+            $room->channel_name = $channelName;
+            $room->save();
+            $room->refresh();
+        }
 
         $room->load([
             'user:id,name,email,phone',
@@ -47,6 +67,8 @@ class DoctorChatController extends Controller
         $data = $request->validate([
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'doctor_id' => ['nullable', 'integer', 'exists:doctors,id'],
+            'channel_name' => ['nullable', 'string', 'max:191'],
+            'channelName' => ['nullable', 'string', 'max:191'],
             'actor_type' => ['nullable', 'string'],
             'actor_id' => ['nullable', 'integer', 'min:1'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
@@ -86,6 +108,20 @@ class DoctorChatController extends Controller
             if (!empty($data['doctor_id'])) {
                 $query->where('doctor_id', (int) $data['doctor_id']);
             }
+        }
+
+        $channelNameFilter = $this->normalizeChannelName(
+            $data['channel_name']
+                ?? $data['channelName']
+                ?? $request->query('channel_name')
+                ?? $request->query('channelName')
+                ?? null
+        );
+        if (
+            $channelNameFilter !== null
+            && Schema::hasColumn('doctor_chat_rooms', 'channel_name')
+        ) {
+            $query->where('channel_name', $channelNameFilter);
         }
 
         $hasAnyFilter = !empty($query->getQuery()->wheres);
@@ -503,6 +539,7 @@ class DoctorChatController extends Controller
                 'email' => $room->doctor?->doctor_email,
                 'mobile' => $room->doctor?->doctor_mobile,
             ],
+            'channel_name' => $room->channel_name,
             'last_message_at' => optional($room->last_message_at)->toIso8601String(),
             'last_message' => $room->latestMessage ? $this->formatMessage($room->latestMessage) : null,
             'unread_count' => $unreadCount,
@@ -523,5 +560,19 @@ class DoctorChatController extends Controller
             'created_at' => optional($message->created_at)->toIso8601String(),
             'updated_at' => optional($message->updated_at)->toIso8601String(),
         ];
+    }
+
+    private function normalizeChannelName(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $normalized = trim($value);
+        if ($normalized === '') {
+            return null;
+        }
+
+        return $normalized;
     }
 }

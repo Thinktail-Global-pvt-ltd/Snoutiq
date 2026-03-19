@@ -12,6 +12,7 @@ class DoctorChatRoom extends Model
     protected $fillable = [
         'user_id',
         'doctor_id',
+        'channel_name',
         'last_message_at',
     ];
 
