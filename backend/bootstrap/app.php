@@ -95,7 +95,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         $schedule->command('notifications:pet-vaccination-upcoming-reminders')
-            ->daily()
+            ->everyMinute()
             ->withoutOverlapping();
 
         // Weather fetch every 4 hours
