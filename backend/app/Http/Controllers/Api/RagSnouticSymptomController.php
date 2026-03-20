@@ -100,6 +100,56 @@ class RagSnouticSymptomController extends Controller
         ]);
     }
 
+    /**
+     * GET|POST /api/rag-snoutic-symptom-checker/page-data
+     * Input: pet_id only
+     * Returns: same sections as web page (prefill, form_values, request_payload, error, response_data).
+     */
+    public function pageData(Request $request)
+    {
+        $petId = $this->resolvePetId($request->input('pet_id', $request->query('pet_id')));
+        if ($petId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_id is required',
+            ], 422);
+        }
+
+        $prefillData = $this->symptomService->prefillPayloadByPetId($petId);
+        if (! $prefillData) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found',
+            ], 404);
+        }
+
+        $formValues = $prefillData['payload'];
+        $requestPayload = $this->symptomService->normalizePayload($formValues);
+        $queryResult = $this->symptomService->queryExternal($requestPayload);
+        $responseData = $queryResult['response_data'] ?? null;
+        $error = $queryResult['success'] ? null : ($queryResult['error'] ?? 'Unable to fetch symptom checker data right now.');
+
+        $body = [
+            'success' => $queryResult['success'],
+            'pet_id' => $petId,
+            'data' => [
+                'prefill_pet_id' => $petId,
+                'prefill_data' => [
+                    'pet_id' => $prefillData['pet_id'],
+                    'pet' => $prefillData['pet'],
+                    'vaccination' => $prefillData['vaccination'],
+                ],
+                'form_values' => $formValues,
+                'request_payload' => $requestPayload,
+                'error' => $error,
+                'response_data' => $responseData,
+                'symptom_data' => data_get($responseData, 'data', []),
+            ],
+        ];
+
+        return response()->json($body, $queryResult['success'] ? 200 : 502);
+    }
+
     private function resolvePetId($raw): int
     {
         return is_numeric($raw) ? (int) $raw : 0;
