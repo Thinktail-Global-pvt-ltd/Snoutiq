@@ -562,12 +562,39 @@ public function pet_update(Request $request, $id)
                 'pet_age_months',
                 'pet_dob',
                 'dob',
+                'pet_doc1',
+                'pic_link',
             ], fn ($column) => in_array($column, $petColumns, true)));
 
             $pets = Pet::query()
                 ->where('user_id', $user->id)
                 ->orderByDesc('id')
                 ->get($petSelectColumns);
+        }
+
+        $petBlobUrlById = collect();
+        $petBlobColumnsReady = $hasPetsTable
+            && Schema::hasColumn('pets', 'pet_doc2_blob')
+            && Schema::hasColumn('pets', 'pet_doc2_mime');
+        if ($petBlobColumnsReady && $pets->isNotEmpty()) {
+            $petIds = $pets->pluck('id')
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            if ($petIds->isNotEmpty()) {
+                $blobPetIds = DB::table('pets')
+                    ->whereIn('id', $petIds->all())
+                    ->whereNotNull('pet_doc2_blob')
+                    ->where('pet_doc2_blob', '!=', '')
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values();
+
+                $petBlobUrlById = $blobPetIds->mapWithKeys(
+                    fn (int $id) => [$id => route('api.pets.pet-doc2-blob', ['pet' => $id], true)]
+                );
+            }
         }
 
         $fields = [
@@ -684,10 +711,13 @@ public function pet_update(Request $request, $id)
         $petDobValue = $pet?->pet_dob ?? $pet?->dob ?? $legacyUserPet?->pet_dob ?? $legacyUserPet?->dob ?? null;
         $petDob = $this->normalizeDateString($petDobValue);
 
-        $petsPayload = $pets->map(function (Pet $item) {
+        $petsPayload = $pets->map(function (Pet $item) use ($petBlobUrlById) {
             $petDobValue = $item->pet_dob ?? $item->dob ?? null;
             $petDob = $this->normalizeDateString($petDobValue);
             $derivedAgeYears = $this->deriveAgeYearsFromDob($petDob);
+            $blobUrl = $item->id ? $petBlobUrlById->get((int) $item->id) : null;
+            $petDoc1Url = $this->normalizePetImageUrl($item->pet_doc1 ?? null);
+            $picLinkUrl = $this->normalizePetImageUrl($item->pic_link ?? null);
 
             return [
                 'id' => $item->id,
@@ -698,6 +728,8 @@ public function pet_update(Request $request, $id)
                 'pet_age' => $item->pet_age ?? $derivedAgeYears,
                 'pet_age_months' => $item->pet_age_months,
                 'pet_dob' => $petDob,
+                'pet_doc2_blob_url' => $blobUrl,
+                'pet_image_url' => $blobUrl ?? $petDoc1Url ?? $picLinkUrl,
             ];
         })->values();
 
@@ -714,6 +746,8 @@ public function pet_update(Request $request, $id)
                 'pet_age' => $legacyUserPet->pet_age ?? $legacyDerivedAge,
                 'pet_age_months' => $legacyUserPet->pet_age_months ?? null,
                 'pet_dob' => $legacyDob,
+                'pet_doc2_blob_url' => null,
+                'pet_image_url' => $this->normalizePetImageUrl($legacyUserPet->pet_doc1 ?? $legacyUserPet->pic_link ?? null),
             ]]);
         } elseif ($petsPayload->isEmpty() && $legacyPetHasData) {
             $petsPayload = collect([[
@@ -725,14 +759,25 @@ public function pet_update(Request $request, $id)
                 'pet_age' => $user->pet_age ?? null,
                 'pet_age_months' => null,
                 'pet_dob' => null,
+                'pet_doc2_blob_url' => null,
+                'pet_image_url' => $this->normalizePetImageUrl($user->pet_doc1 ?? null),
             ]]);
         }
+
+        $selectedPetId = (int) ($pet?->id ?? $legacyUserPet?->id ?? 0);
+        $selectedPetBlobUrl = $selectedPetId > 0 ? $petBlobUrlById->get($selectedPetId) : null;
+        $selectedPetImageUrl = $selectedPetBlobUrl
+            ?? $this->normalizePetImageUrl($pet?->pet_doc1 ?? $pet?->pic_link ?? null)
+            ?? $this->normalizePetImageUrl($legacyUserPet?->pet_doc1 ?? $legacyUserPet?->pic_link ?? null)
+            ?? $this->normalizePetImageUrl($user->pet_doc1 ?? null);
 
         return response()->json([
             'success' => true,
             'data' => [
                 'user_id' => $user->id,
                 'pet_id' => $pet?->id ?? $legacyUserPet?->id,
+                'pet_doc2_blob_url' => $selectedPetBlobUrl,
+                'pet_image_url' => $selectedPetImageUrl,
                 'pet_dob' => $petDob,
                 'fields_total' => $fieldsTotal,
                 'fields_filled' => $fieldsFilled,
@@ -791,5 +836,23 @@ public function pet_update(Request $request, $id)
         } catch (\Throwable $e) {
             return trim((string) $value) ?: null;
         }
+    }
+
+    private function normalizePetImageUrl($value): ?string
+    {
+        if (!$this->profileValueFilled($value)) {
+            return null;
+        }
+
+        $path = trim((string) $value);
+        if ($path === '') {
+            return null;
+        }
+
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            return $path;
+        }
+
+        return url($path);
     }
 }
