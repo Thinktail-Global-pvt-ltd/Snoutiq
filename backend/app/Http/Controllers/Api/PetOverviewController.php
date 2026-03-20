@@ -201,8 +201,8 @@ class PetOverviewController extends Controller
 
     /**
      * POST /api/pets/deworming-vaccination
-     * Input: pet_id, last_deworming_date, vaccination_json (or vaccinations_json / vaccination)
-     * Saves: last_deworming_date, next_deworming_date, dog_disease_payload.vaccination
+     * Input: pet_id, deworming_yes_no, last_deworming_date, vaccination_json (or vaccinations_json / vaccination)
+     * Saves: deworming_yes_no, last_deworming_date, next_deworming_date, dog_disease_payload.vaccination
      */
     public function updateDewormingVaccination(Request $request)
     {
@@ -235,6 +235,26 @@ class PetOverviewController extends Controller
             }
         }
 
+        $hasDewormingYesNoInput = $request->exists('deworming_yes_no') || $request->exists('deworming');
+        $normalizedDewormingYesNo = null;
+        if ($hasDewormingYesNoInput) {
+            $rawDewormingYesNo = $request->input('deworming_yes_no', $request->input('deworming'));
+            if ($rawDewormingYesNo === null || trim((string) $rawDewormingYesNo) === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'deworming_yes_no must be boolean-like (true/false/1/0/Y/N)',
+                ], 422);
+            }
+
+            $normalizedDewormingYesNo = $this->normalizeYesNoFlag($rawDewormingYesNo);
+            if ($normalizedDewormingYesNo === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'deworming_yes_no must be boolean-like (true/false/1/0/Y/N)',
+                ], 422);
+            }
+        }
+
         [$hasVaccinationInput, $vaccinationPayload, $vaccinationError] = $this->extractVaccinationPayloadFromRequest($request);
         if ($vaccinationError !== null) {
             return response()->json([
@@ -242,10 +262,10 @@ class PetOverviewController extends Controller
                 'message' => $vaccinationError,
             ], 422);
         }
-        if (! $hasVaccinationInput && ! $hasLastDewormingInput) {
+        if (! $hasVaccinationInput && ! $hasLastDewormingInput && ! $hasDewormingYesNoInput) {
             return response()->json([
                 'success' => false,
-                'message' => 'Provide at least one field: last_deworming_date or vaccination_json',
+                'message' => 'Provide at least one field: deworming_yes_no, last_deworming_date or vaccination_json',
             ], 422);
         }
 
@@ -266,6 +286,12 @@ class PetOverviewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'pets.last_deworming_date column is missing',
+            ], 500);
+        }
+        if ($hasDewormingYesNoInput && ! Schema::hasColumn('pets', 'deworming_yes_no')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets.deworming_yes_no column is missing',
             ], 500);
         }
 
@@ -322,6 +348,9 @@ class PetOverviewController extends Controller
                 $updates['deworming_status'] = $dewormingSchedule['deworming_status'];
             }
         }
+        if ($hasDewormingYesNoInput && Schema::hasColumn('pets', 'deworming_yes_no')) {
+            $updates['deworming_yes_no'] = $normalizedDewormingYesNo;
+        }
 
         if (Schema::hasColumn('pets', 'updated_at')) {
             $updates['updated_at'] = now();
@@ -334,6 +363,7 @@ class PetOverviewController extends Controller
             'data' => [
                 'pet_id' => $petId,
                 'updated_fields' => array_values(array_diff(array_keys($updates), ['updated_at'])),
+                'deworming_yes_no' => $hasDewormingYesNoInput ? $normalizedDewormingYesNo : null,
                 'last_deworming_date' => $hasLastDewormingInput ? $normalizedLastDewormingDate : null,
                 'next_deworming_date' => $hasLastDewormingInput ? ($dewormingSchedule['next_deworming_date'] ?? null) : null,
                 'deworming_status' => $hasLastDewormingInput ? ($dewormingSchedule['deworming_status'] ?? null) : null,
