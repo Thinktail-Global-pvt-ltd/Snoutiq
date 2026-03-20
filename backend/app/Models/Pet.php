@@ -39,6 +39,9 @@ class Pet extends Model
         'next_deworming_date',
         'vaccination_date',
         'vaccine_reminder_status',
+        'neutering_reminder_sent_at',
+        'vaccination_upcoming_reminder_sent_at',
+        'vaccination_upcoming_reminder_due_date',
         'dog_disease_payload',
         'medical_history',
         'vaccination_log',
@@ -56,6 +59,9 @@ class Pet extends Model
         'next_deworming_date' => 'date',
         'vaccination_date' => 'date',
         'vaccine_reminder_status' => 'array',
+        'neutering_reminder_sent_at' => 'datetime',
+        'vaccination_upcoming_reminder_sent_at' => 'datetime',
+        'vaccination_upcoming_reminder_due_date' => 'date',
         'dog_disease_payload' => 'array',
     ];
 
