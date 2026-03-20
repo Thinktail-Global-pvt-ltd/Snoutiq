@@ -342,6 +342,123 @@ class PetOverviewController extends Controller
         ]);
     }
 
+    /**
+     * POST /api/pets/neutered-status
+     * Input: pet_id, is_nuitered (or is_nuetered / is_neutered)
+     * Updates neutered status in available column(s): is_nuetered and/or is_neutered.
+     */
+    public function updateNeuteredStatus(Request $request)
+    {
+        $rawPetId = $request->input('pet_id', $request->query('pet_id'));
+        $petId = is_numeric($rawPetId) ? (int) $rawPetId : 0;
+        if ($petId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_id is required',
+            ], 422);
+        }
+
+        $hasNeuteredInput = $request->exists('is_nuitered')
+            || $request->exists('is_nuetered')
+            || $request->exists('is_neutered');
+        if (! $hasNeuteredInput) {
+            return response()->json([
+                'success' => false,
+                'message' => 'is_nuitered is required',
+            ], 422);
+        }
+
+        $rawNeutered = $request->input(
+            'is_nuitered',
+            $request->input('is_nuetered', $request->input('is_neutered'))
+        );
+        $normalizedNeutered = $this->normalizeYesNoFlag($rawNeutered);
+        if ($normalizedNeutered === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'is_nuitered must be boolean-like (true/false/1/0/Y/N)',
+            ], 422);
+        }
+
+        if (! Schema::hasTable('pets')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets table is missing',
+            ], 500);
+        }
+
+        $hasIsNueteredColumn = Schema::hasColumn('pets', 'is_nuetered');
+        $hasIsNeuteredColumn = Schema::hasColumn('pets', 'is_neutered');
+        if (! $hasIsNueteredColumn && ! $hasIsNeuteredColumn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Neither is_nuetered nor is_neutered column exists on pets table',
+            ], 500);
+        }
+
+        $selectColumns = ['id'];
+        if ($hasIsNueteredColumn) {
+            $selectColumns[] = 'is_nuetered';
+        }
+        if ($hasIsNeuteredColumn) {
+            $selectColumns[] = 'is_neutered';
+        }
+
+        $pet = DB::table('pets')
+            ->select($selectColumns)
+            ->where('id', $petId)
+            ->first();
+        if (! $pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found',
+            ], 404);
+        }
+
+        $updates = [];
+        if ($hasIsNueteredColumn) {
+            $updates['is_nuetered'] = $this->neuteredValueForColumn('is_nuetered', $normalizedNeutered);
+        }
+        if ($hasIsNeuteredColumn) {
+            $updates['is_neutered'] = $this->neuteredValueForColumn('is_neutered', $normalizedNeutered);
+        }
+        if (Schema::hasColumn('pets', 'updated_at')) {
+            $updates['updated_at'] = now();
+        }
+
+        DB::table('pets')->where('id', $petId)->update($updates);
+
+        $updatedPet = DB::table('pets')
+            ->select($selectColumns)
+            ->where('id', $petId)
+            ->first();
+
+        $isNueteredRaw = property_exists($updatedPet, 'is_nuetered')
+            ? $updatedPet->is_nuetered
+            : null;
+        $isNeuteredRaw = property_exists($updatedPet, 'is_neutered')
+            ? $updatedPet->is_neutered
+            : null;
+        $normalizedCurrentValue = $this->normalizeYesNoFlag(
+            $isNueteredRaw !== null ? $isNueteredRaw : $isNeuteredRaw
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'pet_id' => $petId,
+                'is_nuitered' => $normalizedCurrentValue,
+                'is_nuetered' => $normalizedCurrentValue,
+                'is_neutered' => $normalizedCurrentValue,
+                'stored_values' => [
+                    'is_nuetered' => $isNueteredRaw,
+                    'is_neutered' => $isNeuteredRaw,
+                ],
+                'updated_fields' => array_values(array_diff(array_keys($updates), ['updated_at'])),
+            ],
+        ]);
+    }
+
     private function normalizeDateOnly($value): ?string
     {
         if ($value === null || $value === '') {
@@ -489,6 +606,49 @@ class PetOverviewController extends Controller
         }
 
         return null;
+    }
+
+    private function neuteredValueForColumn(string $column, int $value)
+    {
+        if ($this->petColumnUsesEnumStyle($column)) {
+            return $value === 1 ? 'Y' : 'N';
+        }
+
+        return $value === 1 ? 1 : 0;
+    }
+
+    private function petColumnUsesEnumStyle(string $column): bool
+    {
+        if (! Schema::hasTable('pets') || ! Schema::hasColumn('pets', $column)) {
+            return false;
+        }
+
+        $columnType = null;
+        try {
+            $columnType = Schema::getColumnType('pets', $column);
+        } catch (\Throwable $e) {
+            $columnType = null;
+        }
+
+        $columnTypeNormalized = strtolower(trim((string) $columnType));
+        if (str_contains($columnTypeNormalized, 'enum')
+            || in_array($columnTypeNormalized, ['string', 'char', 'varchar'], true)) {
+            return true;
+        }
+
+        if ($columnTypeNormalized === '' || $columnTypeNormalized === 'unknown') {
+            try {
+                $columnMeta = DB::selectOne("SHOW COLUMNS FROM `pets` LIKE ?", [$column]);
+                $rawType = strtolower((string) ($columnMeta->Type ?? $columnMeta->type ?? ''));
+                if (str_contains($rawType, 'enum(')) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // Use non-enum fallback when metadata lookup fails.
+            }
+        }
+
+        return false;
     }
 
     private function fetchDailyCare(int $petId, ?string $careDate = null): ?array

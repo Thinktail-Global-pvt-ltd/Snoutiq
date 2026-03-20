@@ -2462,6 +2462,7 @@ Route::post('/users/{userId}/pets', [AdminController::class, 'addPet']);
 Route::get('/pets/check/vaccination-deworming-null', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationDewormingNullStatus']);
 Route::post('/pets/check/vaccination-deworming-null', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationDewormingNullStatus']);
 Route::post('/pets/deworming-vaccination', [\App\Http\Controllers\Api\PetOverviewController::class, 'updateDewormingVaccination']);
+Route::post('/pets/neutered-status', [\App\Http\Controllers\Api\PetOverviewController::class, 'updateNeuteredStatus']);
 Route::get('/rag-snoutic-symptom-checker/prefill', [RagSnouticSymptomController::class, 'prefill']);
 Route::post('/rag-snoutic-symptom-checker/query', [RagSnouticSymptomController::class, 'query']);
 Route::match(['get', 'post'], '/rag-snoutic-symptom-checker/page-data', [RagSnouticSymptomController::class, 'pageData']);
