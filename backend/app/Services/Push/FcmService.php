@@ -5,6 +5,7 @@ namespace App\Services\Push;
 use App\Models\DeviceToken;
 use App\Models\FcmNotification;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
@@ -25,6 +26,7 @@ class FcmService
     private const TARGET_TOPIC = 'topic';
 
     private static ?bool $notificationTableExists = null;
+    private static ?bool $notificationCallSessionColumnExists = null;
 
     public function __construct(private readonly Messaging $messaging)
     {
@@ -768,7 +770,7 @@ class FcmService
         }
 
         try {
-            FcmNotification::query()->create([
+            $logPayload = [
                 'status' => $this->truncate((string) ($attributes['status'] ?? ''), 20),
                 'target_type' => $this->truncate((string) ($attributes['target_type'] ?? ''), 32),
                 'notification_type' => $this->truncate(
@@ -799,7 +801,13 @@ class FcmService
                 'request_payload' => is_array($attributes['request_payload'] ?? null) ? $attributes['request_payload'] : null,
                 'response_payload' => is_array($attributes['response_payload'] ?? null) ? $attributes['response_payload'] : null,
                 'sent_at' => $attributes['sent_at'] ?? null,
-            ]);
+            ];
+
+            if ($this->supportsCallSessionColumn()) {
+                $logPayload['call_session'] = $this->resolveCallSessionForFollowUp($attributes);
+            }
+
+            FcmNotification::query()->create($logPayload);
         } catch (Throwable $e) {
             if ($this->isMissingTableError($e)) {
                 self::$notificationTableExists = false;
@@ -812,6 +820,58 @@ class FcmService
                 'target_type' => $attributes['target_type'] ?? null,
             ]);
         }
+    }
+
+    private function supportsCallSessionColumn(): bool
+    {
+        if (self::$notificationCallSessionColumnExists === null) {
+            self::$notificationCallSessionColumnExists = Schema::hasTable('fcm_notifications')
+                && Schema::hasColumn('fcm_notifications', 'call_session');
+        }
+
+        return self::$notificationCallSessionColumnExists;
+    }
+
+    /**
+     * @param array<string,mixed> $attributes
+     */
+    private function resolveCallSessionForFollowUp(array $attributes): ?string
+    {
+        $notificationType = strtolower(trim((string) ($attributes['notification_type'] ?? '')));
+        if ($notificationType === '') {
+            return null;
+        }
+
+        $isFollowUpNotification = str_contains($notificationType, 'follow_up')
+            || str_contains($notificationType, 'followup');
+
+        if (!$isFollowUpNotification) {
+            return null;
+        }
+
+        $callSession = $this->stringifyValue($attributes['call_session'] ?? null, 255);
+        if ($callSession !== null && trim($callSession) !== '') {
+            return $this->truncate($callSession, 255);
+        }
+
+        $dataPayload = is_array($attributes['data_payload'] ?? null) ? $attributes['data_payload'] : [];
+        $candidates = [
+            $dataPayload['call_session'] ?? null,
+            $dataPayload['callSession'] ?? null,
+            $dataPayload['call_session_id'] ?? null,
+            $dataPayload['callSessionId'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $normalized = $this->stringifyValue($candidate, 255);
+            if ($normalized === null || trim($normalized) === '') {
+                continue;
+            }
+
+            return $this->truncate($normalized, 255);
+        }
+
+        return null;
     }
 
     private function isMissingTableError(Throwable $e): bool

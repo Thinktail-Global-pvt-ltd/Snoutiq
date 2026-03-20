@@ -23,6 +23,7 @@ class FcmNotification extends Model
         'to_topic',
         'device_token_id',
         'user_id',
+        'call_session',
         'owner_model',
         'title',
         'notification_text',

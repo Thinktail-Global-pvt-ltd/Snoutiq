@@ -42,6 +42,7 @@ class LogTodayPrescriptionFollowUps extends Command
                 'user_id',
                 'pet_id',
                 'medical_record_id',
+                'call_session',
                 'follow_up_date',
                 'follow_up_notification_sent_at',
             ]);
@@ -171,6 +172,11 @@ class LogTodayPrescriptionFollowUps extends Command
             'pet_id' => (string) ($prescription->pet_id ?? ''),
             'follow_up_date' => (string) optional($prescription->follow_up_date)->toDateString(),
         ];
+
+        $callSession = trim((string) ($prescription->call_session ?? ''));
+        if ($callSession !== '') {
+            $data['call_session'] = $callSession;
+        }
 
         $successCount = 0;
         $failureCount = 0;
