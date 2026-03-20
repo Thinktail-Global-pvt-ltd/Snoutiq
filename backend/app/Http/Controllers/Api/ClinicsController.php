@@ -206,14 +206,51 @@ class ClinicsController extends Controller
             ->where('user_id', '>', 0)
             ->groupBy('user_id');
 
+        $patientIdSources = DB::table('transactions')
+            ->select('user_id')
+            ->where('clinic_id', $clinicId)
+            ->whereNotNull('user_id')
+            ->where('user_id', '>', 0);
+
+        if (Schema::hasColumn('users', 'last_vet_is')) {
+            $patientIdSources = $patientIdSources->union(
+                DB::table('users')
+                    ->select('id as user_id')
+                    ->whereNotNull('last_vet_is')
+                    ->where('last_vet_is', '<>', '')
+                    ->where(function ($query) use ($clinicId) {
+                        $query->where('last_vet_is', $clinicId)
+                            ->orWhere('last_vet_is', (string) $clinicId);
+                    })
+            );
+        }
+
+        if (Schema::hasColumn('users', 'last_vet_id')) {
+            $patientIdSources = $patientIdSources->union(
+                DB::table('users')
+                    ->select('id as user_id')
+                    ->where('last_vet_id', $clinicId)
+            );
+        }
+
+        $patientIds = DB::query()
+            ->fromSub($patientIdSources, 'patient_sources')
+            ->select('user_id')
+            ->whereNotNull('user_id')
+            ->groupBy('user_id');
+
         $patients = DB::table('users as u')
-            ->joinSub($transactionStats, 'tx', function ($join) {
+            ->joinSub($patientIds, 'pids', function ($join) {
+                $join->on('pids.user_id', '=', 'u.id');
+            })
+            ->leftJoinSub($transactionStats, 'tx', function ($join) {
                 $join->on('tx.user_id', '=', 'u.id');
             })
             ->leftJoinSub($recordStats, 'mr', function ($join) {
                 $join->on('mr.user_id', '=', 'u.id');
             })
             ->orderByDesc('tx.last_transaction_at')
+            ->orderByDesc('u.updated_at')
             ->limit(500)
             ->select(
                 'u.id',
