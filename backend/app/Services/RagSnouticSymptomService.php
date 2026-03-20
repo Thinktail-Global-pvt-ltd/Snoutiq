@@ -70,10 +70,18 @@ class RagSnouticSymptomService
     public function normalizePayload(array $payload): array
     {
         $normalized = [];
-        foreach ($this->defaultPayload() as $key => $_) {
+        $defaults = $this->defaultPayload();
+
+        foreach ($defaults as $key => $_) {
             $value = Arr::get($payload, $key);
             $normalized[$key] = is_string($value) ? trim($value) : $value;
         }
+
+        $normalizedQuery = $this->normalizeQuery($normalized['query'] ?? null);
+        if ($normalizedQuery === null) {
+            $normalizedQuery = $defaults['query'];
+        }
+        $normalized['query'] = $normalizedQuery;
 
         return $normalized;
     }
@@ -88,11 +96,16 @@ class RagSnouticSymptomService
             $responseData = $response->json();
 
             if (! $response->successful()) {
+                $errorMessage = null;
+                if (is_array($responseData)) {
+                    $errorMessage = $responseData['error'] ?? $responseData['message'] ?? null;
+                }
+
                 return [
                     'success' => false,
                     'status' => $response->status(),
                     'response_data' => $responseData,
-                    'error' => 'Unable to fetch symptom checker data right now.',
+                    'error' => $this->cleanText($errorMessage) ?? 'Unable to fetch symptom checker data right now.',
                 ];
             }
 
@@ -157,7 +170,7 @@ class RagSnouticSymptomService
         ]);
 
         $payload['query'] = $this->firstNonEmptyString([
-            $this->cleanText($pet->reported_symptom ?? null),
+            $this->normalizeQuery($pet->reported_symptom ?? null),
             $payload['query'],
         ]);
 
@@ -435,5 +448,15 @@ class RagSnouticSymptomService
         $text = trim((string) $value);
 
         return $text === '' ? null : $text;
+    }
+
+    private function normalizeQuery($value): ?string
+    {
+        $query = $this->cleanText($value);
+        if ($query === null) {
+            return null;
+        }
+
+        return mb_strlen($query) >= 10 ? $query : null;
     }
 }
