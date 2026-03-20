@@ -89,9 +89,9 @@ return Application::configure(basePath: dirname(__DIR__))
             ->everyMinute()
             ->withoutOverlapping();
 
-        // Pet reminders (daily)
+        // Pet reminders
         $schedule->command('notifications:pet-neutering-reminders')
-            ->daily()
+            ->everyMinute()
             ->withoutOverlapping();
 
         $schedule->command('notifications:pet-vaccination-upcoming-reminders')

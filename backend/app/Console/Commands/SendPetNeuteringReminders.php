@@ -14,7 +14,7 @@ class SendPetNeuteringReminders extends Command
 {
     protected $signature = 'notifications:pet-neutering-reminders {--pet_id=}';
 
-    protected $description = 'Send daily FCM reminders for pets marked as not neutered.';
+    protected $description = 'Send FCM reminders for pets marked as not neutered.';
 
     public function __construct(private readonly FcmService $fcm)
     {
@@ -24,18 +24,27 @@ class SendPetNeuteringReminders extends Command
     public function handle(): int
     {
         if (! Schema::hasTable('pets')) {
+            Log::error('pets.neutering_reminder.config_error', [
+                'message' => 'Missing table: pets',
+            ]);
             $this->error('Missing table: pets');
 
             return self::FAILURE;
         }
 
         if (! Schema::hasColumn('pets', 'user_id')) {
+            Log::error('pets.neutering_reminder.config_error', [
+                'message' => 'Missing column: pets.user_id',
+            ]);
             $this->error('Missing column: pets.user_id');
 
             return self::FAILURE;
         }
 
         if (! Schema::hasColumn('pets', 'neutering_reminder_sent_at')) {
+            Log::error('pets.neutering_reminder.config_error', [
+                'message' => 'Missing column: pets.neutering_reminder_sent_at',
+            ]);
             $this->error('Missing column: pets.neutering_reminder_sent_at. Run migrations first.');
 
             return self::FAILURE;
@@ -43,6 +52,9 @@ class SendPetNeuteringReminders extends Command
 
         $neuteredColumn = $this->resolveNeuteredColumn();
         if ($neuteredColumn === null) {
+            Log::error('pets.neutering_reminder.config_error', [
+                'message' => 'Missing column: pets.is_neutered (or pets.is_nuetered)',
+            ]);
             $this->error('Missing column: pets.is_neutered (or pets.is_nuetered)');
 
             return self::FAILURE;
@@ -81,6 +93,10 @@ class SendPetNeuteringReminders extends Command
         ]);
 
         if ($totalCandidates === 0) {
+            Log::info('pets.neutering_reminder.no_candidates', [
+                'date' => $today,
+                'forced_pet_id' => $forcedPetId ? (int) $forcedPetId : null,
+            ]);
             $this->info('No pets pending neutering reminders.');
 
             return self::SUCCESS;
