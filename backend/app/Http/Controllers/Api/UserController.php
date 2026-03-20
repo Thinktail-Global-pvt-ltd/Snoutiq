@@ -586,7 +586,7 @@ public function pet_update(Request $request, $id)
                 $blobPetIds = DB::table('pets')
                     ->whereIn('id', $petIds->all())
                     ->whereNotNull('pet_doc2_blob')
-                    ->where('pet_doc2_blob', '!=', '')
+                    ->whereRaw('LENGTH(pet_doc2_blob) > 0')
                     ->pluck('id')
                     ->map(fn ($id) => (int) $id)
                     ->values();
@@ -765,7 +765,21 @@ public function pet_update(Request $request, $id)
         }
 
         $selectedPetId = (int) ($pet?->id ?? $legacyUserPet?->id ?? 0);
-        $selectedPetBlobUrl = $selectedPetId > 0 ? $petBlobUrlById->get($selectedPetId) : null;
+        $selectedPetBlobUrl = null;
+        if ($selectedPetId > 0 && $petBlobColumnsReady) {
+            $selectedPetBlobUrl = $petBlobUrlById->get($selectedPetId);
+            if (!$selectedPetBlobUrl) {
+                $hasSelectedPetBlob = DB::table('pets')
+                    ->where('id', $selectedPetId)
+                    ->whereNotNull('pet_doc2_blob')
+                    ->whereRaw('LENGTH(pet_doc2_blob) > 0')
+                    ->exists();
+                if ($hasSelectedPetBlob) {
+                    $selectedPetBlobUrl = route('api.pets.pet-doc2-blob', ['pet' => $selectedPetId], true);
+                }
+            }
+        }
+
         $selectedPetImageUrl = $selectedPetBlobUrl
             ?? $this->normalizePetImageUrl($pet?->pet_doc1 ?? $pet?->pic_link ?? null)
             ?? $this->normalizePetImageUrl($legacyUserPet?->pet_doc1 ?? $legacyUserPet?->pic_link ?? null)
