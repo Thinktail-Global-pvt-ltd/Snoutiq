@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
 import { PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
@@ -236,6 +237,8 @@ const DEFAULT_PRIMARY_PAYMENT_VET = {
 };
 
 const DOCTOR_LIST_ENDPOINT = "/api/exported_from_excell_doctors";
+const PET_FORM_SUBMIT_TAG_ID = "AW-107928384221313";
+const PET_FORM_SUBMIT_EVENT_NAME = "pet_form_submit";
 
 const getAssetRoot = () => {
   const base = apiBaseUrl().replace(/\/+$/, "");
@@ -839,6 +842,9 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     (!showBreed || details.breed) &&
     (!isExotic || details.exoticType.trim().length > 0) &&
     details.problemText.trim().length > 10 &&
+    details.lastDaysEnergy &&
+    details.lastDaysAppetite &&
+    details.mood &&
     details.isNeutered !== "" &&
     details.vaccinatedYesNo !== "" &&
     details.dewormingYesNo !== "" &&
@@ -859,6 +865,9 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     if (!details.petDob) return "Please select pet's date of birth";
     if (details.problemText.trim().length <= 10)
       return "Please describe the problem in detail (minimum 10 characters)";
+    if (!details.lastDaysEnergy) return "Please select energy level";
+    if (!details.lastDaysAppetite) return "Please select appetite";
+    if (!details.mood) return "Please select mood";
     if (details.isNeutered === "") return "Please select neutered status";
     if (details.vaccinatedYesNo === "") return "Please select vaccination status";
     if (details.dewormingYesNo === "") return "Please select deworming status";
@@ -867,6 +876,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
   };
 
   const submitObservation = async () => {
+    if (!isValid || submitting) return;
     setSubmitError("");
     setSubmitting(true);
 
@@ -993,6 +1003,20 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmitClick = () => {
+    if (typeof window !== "undefined") {
+      if (typeof window.gtagSendEvent === "function") {
+        window.gtagSendEvent();
+      } else if (typeof window.gtag === "function") {
+        window.gtag("event", PET_FORM_SUBMIT_EVENT_NAME, {
+          event_timeout: 2000,
+        });
+      }
+    }
+
+    submitObservation();
   };
 
   useEffect(() => {
@@ -1140,7 +1164,29 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
       : null;
 
   return (
-    <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
+    <>
+      <Helmet>
+        <script>
+          {`
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
+            window.gtag("config", "${PET_FORM_SUBMIT_TAG_ID}");
+            window.gtagSendEvent = function(url) {
+              var callback = function () {
+                if (typeof url === "string") {
+                  window.location = url;
+                }
+              };
+              window.gtag("event", "${PET_FORM_SUBMIT_EVENT_NAME}", {
+                event_callback: callback,
+                event_timeout: 2000
+              });
+              return false;
+            };
+          `}
+        </script>
+      </Helmet>
+      <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
       <div className="sticky top-0 z-40 border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-3 text-center md:px-6">
           <div className="text-base font-semibold text-gray-900 md:text-lg">
@@ -1806,7 +1852,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                       <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Energy Level
+                            Energy Level <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <Activity
@@ -1836,7 +1882,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Appetite
+                            Appetite <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <Coffee
@@ -1866,7 +1912,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Mood
+                            Mood <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <Heart
@@ -2130,7 +2176,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
                   <Button
-                    onClick={submitObservation}
+                    onClick={handleSubmitClick}
                     disabled={!isValid || submitting}
                     title={!isValid ? getSubmitTooltip() : undefined}
                     className={`w-full text-base font-semibold md:py-4 md:rounded-xl ${
@@ -2470,7 +2516,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 safe-area-pb max-w-md mx-auto z-20 md:hidden shadow-lg">
         <div className="space-y-2">
           <Button
-            onClick={submitObservation}
+            onClick={handleSubmitClick}
             fullWidth
             disabled={!isValid || submitting}
             className={
@@ -2488,7 +2534,8 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
