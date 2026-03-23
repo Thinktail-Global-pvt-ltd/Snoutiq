@@ -465,25 +465,53 @@ class AdminPanelController extends Controller
             // 2) Follow-up notifications: fcm_notifications.call_session = prescriptions.call_session.
             if ($supportsFollowUpNotificationJoin && $videoFollowUpLeads->isNotEmpty()) {
                 $followUpSessionToUserIds = [];
+                $followUpLeadUserIds = [];
+                $normalizeSessionKey = static fn ($value): string => strtolower(trim((string) $value));
+                $isFollowUpNotificationType = static function (string $type): bool {
+                    $type = strtolower(trim($type));
+                    if ($type === '') {
+                        return false;
+                    }
+
+                    return str_contains($type, 'follow_up')
+                        || str_contains($type, 'follow-up')
+                        || str_contains($type, 'followup');
+                };
 
                 foreach ($videoFollowUpLeads as $followUpLead) {
-                    $sessionKey = trim((string) ($followUpLead->getAttribute('lead_call_session') ?? ''));
                     $userId = is_numeric($followUpLead->user_id) ? (int) $followUpLead->user_id : 0;
-
-                    if ($sessionKey === '' || $userId <= 0) {
+                    if ($userId <= 0) {
                         continue;
                     }
 
-                    if (!isset($followUpSessionToUserIds[$sessionKey])) {
-                        $followUpSessionToUserIds[$sessionKey] = [];
+                    $followUpLeadUserIds[$userId] = true;
+
+                    $sessionCandidates = [
+                        $followUpLead->getAttribute('lead_call_session'),
+                        $followUpLead->getAttribute('channel_name'),
+                    ];
+
+                    if (is_string($transactionSessionColumn) && $transactionSessionColumn !== 'channel_name') {
+                        $sessionCandidates[] = $followUpLead->getAttribute($transactionSessionColumn);
                     }
 
-                    $followUpSessionToUserIds[$sessionKey][$userId] = true;
+                    foreach ($sessionCandidates as $sessionCandidate) {
+                        $sessionKey = $normalizeSessionKey($sessionCandidate);
+                        if ($sessionKey === '') {
+                            continue;
+                        }
+
+                        if (!isset($followUpSessionToUserIds[$sessionKey])) {
+                            $followUpSessionToUserIds[$sessionKey] = [];
+                        }
+
+                        $followUpSessionToUserIds[$sessionKey][$userId] = true;
+                    }
                 }
 
-                if (!empty($followUpSessionToUserIds)) {
+                if (!empty($followUpLeadUserIds)) {
                     $fcmFollowUpQuery = FcmNotification::query()
-                        ->select(['id', 'call_session']);
+                        ->select(['id', 'user_id', 'call_session']);
 
                     if ($supportsNeuteringNotificationJoin) {
                         $fcmFollowUpQuery->addSelect('data_payload');
@@ -502,16 +530,11 @@ class AdminPanelController extends Controller
                     }
 
                     $fcmFollowUpRows = $fcmFollowUpQuery
-                        ->whereIn('call_session', array_keys($followUpSessionToUserIds))
+                        ->whereIn('user_id', array_keys($followUpLeadUserIds))
                         ->orderByDesc('id')
                         ->get();
 
                     foreach ($fcmFollowUpRows as $fcmRow) {
-                        $sessionKey = trim((string) ($fcmRow->call_session ?? ''));
-                        if ($sessionKey === '' || !isset($followUpSessionToUserIds[$sessionKey])) {
-                            continue;
-                        }
-
                         if (!$isDeliveredNotification($fcmRow)) {
                             continue;
                         }
@@ -520,10 +543,39 @@ class AdminPanelController extends Controller
                             ? $fcmRow->data_payload
                             : [];
                         $notificationType = $resolveNotificationType($fcmRow, $dataPayload);
+                        $payloadType = trim((string) data_get($dataPayload, 'type'));
+                        $sessionKey = $normalizeSessionKey($fcmRow->call_session ?? '');
+
+                        $matchedSessionUserIds = [];
+                        if ($sessionKey !== '' && isset($followUpSessionToUserIds[$sessionKey])) {
+                            $matchedSessionUserIds = array_keys($followUpSessionToUserIds[$sessionKey]);
+                        }
+
+                        $isFollowUpRow = !empty($matchedSessionUserIds)
+                            || $isFollowUpNotificationType($notificationType)
+                            || $isFollowUpNotificationType($payloadType);
+
+                        if (!$isFollowUpRow) {
+                            continue;
+                        }
+
                         $timestamp = $resolveNotificationTimestamp($fcmRow);
                         $status = $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null;
 
-                        foreach (array_keys($followUpSessionToUserIds[$sessionKey]) as $userId) {
+                        $fcmUserId = is_numeric($fcmRow->user_id) ? (int) $fcmRow->user_id : 0;
+
+                        $candidateUserIds = $matchedSessionUserIds;
+                        if ($fcmUserId > 0 && isset($followUpLeadUserIds[$fcmUserId])) {
+                            $candidateUserIds = [$fcmUserId];
+                        } elseif (empty($candidateUserIds) && $fcmUserId > 0) {
+                            continue;
+                        }
+
+                        if (empty($candidateUserIds)) {
+                            continue;
+                        }
+
+                        foreach ($candidateUserIds as $userId) {
                             $userId = (int) $userId;
                             if ($userId <= 0) {
                                 continue;
