@@ -75,11 +75,21 @@ class AdminPanelController extends Controller
         $hasIsNeutered = $hasPetsTable && Schema::hasColumn('pets', 'is_neutered');
         $hasIsNuetered = $hasPetsTable && Schema::hasColumn('pets', 'is_nuetered');
 
+        $hasPetType = $hasPetsTable && Schema::hasColumn('pets', 'pet_type');
+        $hasLegacyPetType = $hasPetsTable && Schema::hasColumn('pets', 'type');
+        $petLeadBaseColumns = ['id', 'user_id', 'name', 'breed', 'created_at'];
+        if ($hasPetType) {
+            $petLeadBaseColumns[] = 'pet_type';
+        }
+        if ($hasLegacyPetType) {
+            $petLeadBaseColumns[] = 'type';
+        }
+
         $neuteringLeadCount = 0;
         $neuteringLeads = collect();
 
         if ($hasPetsTable && ($hasIsNeutered || $hasIsNuetered)) {
-            $petColumns = ['id', 'user_id', 'name', 'breed', 'pet_type', 'type', 'created_at'];
+            $petColumns = $petLeadBaseColumns;
             if ($hasIsNeutered) {
                 $petColumns[] = 'is_neutered';
             }
@@ -182,7 +192,7 @@ class AdminPanelController extends Controller
                     'clinic:id,name',
                     'doctor:id,doctor_name,doctor_email,doctor_mobile',
                     'user:id,name,email,phone,city',
-                    'pet:id,user_id,name,breed,pet_type,type',
+                    'pet:' . implode(',', $petLeadBaseColumns),
                 ])
                 ->orderBy('lead_prescription.follow_up_date')
                 ->orderByDesc('transactions.id')
