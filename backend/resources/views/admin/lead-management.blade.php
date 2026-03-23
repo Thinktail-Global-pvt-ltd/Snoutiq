@@ -137,6 +137,18 @@
             return (string) $value;
         }
     };
+
+    $formatDateTime = static function ($value): string {
+        if (empty($value)) {
+            return '—';
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->format('d M Y, H:i');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
+    };
 @endphp
 
 <div class="row g-4">
@@ -169,6 +181,9 @@
                 @if(!($leadConfig['supports_video_follow_up'] ?? false))
                     <div class="alert alert-warning py-2 mb-3">Video follow-up category is unavailable on this database (missing join columns).</div>
                 @endif
+                @if(!($leadConfig['supports_neutering_notification_join'] ?? false))
+                    <div class="alert alert-warning py-2 mb-3">Neutering notification join is unavailable (missing <code>fcm_notifications.data_payload</code>).</div>
+                @endif
 
                 <div class="row g-3">
                     <div class="col-6 col-lg-3">
@@ -193,6 +208,12 @@
                         <div class="lead-summary-card">
                             <div class="value">{{ number_format($summary['filtered_users'] ?? 0) }}</div>
                             <div class="label">Filtered Users</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="lead-summary-card">
+                            <div class="value">{{ number_format($summary['neutering_notified_users'] ?? 0) }}</div>
+                            <div class="label">Neutering Notified Users</div>
                         </div>
                     </div>
                 </div>
@@ -225,6 +246,7 @@
                                     <th>City</th>
                                     <th>Lead Categories</th>
                                     <th>Neutering Pets</th>
+                                    <th>Neutering Notification</th>
                                     <th>Video Follow-up</th>
                                 </tr>
                             </thead>
@@ -246,6 +268,9 @@
                                                 $followUpChipLabel = 'Upcoming';
                                             }
                                         }
+
+                                        $neuteringNotificationCount = (int) ($leadUser['neutering_notification_count'] ?? 0);
+                                        $notifiedNeuteringPetNames = collect($leadUser['notified_neutering_pet_names'] ?? [])->take(3)->implode(', ');
                                     @endphp
                                     <tr>
                                         <td data-label="User">
@@ -270,6 +295,20 @@
                                             <div class="text-muted small">
                                                 {{ collect($leadUser['neutering_pet_names'] ?? [])->take(3)->implode(', ') ?: '—' }}
                                             </div>
+                                        </td>
+                                        <td data-label="Neutering Notification">
+                                            @if(!($leadConfig['supports_neutering_notification_join'] ?? false))
+                                                <span class="badge text-bg-light">Unavailable</span>
+                                            @elseif(empty($leadUser['has_neutering']))
+                                                <span class="badge text-bg-light">N/A</span>
+                                            @elseif($neuteringNotificationCount > 0)
+                                                <span class="badge text-bg-success">Sent</span>
+                                                <div class="text-muted small mt-1">Notified pets: {{ $neuteringNotificationCount }}</div>
+                                                <div class="text-muted small">{{ $notifiedNeuteringPetNames ?: '—' }}</div>
+                                                <div class="text-muted small">Last sent: {{ $formatDateTime($leadUser['last_neutering_notification_at'] ?? null) }}</div>
+                                            @else
+                                                <span class="badge text-bg-secondary">Not sent</span>
+                                            @endif
                                         </td>
                                         <td data-label="Video Follow-up">
                                             <div class="fw-semibold">{{ (int) ($leadUser['video_follow_up_count'] ?? 0) }} follow-ups</div>

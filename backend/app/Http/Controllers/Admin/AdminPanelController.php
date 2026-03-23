@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\TransactionInvoiceController;
 use App\Models\CustomerTicket;
 use App\Models\Doctor;
+use App\Models\FcmNotification;
 use App\Models\GroomerBooking;
 use App\Models\GroomerProfile;
 use App\Models\Pet;
@@ -210,7 +211,23 @@ class AdminPanelController extends Controller
                 'neutering_pet_names' => [],
                 'video_follow_up_count' => 0,
                 'next_follow_up_date' => null,
+                'neutering_notification_count' => 0,
+                'notified_neutering_pet_ids' => [],
+                'notified_neutering_pet_names' => [],
+                'last_neutering_notification_at' => null,
             ];
+        };
+
+        $normalizeDateTime = static function ($value): ?string {
+            if (empty($value)) {
+                return null;
+            }
+
+            try {
+                return \Illuminate\Support\Carbon::parse($value)->toDateTimeString();
+            } catch (\Throwable $e) {
+                return null;
+            }
         };
 
         foreach ($neuteringLeads as $petLead) {
@@ -271,6 +288,135 @@ class AdminPanelController extends Controller
             $targetUsers->put($userId, $leadUser);
         }
 
+        $supportsNeuteringNotificationJoin = Schema::hasTable('fcm_notifications')
+            && Schema::hasColumn('fcm_notifications', 'data_payload');
+        $fcmHasStatus = $supportsNeuteringNotificationJoin && Schema::hasColumn('fcm_notifications', 'status');
+        $fcmHasSentAt = $supportsNeuteringNotificationJoin && Schema::hasColumn('fcm_notifications', 'sent_at');
+        $fcmHasCreatedAt = $supportsNeuteringNotificationJoin && Schema::hasColumn('fcm_notifications', 'created_at');
+
+        if ($supportsNeuteringNotificationJoin && $neuteringLeads->isNotEmpty()) {
+            $neuteringPetLookup = $neuteringLeads
+                ->filter(fn (Pet $pet) => is_numeric($pet->id) && (int) $pet->id > 0)
+                ->mapWithKeys(function (Pet $pet): array {
+                    $petId = (int) $pet->id;
+                    $petName = trim((string) ($pet->name ?? ''));
+                    $ownerId = is_numeric($pet->user_id) ? (int) $pet->user_id : 0;
+
+                    return [
+                        $petId => [
+                            'pet_name' => $petName,
+                            'user_id' => $ownerId,
+                        ],
+                    ];
+                });
+
+            $neuteringUserIds = $neuteringLeads->pluck('user_id')
+                ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                ->map(fn ($userId) => (int) $userId)
+                ->unique()
+                ->values();
+
+            if ($neuteringPetLookup->isNotEmpty() && $neuteringUserIds->isNotEmpty()) {
+                $fcmQuery = FcmNotification::query()
+                    ->select(['id', 'user_id', 'data_payload']);
+
+                if ($fcmHasStatus) {
+                    $fcmQuery->addSelect('status');
+                }
+                if ($fcmHasSentAt) {
+                    $fcmQuery->addSelect('sent_at');
+                }
+                if ($fcmHasCreatedAt) {
+                    $fcmQuery->addSelect('created_at');
+                }
+
+                $fcmRows = $fcmQuery
+                    ->whereIn('user_id', $neuteringUserIds->all())
+                    ->whereNotNull('data_payload')
+                    ->orderByDesc('id')
+                    ->get();
+
+                foreach ($fcmRows as $fcmRow) {
+                    $dataPayload = is_array($fcmRow->data_payload) ? $fcmRow->data_payload : [];
+                    $notificationType = strtolower(trim((string) (data_get($dataPayload, 'type') ?? '')));
+                    if ($notificationType !== 'pet_neutering_reminder') {
+                        continue;
+                    }
+
+                    $petIdRaw = data_get($dataPayload, 'pet_id');
+                    if (!is_numeric($petIdRaw)) {
+                        continue;
+                    }
+
+                    $petId = (int) $petIdRaw;
+                    if ($petId <= 0 || !$neuteringPetLookup->has($petId)) {
+                        continue;
+                    }
+
+                    $isDelivered = false;
+                    if ($fcmHasStatus) {
+                        $status = strtolower(trim((string) ($fcmRow->status ?? '')));
+                        $isDelivered = $status === 'sent';
+                    }
+                    if (!$isDelivered && $fcmHasSentAt) {
+                        $isDelivered = $normalizeDateTime($fcmRow->sent_at) !== null;
+                    }
+                    if (!$isDelivered) {
+                        continue;
+                    }
+
+                    $petMeta = $neuteringPetLookup->get($petId);
+
+                    $userIdRaw = $fcmRow->user_id
+                        ?? data_get($dataPayload, 'user_id')
+                        ?? data_get($petMeta, 'user_id');
+                    if (!is_numeric($userIdRaw)) {
+                        continue;
+                    }
+
+                    $userId = (int) $userIdRaw;
+                    if ($userId <= 0) {
+                        continue;
+                    }
+
+                    if (!$targetUsers->has($userId)) {
+                        $targetUsers->put($userId, $initializeLeadUser(null, $userId));
+                    }
+
+                    $leadUser = $targetUsers->get($userId);
+                    if (!is_array($leadUser)) {
+                        continue;
+                    }
+
+                    if (!in_array($petId, $leadUser['notified_neutering_pet_ids'], true)) {
+                        $leadUser['notified_neutering_pet_ids'][] = $petId;
+                        $leadUser['neutering_notification_count'] = (int) $leadUser['neutering_notification_count'] + 1;
+                    }
+
+                    $petName = trim((string) (data_get($petMeta, 'pet_name') ?? ''));
+                    if ($petName !== '' && !in_array($petName, $leadUser['notified_neutering_pet_names'], true)) {
+                        $leadUser['notified_neutering_pet_names'][] = $petName;
+                    }
+
+                    $sentAtCandidate = $fcmHasSentAt
+                        ? $normalizeDateTime($fcmRow->sent_at)
+                        : null;
+                    if ($sentAtCandidate === null && $fcmHasCreatedAt) {
+                        $sentAtCandidate = $normalizeDateTime($fcmRow->created_at);
+                    }
+
+                    if ($sentAtCandidate !== null) {
+                        $currentLastSentAt = $leadUser['last_neutering_notification_at'];
+                        if ($currentLastSentAt === null || strcmp($sentAtCandidate, (string) $currentLastSentAt) > 0) {
+                            $leadUser['last_neutering_notification_at'] = $sentAtCandidate;
+                        }
+                    }
+
+                    $targetUsers->put($userId, $leadUser);
+                }
+            }
+        }
+
         $filteredTargetUsers = $targetUsers
             ->values()
             ->filter(function (array $leadUser) use ($leadFilter): bool {
@@ -303,6 +449,11 @@ class AdminPanelController extends Controller
             })
             ->values();
 
+        $neuteringNotifiedUsersCount = $targetUsers
+            ->filter(fn (array $leadUser) => (bool) ($leadUser['has_neutering'] ?? false))
+            ->filter(fn (array $leadUser) => (int) ($leadUser['neutering_notification_count'] ?? 0) > 0)
+            ->count();
+
         return view('admin.lead-management', [
             'filteredTargetUsers' => $filteredTargetUsers,
             'leadFilter' => $leadFilter,
@@ -311,11 +462,13 @@ class AdminPanelController extends Controller
                 'video_follow_up_leads' => $videoFollowUpLeadCount,
                 'target_users' => $targetUsers->count(),
                 'filtered_users' => $filteredTargetUsers->count(),
+                'neutering_notified_users' => $neuteringNotifiedUsersCount,
             ],
             'limit' => $limit,
             'leadConfig' => [
                 'supports_neutering' => $hasIsNeutered || $hasIsNuetered,
                 'supports_video_follow_up' => $supportsVideoFollowUpLeads,
+                'supports_neutering_notification_join' => $supportsNeuteringNotificationJoin,
                 'transaction_session_column' => $transactionSessionColumn,
                 'neutering_columns' => [
                     'is_neutered' => $hasIsNeutered,
