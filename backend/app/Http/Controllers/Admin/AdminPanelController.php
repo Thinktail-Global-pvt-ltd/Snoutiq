@@ -56,6 +56,171 @@ class AdminPanelController extends Controller
         return view('admin.users', compact('users'));
     }
 
+    public function leadManagement(Request $request): View
+    {
+        $filters = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
+        ]);
+
+        $limit = (int) ($filters['limit'] ?? 250);
+        $userLeadCount = Schema::hasTable('users') ? User::query()->count() : 0;
+
+        $allUserLeads = User::query()
+            ->select('id', 'name', 'email', 'phone', 'city', 'created_at')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        $hasPetsTable = Schema::hasTable('pets');
+        $hasIsNeutered = $hasPetsTable && Schema::hasColumn('pets', 'is_neutered');
+        $hasIsNuetered = $hasPetsTable && Schema::hasColumn('pets', 'is_nuetered');
+
+        $neuteringLeadCount = 0;
+        $neuteringLeads = collect();
+
+        if ($hasPetsTable && ($hasIsNeutered || $hasIsNuetered)) {
+            $petColumns = ['id', 'user_id', 'name', 'breed', 'pet_type', 'type', 'created_at'];
+            if ($hasIsNeutered) {
+                $petColumns[] = 'is_neutered';
+            }
+            if ($hasIsNuetered) {
+                $petColumns[] = 'is_nuetered';
+            }
+
+            $neuteringBaseQuery = Pet::query()
+                ->where(function (Builder $query) use ($hasIsNeutered, $hasIsNuetered): void {
+                    $hasCondition = false;
+
+                    if ($hasIsNeutered) {
+                        $query->whereRaw("UPPER(TRIM(COALESCE(is_neutered, ''))) = 'N'");
+                        $hasCondition = true;
+                    }
+
+                    if ($hasIsNuetered) {
+                        if ($hasCondition) {
+                            $query->orWhereRaw("UPPER(TRIM(COALESCE(is_nuetered, ''))) = 'N'");
+                        } else {
+                            $query->whereRaw("UPPER(TRIM(COALESCE(is_nuetered, ''))) = 'N'");
+                        }
+                    }
+                });
+
+            $neuteringLeadCount = (clone $neuteringBaseQuery)->count();
+
+            $neuteringLeads = $neuteringBaseQuery
+                ->select($petColumns)
+                ->with(['owner:id,name,email,phone,city'])
+                ->orderByDesc('created_at')
+                ->limit($limit)
+                ->get();
+        }
+
+        $hasTransactionsTable = Schema::hasTable('transactions');
+        $hasPrescriptionsTable = Schema::hasTable('prescriptions');
+        $hasTransactionType = $hasTransactionsTable && Schema::hasColumn('transactions', 'type');
+        $hasTransactionMetadata = $hasTransactionsTable && Schema::hasColumn('transactions', 'metadata');
+        $hasPrescriptionCallSession = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'call_session');
+        $hasPrescriptionFollowUpDate = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'follow_up_date');
+
+        $transactionSessionColumn = null;
+        if ($hasTransactionsTable && Schema::hasColumn('transactions', 'call_session')) {
+            $transactionSessionColumn = 'call_session';
+        } elseif ($hasTransactionsTable && Schema::hasColumn('transactions', 'channel_name')) {
+            $transactionSessionColumn = 'channel_name';
+        }
+
+        $supportsVideoFollowUpLeads = $hasTransactionType
+            && $hasPrescriptionCallSession
+            && $hasPrescriptionFollowUpDate
+            && is_string($transactionSessionColumn);
+
+        $videoFollowUpLeadCount = 0;
+        $videoFollowUpLeads = collect();
+
+        if ($supportsVideoFollowUpLeads) {
+            $latestFollowUpPrescriptionBySession = DB::table('prescriptions as p')
+                ->selectRaw('MAX(p.id) as latest_prescription_id, p.call_session as call_session_key')
+                ->whereNotNull('p.call_session')
+                ->where('p.call_session', '!=', '')
+                ->whereNotNull('p.follow_up_date')
+                ->groupBy('p.call_session');
+
+            $videoFollowUpBaseQuery = Transaction::query()
+                ->where(function (Builder $query) use ($hasTransactionMetadata): void {
+                    $query->whereIn('transactions.type', ['video_consult', 'excell_export_campaign']);
+
+                    if ($hasTransactionMetadata) {
+                        $query->orWhereIn('transactions.metadata->order_type', ['video_consult', 'excell_export_campaign']);
+                    }
+                })
+                ->whereNotNull("transactions.{$transactionSessionColumn}")
+                ->where("transactions.{$transactionSessionColumn}", '!=', '')
+                ->joinSub($latestFollowUpPrescriptionBySession, 'latest_follow_up_prescription_by_session', function ($join) use ($transactionSessionColumn): void {
+                    $join->on(
+                        'latest_follow_up_prescription_by_session.call_session_key',
+                        '=',
+                        "transactions.{$transactionSessionColumn}"
+                    );
+                })
+                ->join(
+                    'prescriptions as lead_prescription',
+                    'lead_prescription.id',
+                    '=',
+                    'latest_follow_up_prescription_by_session.latest_prescription_id'
+                );
+
+            $videoFollowUpLeadCount = (clone $videoFollowUpBaseQuery)->count('transactions.id');
+
+            $videoFollowUpLeads = $videoFollowUpBaseQuery
+                ->select('transactions.*')
+                ->addSelect([
+                    'lead_prescription_id' => DB::raw('lead_prescription.id'),
+                    'lead_follow_up_date' => DB::raw('lead_prescription.follow_up_date'),
+                    'lead_call_session' => DB::raw('lead_prescription.call_session'),
+                ])
+                ->with([
+                    'clinic:id,name',
+                    'doctor:id,doctor_name,doctor_email,doctor_mobile',
+                    'user:id,name,email,phone,city',
+                    'pet:id,user_id,name,breed,pet_type,type',
+                ])
+                ->orderBy('lead_prescription.follow_up_date')
+                ->orderByDesc('transactions.id')
+                ->limit($limit)
+                ->get();
+        }
+
+        $targetUserCount = $neuteringLeads
+            ->pluck('user_id')
+            ->merge($videoFollowUpLeads->pluck('user_id'))
+            ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+            ->map(fn ($userId) => (int) $userId)
+            ->unique()
+            ->count();
+
+        return view('admin.lead-management', [
+            'allUserLeads' => $allUserLeads,
+            'neuteringLeads' => $neuteringLeads,
+            'videoFollowUpLeads' => $videoFollowUpLeads,
+            'summary' => [
+                'all_users' => $userLeadCount,
+                'neutering_leads' => $neuteringLeadCount,
+                'video_follow_up_leads' => $videoFollowUpLeadCount,
+                'target_users' => $targetUserCount,
+            ],
+            'limit' => $limit,
+            'leadConfig' => [
+                'supports_neutering' => $hasIsNeutered || $hasIsNuetered,
+                'supports_video_follow_up' => $supportsVideoFollowUpLeads,
+                'transaction_session_column' => $transactionSessionColumn,
+                'neutering_columns' => [
+                    'is_neutered' => $hasIsNeutered,
+                    'is_nuetered' => $hasIsNuetered,
+                ],
+            ],
+        ]);
+    }
+
     public function bookings(): View
     {
         $bookings = GroomerBooking::with(['groomerEmployee', 'user'])->orderByDesc('created_at')->get();

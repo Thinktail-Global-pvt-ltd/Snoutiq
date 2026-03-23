@@ -219,6 +219,7 @@ Route::prefix('admin')->group(function () {
     Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
         Route::get('/dashboard', [AdminPanelController::class, 'index'])->name('admin.dashboard');
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
+        Route::get('/lead-management', [AdminPanelController::class, 'leadManagement'])->name('admin.lead-management');
         Route::get('/pet-parents', [AdminPetParentController::class, 'index'])->name('admin.pet-parents');
         Route::get('/pets', [AdminPanelController::class, 'pets'])->name('admin.pets');
         Route::get('/doctors', [AdminPanelController::class, 'doctors'])->name('admin.doctors');
