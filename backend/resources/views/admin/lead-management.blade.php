@@ -125,6 +125,34 @@
 
     $activeFilterLabel = $filterLabels[$leadFilter] ?? $filterLabels['all'];
     $todayDate = \Illuminate\Support\Carbon::today()->toDateString();
+    $notificationsByUser = collect($filteredTargetUsers ?? [])
+        ->mapWithKeys(function (array $leadUser): array {
+            $userId = (string) ((int) ($leadUser['id'] ?? 0));
+            $notifications = collect($leadUser['all_notifications'] ?? [])
+                ->map(function (array $item): array {
+                    $bucket = trim((string) ($item['bucket'] ?? ''));
+                    $bucketLabel = match ($bucket) {
+                        'neutering' => 'Neutering',
+                        'follow_up' => 'Follow-up',
+                        default => '',
+                    };
+
+                    $notificationType = (string) ($item['notification_type'] ?? 'unknown');
+                    if ($bucketLabel !== '') {
+                        $notificationType .= " ({$bucketLabel})";
+                    }
+
+                    return [
+                        'notification_type' => $notificationType,
+                        'timestamp' => (string) ($item['timestamp'] ?? ''),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return [$userId => $notifications];
+        })
+        ->all();
 
     $formatDate = static function ($value): string {
         if (empty($value)) {
@@ -183,6 +211,9 @@
                 @endif
                 @if(!($leadConfig['supports_neutering_notification_join'] ?? false))
                     <div class="alert alert-warning py-2 mb-3">Neutering notification join is unavailable (missing <code>fcm_notifications.data_payload</code>).</div>
+                @endif
+                @if(!($leadConfig['supports_follow_up_notification_join'] ?? false))
+                    <div class="alert alert-warning py-2 mb-3">Follow-up notification join is unavailable (missing <code>fcm_notifications.call_session</code> or <code>prescriptions.call_session</code>).</div>
                 @endif
 
                 <div class="row g-3">
@@ -309,6 +340,22 @@
                                             @else
                                                 <span class="badge text-bg-secondary">Not sent</span>
                                             @endif
+
+                                            @php $allNotificationsCount = (int) ($leadUser['all_notifications_count'] ?? 0); @endphp
+                                            <div class="mt-2">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#userNotificationsModal"
+                                                    data-user-id="{{ (int) ($leadUser['id'] ?? 0) }}"
+                                                    data-user-name="{{ $leadUser['name'] ?: ('User #' . ((int) ($leadUser['id'] ?? 0))) }}"
+                                                    @disabled($allNotificationsCount <= 0)
+                                                >
+                                                    View More
+                                                </button>
+                                                <div class="text-muted small mt-1">{{ $allNotificationsCount }} total</div>
+                                            </div>
                                         </td>
                                         <td data-label="Video Follow-up">
                                             <div class="fw-semibold">{{ (int) ($leadUser['video_follow_up_count'] ?? 0) }} follow-ups</div>
@@ -325,4 +372,75 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="userNotificationsModal" tabindex="-1" aria-labelledby="userNotificationsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userNotificationsModalLabel">Notifications</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-muted small mb-2" id="userNotificationsMeta"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Notification Type</th>
+                                <th>Time (Timestamp)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userNotificationsTableBody">
+                            <tr>
+                                <td colspan="2" class="text-muted">No notifications found.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+(() => {
+    const notificationsByUser = @json($notificationsByUser);
+    const modal = document.getElementById('userNotificationsModal');
+    const meta = document.getElementById('userNotificationsMeta');
+    const body = document.getElementById('userNotificationsTableBody');
+    const escapeHtml = (value) => String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+    if (!modal || !meta || !body) return;
+
+    modal.addEventListener('show.bs.modal', (event) => {
+        const trigger = event.relatedTarget;
+        const userId = trigger?.getAttribute('data-user-id') || '';
+        const userName = trigger?.getAttribute('data-user-name') || 'User';
+        const rows = notificationsByUser[userId] || [];
+
+        meta.textContent = `${userName} (ID: ${userId}) • ${rows.length} notifications`;
+
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="2" class="text-muted">No notifications found.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = rows.map((row) => {
+            const type = escapeHtml(row.notification_type || 'unknown');
+            const ts = escapeHtml(row.timestamp || '—');
+            return `<tr><td>${type}</td><td>${ts}</td></tr>`;
+        }).join('');
+    });
+})();
+</script>
+@endpush

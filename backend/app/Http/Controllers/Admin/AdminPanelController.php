@@ -215,6 +215,8 @@ class AdminPanelController extends Controller
                 'notified_neutering_pet_ids' => [],
                 'notified_neutering_pet_names' => [],
                 'last_neutering_notification_at' => null,
+                'all_notifications_count' => 0,
+                'all_notifications' => [],
             ];
         };
 
@@ -288,134 +290,293 @@ class AdminPanelController extends Controller
             $targetUsers->put($userId, $leadUser);
         }
 
-        $supportsNeuteringNotificationJoin = Schema::hasTable('fcm_notifications')
+        $supportsFcmNotifications = Schema::hasTable('fcm_notifications')
+            && Schema::hasColumn('fcm_notifications', 'user_id');
+        $supportsNeuteringNotificationJoin = $supportsFcmNotifications
             && Schema::hasColumn('fcm_notifications', 'data_payload');
-        $fcmHasStatus = $supportsNeuteringNotificationJoin && Schema::hasColumn('fcm_notifications', 'status');
-        $fcmHasSentAt = $supportsNeuteringNotificationJoin && Schema::hasColumn('fcm_notifications', 'sent_at');
-        $fcmHasCreatedAt = $supportsNeuteringNotificationJoin && Schema::hasColumn('fcm_notifications', 'created_at');
+        $fcmHasCallSession = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'call_session');
+        $supportsFollowUpNotificationJoin = $fcmHasCallSession && $hasPrescriptionCallSession;
+        $fcmHasStatus = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'status');
+        $fcmHasSentAt = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'sent_at');
+        $fcmHasCreatedAt = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'created_at');
+        $fcmHasNotificationType = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'notification_type');
 
-        if ($supportsNeuteringNotificationJoin && $neuteringLeads->isNotEmpty()) {
-            $neuteringPetLookup = $neuteringLeads
-                ->filter(fn (Pet $pet) => is_numeric($pet->id) && (int) $pet->id > 0)
-                ->mapWithKeys(function (Pet $pet): array {
-                    $petId = (int) $pet->id;
-                    $petName = trim((string) ($pet->name ?? ''));
-                    $ownerId = is_numeric($pet->user_id) ? (int) $pet->user_id : 0;
+        $resolveNotificationType = static function ($fcmRow, array $dataPayload = []) use ($fcmHasNotificationType): string {
+            $notificationTypeRaw = trim((string) (
+                ($fcmHasNotificationType ? ($fcmRow->notification_type ?? '') : '')
+                ?: (data_get($dataPayload, 'type') ?? '')
+            ));
 
-                    return [
-                        $petId => [
-                            'pet_name' => $petName,
-                            'user_id' => $ownerId,
-                        ],
-                    ];
-                });
+            return $notificationTypeRaw !== '' ? $notificationTypeRaw : 'unknown';
+        };
 
-            $neuteringUserIds = $neuteringLeads->pluck('user_id')
+        $resolveNotificationTimestamp = static function ($fcmRow) use ($fcmHasSentAt, $fcmHasCreatedAt, $normalizeDateTime): ?string {
+            $timestamp = $fcmHasSentAt
+                ? $normalizeDateTime($fcmRow->sent_at)
+                : null;
+
+            if ($timestamp === null && $fcmHasCreatedAt) {
+                $timestamp = $normalizeDateTime($fcmRow->created_at);
+            }
+
+            return $timestamp;
+        };
+
+        $isDeliveredNotification = static function ($fcmRow) use ($fcmHasStatus, $fcmHasSentAt, $normalizeDateTime): bool {
+            if ($fcmHasStatus) {
+                $status = strtolower(trim((string) ($fcmRow->status ?? '')));
+                if ($status === 'sent') {
+                    return true;
+                }
+            }
+
+            return $fcmHasSentAt && $normalizeDateTime($fcmRow->sent_at) !== null;
+        };
+
+        if ($supportsFcmNotifications && $targetUsers->isNotEmpty()) {
+            $targetUserIds = $targetUsers->keys()
                 ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
                 ->map(fn ($userId) => (int) $userId)
                 ->unique()
                 ->values();
 
-            if ($neuteringPetLookup->isNotEmpty() && $neuteringUserIds->isNotEmpty()) {
-                $fcmQuery = FcmNotification::query()
-                    ->select(['id', 'user_id', 'data_payload']);
+            // 1) Neutering notifications: data_payload.pet_id -> neutering lead pets.
+            if ($supportsNeuteringNotificationJoin && $neuteringLeads->isNotEmpty()) {
+                $neuteringPetLookup = $neuteringLeads
+                    ->filter(fn (Pet $pet) => is_numeric($pet->id) && (int) $pet->id > 0)
+                    ->mapWithKeys(function (Pet $pet): array {
+                        $petId = (int) $pet->id;
+                        $petName = trim((string) ($pet->name ?? ''));
+                        $ownerId = is_numeric($pet->user_id) ? (int) $pet->user_id : 0;
 
-                if ($fcmHasStatus) {
-                    $fcmQuery->addSelect('status');
-                }
-                if ($fcmHasSentAt) {
-                    $fcmQuery->addSelect('sent_at');
-                }
-                if ($fcmHasCreatedAt) {
-                    $fcmQuery->addSelect('created_at');
-                }
+                        return [
+                            $petId => [
+                                'pet_name' => $petName,
+                                'user_id' => $ownerId,
+                            ],
+                        ];
+                    });
 
-                $fcmRows = $fcmQuery
-                    ->whereIn('user_id', $neuteringUserIds->all())
-                    ->whereNotNull('data_payload')
-                    ->orderByDesc('id')
-                    ->get();
+                $neuteringUserIds = $neuteringPetLookup
+                    ->pluck('user_id')
+                    ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                    ->map(fn ($userId) => (int) $userId)
+                    ->unique()
+                    ->values();
 
-                foreach ($fcmRows as $fcmRow) {
-                    $dataPayload = is_array($fcmRow->data_payload) ? $fcmRow->data_payload : [];
-                    $notificationType = strtolower(trim((string) (data_get($dataPayload, 'type') ?? '')));
-                    if ($notificationType !== 'pet_neutering_reminder') {
-                        continue;
+                if ($neuteringPetLookup->isNotEmpty() && $neuteringUserIds->isNotEmpty()) {
+                    $fcmNeuteringQuery = FcmNotification::query()
+                        ->select(['id', 'user_id', 'data_payload']);
+
+                    if ($fcmHasNotificationType) {
+                        $fcmNeuteringQuery->addSelect('notification_type');
                     }
-
-                    $petIdRaw = data_get($dataPayload, 'pet_id');
-                    if (!is_numeric($petIdRaw)) {
-                        continue;
-                    }
-
-                    $petId = (int) $petIdRaw;
-                    if ($petId <= 0 || !$neuteringPetLookup->has($petId)) {
-                        continue;
-                    }
-
-                    $isDelivered = false;
                     if ($fcmHasStatus) {
-                        $status = strtolower(trim((string) ($fcmRow->status ?? '')));
-                        $isDelivered = $status === 'sent';
+                        $fcmNeuteringQuery->addSelect('status');
                     }
-                    if (!$isDelivered && $fcmHasSentAt) {
-                        $isDelivered = $normalizeDateTime($fcmRow->sent_at) !== null;
+                    if ($fcmHasSentAt) {
+                        $fcmNeuteringQuery->addSelect('sent_at');
                     }
-                    if (!$isDelivered) {
+                    if ($fcmHasCreatedAt) {
+                        $fcmNeuteringQuery->addSelect('created_at');
+                    }
+
+                    $fcmNeuteringRows = $fcmNeuteringQuery
+                        ->whereIn('user_id', $neuteringUserIds->all())
+                        ->whereNotNull('data_payload')
+                        ->orderByDesc('id')
+                        ->get();
+
+                    foreach ($fcmNeuteringRows as $fcmRow) {
+                        $dataPayload = is_array($fcmRow->data_payload) ? $fcmRow->data_payload : [];
+                        $notificationType = $resolveNotificationType($fcmRow, $dataPayload);
+
+                        if (strtolower($notificationType) !== 'pet_neutering_reminder') {
+                            continue;
+                        }
+
+                        $petIdRaw = data_get($dataPayload, 'pet_id');
+                        if (!is_numeric($petIdRaw)) {
+                            continue;
+                        }
+
+                        $petId = (int) $petIdRaw;
+                        if ($petId <= 0 || !$neuteringPetLookup->has($petId)) {
+                            continue;
+                        }
+
+                        if (!$isDeliveredNotification($fcmRow)) {
+                            continue;
+                        }
+
+                        $petMeta = $neuteringPetLookup->get($petId);
+                        $userIdRaw = $fcmRow->user_id
+                            ?? data_get($dataPayload, 'user_id')
+                            ?? data_get($petMeta, 'user_id');
+                        if (!is_numeric($userIdRaw)) {
+                            continue;
+                        }
+
+                        $userId = (int) $userIdRaw;
+                        if ($userId <= 0) {
+                            continue;
+                        }
+
+                        if (!$targetUsers->has($userId)) {
+                            $targetUsers->put($userId, $initializeLeadUser(null, $userId));
+                        }
+
+                        $leadUser = $targetUsers->get($userId);
+                        if (!is_array($leadUser)) {
+                            continue;
+                        }
+
+                        if (!in_array($petId, $leadUser['notified_neutering_pet_ids'], true)) {
+                            $leadUser['notified_neutering_pet_ids'][] = $petId;
+                            $leadUser['neutering_notification_count'] = (int) $leadUser['neutering_notification_count'] + 1;
+                        }
+
+                        $petName = trim((string) (data_get($petMeta, 'pet_name') ?? ''));
+                        if ($petName !== '' && !in_array($petName, $leadUser['notified_neutering_pet_names'], true)) {
+                            $leadUser['notified_neutering_pet_names'][] = $petName;
+                        }
+
+                        $timestamp = $resolveNotificationTimestamp($fcmRow);
+                        if ($timestamp !== null) {
+                            $currentLastSentAt = $leadUser['last_neutering_notification_at'];
+                            if ($currentLastSentAt === null || strcmp($timestamp, (string) $currentLastSentAt) > 0) {
+                                $leadUser['last_neutering_notification_at'] = $timestamp;
+                            }
+                        }
+
+                        $leadUser['all_notifications'][] = [
+                            'id' => (int) ($fcmRow->id ?? 0),
+                            'notification_type' => $notificationType,
+                            'timestamp' => $timestamp,
+                            'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
+                            'bucket' => 'neutering',
+                        ];
+
+                        $targetUsers->put($userId, $leadUser);
+                    }
+                }
+            }
+
+            // 2) Follow-up notifications: fcm_notifications.call_session = prescriptions.call_session.
+            if ($supportsFollowUpNotificationJoin && $videoFollowUpLeads->isNotEmpty()) {
+                $followUpSessionToUserIds = [];
+
+                foreach ($videoFollowUpLeads as $followUpLead) {
+                    $sessionKey = trim((string) ($followUpLead->getAttribute('lead_call_session') ?? ''));
+                    $userId = is_numeric($followUpLead->user_id) ? (int) $followUpLead->user_id : 0;
+
+                    if ($sessionKey === '' || $userId <= 0) {
                         continue;
                     }
 
-                    $petMeta = $neuteringPetLookup->get($petId);
-
-                    $userIdRaw = $fcmRow->user_id
-                        ?? data_get($dataPayload, 'user_id')
-                        ?? data_get($petMeta, 'user_id');
-                    if (!is_numeric($userIdRaw)) {
-                        continue;
+                    if (!isset($followUpSessionToUserIds[$sessionKey])) {
+                        $followUpSessionToUserIds[$sessionKey] = [];
                     }
 
-                    $userId = (int) $userIdRaw;
-                    if ($userId <= 0) {
-                        continue;
+                    $followUpSessionToUserIds[$sessionKey][$userId] = true;
+                }
+
+                if (!empty($followUpSessionToUserIds)) {
+                    $fcmFollowUpQuery = FcmNotification::query()
+                        ->select(['id', 'call_session']);
+
+                    if ($supportsNeuteringNotificationJoin) {
+                        $fcmFollowUpQuery->addSelect('data_payload');
+                    }
+                    if ($fcmHasNotificationType) {
+                        $fcmFollowUpQuery->addSelect('notification_type');
+                    }
+                    if ($fcmHasStatus) {
+                        $fcmFollowUpQuery->addSelect('status');
+                    }
+                    if ($fcmHasSentAt) {
+                        $fcmFollowUpQuery->addSelect('sent_at');
+                    }
+                    if ($fcmHasCreatedAt) {
+                        $fcmFollowUpQuery->addSelect('created_at');
                     }
 
-                    if (!$targetUsers->has($userId)) {
-                        $targetUsers->put($userId, $initializeLeadUser(null, $userId));
-                    }
+                    $fcmFollowUpRows = $fcmFollowUpQuery
+                        ->whereIn('call_session', array_keys($followUpSessionToUserIds))
+                        ->orderByDesc('id')
+                        ->get();
 
-                    $leadUser = $targetUsers->get($userId);
-                    if (!is_array($leadUser)) {
-                        continue;
-                    }
+                    foreach ($fcmFollowUpRows as $fcmRow) {
+                        $sessionKey = trim((string) ($fcmRow->call_session ?? ''));
+                        if ($sessionKey === '' || !isset($followUpSessionToUserIds[$sessionKey])) {
+                            continue;
+                        }
 
-                    if (!in_array($petId, $leadUser['notified_neutering_pet_ids'], true)) {
-                        $leadUser['notified_neutering_pet_ids'][] = $petId;
-                        $leadUser['neutering_notification_count'] = (int) $leadUser['neutering_notification_count'] + 1;
-                    }
+                        if (!$isDeliveredNotification($fcmRow)) {
+                            continue;
+                        }
 
-                    $petName = trim((string) (data_get($petMeta, 'pet_name') ?? ''));
-                    if ($petName !== '' && !in_array($petName, $leadUser['notified_neutering_pet_names'], true)) {
-                        $leadUser['notified_neutering_pet_names'][] = $petName;
-                    }
+                        $dataPayload = ($supportsNeuteringNotificationJoin && is_array($fcmRow->data_payload))
+                            ? $fcmRow->data_payload
+                            : [];
+                        $notificationType = $resolveNotificationType($fcmRow, $dataPayload);
+                        $timestamp = $resolveNotificationTimestamp($fcmRow);
+                        $status = $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null;
 
-                    $sentAtCandidate = $fcmHasSentAt
-                        ? $normalizeDateTime($fcmRow->sent_at)
-                        : null;
-                    if ($sentAtCandidate === null && $fcmHasCreatedAt) {
-                        $sentAtCandidate = $normalizeDateTime($fcmRow->created_at);
-                    }
+                        foreach (array_keys($followUpSessionToUserIds[$sessionKey]) as $userId) {
+                            $userId = (int) $userId;
+                            if ($userId <= 0) {
+                                continue;
+                            }
 
-                    if ($sentAtCandidate !== null) {
-                        $currentLastSentAt = $leadUser['last_neutering_notification_at'];
-                        if ($currentLastSentAt === null || strcmp($sentAtCandidate, (string) $currentLastSentAt) > 0) {
-                            $leadUser['last_neutering_notification_at'] = $sentAtCandidate;
+                            if (!$targetUsers->has($userId)) {
+                                $targetUsers->put($userId, $initializeLeadUser(null, $userId));
+                            }
+
+                            $leadUser = $targetUsers->get($userId);
+                            if (!is_array($leadUser)) {
+                                continue;
+                            }
+
+                            $leadUser['all_notifications'][] = [
+                                'id' => (int) ($fcmRow->id ?? 0),
+                                'notification_type' => $notificationType,
+                                'timestamp' => $timestamp,
+                                'status' => $status,
+                                'bucket' => 'follow_up',
+                            ];
+
+                            $targetUsers->put($userId, $leadUser);
                         }
                     }
-
-                    $targetUsers->put($userId, $leadUser);
                 }
             }
         }
+
+        $targetUsers = $targetUsers->map(function (array $leadUser): array {
+            $notifications = collect($leadUser['all_notifications'] ?? [])
+                ->unique(function (array $item): string {
+                    return (string) ((int) ($item['id'] ?? 0))
+                        .'|'.trim((string) ($item['bucket'] ?? ''))
+                        .'|'.trim((string) ($item['timestamp'] ?? ''));
+                })
+                ->sort(function (array $left, array $right): int {
+                    $leftTs = (string) ($left['timestamp'] ?? '0000-00-00 00:00:00');
+                    $rightTs = (string) ($right['timestamp'] ?? '0000-00-00 00:00:00');
+                    if ($leftTs !== $rightTs) {
+                        return strcmp($rightTs, $leftTs);
+                    }
+
+                    return ((int) ($right['id'] ?? 0)) <=> ((int) ($left['id'] ?? 0));
+                })
+                ->values()
+                ->all();
+
+            $leadUser['all_notifications'] = $notifications;
+            $leadUser['all_notifications_count'] = count($notifications);
+
+            return $leadUser;
+        });
 
         $filteredTargetUsers = $targetUsers
             ->values()
@@ -469,6 +630,7 @@ class AdminPanelController extends Controller
                 'supports_neutering' => $hasIsNeutered || $hasIsNuetered,
                 'supports_video_follow_up' => $supportsVideoFollowUpLeads,
                 'supports_neutering_notification_join' => $supportsNeuteringNotificationJoin,
+                'supports_follow_up_notification_join' => $supportsFollowUpNotificationJoin,
                 'transaction_session_column' => $transactionSessionColumn,
                 'neutering_columns' => [
                     'is_neutered' => $hasIsNeutered,
