@@ -17,12 +17,21 @@ class DocumentUpload extends Model
         'source',
         'file_count',
         'files_json',
+        'file_blob',
+        'file_mime',
+        'file_name',
+        'file_size',
         'uploaded_at',
     ];
 
     protected $casts = [
         'files_json' => 'array',
+        'file_size' => 'integer',
         'uploaded_at' => 'datetime',
+    ];
+
+    protected $hidden = [
+        'file_blob',
     ];
 
     public function user()
