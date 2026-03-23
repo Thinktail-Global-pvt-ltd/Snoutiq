@@ -227,6 +227,7 @@ class AdminController extends Controller
         $isNeutered = $this->normalizeNullableBoolInt($request->input('is_nuetered', $request->input('is_neutered')));
         $dewormingYesNo = $this->normalizeNullableBoolInt($request->input('deworming_yes_no', $request->input('deworming')));
         $lastDewormingDate = $this->normalizeDateInput($request->input('last_deworming_date'));
+        $dewormingSchedule = $this->resolveDewormingScheduleFromDob($petDob, $lastDewormingDate);
 
         $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
         [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
@@ -255,6 +256,7 @@ class AdminController extends Controller
             $isNeutered,
             $dewormingYesNo,
             $lastDewormingDate,
+            $dewormingSchedule,
             $petDoc1,
             $petDoc2,
             $blobColumnsReady,
@@ -285,6 +287,8 @@ class AdminController extends Controller
             $this->setColumnValue($petPayload, $petColumns, 'pet_doc2', $petDoc2);
             $this->setColumnValue($petPayload, $petColumns, 'deworming_yes_no', $dewormingYesNo);
             $this->setColumnValue($petPayload, $petColumns, 'last_deworming_date', $lastDewormingDate);
+            $this->setColumnValue($petPayload, $petColumns, 'deworming_status', $dewormingSchedule['deworming_status'] ?? null);
+            $this->setColumnValue($petPayload, $petColumns, 'next_deworming_date', $dewormingSchedule['next_deworming_date'] ?? null);
             $this->setColumnValue($petPayload, $petColumns, 'role', $request->input('role'));
 
             if ($isNeutered !== null) {
@@ -440,6 +444,27 @@ class AdminController extends Controller
             $lastDewormingDate = $this->normalizeDateInput($lastDewormingRaw);
             if ($lastDewormingDate !== null || $lastDewormingRaw === null || trim((string) $lastDewormingRaw) === '') {
                 $this->setColumnValue($updatePayload, $petColumns, 'last_deworming_date', $lastDewormingDate, true);
+            }
+        }
+
+        if ($request->has('pet_dob') || $request->has('last_deworming_date')) {
+            $effectivePetDob = $this->normalizeDateInput(
+                array_key_exists('pet_dob', $updatePayload)
+                    ? $updatePayload['pet_dob']
+                    : ($pet->pet_dob ?? ($pet->dob ?? null))
+            );
+            $effectiveLastDewormingDate = $this->normalizeDateInput(
+                array_key_exists('last_deworming_date', $updatePayload)
+                    ? $updatePayload['last_deworming_date']
+                    : ($pet->last_deworming_date ?? null)
+            );
+
+            $dewormingSchedule = $this->resolveDewormingScheduleFromDob($effectivePetDob, $effectiveLastDewormingDate);
+            if (!empty($dewormingSchedule['deworming_status'])) {
+                $this->setColumnValue($updatePayload, $petColumns, 'deworming_status', $dewormingSchedule['deworming_status'], true);
+            }
+            if (!empty($dewormingSchedule['next_deworming_date'])) {
+                $this->setColumnValue($updatePayload, $petColumns, 'next_deworming_date', $dewormingSchedule['next_deworming_date'], true);
             }
         }
 
@@ -708,6 +733,60 @@ class AdminController extends Controller
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Predict deworming cadence/date from DOB and last deworming date.
+     *
+     * Puppies (<6 months): every 15 days
+     * Adults (>=6 months): every 3 months
+     *
+     * @return array{deworming_status:?string,next_deworming_date:?string}
+     */
+    private function resolveDewormingScheduleFromDob(?string $petDob, ?string $lastDewormingDate): array
+    {
+        $normalizedDob = $this->normalizeDateInput($petDob);
+        if ($normalizedDob === null) {
+            return [
+                'deworming_status' => null,
+                'next_deworming_date' => null,
+            ];
+        }
+
+        try {
+            $dob = Carbon::parse($normalizedDob)->startOfDay();
+        } catch (\Throwable $e) {
+            return [
+                'deworming_status' => null,
+                'next_deworming_date' => null,
+            ];
+        }
+
+        $today = Carbon::today();
+        $ageInMonths = max(0, $dob->diffInMonths($today, false));
+        $isUnderSixMonths = $ageInMonths < 6;
+        $status = $isUnderSixMonths ? 'every_15_days' : 'every_3_months';
+
+        $normalizedLastDate = $this->normalizeDateInput($lastDewormingDate);
+        $baseDate = $normalizedLastDate
+            ? Carbon::parse($normalizedLastDate)->startOfDay()
+            : $dob->copy();
+
+        $nextDate = $baseDate->copy();
+        if ($isUnderSixMonths) {
+            do {
+                $nextDate->addDays(15);
+            } while ($nextDate->lte($today));
+        } else {
+            do {
+                $nextDate->addMonthsNoOverflow(3);
+            } while ($nextDate->lte($today));
+        }
+
+        return [
+            'deworming_status' => $status,
+            'next_deworming_date' => $nextDate->toDateString(),
+        ];
     }
 
     private function tableColumns(string $table): array
