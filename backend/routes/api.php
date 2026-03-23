@@ -93,6 +93,7 @@ Route::get('/call-sessions/{callSession}', [CallSessionCrudController::class, 's
 Route::post('/call-recordings/upload', [RecordingUploadController::class, 'store']);
 Route::post('/csv/upload', [CsvUploadController::class, 'store']);
 Route::post('/error-logs', [ErrorLogController::class, 'store'])->name('api.error-logs.store');
+Route::get('/documents', [MedicalRecordController::class, 'documents'])->name('api.documents.query');
 Route::post('/documents/upload', [DocumentUploadController::class, 'store'])->name('api.documents.upload');
 Route::get('/documents/{uploadId}/blob', [DocumentUploadController::class, 'blob'])->whereNumber('uploadId')->name('api.documents.blob');
 Route::get('/users/{userId}/document-uploads', [DocumentUploadController::class, 'index'])->name('api.documents.index');

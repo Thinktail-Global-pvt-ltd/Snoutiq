@@ -32,6 +32,124 @@ class MedicalRecordController extends Controller
         return $this->recordsForUser($this->resolveUser((string) $userId), null, true);
     }
 
+    /**
+     * Alias endpoint for mobile clients:
+     * GET /api/documents?user_id={id}&pet_id={id}
+     * Returns medical records mapped to the requested pet.
+     */
+    public function documents(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer'],
+            'pet_id' => ['required', 'integer'],
+            'clinic_id' => ['nullable', 'integer'],
+        ]);
+
+        $user = User::query()
+            ->select('id', 'name')
+            ->find((int) $validated['user_id']);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error' => 'User not found',
+            ], 404);
+        }
+
+        $petId = (int) $validated['pet_id'];
+        if ($this->ensurePetBelongsToUser((int) $user->id, $petId) === null) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Pet not found for this user',
+            ], 422);
+        }
+
+        $clinicId = isset($validated['clinic_id']) ? (int) $validated['clinic_id'] : null;
+
+        $prescriptionQuery = Prescription::query()
+            ->where('user_id', (int) $user->id)
+            ->where('pet_id', $petId)
+            ->whereNotNull('medical_record_id');
+
+        if ($clinicId) {
+            $prescriptionQuery->whereIn('medical_record_id', MedicalRecord::query()
+                ->select('id')
+                ->where('user_id', (int) $user->id)
+                ->where('vet_registeration_id', $clinicId));
+        }
+
+        $recordIds = $prescriptionQuery
+            ->orderByDesc('id')
+            ->pluck('medical_record_id')
+            ->filter(fn ($id) => (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($recordIds->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                    ],
+                    'pet_id' => $petId,
+                    'records' => [],
+                ],
+            ]);
+        }
+
+        $records = MedicalRecord::query()
+            ->where('user_id', (int) $user->id)
+            ->whereIn('id', $recordIds->all())
+            ->orderByDesc('created_at')
+            ->get();
+
+        $prescriptions = Prescription::query()
+            ->where('user_id', (int) $user->id)
+            ->where('pet_id', $petId)
+            ->whereIn('medical_record_id', $records->pluck('id')->all())
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('medical_record_id')
+            ->map(fn ($items) => $items->first());
+
+        $petPayload = null;
+        if (Schema::hasTable('pets')) {
+            $petPayload = Pet::query()->find($petId)?->toArray();
+        }
+
+        $recordsMapped = $records->map(function (MedicalRecord $record) use ($prescriptions, $petId, $petPayload) {
+            return [
+                'id' => $record->id,
+                'user_id' => $record->user_id,
+                'doctor_id' => $record->doctor_id,
+                'clinic_id' => $record->vet_registeration_id,
+                'pet_id' => $petId,
+                'pet' => $petPayload,
+                'pets' => $petPayload,
+                'file_name' => $record->file_name,
+                'mime_type' => $record->mime_type,
+                'notes' => $record->notes,
+                'uploaded_at' => optional($record->created_at)->toIso8601String(),
+                'url' => $this->buildRecordUrl($record->file_path),
+                'prescription' => $prescriptions->get($record->id),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                ],
+                'pet_id' => $petId,
+                'records' => $recordsMapped,
+            ],
+        ]);
+    }
+
     public function update(Request $request, MedicalRecord $record)
     {
         $validated = $request->validate([
