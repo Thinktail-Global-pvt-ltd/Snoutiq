@@ -60,16 +60,11 @@ class AdminPanelController extends Controller
     {
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
+            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,both'],
         ]);
 
         $limit = (int) ($filters['limit'] ?? 250);
-        $userLeadCount = Schema::hasTable('users') ? User::query()->count() : 0;
-
-        $allUserLeads = User::query()
-            ->select('id', 'name', 'email', 'phone', 'city', 'created_at')
-            ->orderByDesc('created_at')
-            ->limit($limit)
-            ->get();
+        $leadFilter = strtolower((string) ($filters['lead_filter'] ?? 'all'));
 
         $hasPetsTable = Schema::hasTable('pets');
         $hasIsNeutered = $hasPetsTable && Schema::hasColumn('pets', 'is_neutered');
@@ -200,23 +195,122 @@ class AdminPanelController extends Controller
                 ->get();
         }
 
-        $targetUserCount = $neuteringLeads
-            ->pluck('user_id')
-            ->merge($videoFollowUpLeads->pluck('user_id'))
-            ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
-            ->map(fn ($userId) => (int) $userId)
-            ->unique()
-            ->count();
+        $targetUsers = collect();
+
+        $initializeLeadUser = static function (?User $user, int $fallbackUserId = 0): array {
+            return [
+                'id' => $user?->id ? (int) $user->id : $fallbackUserId,
+                'name' => $user?->name,
+                'email' => $user?->email,
+                'phone' => $user?->phone,
+                'city' => $user?->city,
+                'has_neutering' => false,
+                'has_video_follow_up' => false,
+                'neutering_pet_count' => 0,
+                'neutering_pet_names' => [],
+                'video_follow_up_count' => 0,
+                'next_follow_up_date' => null,
+            ];
+        };
+
+        foreach ($neuteringLeads as $petLead) {
+            $owner = $petLead->owner;
+            $ownerId = is_numeric($petLead->user_id) ? (int) $petLead->user_id : null;
+            if ($ownerId === null || $ownerId <= 0) {
+                continue;
+            }
+
+            if (!$targetUsers->has($ownerId)) {
+                $targetUsers->put($ownerId, $initializeLeadUser($owner, $ownerId));
+            }
+
+            $leadUser = $targetUsers->get($ownerId);
+            $leadUser['has_neutering'] = true;
+            $leadUser['neutering_pet_count'] = (int) $leadUser['neutering_pet_count'] + 1;
+
+            $petName = trim((string) ($petLead->name ?? ''));
+            if ($petName !== '' && !in_array($petName, $leadUser['neutering_pet_names'], true)) {
+                $leadUser['neutering_pet_names'][] = $petName;
+            }
+
+            $targetUsers->put($ownerId, $leadUser);
+        }
+
+        foreach ($videoFollowUpLeads as $followUpLead) {
+            $user = $followUpLead->user;
+            $userId = is_numeric($followUpLead->user_id) ? (int) $followUpLead->user_id : null;
+            if ($userId === null || $userId <= 0) {
+                continue;
+            }
+
+            if (!$targetUsers->has($userId)) {
+                $targetUsers->put($userId, $initializeLeadUser($user, $userId));
+            }
+
+            $leadUser = $targetUsers->get($userId);
+            $leadUser['has_video_follow_up'] = true;
+            $leadUser['video_follow_up_count'] = (int) $leadUser['video_follow_up_count'] + 1;
+
+            $followUpDate = null;
+            $rawFollowUpDate = $followUpLead->getAttribute('lead_follow_up_date');
+            if (!empty($rawFollowUpDate)) {
+                try {
+                    $followUpDate = \Illuminate\Support\Carbon::parse($rawFollowUpDate)->toDateString();
+                } catch (\Throwable $e) {
+                    $followUpDate = null;
+                }
+            }
+
+            if ($followUpDate !== null) {
+                $existingDate = $leadUser['next_follow_up_date'];
+                if ($existingDate === null || strcmp($followUpDate, (string) $existingDate) < 0) {
+                    $leadUser['next_follow_up_date'] = $followUpDate;
+                }
+            }
+
+            $targetUsers->put($userId, $leadUser);
+        }
+
+        $filteredTargetUsers = $targetUsers
+            ->values()
+            ->filter(function (array $leadUser) use ($leadFilter): bool {
+                return match ($leadFilter) {
+                    'neutering' => (bool) $leadUser['has_neutering'],
+                    'video_follow_up' => (bool) $leadUser['has_video_follow_up'],
+                    'both' => (bool) $leadUser['has_neutering'] && (bool) $leadUser['has_video_follow_up'],
+                    default => (bool) $leadUser['has_neutering'] || (bool) $leadUser['has_video_follow_up'],
+                };
+            })
+            ->sort(function (array $left, array $right): int {
+                $leftDate = $left['next_follow_up_date'] ?? '9999-12-31';
+                $rightDate = $right['next_follow_up_date'] ?? '9999-12-31';
+                if ($leftDate !== $rightDate) {
+                    return strcmp((string) $leftDate, (string) $rightDate);
+                }
+
+                if ((int) $left['video_follow_up_count'] !== (int) $right['video_follow_up_count']) {
+                    return (int) $right['video_follow_up_count'] <=> (int) $left['video_follow_up_count'];
+                }
+
+                if ((int) $left['neutering_pet_count'] !== (int) $right['neutering_pet_count']) {
+                    return (int) $right['neutering_pet_count'] <=> (int) $left['neutering_pet_count'];
+                }
+
+                return strcmp(
+                    strtolower(trim((string) ($left['name'] ?? ''))),
+                    strtolower(trim((string) ($right['name'] ?? '')))
+                );
+            })
+            ->values();
 
         return view('admin.lead-management', [
-            'allUserLeads' => $allUserLeads,
-            'neuteringLeads' => $neuteringLeads,
-            'videoFollowUpLeads' => $videoFollowUpLeads,
+            'filteredTargetUsers' => $filteredTargetUsers,
+            'leadFilter' => $leadFilter,
             'summary' => [
-                'all_users' => $userLeadCount,
                 'neutering_leads' => $neuteringLeadCount,
                 'video_follow_up_leads' => $videoFollowUpLeadCount,
-                'target_users' => $targetUserCount,
+                'target_users' => $targetUsers->count(),
+                'filtered_users' => $filteredTargetUsers->count(),
             ],
             'limit' => $limit,
             'leadConfig' => [
