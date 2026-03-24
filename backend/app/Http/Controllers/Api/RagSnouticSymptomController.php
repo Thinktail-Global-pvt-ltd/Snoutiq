@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\RagSnouticSymptomService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class RagSnouticSymptomController extends Controller
 {
@@ -207,7 +209,18 @@ class RagSnouticSymptomController extends Controller
             ],
         ];
 
-        return response()->json($body, $queryResult['success'] ? 200 : 502);
+        $statusCode = $queryResult['success'] ? 200 : 502;
+        $this->persistPageDataLog(
+            request: $request,
+            validated: $validated,
+            formValues: $formValues,
+            requestPayload: $requestPayload,
+            queryResult: $queryResult,
+            responseBody: $body,
+            statusCode: $statusCode
+        );
+
+        return response()->json($body, $statusCode);
     }
 
     private function resolvePetId($raw): int
@@ -292,5 +305,60 @@ class RagSnouticSymptomController extends Controller
         }
 
         return $parts === [] ? 'Vaccination data provided.' : implode('; ', $parts);
+    }
+
+    private function persistPageDataLog(
+        Request $request,
+        array $validated,
+        array $formValues,
+        array $requestPayload,
+        array $queryResult,
+        array $responseBody,
+        int $statusCode
+    ): void {
+        if (!Schema::hasTable('rag_symptom_checker_logs')) {
+            return;
+        }
+
+        try {
+            $userId = is_numeric($validated['user_id'] ?? null) ? (int) $validated['user_id'] : null;
+            $petId = is_numeric($validated['pet_id'] ?? null) ? (int) $validated['pet_id'] : null;
+            $petName = trim((string) ($this->firstFilled($validated, ['pet_name', 'name']) ?? ''));
+
+            DB::table('rag_symptom_checker_logs')->insert([
+                'success' => (bool) ($responseBody['success'] ?? false),
+                'user_id' => $userId,
+                'pet_id' => $petId,
+                'pet_name' => $petName !== '' ? $petName : null,
+                'endpoint' => '/api/rag-snoutic-symptom-checker/page-data',
+                'http_method' => strtoupper((string) $request->method()),
+                'input_payload_json' => $this->encodeJson($request->all()),
+                'prefill_data_json' => $this->encodeJson(data_get($responseBody, 'data.prefill_data')),
+                'form_values_json' => $this->encodeJson($formValues),
+                'request_payload_json' => $this->encodeJson($requestPayload),
+                'response_data_json' => $this->encodeJson(data_get($responseBody, 'data.response_data')),
+                'symptom_data_json' => $this->encodeJson(data_get($responseBody, 'data.symptom_data')),
+                'full_response_json' => $this->encodeJson($responseBody),
+                'error_message' => data_get($responseBody, 'data.error'),
+                'http_status_code' => $statusCode,
+                'external_status_code' => is_numeric($queryResult['status'] ?? null) ? (int) $queryResult['status'] : null,
+                'logged_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    private function encodeJson(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return $encoded === false ? null : $encoded;
     }
 }
