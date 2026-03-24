@@ -247,6 +247,7 @@ class AdminPanelController extends Controller
                 'conversion_captured' => false,
                 'conversion_notification_id' => null,
                 'conversion_notification_title' => null,
+                'conversion_notification_text' => null,
                 'conversion_notification_type' => null,
                 'conversion_notification_bucket' => null,
                 'conversion_notification_at' => null,
@@ -364,6 +365,7 @@ class AdminPanelController extends Controller
         $fcmHasSentAt = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'sent_at');
         $fcmHasCreatedAt = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'created_at');
         $fcmHasTitle = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'title');
+        $fcmHasNotificationText = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'notification_text');
         $fcmHasNotificationType = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'notification_type');
         $supportsVaccinationNotificationJoin = $supportsFcmNotifications
             && ($fcmHasNotificationType || $supportsNeuteringNotificationJoin);
@@ -376,6 +378,17 @@ class AdminPanelController extends Controller
             ));
 
             return $titleRaw !== '' ? $titleRaw : null;
+        };
+
+        $resolveNotificationText = static function ($fcmRow, array $dataPayload = []) use ($fcmHasNotificationText): ?string {
+            $textRaw = trim((string) (
+                ($fcmHasNotificationText ? ($fcmRow->notification_text ?? '') : '')
+                ?: (data_get($dataPayload, 'notification_text') ?? '')
+                ?: (data_get($dataPayload, 'body') ?? '')
+                ?: (data_get($dataPayload, 'message') ?? '')
+            ));
+
+            return $textRaw !== '' ? $textRaw : null;
         };
 
         $resolveNotificationType = static function ($fcmRow, array $dataPayload = []) use ($fcmHasNotificationType): string {
@@ -448,6 +461,9 @@ class AdminPanelController extends Controller
                     if ($fcmHasTitle) {
                         $fcmNeuteringQuery->addSelect('title');
                     }
+                    if ($fcmHasNotificationText) {
+                        $fcmNeuteringQuery->addSelect('notification_text');
+                    }
                     if ($fcmHasSentAt) {
                         $fcmNeuteringQuery->addSelect('sent_at');
                     }
@@ -465,6 +481,7 @@ class AdminPanelController extends Controller
                         $dataPayload = is_array($fcmRow->data_payload) ? $fcmRow->data_payload : [];
                         $notificationType = $resolveNotificationType($fcmRow, $dataPayload);
                         $notificationTitle = $resolveNotificationTitle($fcmRow, $dataPayload);
+                        $notificationText = $resolveNotificationText($fcmRow, $dataPayload);
 
                         if (strtolower($notificationType) !== 'pet_neutering_reminder') {
                             continue;
@@ -527,6 +544,7 @@ class AdminPanelController extends Controller
                         $leadUser['all_notifications'][] = [
                             'id' => (int) ($fcmRow->id ?? 0),
                             'notification_title' => $notificationTitle,
+                            'notification_text' => $notificationText,
                             'notification_type' => $notificationType,
                             'timestamp' => $timestamp,
                             'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
@@ -603,6 +621,9 @@ class AdminPanelController extends Controller
                     if ($fcmHasTitle) {
                         $fcmFollowUpQuery->addSelect('title');
                     }
+                    if ($fcmHasNotificationText) {
+                        $fcmFollowUpQuery->addSelect('notification_text');
+                    }
                     if ($fcmHasSentAt) {
                         $fcmFollowUpQuery->addSelect('sent_at');
                     }
@@ -625,6 +646,7 @@ class AdminPanelController extends Controller
                             : [];
                         $notificationType = $resolveNotificationType($fcmRow, $dataPayload);
                         $notificationTitle = $resolveNotificationTitle($fcmRow, $dataPayload);
+                        $notificationText = $resolveNotificationText($fcmRow, $dataPayload);
                         $payloadType = trim((string) data_get($dataPayload, 'type'));
                         $sessionKey = $normalizeSessionKey($fcmRow->call_session ?? '');
 
@@ -676,6 +698,7 @@ class AdminPanelController extends Controller
                             $leadUser['all_notifications'][] = [
                                 'id' => (int) ($fcmRow->id ?? 0),
                                 'notification_title' => $notificationTitle,
+                                'notification_text' => $notificationText,
                                 'notification_type' => $notificationType,
                                 'timestamp' => $timestamp,
                                 'status' => $status,
@@ -735,6 +758,9 @@ class AdminPanelController extends Controller
                 if ($fcmHasTitle) {
                     $fcmVaccinationQuery->addSelect('title');
                 }
+                if ($fcmHasNotificationText) {
+                    $fcmVaccinationQuery->addSelect('notification_text');
+                }
                 if ($fcmHasSentAt) {
                     $fcmVaccinationQuery->addSelect('sent_at');
                 }
@@ -770,6 +796,7 @@ class AdminPanelController extends Controller
                         : [];
                     $notificationType = $resolveNotificationType($fcmRow, $dataPayload);
                     $notificationTitle = $resolveNotificationTitle($fcmRow, $dataPayload);
+                    $notificationText = $resolveNotificationText($fcmRow, $dataPayload);
                     $payloadType = strtolower(trim((string) data_get($dataPayload, 'type')));
 
                     if (strtolower($notificationType) !== $vaccinationReminderType && $payloadType !== $vaccinationReminderType) {
@@ -823,6 +850,7 @@ class AdminPanelController extends Controller
                     $leadUser['all_notifications'][] = [
                         'id' => (int) ($fcmRow->id ?? 0),
                         'notification_title' => $notificationTitle,
+                        'notification_text' => $notificationText,
                         'notification_type' => $vaccinationReminderType,
                         'timestamp' => $timestamp,
                         'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
@@ -1082,6 +1110,9 @@ class AdminPanelController extends Controller
                     $leadUser['conversion_notification_id'] = (int) ($matchedNotification['id'] ?? 0);
                     $leadUser['conversion_notification_title'] = !empty($matchedNotification['notification_title'])
                         ? (string) $matchedNotification['notification_title']
+                        : null;
+                    $leadUser['conversion_notification_text'] = !empty($matchedNotification['notification_text'])
+                        ? (string) $matchedNotification['notification_text']
                         : null;
                     $leadUser['conversion_notification_type'] = (string) ($matchedNotification['notification_type'] ?? 'unknown');
                     $leadUser['conversion_notification_bucket'] = trim((string) ($matchedNotification['bucket'] ?? ''));
