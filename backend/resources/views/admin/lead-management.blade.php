@@ -141,13 +141,12 @@
                         default => '',
                     };
 
-                    $notificationType = (string) ($item['notification_type'] ?? 'unknown');
-                    if ($bucketLabel !== '') {
-                        $notificationType .= " ({$bucketLabel})";
-                    }
-
                     return [
-                        'notification_type' => $notificationType,
+                        'id' => (int) ($item['id'] ?? 0),
+                        'notification_title' => trim((string) ($item['notification_title'] ?? '')),
+                        'notification_type' => (string) ($item['notification_type'] ?? 'unknown'),
+                        'bucket' => $bucket,
+                        'bucket_label' => $bucketLabel !== '' ? $bucketLabel : '—',
                         'timestamp' => (string) ($item['timestamp'] ?? ''),
                     ];
                 })
@@ -155,6 +154,37 @@
                 ->all();
 
             return [$userId => $notifications];
+        })
+        ->all();
+
+    $conversionsByUser = collect($filteredTargetUsers ?? [])
+        ->mapWithKeys(function (array $leadUser): array {
+            $userId = (string) ((int) ($leadUser['id'] ?? 0));
+            $bucket = trim((string) ($leadUser['conversion_notification_bucket'] ?? ''));
+            $bucketLabel = match ($bucket) {
+                'neutering' => 'Neutering',
+                'follow_up' => 'Follow-up',
+                'vaccination' => 'Vaccination',
+                default => 'Lead',
+            };
+
+            return [
+                $userId => [
+                    'captured' => (bool) ($leadUser['conversion_captured'] ?? false),
+                    'notification_id' => (int) ($leadUser['conversion_notification_id'] ?? 0),
+                    'notification_title' => (string) ($leadUser['conversion_notification_title'] ?? ''),
+                    'notification_type' => (string) ($leadUser['conversion_notification_type'] ?? ''),
+                    'notification_bucket_label' => $bucketLabel,
+                    'notification_at' => (string) ($leadUser['conversion_notification_at'] ?? ''),
+                    'transaction_id' => (int) ($leadUser['conversion_transaction_id'] ?? 0),
+                    'transaction_type' => (string) ($leadUser['conversion_transaction_type'] ?? ''),
+                    'transaction_status' => (string) ($leadUser['conversion_transaction_status'] ?? ''),
+                    'transaction_at' => (string) ($leadUser['conversion_transaction_at'] ?? ''),
+                    'lag_minutes' => is_numeric($leadUser['conversion_lag_minutes'] ?? null)
+                        ? (int) $leadUser['conversion_lag_minutes']
+                        : null,
+                ],
+            ];
         })
         ->all();
 
@@ -509,7 +539,7 @@
 </div>
 
 <div class="modal fade" id="userNotificationsModal" tabindex="-1" aria-labelledby="userNotificationsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="userNotificationsModalLabel">Notifications</h5>
@@ -517,17 +547,21 @@
             </div>
             <div class="modal-body">
                 <div class="text-muted small mb-2" id="userNotificationsMeta"></div>
+                <div class="border rounded p-3 mb-3 bg-light" id="userConversionMeta"></div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
                         <thead class="table-light">
                             <tr>
+                                <th>Notification Title (Exact)</th>
                                 <th>Notification Type</th>
+                                <th>Lead Bucket</th>
                                 <th>Time (Timestamp)</th>
+                                <th>Converted</th>
                             </tr>
                         </thead>
                         <tbody id="userNotificationsTableBody">
                             <tr>
-                                <td colspan="2" class="text-muted">No notifications found.</td>
+                                <td colspan="5" class="text-muted">No notifications found.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -545,8 +579,10 @@
 <script>
 (() => {
     const notificationsByUser = @json($notificationsByUser);
+    const conversionsByUser = @json($conversionsByUser);
     const modal = document.getElementById('userNotificationsModal');
     const meta = document.getElementById('userNotificationsMeta');
+    const conversionMeta = document.getElementById('userConversionMeta');
     const body = document.getElementById('userNotificationsTableBody');
     const escapeHtml = (value) => String(value)
         .replace(/&/g, '&amp;')
@@ -555,25 +591,66 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 
-    if (!modal || !meta || !body) return;
+    if (!modal || !meta || !conversionMeta || !body) return;
 
     modal.addEventListener('show.bs.modal', (event) => {
         const trigger = event.relatedTarget;
         const userId = trigger?.getAttribute('data-user-id') || '';
         const userName = trigger?.getAttribute('data-user-name') || 'User';
         const rows = notificationsByUser[userId] || [];
+        const conversion = conversionsByUser[userId] || null;
 
         meta.textContent = `${userName} (ID: ${userId}) • ${rows.length} notifications`;
 
+        if (conversion?.captured) {
+            const title = escapeHtml(conversion.notification_title || '—');
+            const type = escapeHtml(conversion.notification_type || 'unknown');
+            const bucket = escapeHtml(conversion.notification_bucket_label || 'Lead');
+            const notifiedAt = escapeHtml(conversion.notification_at || '—');
+            const txnId = Number(conversion.transaction_id || 0);
+            const txnType = escapeHtml(conversion.transaction_type || 'unknown');
+            const txnStatus = escapeHtml(conversion.transaction_status || '—');
+            const txnAt = escapeHtml(conversion.transaction_at || '—');
+            const lagRaw = conversion.lag_minutes;
+            const lag = (lagRaw !== null && lagRaw !== undefined && lagRaw !== '' && Number.isFinite(Number(lagRaw)))
+                ? `${Number(lagRaw)} min`
+                : '—';
+
+            conversionMeta.innerHTML = `
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge text-bg-success">Converted</span>
+                    <span class="small text-muted">Notification -> Transaction attribution</span>
+                </div>
+                <div class="small"><strong>Notification title:</strong> ${title}</div>
+                <div class="small"><strong>Notification type:</strong> ${type} (${bucket})</div>
+                <div class="small"><strong>Notified at:</strong> ${notifiedAt}</div>
+                <div class="small"><strong>Converted transaction:</strong> #${txnId} • ${txnType} • ${txnStatus}</div>
+                <div class="small"><strong>Transaction time:</strong> ${txnAt} • <strong>Lag:</strong> ${lag}</div>
+            `;
+        } else {
+            conversionMeta.innerHTML = `
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge text-bg-secondary">Not converted</span>
+                    <span class="small text-muted">No transaction mapped after delivered notifications.</span>
+                </div>
+            `;
+        }
+
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="2" class="text-muted">No notifications found.</td></tr>';
+            body.innerHTML = '<tr><td colspan="5" class="text-muted">No notifications found.</td></tr>';
             return;
         }
 
         body.innerHTML = rows.map((row) => {
+            const title = escapeHtml(row.notification_title || '—');
             const type = escapeHtml(row.notification_type || 'unknown');
+            const bucket = escapeHtml(row.bucket_label || '—');
             const ts = escapeHtml(row.timestamp || '—');
-            return `<tr><td>${type}</td><td>${ts}</td></tr>`;
+            const converted = (conversion?.captured && Number(conversion.notification_id || 0) > 0 && Number(conversion.notification_id || 0) === Number(row.id || 0))
+                ? '<span class="badge text-bg-success">Yes</span>'
+                : '<span class="text-muted">—</span>';
+
+            return `<tr><td>${title}</td><td>${type}</td><td>${bucket}</td><td>${ts}</td><td>${converted}</td></tr>`;
         }).join('');
     });
 })();
