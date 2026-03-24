@@ -120,6 +120,7 @@
         'all' => 'All Targeted Users',
         'neutering' => 'Neutering Package Leads',
         'video_follow_up' => 'Video Follow-up Leads',
+        'vaccination' => 'Vaccination Reminder Leads',
         'both' => 'Users In Both Categories',
     ];
 
@@ -134,6 +135,7 @@
                     $bucketLabel = match ($bucket) {
                         'neutering' => 'Neutering',
                         'follow_up' => 'Follow-up',
+                        'vaccination' => 'Vaccination',
                         default => '',
                     };
 
@@ -186,7 +188,7 @@
                 <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
                     <div>
                         <h2 class="h5 mb-1">Lead Categories</h2>
-                        <p class="text-muted mb-0">Showing only users from Neutering and Video Follow-up lead buckets.</p>
+                        <p class="text-muted mb-0">Showing only users from Neutering, Video Follow-up, and Vaccination reminder lead buckets.</p>
                     </div>
                     <form class="d-flex align-items-center gap-2 flex-wrap" method="GET" action="{{ route('admin.lead-management') }}">
                         <label for="lead_filter" class="small text-muted text-nowrap mb-0">Category filter</label>
@@ -194,6 +196,7 @@
                             <option value="all" @selected($leadFilter === 'all')>All targeted users</option>
                             <option value="neutering" @selected($leadFilter === 'neutering')>Neutering package leads</option>
                             <option value="video_follow_up" @selected($leadFilter === 'video_follow_up')>Video follow-up leads</option>
+                            <option value="vaccination" @selected($leadFilter === 'vaccination')>Vaccination reminder leads</option>
                             <option value="both" @selected($leadFilter === 'both')>Users in both categories</option>
                         </select>
 
@@ -214,6 +217,9 @@
                 @endif
                 @if(!($leadConfig['supports_follow_up_notification_join'] ?? false))
                     <div class="alert alert-warning py-2 mb-3">Follow-up notification join is unavailable (missing <code>fcm_notifications.call_session</code> or <code>prescriptions.call_session</code>).</div>
+                @endif
+                @if(!($leadConfig['supports_vaccination_notification_join'] ?? false))
+                    <div class="alert alert-warning py-2 mb-3">Vaccination reminder module is unavailable (missing <code>fcm_notifications.notification_type</code> / <code>fcm_notifications.data_payload</code>).</div>
                 @endif
 
                 <div class="row g-3">
@@ -247,6 +253,12 @@
                             <div class="label">Neutering Notified Users</div>
                         </div>
                     </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="lead-summary-card">
+                            <div class="value">{{ number_format($summary['vaccination_notified_users'] ?? 0) }}</div>
+                            <div class="label">Vaccination Notified Users</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -278,6 +290,7 @@
                                     <th>Lead Categories</th>
                                     <th>Neutering Pets</th>
                                     <th>Neutering Notification</th>
+                                    <th>Vaccination Reminder</th>
                                     <th>Video Follow-up</th>
                                 </tr>
                             </thead>
@@ -302,6 +315,8 @@
 
                                         $neuteringNotificationCount = (int) ($leadUser['neutering_notification_count'] ?? 0);
                                         $notifiedNeuteringPetNames = collect($leadUser['notified_neutering_pet_names'] ?? [])->take(3)->implode(', ');
+                                        $vaccinationNotificationCount = (int) ($leadUser['vaccination_notification_count'] ?? 0);
+                                        $notifiedVaccinationPetNames = collect($leadUser['notified_vaccination_pet_names'] ?? [])->take(3)->implode(', ');
                                     @endphp
                                     <tr>
                                         <td data-label="User">
@@ -319,6 +334,9 @@
                                             @endif
                                             @if(!empty($leadUser['has_video_follow_up']))
                                                 <span class="badge text-bg-success">Video Follow-up</span>
+                                            @endif
+                                            @if(!empty($leadUser['has_vaccination_reminder']))
+                                                <span class="badge text-bg-info">Vaccination Reminder</span>
                                             @endif
                                         </td>
                                         <td data-label="Neutering Pets">
@@ -356,6 +374,18 @@
                                                 </button>
                                                 <div class="text-muted small mt-1">{{ $allNotificationsCount }} total</div>
                                             </div>
+                                        </td>
+                                        <td data-label="Vaccination Reminder">
+                                            @if(!($leadConfig['supports_vaccination_notification_join'] ?? false))
+                                                <span class="badge text-bg-light">Unavailable</span>
+                                            @elseif($vaccinationNotificationCount > 0)
+                                                <span class="badge text-bg-info">Sent</span>
+                                                <div class="text-muted small mt-1">Notifications: {{ $vaccinationNotificationCount }}</div>
+                                                <div class="text-muted small">{{ $notifiedVaccinationPetNames ?: '—' }}</div>
+                                                <div class="text-muted small">Last sent: {{ $formatDateTime($leadUser['last_vaccination_notification_at'] ?? null) }}</div>
+                                            @else
+                                                <span class="badge text-bg-secondary">Not sent</span>
+                                            @endif
                                         </td>
                                         <td data-label="Video Follow-up">
                                             <div class="fw-semibold">{{ (int) ($leadUser['video_follow_up_count'] ?? 0) }} follow-ups</div>

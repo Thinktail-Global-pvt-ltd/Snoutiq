@@ -61,7 +61,7 @@ class AdminPanelController extends Controller
     {
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
-            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,both'],
+            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,vaccination,both'],
         ]);
 
         $limit = (int) ($filters['limit'] ?? 250);
@@ -207,6 +207,7 @@ class AdminPanelController extends Controller
                 'city' => $user?->city,
                 'has_neutering' => false,
                 'has_video_follow_up' => false,
+                'has_vaccination_reminder' => false,
                 'neutering_pet_count' => 0,
                 'neutering_pet_names' => [],
                 'video_follow_up_count' => 0,
@@ -215,6 +216,10 @@ class AdminPanelController extends Controller
                 'notified_neutering_pet_ids' => [],
                 'notified_neutering_pet_names' => [],
                 'last_neutering_notification_at' => null,
+                'vaccination_notification_count' => 0,
+                'notified_vaccination_pet_ids' => [],
+                'notified_vaccination_pet_names' => [],
+                'last_vaccination_notification_at' => null,
                 'all_notifications_count' => 0,
                 'all_notifications' => [],
             ];
@@ -300,6 +305,9 @@ class AdminPanelController extends Controller
         $fcmHasSentAt = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'sent_at');
         $fcmHasCreatedAt = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'created_at');
         $fcmHasNotificationType = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'notification_type');
+        $supportsVaccinationNotificationJoin = $supportsFcmNotifications
+            && ($fcmHasNotificationType || $supportsNeuteringNotificationJoin);
+        $vaccinationReminderType = 'pet_vaccination_upcoming_reminder';
 
         $resolveNotificationType = static function ($fcmRow, array $dataPayload = []) use ($fcmHasNotificationType): string {
             $notificationTypeRaw = trim((string) (
@@ -333,13 +341,7 @@ class AdminPanelController extends Controller
             return $fcmHasSentAt && $normalizeDateTime($fcmRow->sent_at) !== null;
         };
 
-        if ($supportsFcmNotifications && $targetUsers->isNotEmpty()) {
-            $targetUserIds = $targetUsers->keys()
-                ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
-                ->map(fn ($userId) => (int) $userId)
-                ->unique()
-                ->values();
-
+        if ($supportsFcmNotifications) {
             // 1) Neutering notifications: data_payload.pet_id -> neutering lead pets.
             if ($supportsNeuteringNotificationJoin && $neuteringLeads->isNotEmpty()) {
                 $neuteringPetLookup = $neuteringLeads
@@ -603,6 +605,144 @@ class AdminPanelController extends Controller
                     }
                 }
             }
+
+            // 3) Vaccination notifications: fcm_notifications.user_id + notification type.
+            if ($supportsVaccinationNotificationJoin) {
+                $vaccinationReminderBaseQuery = FcmNotification::query()
+                    ->whereNotNull('user_id')
+                    ->where('user_id', '>', 0)
+                    ->where(function (Builder $query) use ($fcmHasNotificationType, $supportsNeuteringNotificationJoin, $vaccinationReminderType): void {
+                        $hasCondition = false;
+                        if ($fcmHasNotificationType) {
+                            $query->whereRaw(
+                                "LOWER(TRIM(COALESCE(notification_type, ''))) = ?",
+                                [$vaccinationReminderType]
+                            );
+                            $hasCondition = true;
+                        }
+
+                        if ($supportsNeuteringNotificationJoin) {
+                            if ($hasCondition) {
+                                $query->orWhereRaw(
+                                    "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_payload, '$.type')), ''))) = ?",
+                                    [$vaccinationReminderType]
+                                );
+                            } else {
+                                $query->whereRaw(
+                                    "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_payload, '$.type')), ''))) = ?",
+                                    [$vaccinationReminderType]
+                                );
+                            }
+                        }
+                    });
+
+                $fcmVaccinationQuery = (clone $vaccinationReminderBaseQuery)
+                    ->select(['id', 'user_id']);
+
+                if ($supportsNeuteringNotificationJoin) {
+                    $fcmVaccinationQuery->addSelect('data_payload');
+                }
+                if ($fcmHasNotificationType) {
+                    $fcmVaccinationQuery->addSelect('notification_type');
+                }
+                if ($fcmHasStatus) {
+                    $fcmVaccinationQuery->addSelect('status');
+                }
+                if ($fcmHasSentAt) {
+                    $fcmVaccinationQuery->addSelect('sent_at');
+                }
+                if ($fcmHasCreatedAt) {
+                    $fcmVaccinationQuery->addSelect('created_at');
+                }
+
+                $fcmVaccinationRows = $fcmVaccinationQuery
+                    ->orderByDesc('id')
+                    ->limit($limit)
+                    ->get();
+
+                $vaccinationUsers = User::query()
+                    ->whereIn(
+                        'id',
+                        $fcmVaccinationRows->pluck('user_id')
+                            ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                            ->map(fn ($userId) => (int) $userId)
+                            ->unique()
+                            ->values()
+                            ->all()
+                    )
+                    ->get(['id', 'name', 'email', 'phone', 'city'])
+                    ->keyBy('id');
+
+                foreach ($fcmVaccinationRows as $fcmRow) {
+                    if (!$isDeliveredNotification($fcmRow)) {
+                        continue;
+                    }
+
+                    $dataPayload = ($supportsNeuteringNotificationJoin && is_array($fcmRow->data_payload))
+                        ? $fcmRow->data_payload
+                        : [];
+                    $notificationType = $resolveNotificationType($fcmRow, $dataPayload);
+                    $payloadType = strtolower(trim((string) data_get($dataPayload, 'type')));
+
+                    if (strtolower($notificationType) !== $vaccinationReminderType && $payloadType !== $vaccinationReminderType) {
+                        continue;
+                    }
+
+                    $userIdRaw = $fcmRow->user_id ?? data_get($dataPayload, 'user_id');
+                    if (!is_numeric($userIdRaw)) {
+                        continue;
+                    }
+
+                    $userId = (int) $userIdRaw;
+                    if ($userId <= 0) {
+                        continue;
+                    }
+
+                    if (!$targetUsers->has($userId)) {
+                        $user = $vaccinationUsers->get($userId);
+                        $targetUsers->put($userId, $initializeLeadUser($user instanceof User ? $user : null, $userId));
+                    }
+
+                    $leadUser = $targetUsers->get($userId);
+                    if (!is_array($leadUser)) {
+                        continue;
+                    }
+
+                    $leadUser['has_vaccination_reminder'] = true;
+                    $leadUser['vaccination_notification_count'] = (int) $leadUser['vaccination_notification_count'] + 1;
+
+                    $petIdRaw = data_get($dataPayload, 'pet_id');
+                    if (is_numeric($petIdRaw)) {
+                        $petId = (int) $petIdRaw;
+                        if ($petId > 0 && !in_array($petId, $leadUser['notified_vaccination_pet_ids'], true)) {
+                            $leadUser['notified_vaccination_pet_ids'][] = $petId;
+                        }
+                    }
+
+                    $petName = trim((string) (data_get($dataPayload, 'pet_name') ?? ''));
+                    if ($petName !== '' && !in_array($petName, $leadUser['notified_vaccination_pet_names'], true)) {
+                        $leadUser['notified_vaccination_pet_names'][] = $petName;
+                    }
+
+                    $timestamp = $resolveNotificationTimestamp($fcmRow);
+                    if ($timestamp !== null) {
+                        $currentLastSentAt = $leadUser['last_vaccination_notification_at'];
+                        if ($currentLastSentAt === null || strcmp($timestamp, (string) $currentLastSentAt) > 0) {
+                            $leadUser['last_vaccination_notification_at'] = $timestamp;
+                        }
+                    }
+
+                    $leadUser['all_notifications'][] = [
+                        'id' => (int) ($fcmRow->id ?? 0),
+                        'notification_type' => $vaccinationReminderType,
+                        'timestamp' => $timestamp,
+                        'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
+                        'bucket' => 'vaccination',
+                    ];
+
+                    $targetUsers->put($userId, $leadUser);
+                }
+            }
         }
 
         $targetUsers = $targetUsers->map(function (array $leadUser): array {
@@ -636,8 +776,11 @@ class AdminPanelController extends Controller
                 return match ($leadFilter) {
                     'neutering' => (bool) $leadUser['has_neutering'],
                     'video_follow_up' => (bool) $leadUser['has_video_follow_up'],
+                    'vaccination' => (bool) $leadUser['has_vaccination_reminder'],
                     'both' => (bool) $leadUser['has_neutering'] && (bool) $leadUser['has_video_follow_up'],
-                    default => (bool) $leadUser['has_neutering'] || (bool) $leadUser['has_video_follow_up'],
+                    default => (bool) $leadUser['has_neutering']
+                        || (bool) $leadUser['has_video_follow_up']
+                        || (bool) $leadUser['has_vaccination_reminder'],
                 };
             })
             ->sort(function (array $left, array $right): int {
@@ -649,6 +792,10 @@ class AdminPanelController extends Controller
 
                 if ((int) $left['video_follow_up_count'] !== (int) $right['video_follow_up_count']) {
                     return (int) $right['video_follow_up_count'] <=> (int) $left['video_follow_up_count'];
+                }
+
+                if ((int) $left['vaccination_notification_count'] !== (int) $right['vaccination_notification_count']) {
+                    return (int) $right['vaccination_notification_count'] <=> (int) $left['vaccination_notification_count'];
                 }
 
                 if ((int) $left['neutering_pet_count'] !== (int) $right['neutering_pet_count']) {
@@ -667,6 +814,10 @@ class AdminPanelController extends Controller
             ->filter(fn (array $leadUser) => (int) ($leadUser['neutering_notification_count'] ?? 0) > 0)
             ->count();
 
+        $vaccinationNotifiedUsersCount = $targetUsers
+            ->filter(fn (array $leadUser) => (int) ($leadUser['vaccination_notification_count'] ?? 0) > 0)
+            ->count();
+
         return view('admin.lead-management', [
             'filteredTargetUsers' => $filteredTargetUsers,
             'leadFilter' => $leadFilter,
@@ -676,6 +827,7 @@ class AdminPanelController extends Controller
                 'target_users' => $targetUsers->count(),
                 'filtered_users' => $filteredTargetUsers->count(),
                 'neutering_notified_users' => $neuteringNotifiedUsersCount,
+                'vaccination_notified_users' => $vaccinationNotifiedUsersCount,
             ],
             'limit' => $limit,
             'leadConfig' => [
@@ -683,6 +835,7 @@ class AdminPanelController extends Controller
                 'supports_video_follow_up' => $supportsVideoFollowUpLeads,
                 'supports_neutering_notification_join' => $supportsNeuteringNotificationJoin,
                 'supports_follow_up_notification_join' => $supportsFollowUpNotificationJoin,
+                'supports_vaccination_notification_join' => $supportsVaccinationNotificationJoin,
                 'transaction_session_column' => $transactionSessionColumn,
                 'neutering_columns' => [
                     'is_neutered' => $hasIsNeutered,
