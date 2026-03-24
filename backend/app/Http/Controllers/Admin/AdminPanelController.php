@@ -61,7 +61,7 @@ class AdminPanelController extends Controller
     {
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
-            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,vaccination,both'],
+            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,video_follow_up_video,video_follow_up_in_clinic,vaccination,both'],
         ]);
 
         $limit = (int) ($filters['limit'] ?? 250);
@@ -127,6 +127,7 @@ class AdminPanelController extends Controller
         $hasTransactionMetadata = $hasTransactionsTable && Schema::hasColumn('transactions', 'metadata');
         $hasPrescriptionCallSession = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'call_session');
         $hasPrescriptionFollowUpDate = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'follow_up_date');
+        $hasPrescriptionVideoInclinic = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'video_inclinic');
 
         $transactionSessionColumn = null;
         if ($hasTransactionsTable && Schema::hasColumn('transactions', 'call_session')) {
@@ -139,8 +140,11 @@ class AdminPanelController extends Controller
             && $hasPrescriptionCallSession
             && $hasPrescriptionFollowUpDate
             && is_string($transactionSessionColumn);
+        $supportsVideoFollowUpModeSplit = $supportsVideoFollowUpLeads && $hasPrescriptionVideoInclinic;
 
         $videoFollowUpLeadCount = 0;
+        $videoFollowUpVideoLeadCount = 0;
+        $videoFollowUpInClinicLeadCount = 0;
         $videoFollowUpLeads = collect();
 
         if ($supportsVideoFollowUpLeads) {
@@ -176,6 +180,15 @@ class AdminPanelController extends Controller
                 );
 
             $videoFollowUpLeadCount = (clone $videoFollowUpBaseQuery)->count('transactions.id');
+            if ($supportsVideoFollowUpModeSplit) {
+                $videoFollowUpVideoLeadCount = (clone $videoFollowUpBaseQuery)
+                    ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('video', 'video_consult', 'video_consultation')")
+                    ->count('transactions.id');
+
+                $videoFollowUpInClinicLeadCount = (clone $videoFollowUpBaseQuery)
+                    ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('in_clinic', 'inclinic', 'in-clinic', 'clinic')")
+                    ->count('transactions.id');
+            }
 
             $videoFollowUpLeads = $videoFollowUpBaseQuery
                 ->select('transactions.*')
@@ -183,6 +196,9 @@ class AdminPanelController extends Controller
                     'lead_prescription_id' => DB::raw('lead_prescription.id'),
                     'lead_follow_up_date' => DB::raw('lead_prescription.follow_up_date'),
                     'lead_call_session' => DB::raw('lead_prescription.call_session'),
+                    'lead_video_inclinic' => $hasPrescriptionVideoInclinic
+                        ? DB::raw('lead_prescription.video_inclinic')
+                        : DB::raw('NULL'),
                 ])
                 ->with([
                     'clinic:id,name',
@@ -207,11 +223,17 @@ class AdminPanelController extends Controller
                 'city' => $user?->city,
                 'has_neutering' => false,
                 'has_video_follow_up' => false,
+                'has_video_follow_up_video' => false,
+                'has_video_follow_up_in_clinic' => false,
                 'has_vaccination_reminder' => false,
                 'neutering_pet_count' => 0,
                 'neutering_pet_names' => [],
                 'video_follow_up_count' => 0,
+                'video_follow_up_video_count' => 0,
+                'video_follow_up_in_clinic_count' => 0,
                 'next_follow_up_date' => null,
+                'next_video_follow_up_date' => null,
+                'next_in_clinic_follow_up_date' => null,
                 'neutering_notification_count' => 0,
                 'notified_neutering_pet_ids' => [],
                 'notified_neutering_pet_names' => [],
@@ -275,6 +297,18 @@ class AdminPanelController extends Controller
             $leadUser['has_video_follow_up'] = true;
             $leadUser['video_follow_up_count'] = (int) $leadUser['video_follow_up_count'] + 1;
 
+            $followUpModeRaw = strtolower(trim((string) ($followUpLead->getAttribute('lead_video_inclinic') ?? '')));
+            $isVideoFollowUp = in_array($followUpModeRaw, ['video', 'video_consult', 'video_consultation'], true);
+            $isInClinicFollowUp = in_array($followUpModeRaw, ['in_clinic', 'inclinic', 'in-clinic', 'clinic'], true);
+
+            if ($isVideoFollowUp) {
+                $leadUser['has_video_follow_up_video'] = true;
+                $leadUser['video_follow_up_video_count'] = (int) $leadUser['video_follow_up_video_count'] + 1;
+            } elseif ($isInClinicFollowUp) {
+                $leadUser['has_video_follow_up_in_clinic'] = true;
+                $leadUser['video_follow_up_in_clinic_count'] = (int) $leadUser['video_follow_up_in_clinic_count'] + 1;
+            }
+
             $followUpDate = null;
             $rawFollowUpDate = $followUpLead->getAttribute('lead_follow_up_date');
             if (!empty($rawFollowUpDate)) {
@@ -289,6 +323,18 @@ class AdminPanelController extends Controller
                 $existingDate = $leadUser['next_follow_up_date'];
                 if ($existingDate === null || strcmp($followUpDate, (string) $existingDate) < 0) {
                     $leadUser['next_follow_up_date'] = $followUpDate;
+                }
+
+                if ($isVideoFollowUp) {
+                    $existingVideoDate = $leadUser['next_video_follow_up_date'];
+                    if ($existingVideoDate === null || strcmp($followUpDate, (string) $existingVideoDate) < 0) {
+                        $leadUser['next_video_follow_up_date'] = $followUpDate;
+                    }
+                } elseif ($isInClinicFollowUp) {
+                    $existingInClinicDate = $leadUser['next_in_clinic_follow_up_date'];
+                    if ($existingInClinicDate === null || strcmp($followUpDate, (string) $existingInClinicDate) < 0) {
+                        $leadUser['next_in_clinic_follow_up_date'] = $followUpDate;
+                    }
                 }
             }
 
@@ -776,6 +822,8 @@ class AdminPanelController extends Controller
                 return match ($leadFilter) {
                     'neutering' => (bool) $leadUser['has_neutering'],
                     'video_follow_up' => (bool) $leadUser['has_video_follow_up'],
+                    'video_follow_up_video' => (bool) $leadUser['has_video_follow_up_video'],
+                    'video_follow_up_in_clinic' => (bool) $leadUser['has_video_follow_up_in_clinic'],
                     'vaccination' => (bool) $leadUser['has_vaccination_reminder'],
                     'both' => (bool) $leadUser['has_neutering'] && (bool) $leadUser['has_video_follow_up'],
                     default => (bool) $leadUser['has_neutering']
@@ -792,6 +840,14 @@ class AdminPanelController extends Controller
 
                 if ((int) $left['video_follow_up_count'] !== (int) $right['video_follow_up_count']) {
                     return (int) $right['video_follow_up_count'] <=> (int) $left['video_follow_up_count'];
+                }
+
+                if ((int) $left['video_follow_up_video_count'] !== (int) $right['video_follow_up_video_count']) {
+                    return (int) $right['video_follow_up_video_count'] <=> (int) $left['video_follow_up_video_count'];
+                }
+
+                if ((int) $left['video_follow_up_in_clinic_count'] !== (int) $right['video_follow_up_in_clinic_count']) {
+                    return (int) $right['video_follow_up_in_clinic_count'] <=> (int) $left['video_follow_up_in_clinic_count'];
                 }
 
                 if ((int) $left['vaccination_notification_count'] !== (int) $right['vaccination_notification_count']) {
@@ -824,6 +880,8 @@ class AdminPanelController extends Controller
             'summary' => [
                 'neutering_leads' => $neuteringLeadCount,
                 'video_follow_up_leads' => $videoFollowUpLeadCount,
+                'video_follow_up_video_leads' => $videoFollowUpVideoLeadCount,
+                'video_follow_up_in_clinic_leads' => $videoFollowUpInClinicLeadCount,
                 'target_users' => $targetUsers->count(),
                 'filtered_users' => $filteredTargetUsers->count(),
                 'neutering_notified_users' => $neuteringNotifiedUsersCount,
@@ -833,6 +891,7 @@ class AdminPanelController extends Controller
             'leadConfig' => [
                 'supports_neutering' => $hasIsNeutered || $hasIsNuetered,
                 'supports_video_follow_up' => $supportsVideoFollowUpLeads,
+                'supports_video_follow_up_mode_split' => $supportsVideoFollowUpModeSplit,
                 'supports_neutering_notification_join' => $supportsNeuteringNotificationJoin,
                 'supports_follow_up_notification_join' => $supportsFollowUpNotificationJoin,
                 'supports_vaccination_notification_join' => $supportsVaccinationNotificationJoin,
