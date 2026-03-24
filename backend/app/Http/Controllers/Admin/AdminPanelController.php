@@ -61,7 +61,7 @@ class AdminPanelController extends Controller
     {
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
-            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,vaccination,both'],
+            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,video_follow_up_video,video_follow_up_in_clinic,vaccination,both'],
         ]);
 
         $limit = (int) ($filters['limit'] ?? 250);
@@ -127,6 +127,7 @@ class AdminPanelController extends Controller
         $hasTransactionMetadata = $hasTransactionsTable && Schema::hasColumn('transactions', 'metadata');
         $hasPrescriptionCallSession = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'call_session');
         $hasPrescriptionFollowUpDate = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'follow_up_date');
+        $hasPrescriptionVideoInclinic = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'video_inclinic');
 
         $transactionSessionColumn = null;
         if ($hasTransactionsTable && Schema::hasColumn('transactions', 'call_session')) {
@@ -139,8 +140,11 @@ class AdminPanelController extends Controller
             && $hasPrescriptionCallSession
             && $hasPrescriptionFollowUpDate
             && is_string($transactionSessionColumn);
+        $supportsVideoFollowUpModeSplit = $supportsVideoFollowUpLeads && $hasPrescriptionVideoInclinic;
 
         $videoFollowUpLeadCount = 0;
+        $videoFollowUpVideoLeadCount = 0;
+        $videoFollowUpInClinicLeadCount = 0;
         $videoFollowUpLeads = collect();
 
         if ($supportsVideoFollowUpLeads) {
@@ -176,6 +180,15 @@ class AdminPanelController extends Controller
                 );
 
             $videoFollowUpLeadCount = (clone $videoFollowUpBaseQuery)->count('transactions.id');
+            if ($supportsVideoFollowUpModeSplit) {
+                $videoFollowUpVideoLeadCount = (clone $videoFollowUpBaseQuery)
+                    ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('video', 'video_consult', 'video_consultation')")
+                    ->count('transactions.id');
+
+                $videoFollowUpInClinicLeadCount = (clone $videoFollowUpBaseQuery)
+                    ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('in_clinic', 'inclinic', 'in-clinic', 'clinic')")
+                    ->count('transactions.id');
+            }
 
             $videoFollowUpLeads = $videoFollowUpBaseQuery
                 ->select('transactions.*')
@@ -183,6 +196,9 @@ class AdminPanelController extends Controller
                     'lead_prescription_id' => DB::raw('lead_prescription.id'),
                     'lead_follow_up_date' => DB::raw('lead_prescription.follow_up_date'),
                     'lead_call_session' => DB::raw('lead_prescription.call_session'),
+                    'lead_video_inclinic' => $hasPrescriptionVideoInclinic
+                        ? DB::raw('lead_prescription.video_inclinic')
+                        : DB::raw('NULL'),
                 ])
                 ->with([
                     'clinic:id,name',
@@ -207,11 +223,17 @@ class AdminPanelController extends Controller
                 'city' => $user?->city,
                 'has_neutering' => false,
                 'has_video_follow_up' => false,
+                'has_video_follow_up_video' => false,
+                'has_video_follow_up_in_clinic' => false,
                 'has_vaccination_reminder' => false,
                 'neutering_pet_count' => 0,
                 'neutering_pet_names' => [],
                 'video_follow_up_count' => 0,
+                'video_follow_up_video_count' => 0,
+                'video_follow_up_in_clinic_count' => 0,
                 'next_follow_up_date' => null,
+                'next_video_follow_up_date' => null,
+                'next_in_clinic_follow_up_date' => null,
                 'neutering_notification_count' => 0,
                 'notified_neutering_pet_ids' => [],
                 'notified_neutering_pet_names' => [],
@@ -222,6 +244,15 @@ class AdminPanelController extends Controller
                 'last_vaccination_notification_at' => null,
                 'all_notifications_count' => 0,
                 'all_notifications' => [],
+                'conversion_captured' => false,
+                'conversion_notification_type' => null,
+                'conversion_notification_bucket' => null,
+                'conversion_notification_at' => null,
+                'conversion_transaction_id' => null,
+                'conversion_transaction_type' => null,
+                'conversion_transaction_status' => null,
+                'conversion_transaction_at' => null,
+                'conversion_lag_minutes' => null,
             ];
         };
 
@@ -236,6 +267,8 @@ class AdminPanelController extends Controller
                 return null;
             }
         };
+
+        $normalizeSessionKey = static fn ($value): string => strtolower(trim((string) $value));
 
         foreach ($neuteringLeads as $petLead) {
             $owner = $petLead->owner;
@@ -275,6 +308,18 @@ class AdminPanelController extends Controller
             $leadUser['has_video_follow_up'] = true;
             $leadUser['video_follow_up_count'] = (int) $leadUser['video_follow_up_count'] + 1;
 
+            $followUpModeRaw = strtolower(trim((string) ($followUpLead->getAttribute('lead_video_inclinic') ?? '')));
+            $isVideoFollowUp = in_array($followUpModeRaw, ['video', 'video_consult', 'video_consultation'], true);
+            $isInClinicFollowUp = in_array($followUpModeRaw, ['in_clinic', 'inclinic', 'in-clinic', 'clinic'], true);
+
+            if ($isVideoFollowUp) {
+                $leadUser['has_video_follow_up_video'] = true;
+                $leadUser['video_follow_up_video_count'] = (int) $leadUser['video_follow_up_video_count'] + 1;
+            } elseif ($isInClinicFollowUp) {
+                $leadUser['has_video_follow_up_in_clinic'] = true;
+                $leadUser['video_follow_up_in_clinic_count'] = (int) $leadUser['video_follow_up_in_clinic_count'] + 1;
+            }
+
             $followUpDate = null;
             $rawFollowUpDate = $followUpLead->getAttribute('lead_follow_up_date');
             if (!empty($rawFollowUpDate)) {
@@ -289,6 +334,18 @@ class AdminPanelController extends Controller
                 $existingDate = $leadUser['next_follow_up_date'];
                 if ($existingDate === null || strcmp($followUpDate, (string) $existingDate) < 0) {
                     $leadUser['next_follow_up_date'] = $followUpDate;
+                }
+
+                if ($isVideoFollowUp) {
+                    $existingVideoDate = $leadUser['next_video_follow_up_date'];
+                    if ($existingVideoDate === null || strcmp($followUpDate, (string) $existingVideoDate) < 0) {
+                        $leadUser['next_video_follow_up_date'] = $followUpDate;
+                    }
+                } elseif ($isInClinicFollowUp) {
+                    $existingInClinicDate = $leadUser['next_in_clinic_follow_up_date'];
+                    if ($existingInClinicDate === null || strcmp($followUpDate, (string) $existingInClinicDate) < 0) {
+                        $leadUser['next_in_clinic_follow_up_date'] = $followUpDate;
+                    }
                 }
             }
 
@@ -457,6 +514,8 @@ class AdminPanelController extends Controller
                             'timestamp' => $timestamp,
                             'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
                             'bucket' => 'neutering',
+                            'pet_id' => $petId,
+                            'call_session' => null,
                         ];
 
                         $targetUsers->put($userId, $leadUser);
@@ -563,6 +622,7 @@ class AdminPanelController extends Controller
 
                         $timestamp = $resolveNotificationTimestamp($fcmRow);
                         $status = $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null;
+                        $fcmCallSession = trim((string) ($fcmRow->call_session ?? ''));
 
                         $fcmUserId = is_numeric($fcmRow->user_id) ? (int) $fcmRow->user_id : 0;
 
@@ -598,6 +658,8 @@ class AdminPanelController extends Controller
                                 'timestamp' => $timestamp,
                                 'status' => $status,
                                 'bucket' => 'follow_up',
+                                'pet_id' => null,
+                                'call_session' => $fcmCallSession !== '' ? $fcmCallSession : trim((string) data_get($dataPayload, 'call_session')),
                             ];
 
                             $targetUsers->put($userId, $leadUser);
@@ -738,6 +800,8 @@ class AdminPanelController extends Controller
                         'timestamp' => $timestamp,
                         'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
                         'bucket' => 'vaccination',
+                        'pet_id' => is_numeric($petIdRaw ?? null) ? (int) $petIdRaw : null,
+                        'call_session' => null,
                     ];
 
                     $targetUsers->put($userId, $leadUser);
@@ -770,12 +834,250 @@ class AdminPanelController extends Controller
             return $leadUser;
         });
 
+        $hasTransactionUserId = $hasTransactionsTable && Schema::hasColumn('transactions', 'user_id');
+        $hasTransactionCreatedAt = $hasTransactionsTable && Schema::hasColumn('transactions', 'created_at');
+        $hasTransactionStatus = $hasTransactionsTable && Schema::hasColumn('transactions', 'status');
+        $hasTransactionChannelName = $hasTransactionsTable && Schema::hasColumn('transactions', 'channel_name');
+        $hasTransactionCallSession = $hasTransactionsTable && Schema::hasColumn('transactions', 'call_session');
+        $hasTransactionPetId = $hasTransactionsTable && Schema::hasColumn('transactions', 'pet_id');
+        $supportsConversionTracking = $hasTransactionUserId && $hasTransactionCreatedAt;
+        $convertedUsersCount = 0;
+
+        if ($supportsConversionTracking && $targetUsers->isNotEmpty()) {
+            $leadUserIds = $targetUsers
+                ->keys()
+                ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                ->map(fn ($userId) => (int) $userId)
+                ->values()
+                ->all();
+
+            if (!empty($leadUserIds)) {
+                $transactionQuery = Transaction::query()
+                    ->select(['id', 'user_id', 'created_at']);
+
+                if ($hasTransactionType) {
+                    $transactionQuery->addSelect('type');
+                }
+                if ($hasTransactionStatus) {
+                    $transactionQuery->addSelect('status');
+                }
+                if ($hasTransactionChannelName) {
+                    $transactionQuery->addSelect('channel_name');
+                }
+                if ($hasTransactionCallSession) {
+                    $transactionQuery->addSelect('call_session');
+                }
+                if ($hasTransactionPetId) {
+                    $transactionQuery->addSelect('pet_id');
+                }
+                if ($hasTransactionMetadata) {
+                    $transactionQuery->addSelect('metadata');
+                }
+
+                $successfulStatuses = [
+                    'completed',
+                    'captured',
+                    'paid',
+                    'success',
+                    'successful',
+                    'settled',
+                ];
+
+                $transactionsByUser = [];
+                $leadTransactions = $transactionQuery
+                    ->whereIn('user_id', $leadUserIds)
+                    ->orderBy('created_at')
+                    ->orderBy('id')
+                    ->get();
+
+                foreach ($leadTransactions as $leadTransaction) {
+                    $userId = is_numeric($leadTransaction->user_id) ? (int) $leadTransaction->user_id : 0;
+                    if ($userId <= 0) {
+                        continue;
+                    }
+
+                    $transactionAt = $normalizeDateTime($leadTransaction->created_at);
+                    if ($transactionAt === null) {
+                        continue;
+                    }
+
+                    $transactionStatus = $hasTransactionStatus
+                        ? strtolower(trim((string) ($leadTransaction->status ?? '')))
+                        : '';
+                    if ($hasTransactionStatus && $transactionStatus !== '' && !in_array($transactionStatus, $successfulStatuses, true)) {
+                        continue;
+                    }
+
+                    $transactionType = $hasTransactionType
+                        ? trim((string) ($leadTransaction->type ?? ''))
+                        : '';
+                    if ($transactionType === '' && $hasTransactionMetadata) {
+                        $transactionType = trim((string) data_get($leadTransaction->metadata, 'order_type'));
+                    }
+                    if ($transactionType === '') {
+                        $transactionType = 'unknown';
+                    }
+
+                    $sessionKeys = [];
+                    $sessionCandidates = [];
+                    if ($hasTransactionChannelName) {
+                        $sessionCandidates[] = $leadTransaction->channel_name;
+                    }
+                    if ($hasTransactionCallSession) {
+                        $sessionCandidates[] = $leadTransaction->call_session;
+                    }
+                    if ($hasTransactionMetadata) {
+                        $sessionCandidates[] = data_get($leadTransaction->metadata, 'channel_name');
+                        $sessionCandidates[] = data_get($leadTransaction->metadata, 'call_session');
+                        $sessionCandidates[] = data_get($leadTransaction->metadata, 'call_session_id');
+                        $sessionCandidates[] = data_get($leadTransaction->metadata, 'call_id');
+                    }
+
+                    foreach ($sessionCandidates as $sessionCandidate) {
+                        $sessionKey = $normalizeSessionKey($sessionCandidate);
+                        if ($sessionKey !== '') {
+                            $sessionKeys[$sessionKey] = true;
+                        }
+                    }
+
+                    if (!isset($transactionsByUser[$userId])) {
+                        $transactionsByUser[$userId] = [];
+                    }
+
+                    $transactionsByUser[$userId][] = [
+                        'id' => (int) ($leadTransaction->id ?? 0),
+                        'created_at' => $transactionAt,
+                        'type' => $transactionType,
+                        'status' => $transactionStatus !== '' ? $transactionStatus : null,
+                        'pet_id' => $hasTransactionPetId && is_numeric($leadTransaction->pet_id) ? (int) $leadTransaction->pet_id : null,
+                        'session_keys' => array_keys($sessionKeys),
+                    ];
+                }
+
+                $notificationMatchesTransaction = static function (array $notification, array $transaction) use ($normalizeSessionKey): bool {
+                    $bucket = strtolower(trim((string) ($notification['bucket'] ?? '')));
+                    $notificationSession = $normalizeSessionKey($notification['call_session'] ?? '');
+                    $notificationPetId = is_numeric($notification['pet_id'] ?? null) ? (int) $notification['pet_id'] : 0;
+                    $transactionPetId = is_numeric($transaction['pet_id'] ?? null) ? (int) $transaction['pet_id'] : 0;
+                    $transactionSessionKeys = is_array($transaction['session_keys'] ?? null)
+                        ? $transaction['session_keys']
+                        : [];
+
+                    if ($bucket === 'follow_up' && $notificationSession !== '') {
+                        return in_array($notificationSession, $transactionSessionKeys, true);
+                    }
+
+                    if (in_array($bucket, ['neutering', 'vaccination'], true) && $notificationPetId > 0 && $transactionPetId > 0) {
+                        return $notificationPetId === $transactionPetId;
+                    }
+
+                    if ($notificationSession !== '') {
+                        return in_array($notificationSession, $transactionSessionKeys, true);
+                    }
+
+                    if ($notificationPetId > 0 && $transactionPetId > 0) {
+                        return $notificationPetId === $transactionPetId;
+                    }
+
+                    return true;
+                };
+
+                $targetUsers = $targetUsers->map(function (array $leadUser) use ($transactionsByUser, $notificationMatchesTransaction): array {
+                    $userId = is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0;
+                    if ($userId <= 0) {
+                        return $leadUser;
+                    }
+
+                    $userTransactions = $transactionsByUser[$userId] ?? [];
+                    if (empty($userTransactions)) {
+                        return $leadUser;
+                    }
+
+                    $userNotifications = collect($leadUser['all_notifications'] ?? [])
+                        ->filter(fn (array $item): bool => !empty($item['timestamp']))
+                        ->sort(function (array $left, array $right): int {
+                            $leftTs = (string) ($left['timestamp'] ?? '');
+                            $rightTs = (string) ($right['timestamp'] ?? '');
+                            if ($leftTs !== $rightTs) {
+                                return strcmp($leftTs, $rightTs);
+                            }
+
+                            return ((int) ($left['id'] ?? 0)) <=> ((int) ($right['id'] ?? 0));
+                        })
+                        ->values()
+                        ->all();
+
+                    if (empty($userNotifications)) {
+                        return $leadUser;
+                    }
+
+                    $matchedNotification = null;
+                    $matchedTransaction = null;
+
+                    foreach ($userTransactions as $userTransaction) {
+                        $bestForTransaction = null;
+
+                        foreach ($userNotifications as $userNotification) {
+                            $notificationAt = (string) ($userNotification['timestamp'] ?? '');
+                            if ($notificationAt === '' || strcmp($notificationAt, (string) $userTransaction['created_at']) > 0) {
+                                continue;
+                            }
+
+                            if (!$notificationMatchesTransaction($userNotification, $userTransaction)) {
+                                continue;
+                            }
+
+                            if ($bestForTransaction === null || strcmp($notificationAt, (string) ($bestForTransaction['timestamp'] ?? '')) >= 0) {
+                                $bestForTransaction = $userNotification;
+                            }
+                        }
+
+                        if ($bestForTransaction !== null) {
+                            $matchedNotification = $bestForTransaction;
+                            $matchedTransaction = $userTransaction;
+                            break;
+                        }
+                    }
+
+                    if ($matchedNotification === null || $matchedTransaction === null) {
+                        return $leadUser;
+                    }
+
+                    $lagMinutes = null;
+                    try {
+                        $lagMinutes = \Illuminate\Support\Carbon::parse($matchedNotification['timestamp'])
+                            ->diffInMinutes(\Illuminate\Support\Carbon::parse($matchedTransaction['created_at']));
+                    } catch (\Throwable $e) {
+                        $lagMinutes = null;
+                    }
+
+                    $leadUser['conversion_captured'] = true;
+                    $leadUser['conversion_notification_type'] = (string) ($matchedNotification['notification_type'] ?? 'unknown');
+                    $leadUser['conversion_notification_bucket'] = trim((string) ($matchedNotification['bucket'] ?? ''));
+                    $leadUser['conversion_notification_at'] = (string) ($matchedNotification['timestamp'] ?? '');
+                    $leadUser['conversion_transaction_id'] = (int) ($matchedTransaction['id'] ?? 0);
+                    $leadUser['conversion_transaction_type'] = (string) ($matchedTransaction['type'] ?? 'unknown');
+                    $leadUser['conversion_transaction_status'] = $matchedTransaction['status'] ?? null;
+                    $leadUser['conversion_transaction_at'] = (string) ($matchedTransaction['created_at'] ?? '');
+                    $leadUser['conversion_lag_minutes'] = is_numeric($lagMinutes) ? (int) $lagMinutes : null;
+
+                    return $leadUser;
+                });
+
+                $convertedUsersCount = $targetUsers
+                    ->filter(fn (array $leadUser) => (bool) ($leadUser['conversion_captured'] ?? false))
+                    ->count();
+            }
+        }
+
         $filteredTargetUsers = $targetUsers
             ->values()
             ->filter(function (array $leadUser) use ($leadFilter): bool {
                 return match ($leadFilter) {
                     'neutering' => (bool) $leadUser['has_neutering'],
                     'video_follow_up' => (bool) $leadUser['has_video_follow_up'],
+                    'video_follow_up_video' => (bool) $leadUser['has_video_follow_up_video'],
+                    'video_follow_up_in_clinic' => (bool) $leadUser['has_video_follow_up_in_clinic'],
                     'vaccination' => (bool) $leadUser['has_vaccination_reminder'],
                     'both' => (bool) $leadUser['has_neutering'] && (bool) $leadUser['has_video_follow_up'],
                     default => (bool) $leadUser['has_neutering']
@@ -792,6 +1094,14 @@ class AdminPanelController extends Controller
 
                 if ((int) $left['video_follow_up_count'] !== (int) $right['video_follow_up_count']) {
                     return (int) $right['video_follow_up_count'] <=> (int) $left['video_follow_up_count'];
+                }
+
+                if ((int) $left['video_follow_up_video_count'] !== (int) $right['video_follow_up_video_count']) {
+                    return (int) $right['video_follow_up_video_count'] <=> (int) $left['video_follow_up_video_count'];
+                }
+
+                if ((int) $left['video_follow_up_in_clinic_count'] !== (int) $right['video_follow_up_in_clinic_count']) {
+                    return (int) $right['video_follow_up_in_clinic_count'] <=> (int) $left['video_follow_up_in_clinic_count'];
                 }
 
                 if ((int) $left['vaccination_notification_count'] !== (int) $right['vaccination_notification_count']) {
@@ -824,18 +1134,23 @@ class AdminPanelController extends Controller
             'summary' => [
                 'neutering_leads' => $neuteringLeadCount,
                 'video_follow_up_leads' => $videoFollowUpLeadCount,
+                'video_follow_up_video_leads' => $videoFollowUpVideoLeadCount,
+                'video_follow_up_in_clinic_leads' => $videoFollowUpInClinicLeadCount,
                 'target_users' => $targetUsers->count(),
                 'filtered_users' => $filteredTargetUsers->count(),
                 'neutering_notified_users' => $neuteringNotifiedUsersCount,
                 'vaccination_notified_users' => $vaccinationNotifiedUsersCount,
+                'converted_users' => $convertedUsersCount,
             ],
             'limit' => $limit,
             'leadConfig' => [
                 'supports_neutering' => $hasIsNeutered || $hasIsNuetered,
                 'supports_video_follow_up' => $supportsVideoFollowUpLeads,
+                'supports_video_follow_up_mode_split' => $supportsVideoFollowUpModeSplit,
                 'supports_neutering_notification_join' => $supportsNeuteringNotificationJoin,
                 'supports_follow_up_notification_join' => $supportsFollowUpNotificationJoin,
                 'supports_vaccination_notification_join' => $supportsVaccinationNotificationJoin,
+                'supports_conversion_tracking' => $supportsConversionTracking,
                 'transaction_session_column' => $transactionSessionColumn,
                 'neutering_columns' => [
                     'is_neutered' => $hasIsNeutered,

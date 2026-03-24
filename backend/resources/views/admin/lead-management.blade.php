@@ -119,7 +119,9 @@
     $filterLabels = [
         'all' => 'All Targeted Users',
         'neutering' => 'Neutering Package Leads',
-        'video_follow_up' => 'Video Follow-up Leads',
+        'video_follow_up' => 'All Follow-up Leads',
+        'video_follow_up_video' => 'Video Follow-up Leads',
+        'video_follow_up_in_clinic' => 'In-clinic Follow-up Leads',
         'vaccination' => 'Vaccination Reminder Leads',
         'both' => 'Users In Both Categories',
     ];
@@ -179,6 +181,29 @@
             return (string) $value;
         }
     };
+
+    $resolveFollowUpChip = static function (?string $date) use ($todayDate): array {
+        $chipClass = 'neutral';
+        $chipLabel = 'No Date';
+
+        if (!empty($date)) {
+            if ($date < $todayDate) {
+                $chipClass = 'overdue';
+                $chipLabel = 'Overdue';
+            } elseif ($date === $todayDate) {
+                $chipClass = 'today';
+                $chipLabel = 'Due Today';
+            } else {
+                $chipClass = 'upcoming';
+                $chipLabel = 'Upcoming';
+            }
+        }
+
+        return [
+            'class' => $chipClass,
+            'label' => $chipLabel,
+        ];
+    };
 @endphp
 
 <div class="row g-4">
@@ -188,14 +213,16 @@
                 <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
                     <div>
                         <h2 class="h5 mb-1">Lead Categories</h2>
-                        <p class="text-muted mb-0">Showing only users from Neutering, Video Follow-up, and Vaccination reminder lead buckets.</p>
+                        <p class="text-muted mb-0">Showing only users from Neutering, Video/In-clinic Follow-up, and Vaccination reminder lead buckets.</p>
                     </div>
                     <form class="d-flex align-items-center gap-2 flex-wrap" method="GET" action="{{ route('admin.lead-management') }}">
                         <label for="lead_filter" class="small text-muted text-nowrap mb-0">Category filter</label>
                         <select id="lead_filter" name="lead_filter" class="form-select form-select-sm" style="min-width: 240px;">
                             <option value="all" @selected($leadFilter === 'all')>All targeted users</option>
                             <option value="neutering" @selected($leadFilter === 'neutering')>Neutering package leads</option>
-                            <option value="video_follow_up" @selected($leadFilter === 'video_follow_up')>Video follow-up leads</option>
+                            <option value="video_follow_up" @selected($leadFilter === 'video_follow_up')>All follow-up leads</option>
+                            <option value="video_follow_up_video" @selected($leadFilter === 'video_follow_up_video')>Video follow-up leads</option>
+                            <option value="video_follow_up_in_clinic" @selected($leadFilter === 'video_follow_up_in_clinic')>In-clinic follow-up leads</option>
                             <option value="vaccination" @selected($leadFilter === 'vaccination')>Vaccination reminder leads</option>
                             <option value="both" @selected($leadFilter === 'both')>Users in both categories</option>
                         </select>
@@ -212,6 +239,9 @@
                 @if(!($leadConfig['supports_video_follow_up'] ?? false))
                     <div class="alert alert-warning py-2 mb-3">Video follow-up category is unavailable on this database (missing join columns).</div>
                 @endif
+                @if(($leadConfig['supports_video_follow_up'] ?? false) && !($leadConfig['supports_video_follow_up_mode_split'] ?? false))
+                    <div class="alert alert-warning py-2 mb-3">Video/In-clinic split is unavailable (missing <code>prescriptions.video_inclinic</code>).</div>
+                @endif
                 @if(!($leadConfig['supports_neutering_notification_join'] ?? false))
                     <div class="alert alert-warning py-2 mb-3">Neutering notification join is unavailable (missing <code>fcm_notifications.data_payload</code>).</div>
                 @endif
@@ -220,6 +250,9 @@
                 @endif
                 @if(!($leadConfig['supports_vaccination_notification_join'] ?? false))
                     <div class="alert alert-warning py-2 mb-3">Vaccination reminder module is unavailable (missing <code>fcm_notifications.notification_type</code> / <code>fcm_notifications.data_payload</code>).</div>
+                @endif
+                @if(!($leadConfig['supports_conversion_tracking'] ?? false))
+                    <div class="alert alert-warning py-2 mb-3">Lead conversion tracking is unavailable (missing <code>transactions.user_id</code> / <code>transactions.created_at</code>).</div>
                 @endif
 
                 <div class="row g-3">
@@ -231,8 +264,14 @@
                     </div>
                     <div class="col-6 col-lg-3">
                         <div class="lead-summary-card">
-                            <div class="value">{{ number_format($summary['video_follow_up_leads'] ?? 0) }}</div>
+                            <div class="value">{{ number_format($summary['video_follow_up_video_leads'] ?? 0) }}</div>
                             <div class="label">Video Follow-up Leads</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="lead-summary-card">
+                            <div class="value">{{ number_format($summary['video_follow_up_in_clinic_leads'] ?? 0) }}</div>
+                            <div class="label">In-clinic Follow-up Leads</div>
                         </div>
                     </div>
                     <div class="col-6 col-lg-3">
@@ -257,6 +296,12 @@
                         <div class="lead-summary-card">
                             <div class="value">{{ number_format($summary['vaccination_notified_users'] ?? 0) }}</div>
                             <div class="label">Vaccination Notified Users</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="lead-summary-card">
+                            <div class="value">{{ number_format($summary['converted_users'] ?? 0) }}</div>
+                            <div class="label">Converted Users</div>
                         </div>
                     </div>
                 </div>
@@ -291,32 +336,36 @@
                                     <th>Neutering Pets</th>
                                     <th>Neutering Notification</th>
                                     <th>Vaccination Reminder</th>
-                                    <th>Video Follow-up</th>
+                                    <th>Follow-up (Video/In-clinic)</th>
+                                    <th>Conversion</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($filteredTargetUsers as $leadUser)
                                     @php
                                         $nextFollowUpDate = $leadUser['next_follow_up_date'] ?? null;
-                                        $followUpChipClass = 'neutral';
-                                        $followUpChipLabel = 'No Date';
-                                        if (!empty($nextFollowUpDate)) {
-                                            if ($nextFollowUpDate < $todayDate) {
-                                                $followUpChipClass = 'overdue';
-                                                $followUpChipLabel = 'Overdue';
-                                            } elseif ($nextFollowUpDate === $todayDate) {
-                                                $followUpChipClass = 'today';
-                                                $followUpChipLabel = 'Due Today';
-                                            } else {
-                                                $followUpChipClass = 'upcoming';
-                                                $followUpChipLabel = 'Upcoming';
-                                            }
-                                        }
+                                        $nextVideoFollowUpDate = $leadUser['next_video_follow_up_date'] ?? null;
+                                        $nextInClinicFollowUpDate = $leadUser['next_in_clinic_follow_up_date'] ?? null;
+                                        $followUpChip = $resolveFollowUpChip($nextFollowUpDate);
+                                        $videoFollowUpChip = $resolveFollowUpChip($nextVideoFollowUpDate);
+                                        $inClinicFollowUpChip = $resolveFollowUpChip($nextInClinicFollowUpDate);
+                                        $videoFollowUpCount = (int) ($leadUser['video_follow_up_count'] ?? 0);
+                                        $videoFollowUpVideoCount = (int) ($leadUser['video_follow_up_video_count'] ?? 0);
+                                        $videoFollowUpInClinicCount = (int) ($leadUser['video_follow_up_in_clinic_count'] ?? 0);
+                                        $supportsVideoFollowUpModeSplit = (bool) ($leadConfig['supports_video_follow_up_mode_split'] ?? false);
 
                                         $neuteringNotificationCount = (int) ($leadUser['neutering_notification_count'] ?? 0);
                                         $notifiedNeuteringPetNames = collect($leadUser['notified_neutering_pet_names'] ?? [])->take(3)->implode(', ');
                                         $vaccinationNotificationCount = (int) ($leadUser['vaccination_notification_count'] ?? 0);
                                         $notifiedVaccinationPetNames = collect($leadUser['notified_vaccination_pet_names'] ?? [])->take(3)->implode(', ');
+                                        $conversionCaptured = (bool) ($leadUser['conversion_captured'] ?? false);
+                                        $conversionNotificationBucket = trim((string) ($leadUser['conversion_notification_bucket'] ?? ''));
+                                        $conversionNotificationBucketLabel = match ($conversionNotificationBucket) {
+                                            'neutering' => 'Neutering',
+                                            'follow_up' => 'Follow-up',
+                                            'vaccination' => 'Vaccination',
+                                            default => 'Lead',
+                                        };
                                     @endphp
                                     <tr>
                                         <td data-label="User">
@@ -332,8 +381,22 @@
                                             @if(!empty($leadUser['has_neutering']))
                                                 <span class="badge text-bg-warning">Neutering</span>
                                             @endif
-                                            @if(!empty($leadUser['has_video_follow_up']))
-                                                <span class="badge text-bg-success">Video Follow-up</span>
+                                            @if($supportsVideoFollowUpModeSplit)
+                                                @if(!empty($leadUser['has_video_follow_up_video']))
+                                                    <span class="badge text-bg-success">Video Follow-up</span>
+                                                @endif
+                                                @if(!empty($leadUser['has_video_follow_up_in_clinic']))
+                                                    <span class="badge text-bg-primary">In-clinic Follow-up</span>
+                                                @endif
+                                                @if(
+                                                    !empty($leadUser['has_video_follow_up'])
+                                                    && empty($leadUser['has_video_follow_up_video'])
+                                                    && empty($leadUser['has_video_follow_up_in_clinic'])
+                                                )
+                                                    <span class="badge text-bg-secondary">Follow-up</span>
+                                                @endif
+                                            @elseif(!empty($leadUser['has_video_follow_up']))
+                                                <span class="badge text-bg-success">All Follow-up</span>
                                             @endif
                                             @if(!empty($leadUser['has_vaccination_reminder']))
                                                 <span class="badge text-bg-info">Vaccination Reminder</span>
@@ -387,10 +450,52 @@
                                                 <span class="badge text-bg-secondary">Not sent</span>
                                             @endif
                                         </td>
-                                        <td data-label="Video Follow-up">
-                                            <div class="fw-semibold">{{ (int) ($leadUser['video_follow_up_count'] ?? 0) }} follow-ups</div>
-                                            <div class="text-muted small">Next: {{ $nextFollowUpDate ? $formatDate($nextFollowUpDate) : '—' }}</div>
-                                            <span class="lead-chip {{ $followUpChipClass }} mt-1">{{ $followUpChipLabel }}</span>
+                                        <td data-label="Follow-up (Video/In-clinic)">
+                                            @if($supportsVideoFollowUpModeSplit)
+                                                <div class="fw-semibold">Video: {{ $videoFollowUpVideoCount }} follow-ups</div>
+                                                <div class="text-muted small">Next: {{ $nextVideoFollowUpDate ? $formatDate($nextVideoFollowUpDate) : '—' }}</div>
+                                                <span class="lead-chip {{ $videoFollowUpChip['class'] }} mt-1">{{ $videoFollowUpChip['label'] }}</span>
+                                                <div class="mt-2 fw-semibold">In-clinic: {{ $videoFollowUpInClinicCount }} follow-ups</div>
+                                                <div class="text-muted small">Next: {{ $nextInClinicFollowUpDate ? $formatDate($nextInClinicFollowUpDate) : '—' }}</div>
+                                                <span class="lead-chip {{ $inClinicFollowUpChip['class'] }} mt-1">{{ $inClinicFollowUpChip['label'] }}</span>
+                                                @if($videoFollowUpCount > ($videoFollowUpVideoCount + $videoFollowUpInClinicCount))
+                                                    <div class="text-muted small mt-2">
+                                                        Other: {{ $videoFollowUpCount - ($videoFollowUpVideoCount + $videoFollowUpInClinicCount) }} follow-ups
+                                                    </div>
+                                                @endif
+                                            @else
+                                                <div class="fw-semibold">{{ $videoFollowUpCount }} follow-ups</div>
+                                                <div class="text-muted small">Next: {{ $nextFollowUpDate ? $formatDate($nextFollowUpDate) : '—' }}</div>
+                                                <span class="lead-chip {{ $followUpChip['class'] }} mt-1">{{ $followUpChip['label'] }}</span>
+                                            @endif
+                                        </td>
+                                        <td data-label="Conversion">
+                                            @if(!($leadConfig['supports_conversion_tracking'] ?? false))
+                                                <span class="badge text-bg-light">Unavailable</span>
+                                            @elseif($allNotificationsCount <= 0)
+                                                <span class="badge text-bg-light">N/A</span>
+                                                <div class="text-muted small mt-1">No delivered notifications</div>
+                                            @elseif($conversionCaptured)
+                                                <span class="badge text-bg-success">Converted</span>
+                                                <div class="text-muted small mt-1">
+                                                    After: {{ $leadUser['conversion_notification_type'] ?? 'unknown' }} ({{ $conversionNotificationBucketLabel }})
+                                                </div>
+                                                <div class="text-muted small">Notified at: {{ $formatDateTime($leadUser['conversion_notification_at'] ?? null) }}</div>
+                                                <div class="text-muted small">
+                                                    Txn: #{{ (int) ($leadUser['conversion_transaction_id'] ?? 0) }}
+                                                    • {{ $leadUser['conversion_transaction_type'] ?? 'unknown' }}
+                                                </div>
+                                                <div class="text-muted small">Txn at: {{ $formatDateTime($leadUser['conversion_transaction_at'] ?? null) }}</div>
+                                                @if(!empty($leadUser['conversion_transaction_status']))
+                                                    <div class="text-muted small">Status: {{ $leadUser['conversion_transaction_status'] }}</div>
+                                                @endif
+                                                @if(is_numeric($leadUser['conversion_lag_minutes'] ?? null))
+                                                    <div class="text-muted small">Lag: {{ (int) $leadUser['conversion_lag_minutes'] }} min</div>
+                                                @endif
+                                            @else
+                                                <span class="badge text-bg-secondary">Not converted</span>
+                                                <div class="text-muted small mt-1">No transaction found after notifications</div>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
