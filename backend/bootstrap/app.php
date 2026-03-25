@@ -86,10 +86,9 @@ return Application::configure(basePath: dirname(__DIR__))
             ->everyMinute()
             ->withoutOverlapping();
 
-        // Profile completion reminders (daily)
+        // Profile completion reminders (every minute, run once per day)
         $schedule->command('notifications:pp-profile-completion')
-            ->timezone('Asia/Kolkata')
-            ->dailyAt('10:00')
+            ->everyMinute()
             ->withoutOverlapping();
 
         // Pet parent continuity reminder (+24h after template 1)

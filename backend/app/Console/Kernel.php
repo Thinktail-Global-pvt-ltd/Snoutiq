@@ -114,8 +114,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping();
 
         $schedule->command('notifications:pp-profile-completion')
-            ->timezone('Asia/Kolkata')
-            ->dailyAt('10:00')
+            ->everyMinute()
             ->withoutOverlapping();
 
         $schedule->command('notifications:pp-user-continuity')

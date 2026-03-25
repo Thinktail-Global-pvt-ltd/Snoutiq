@@ -24,6 +24,14 @@ class SendProfileCompletionReminders extends Command
         $dryRun = (bool) $this->option('dry');
         $cooldownHours = 24;
         $cooldownStart = now()->subHours($cooldownHours);
+        $todayStart = now()->startOfDay();
+
+        if (! $forcedUserId && ! $dryRun && $this->hasRunToday($todayStart)) {
+            Log::info('pp_profile_completion.run_skip', [
+                'reason' => 'already_ran_today',
+            ]);
+            return self::SUCCESS;
+        }
 
         $query = User::query()->select(['id', 'phone']);
         if ($forcedUserId) {
@@ -111,6 +119,10 @@ class SendProfileCompletionReminders extends Command
             'errors' => $errors,
         ]);
 
+        if (! $forcedUserId && ! $dryRun) {
+            $this->logRun('completed');
+        }
+
         return self::SUCCESS;
     }
 
@@ -158,6 +170,39 @@ class SendProfileCompletionReminders extends Command
         } catch (\Throwable $e) {
             Log::error('pp_profile_completion.log_failed', [
                 'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function hasRunToday($todayStart): bool
+    {
+        return DB::table('vet_response_reminder_logs')
+            ->whereJsonContains('meta->type', 'pp_profile_completion_run')
+            ->where('created_at', '>=', $todayStart)
+            ->exists();
+    }
+
+    private function logRun(string $status): void
+    {
+        try {
+            DB::table('vet_response_reminder_logs')->insert([
+                'transaction_id' => null,
+                'user_id' => null,
+                'pet_id' => null,
+                'phone' => null,
+                'template' => null,
+                'language' => null,
+                'status' => $status,
+                'error' => null,
+                'meta' => json_encode([
+                    'type' => 'pp_profile_completion_run',
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('pp_profile_completion.run_log_failed', [
                 'error' => $e->getMessage(),
             ]);
         }
