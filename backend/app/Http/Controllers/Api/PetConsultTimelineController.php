@@ -625,8 +625,39 @@ class PetConsultTimelineController extends Controller
 
     private function formatPetAge(array $pet): string
     {
+        $dob = $pet['pet_dob'] ?? $pet['dob'] ?? null;
+        if ($dob) {
+            try {
+                $dobDate = Carbon::parse($dob)->startOfDay();
+                $today = Carbon::today();
+                if ($dobDate->lte($today)) {
+                    $years = $dobDate->diffInYears($today);
+                    $months = $dobDate->copy()->addYears($years)->diffInMonths($today);
+                    $anchor = $dobDate->copy()->addYears($years)->addMonths($months);
+                    $days = $anchor->diffInDays($today);
+
+                    if ($years > 0 || $months > 0) {
+                        $parts = [];
+                        if ($years > 0) {
+                            $parts[] = $years . ' year' . ($years === 1 ? '' : 's');
+                        }
+                        if ($months > 0) {
+                            $parts[] = $months . ' month' . ($months === 1 ? '' : 's');
+                        }
+                        return implode(' ', $parts);
+                    }
+
+                    if ($days > 0) {
+                        return $days . ' day' . ($days === 1 ? '' : 's');
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Ignore invalid DOB formats
+            }
+        }
+
         [$years, $months] = $this->resolveAgeParts(
-            $pet['pet_dob'] ?? $pet['dob'] ?? null,
+            null,
             $pet['pet_age'] ?? null,
             $pet['pet_age_months'] ?? null
         );
@@ -650,6 +681,7 @@ class PetConsultTimelineController extends Controller
     {
         $years = 0;
         $months = 0;
+        $dobParsed = false;
 
         if ($dob) {
             try {
@@ -658,13 +690,14 @@ class PetConsultTimelineController extends Controller
                 if ($dobDate->lte($today)) {
                     $years = $dobDate->diffInYears($today);
                     $months = $dobDate->copy()->addYears($years)->diffInMonths($today);
+                    $dobParsed = true;
                 }
             } catch (\Throwable $e) {
                 // Ignore invalid DOB formats
             }
         }
 
-        if ($years <= 0 && $months <= 0) {
+        if (!$dobParsed && $years <= 0 && $months <= 0) {
             $yearsValue = $this->normalizeNumericValue($ageYears);
             $monthsValue = $this->normalizeNumericValue($ageMonths);
 
