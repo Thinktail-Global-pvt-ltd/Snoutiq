@@ -2,9 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Models\User;
+use App\Jobs\SendNotificationJob;
+use App\Models\Notification;
 use App\Models\Pet;
-use App\Models\VetResponseReminderLog;
+use App\Models\User;
 use App\Services\WhatsAppService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 class SendUserCreatedReminders extends Command
 {
     protected $signature = 'notifications:pp-user-created {--user_id=}';
-    protected $description = 'Send SNQ_PP_RECORDS_CREATED WhatsApp 2 hours after user creation (same-day only).';
+    protected $description = 'Send SNQ_PP_RECORDS_CREATED WhatsApp + FCM 2 hours after user creation (same-day only).';
 
     public function __construct(private readonly WhatsAppService $whatsApp)
     {
@@ -22,9 +23,9 @@ class SendUserCreatedReminders extends Command
 
     public function handle(): int
     {
-        if (! $this->whatsApp->isConfigured()) {
+        $whatsAppConfigured = $this->whatsApp->isConfigured();
+        if (! $whatsAppConfigured) {
             Log::warning('pp_user_created.whatsapp_not_configured');
-            return self::SUCCESS;
         }
 
         $now = now();
@@ -55,11 +56,14 @@ class SendUserCreatedReminders extends Command
             'candidates' => $users->count(),
             'at' => $now->toDateTimeString(),
             'forced_user_id' => $forcedUserId,
+            'whatsapp_configured' => $whatsAppConfigured,
             'window_start' => $windowStart->toDateTimeString(),
             'window_end' => $windowEnd->toDateTimeString(),
         ]);
 
-        $sent = 0;
+        $whatsAppSent = 0;
+        $fcmSent = 0;
+
         foreach ($users as $user) {
             if (! $forcedUserId && $user->created_at) {
                 $createdAt = $user->created_at->copy();
@@ -72,16 +76,10 @@ class SendUserCreatedReminders extends Command
                 }
             }
 
-            $phone = $user->phone;
-            if (! $phone) {
-                $this->log($user->id, 'skipped', $phone, null, null, 'missing_phone');
-                continue;
-            }
-
             // Fetch pet name
             $petName = Pet::where('user_id', $user->id)->orderByDesc('id')->value('name');
             if (! $petName) {
-                $this->log($user->id, 'skipped', $phone, null, null, 'missing_pet_name');
+                $this->log($user->id, 'skipped', $user->phone, null, null, 'missing_pet_name');
                 continue;
             }
 
@@ -98,7 +96,26 @@ class SendUserCreatedReminders extends Command
             }
 
             if (! $doctorName || ! $clinicName) {
-                $this->log($user->id, 'skipped', $phone, null, null, 'missing_doctor_or_clinic');
+                $this->log($user->id, 'skipped', $user->phone, null, null, 'missing_doctor_or_clinic');
+                continue;
+            }
+
+            // Send FCM in addition to WhatsApp.
+            $fcm = $this->sendFcmNotification($user, $petName, $doctorName, $clinicName);
+            $this->logFcm($user->id, $fcm['status'], $fcm['notification_id'], $fcm['error']);
+            if ($fcm['status'] === 'sent') {
+                $fcmSent++;
+            }
+
+            $phone = $user->phone;
+
+            if (! $whatsAppConfigured) {
+                $this->log($user->id, 'skipped', $phone, null, null, 'whatsapp_not_configured');
+                continue;
+            }
+
+            if (! $phone) {
+                $this->log($user->id, 'skipped', $phone, null, null, 'missing_phone');
                 continue;
             }
 
@@ -125,12 +142,17 @@ class SendUserCreatedReminders extends Command
                 'en',
             ]));
 
-            $ok = false; $last = null; $tplUsed = null; $langUsed = null;
+            $ok = false;
+            $last = null;
+            $tplUsed = null;
+            $langUsed = null;
             foreach ($templates as $tpl) {
                 foreach ($languages as $lang) {
                     try {
                         $this->whatsApp->sendTemplate($phone, $tpl, $components, $lang);
-                        $ok = true; $tplUsed = $tpl; $langUsed = $lang;
+                        $ok = true;
+                        $tplUsed = $tpl;
+                        $langUsed = $lang;
                         break 2;
                     } catch (\RuntimeException $e) {
                         $last = $e->getMessage();
@@ -139,7 +161,7 @@ class SendUserCreatedReminders extends Command
             }
 
             if ($ok) {
-                $sent++;
+                $whatsAppSent++;
                 $this->log($user->id, 'sent', $phone, $tplUsed, $langUsed, null);
             } else {
                 $this->log($user->id, 'failed', $phone, $tplUsed ?? $templates[0] ?? null, $langUsed ?? $languages[0] ?? null, $last);
@@ -147,11 +169,67 @@ class SendUserCreatedReminders extends Command
         }
 
         Log::info('pp_user_created.run_finish', [
-            'sent' => $sent,
+            'sent_whatsapp' => $whatsAppSent,
+            'sent_fcm' => $fcmSent,
             'at' => now()->toDateTimeString(),
         ]);
 
         return self::SUCCESS;
+    }
+
+    private function sendFcmNotification(User $user, string $petName, string $doctorName, string $clinicName): array
+    {
+        try {
+            $notification = Notification::create([
+                'user_id' => $user->id,
+                'pet_id' => null,
+                'clinic_id' => null,
+                'type' => 'pp_user_created',
+                'title' => 'Welcome to Snoutiq',
+                'body' => sprintf(
+                    'Dr %s can now help %s via %s. Tap to continue.',
+                    $doctorName,
+                    $petName,
+                    $clinicName
+                ),
+                'payload' => [
+                    'type' => 'pp_user_created',
+                    'user_id' => (string) $user->id,
+                    'pet_name' => $petName,
+                    'doctor_name' => $doctorName,
+                    'clinic_name' => $clinicName,
+                ],
+                'status' => Notification::STATUS_PENDING,
+            ]);
+
+            SendNotificationJob::dispatchSync($notification->id);
+            $notification->refresh();
+
+            if ($notification->status === Notification::STATUS_SENT) {
+                return [
+                    'status' => 'sent',
+                    'notification_id' => $notification->id,
+                    'error' => null,
+                ];
+            }
+
+            return [
+                'status' => 'failed',
+                'notification_id' => $notification->id,
+                'error' => 'notification_status_'.$notification->status,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('pp_user_created.fcm_failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'status' => 'failed',
+                'notification_id' => null,
+                'error' => $e->getMessage(),
+            ];
+        }
     }
 
     private function log(int $userId, string $status, ?string $phone, ?string $template, ?string $language, ?string $error): void
@@ -172,6 +250,30 @@ class SendUserCreatedReminders extends Command
             ]);
         } catch (\Throwable $e) {
             Log::error('pp_user_created.log_failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
+        }
+    }
+
+    private function logFcm(int $userId, string $status, ?int $notificationId, ?string $error): void
+    {
+        try {
+            DB::table('vet_response_reminder_logs')->insert([
+                'transaction_id' => null,
+                'user_id' => $userId,
+                'pet_id' => null,
+                'phone' => null,
+                'template' => null,
+                'language' => null,
+                'status' => $status,
+                'error' => $error,
+                'meta' => json_encode([
+                    'type' => 'pp_user_created_fcm',
+                    'notification_id' => $notificationId,
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('pp_user_created.fcm_log_failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
         }
     }
 }
