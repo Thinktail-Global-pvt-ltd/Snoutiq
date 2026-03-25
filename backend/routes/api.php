@@ -2468,6 +2468,7 @@ Route::post('/pets/neutered-status', [\App\Http\Controllers\Api\PetOverviewContr
 Route::get('/rag-snoutic-symptom-checker/prefill', [RagSnouticSymptomController::class, 'prefill']);
 Route::post('/rag-snoutic-symptom-checker/query', [RagSnouticSymptomController::class, 'query']);
 Route::match(['get', 'post'], '/rag-snoutic-symptom-checker/page-data', [RagSnouticSymptomController::class, 'pageData']);
+Route::post('/symptom-diagnosis', [RagSnouticSymptomController::class, 'diagnoseQuestion']);
 Route::get('/pets/{petId}',         [AdminController::class, 'getPet']);
 Route::post('/pets/{petId}/dog-disease', [AdminController::class, 'suggestDogDisease']);
 Route::post('/pets/{petId}/summary', [AdminController::class, 'summarizePet']);
