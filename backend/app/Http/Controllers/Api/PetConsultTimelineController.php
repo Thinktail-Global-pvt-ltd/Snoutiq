@@ -620,23 +620,25 @@ class PetConsultTimelineController extends Controller
 
     private function formatPetAge(array $pet): string
     {
-        $years = is_numeric($pet['pet_age'] ?? null) ? (int) $pet['pet_age'] : 0;
-        $months = is_numeric($pet['pet_age_months'] ?? null) ? (int) $pet['pet_age_months'] : 0;
+        $years = 0;
+        $months = 0;
+        $dob = $pet['pet_dob'] ?? $pet['dob'] ?? null;
+        if ($dob) {
+            try {
+                $dobDate = Carbon::parse($dob)->startOfDay();
+                $today = Carbon::today();
+                if ($dobDate->lte($today)) {
+                    $years = $dobDate->diffInYears($today);
+                    $months = $dobDate->copy()->addYears($years)->diffInMonths($today);
+                }
+            } catch (\Throwable $e) {
+                // Ignore invalid DOB formats
+            }
+        }
 
         if ($years <= 0 && $months <= 0) {
-            $dob = $pet['pet_dob'] ?? $pet['dob'] ?? null;
-            if ($dob) {
-                try {
-                    $dobDate = Carbon::parse($dob)->startOfDay();
-                    $today = Carbon::today();
-                    if ($dobDate->lte($today)) {
-                        $years = $dobDate->diffInYears($today);
-                        $months = $dobDate->copy()->addYears($years)->diffInMonths($today);
-                    }
-                } catch (\Throwable $e) {
-                    // Ignore invalid DOB formats
-                }
-            }
+            $years = is_numeric($pet['pet_age'] ?? null) ? (int) $pet['pet_age'] : 0;
+            $months = is_numeric($pet['pet_age_months'] ?? null) ? (int) $pet['pet_age_months'] : 0;
         }
 
         if ($years <= 0 && $months <= 0) {
