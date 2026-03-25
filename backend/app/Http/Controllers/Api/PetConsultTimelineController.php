@@ -65,14 +65,33 @@ class PetConsultTimelineController extends Controller
                 ->get();
         }
 
-        $appointmentTimelineItems = $appointments->map(function (Appointment $appointment) {
+        $prescriptionByAppointment = collect();
+        if ($prescriptions->isNotEmpty() && Schema::hasColumn('prescriptions', 'in_clinic_appointment_id')) {
+            $prescriptionByAppointment = $prescriptions
+                ->filter(fn (Prescription $prescription) => !empty($prescription->in_clinic_appointment_id))
+                ->sortByDesc('id')
+                ->groupBy('in_clinic_appointment_id')
+                ->map(fn (Collection $items) => $items->first());
+        }
+
+        $appointmentTimelineItems = $appointments->map(function (Appointment $appointment) use ($prescriptionByAppointment, $pet) {
+            $payload = $this->mapAppointment($appointment);
+            if (Schema::hasColumn('pets', 'reported_symptom')) {
+                $payload['pet_reported_symptom'] = $pet->reported_symptom ?? null;
+            }
+
+            $linkedPrescription = $prescriptionByAppointment->get($appointment->id);
+            if ($linkedPrescription instanceof Prescription) {
+                $payload['clinic_prescription'] = $this->mapModel($linkedPrescription);
+            }
+
             return [
                 'source' => 'appointments',
                 'event_type' => 'appointment',
                 'record_id' => $appointment->id,
                 'event_at' => $this->resolveAppointmentEventAt($appointment),
                 'created_at' => optional($appointment->created_at)->toIso8601String(),
-                'record' => $this->mapAppointment($appointment),
+                'record' => $payload,
             ];
         });
 
@@ -400,6 +419,7 @@ class PetConsultTimelineController extends Controller
             'pet_dob' => $this->normalizeDateString($pet->pet_dob ?? $pet->dob ?? null),
             'weight' => $pet->weight ?? null,
             'is_neutered' => $pet->is_neutered ?? $pet->is_nuetered ?? null,
+            'reported_symptom' => $pet->reported_symptom ?? null,
             'owner_name' => $owner?->name ?? null,
             'owner_city' => $owner?->city ?? null,
             'deworming_yes_no' => $pet->deworming_yes_no ?? null,
@@ -882,6 +902,96 @@ class PetConsultTimelineController extends Controller
         }
 
         return '';
+    }
+
+    private function formatMedicationDetails($medications): string
+    {
+        if (is_string($medications)) {
+            return trim($medications);
+        }
+
+        if (!is_array($medications) || $medications === []) {
+            return '';
+        }
+
+        $encoded = json_encode($medications, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (is_string($encoded) && $encoded !== '' && $encoded !== '[]') {
+            return $encoded;
+        }
+
+        if (!array_is_list($medications)) {
+            $medications = [$medications];
+        }
+
+        $items = [];
+        foreach ($medications as $medication) {
+            if (is_string($medication)) {
+                $value = trim($medication);
+                if ($value !== '') {
+                    $items[] = $value;
+                }
+                continue;
+            }
+
+            if (!is_array($medication)) {
+                $value = $this->normalizeMixedValue($medication);
+                if ($value !== '') {
+                    $items[] = $value;
+                }
+                continue;
+            }
+
+            $name = $this->extractStringFromArray($medication, ['name', 'medicine', 'drug', 'title']);
+            $dose = $this->extractStringFromArray($medication, ['dose', 'dosage', 'strength']);
+            $frequency = $this->extractStringFromArray($medication, ['frequency', 'timing', 'schedule']);
+            $duration = $this->extractStringFromArray($medication, ['duration', 'days']);
+            $route = $this->extractStringFromArray($medication, ['route']);
+            $notes = $this->extractStringFromArray($medication, ['notes', 'note', 'instructions']);
+            $foodRelation = $this->extractStringFromArray($medication, ['food_relation', 'foodRelation', 'food']);
+
+            $timingsRaw = $medication['timings'] ?? null;
+            $timings = '';
+            if (is_array($timingsRaw)) {
+                $timings = implode(', ', array_values(array_filter(array_map('strval', $timingsRaw), fn ($value) => trim($value) !== '')));
+            } elseif (is_string($timingsRaw)) {
+                $timings = trim($timingsRaw);
+            }
+
+            $details = [];
+            if ($dose !== '') {
+                $details[] = 'Dose: ' . $dose;
+            }
+            if ($frequency !== '') {
+                $details[] = 'Frequency: ' . $frequency;
+            }
+            if ($duration !== '') {
+                $details[] = 'Duration: ' . $duration;
+            }
+            if ($route !== '') {
+                $details[] = 'Route: ' . $route;
+            }
+            if ($timings !== '') {
+                $details[] = 'Timings: ' . $timings;
+            }
+            if ($foodRelation !== '') {
+                $details[] = 'Food: ' . $foodRelation;
+            }
+            if ($notes !== '') {
+                $details[] = 'Notes: ' . $notes;
+            }
+
+            $label = $name !== '' ? $name : 'Medication';
+            if ($details !== []) {
+                $label .= ' · ' . implode(' · ', $details);
+            }
+
+            $items[] = $label;
+            if (count($items) >= 4) {
+                break;
+            }
+        }
+
+        return implode(' ; ', $items);
     }
 
     private function resolveOngoingTreatments(array $payload): array
@@ -1408,9 +1518,8 @@ CSS;
                                 <tr>
                                     <td class="icon-cell"><div class="icon-badge purple-bg purple-text">D</div></td>
                                     <td>
-                                        <div class="info-label">Last Deworming</div>
-                                        <div class="info-value">{$lastDewormingNameEsc}</div>
-                                        <div class="info-muted">{$lastDewormingDateEsc}</div>
+                                        <div class="info-label">Last Deworming Date</div>
+                                        <div class="info-value">{$lastDewormingDateEsc}</div>
                                         <div class="info-muted">Administered by {$lastDewormingDoctorEsc}</div>
                                     </td>
                                 </tr>
@@ -1542,10 +1651,29 @@ HTML;
 
             if ($eventType === 'appointment') {
                 $notes = is_array($record['notes_decoded'] ?? null) ? $record['notes_decoded'] : [];
-                $reason = $this->extractStringFromArray($notes, ['symptoms', 'reason', 'complaint', 'notes']);
-                $diagnosis = $this->extractStringFromArray($notes, ['diagnosis', 'diagnosis_summary', 'disease']);
-                $medications = $this->extractStringFromArray($notes, ['medications', 'medicines']);
-                $advice = $this->extractStringFromArray($notes, ['advice', 'instructions', 'home_care', 'follow_up']);
+                $clinicPrescription = is_array($record['clinic_prescription'] ?? null) ? $record['clinic_prescription'] : [];
+
+                $reportedSymptom = $this->normalizeMixedValue($record['pet_reported_symptom'] ?? null);
+                if ($reportedSymptom === '') {
+                    $reportedSymptom = $this->extractStringFromArray($notes, ['symptoms', 'reason', 'complaint', 'notes']);
+                }
+
+                $diagnosis = $this->extractStringFromArray($clinicPrescription, ['diagnosis', 'diagnosys', 'disease_name']);
+                if ($diagnosis === '') {
+                    $diagnosis = $this->extractStringFromArray($notes, ['diagnosis', 'diagnosis_summary', 'disease']);
+                }
+
+                $medications = $this->formatMedicationDetails($clinicPrescription['medications_json'] ?? null);
+                if ($medications === '') {
+                    $medications = $this->extractStringFromArray($notes, ['medications', 'medicines']);
+                }
+
+                $advice = $this->extractStringFromArray($clinicPrescription, ['visit_notes', 'follow_up_notes', 'notes']);
+                if ($advice === '') {
+                    $advice = $this->extractStringFromArray($notes, ['advice', 'instructions', 'home_care', 'follow_up']);
+                }
+
+                $reason = $reportedSymptom;
             } elseif ($eventType === 'video_consultation') {
                 $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
                 $reason = $this->extractStringFromArray($metadata, ['symptoms', 'reason', 'complaint', 'notes']);
@@ -1559,10 +1687,10 @@ HTML;
                 $advice = $this->extractStringFromArray($record, ['home_care', 'treatment_plan', 'doctor_treatment', 'follow_up_notes']);
             }
 
-            $reason = $reason !== '' ? $this->truncateText($reason, 160) : '—';
-            $diagnosis = $diagnosis !== '' ? $this->truncateText($diagnosis, 140) : '—';
-            $medications = $medications !== '' ? $this->truncateText($medications, 140) : '—';
-            $advice = $advice !== '' ? $this->truncateText($advice, 160) : '—';
+            $reason = $reason !== '' ? $this->truncateText($reason, 180) : '—';
+            $diagnosis = $diagnosis !== '' ? $this->truncateText($diagnosis, 160) : '—';
+            $medications = $medications !== '' ? $this->truncateText($medications, 260) : '—';
+            $advice = $advice !== '' ? $this->truncateText($advice, 220) : '—';
 
             return [
                 'layout' => 'consult',
