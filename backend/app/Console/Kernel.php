@@ -10,6 +10,7 @@ use App\Console\Commands\MigrateDummyVetFormResponses;
 use App\Console\Commands\SendVaccineReminders;
 use App\Console\Commands\SendVetResponseReminders;
 use App\Console\Commands\SendMedicalRecordCreatedReminders;
+use App\Console\Commands\SendProfileCompletionReminders;
 use App\Console\Commands\SendUserCreatedReminders;
 use App\Console\Commands\SendUserContinuityReminders;
 use Illuminate\Console\Scheduling\Schedule;
@@ -25,6 +26,7 @@ class Kernel extends ConsoleKernel
         MigrateDummyVetFormResponses::class,
         SendVetResponseReminders::class,
         SendMedicalRecordCreatedReminders::class,
+        SendProfileCompletionReminders::class,
         SendUserCreatedReminders::class,
         SendUserContinuityReminders::class,
     ];
@@ -109,6 +111,11 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('notifications:pp-user-created')
             ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('notifications:pp-profile-completion')
+            ->timezone('Asia/Kolkata')
+            ->dailyAt('10:00')
             ->withoutOverlapping();
 
         $schedule->command('notifications:pp-user-continuity')

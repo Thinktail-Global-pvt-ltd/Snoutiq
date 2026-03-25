@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use App\Console\Commands\SendVaccineReminders;
 use App\Console\Commands\SendVetResponseReminders;
 use App\Console\Commands\SendMedicalRecordCreatedReminders;
+use App\Console\Commands\SendProfileCompletionReminders;
 use App\Console\Commands\SendUserCreatedReminders;
 use App\Console\Commands\SendUserContinuityReminders;
 use App\Console\Commands\LogTodayPrescriptionFollowUps;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SendVaccineReminders::class,
         SendVetResponseReminders::class,
         SendMedicalRecordCreatedReminders::class,
+        SendProfileCompletionReminders::class,
         SendUserCreatedReminders::class,
         SendUserContinuityReminders::class,
         LogTodayPrescriptionFollowUps::class,
@@ -82,6 +84,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Pet parent user-created reminder (2h after user is created)
         $schedule->command('notifications:pp-user-created')
             ->everyMinute()
+            ->withoutOverlapping();
+
+        // Profile completion reminders (daily)
+        $schedule->command('notifications:pp-profile-completion')
+            ->timezone('Asia/Kolkata')
+            ->dailyAt('10:00')
             ->withoutOverlapping();
 
         // Pet parent continuity reminder (+24h after template 1)
