@@ -665,11 +665,36 @@ class PetConsultTimelineController extends Controller
         }
 
         if ($years <= 0 && $months <= 0) {
-            $years = is_numeric($ageYears) ? (int) floor((float) $ageYears) : 0;
-            $months = is_numeric($ageMonths) ? (int) floor((float) $ageMonths) : 0;
+            $yearsValue = $this->normalizeNumericValue($ageYears);
+            $monthsValue = $this->normalizeNumericValue($ageMonths);
+
+            if ($yearsValue !== null && $yearsValue > 0) {
+                $totalMonths = (int) round($yearsValue * 12);
+                $years = intdiv($totalMonths, 12);
+                $months = $totalMonths % 12;
+            } elseif ($monthsValue !== null && $monthsValue > 0) {
+                $totalMonths = (int) round($monthsValue);
+                $years = intdiv($totalMonths, 12);
+                $months = $totalMonths % 12;
+            }
         }
 
         return [$years, $months];
+    }
+
+    private function normalizeNumericValue($value): ?float
+    {
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        if (is_string($value)) {
+            if (preg_match('/-?\d+(?:\.\d+)?/', $value, $matches)) {
+                return (float) $matches[0];
+            }
+        }
+
+        return null;
     }
 
     private function formatPetWeight($weight): string
