@@ -80,6 +80,7 @@ class PetOverviewController extends Controller
                     'breed' => $pet->breed,
                     'age_years' => $pet->pet_age,
                     'age_months' => $pet->pet_age_months,
+                    'pet_dob' => $pet->pet_dob ?? $pet->dob ?? null,
                     'gender' => $pet->pet_gender,
                     'state' => $pet->health_state,
                     'ai_summary' => $pet->ai_summary,
