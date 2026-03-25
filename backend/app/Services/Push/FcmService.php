@@ -233,6 +233,84 @@ class FcmService
     }
 
     /**
+     * @param array<string,mixed> $payload
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    private function applyRichPayloadOverrides(array $payload, array $options): array
+    {
+        $deeplink = $this->stringifyValue($options['deeplink'] ?? null, 2048);
+        if ($deeplink !== null) {
+            if (!isset($payload['fcm_options']) || !is_array($payload['fcm_options'])) {
+                $payload['fcm_options'] = [];
+            }
+            $payload['fcm_options']['link'] = $deeplink;
+
+            if (!isset($payload['android']) || !is_array($payload['android'])) {
+                $payload['android'] = [];
+            }
+            if (!isset($payload['android']['fcm_options']) || !is_array($payload['android']['fcm_options'])) {
+                $payload['android']['fcm_options'] = [];
+            }
+            $payload['android']['fcm_options']['link'] = $deeplink;
+
+            if (!isset($payload['apns']) || !is_array($payload['apns'])) {
+                $payload['apns'] = [];
+            }
+            if (!isset($payload['apns']['fcm_options']) || !is_array($payload['apns']['fcm_options'])) {
+                $payload['apns']['fcm_options'] = [];
+            }
+            $payload['apns']['fcm_options']['link'] = $deeplink;
+        }
+
+        $canDecorateNotification = array_key_exists('notification', $payload);
+        $image = $this->stringifyValue($options['image'] ?? null, 2048);
+        if ($image !== null && $canDecorateNotification) {
+            if (!isset($payload['notification']) || !is_array($payload['notification'])) {
+                $payload['notification'] = [];
+            }
+            $payload['notification']['image'] = $image;
+
+            if (!isset($payload['android']) || !is_array($payload['android'])) {
+                $payload['android'] = [];
+            }
+            if (!isset($payload['android']['notification']) || !is_array($payload['android']['notification'])) {
+                $payload['android']['notification'] = [];
+            }
+            $payload['android']['notification']['image'] = $image;
+
+            if (!isset($payload['apns']) || !is_array($payload['apns'])) {
+                $payload['apns'] = [];
+            }
+            if (!isset($payload['apns']['fcm_options']) || !is_array($payload['apns']['fcm_options'])) {
+                $payload['apns']['fcm_options'] = [];
+            }
+            $payload['apns']['fcm_options']['image'] = $image;
+
+            if (!isset($payload['apns']['payload']) || !is_array($payload['apns']['payload'])) {
+                $payload['apns']['payload'] = [];
+            }
+            if (!isset($payload['apns']['payload']['aps']) || !is_array($payload['apns']['payload']['aps'])) {
+                $payload['apns']['payload']['aps'] = [];
+            }
+            $payload['apns']['payload']['aps']['mutable-content'] = 1;
+        }
+
+        $icon = $this->stringifyValue($options['icon'] ?? null, 255);
+        if ($icon !== null && $canDecorateNotification) {
+            if (!isset($payload['android']) || !is_array($payload['android'])) {
+                $payload['android'] = [];
+            }
+            if (!isset($payload['android']['notification']) || !is_array($payload['android']['notification'])) {
+                $payload['android']['notification'] = [];
+            }
+            $payload['android']['notification']['icon'] = $icon;
+        }
+
+        return $payload;
+    }
+
+    /**
      * @param array<int,string> $tokens
      * @return array{valid:array<int,string>,invalid:array<int,string>}
      */
@@ -272,6 +350,129 @@ class FcmService
         $deliveryMode = $this->resolveDeliveryMode($normalizedData);
         $notificationType = $this->resolveNotificationType($normalizedData);
         $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
+        $source = $this->resolveDispatchSource();
+        $recipient = $this->resolveRecipientContexts([$normalizedToken])[$normalizedToken] ?? [];
+
+        if (!$this->isLikelyFcmToken($normalizedToken)) {
+            Log::warning('Skipping FCM send; token rejected as invalid format', [
+                'token' => $normalizedToken,
+            ]);
+
+            $this->storeDispatchLog([
+                'status' => self::STATUS_SKIPPED,
+                'target_type' => self::TARGET_TOKEN,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $normalizedToken,
+                'to_topic' => null,
+                'device_token_id' => $recipient['device_token_id'] ?? null,
+                'user_id' => $recipient['user_id'] ?? null,
+                'owner_model' => $recipient['owner_model'] ?? null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => null,
+                'error_code' => 'invalid_token_format',
+                'error_message' => 'Token rejected as invalid format',
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => null,
+                'sent_at' => null,
+            ]);
+
+            return;
+        }
+
+        $dataOnly = $this->shouldSendDataOnly($normalizedData);
+        $includesNotification = array_key_exists('notification', $payload);
+
+        Log::info('FCM send to token attempt', [
+            'token' => $this->maskToken($normalizedToken),
+            'title' => $title,
+            'data_keys' => array_keys($normalizedData),
+            'delivery_mode' => $deliveryMode,
+            'data_only' => $dataOnly,
+            'includes_notification' => $includesNotification,
+            'payload' => $this->maskPayloadToken($payload),
+        ]);
+
+        $message = CloudMessage::fromArray($payload);
+        try {
+            $responsePayload = $this->sendMessage($message, $normalizedToken);
+            $providerMessageId = $this->extractProviderMessageId($responsePayload);
+
+            Log::info('FCM send to token success', [
+                'token' => $this->maskToken($normalizedToken),
+            ]);
+
+            $this->storeDispatchLog([
+                'status' => self::STATUS_SENT,
+                'target_type' => self::TARGET_TOKEN,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $normalizedToken,
+                'to_topic' => null,
+                'device_token_id' => $recipient['device_token_id'] ?? null,
+                'user_id' => $recipient['user_id'] ?? null,
+                'owner_model' => $recipient['owner_model'] ?? null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => $providerMessageId,
+                'error_code' => null,
+                'error_message' => null,
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => $responsePayload,
+                'sent_at' => now(),
+            ]);
+        } catch (MessagingException | FirebaseException | Throwable $e) {
+            $this->storeDispatchLog([
+                'status' => self::STATUS_FAILED,
+                'target_type' => self::TARGET_TOKEN,
+                'notification_type' => $notificationType,
+                'delivery_mode' => $deliveryMode,
+                'from_source' => $source['source'],
+                'from_file' => $source['file'],
+                'from_line' => $source['line'],
+                'to_target' => $normalizedToken,
+                'to_topic' => null,
+                'device_token_id' => $recipient['device_token_id'] ?? null,
+                'user_id' => $recipient['user_id'] ?? null,
+                'owner_model' => $recipient['owner_model'] ?? null,
+                'title' => $title,
+                'notification_text' => $body,
+                'provider_message_id' => null,
+                'error_code' => $this->normalizeErrorCode($e),
+                'error_message' => $e->getMessage(),
+                'data_payload' => $normalizedData,
+                'request_payload' => $payload,
+                'response_payload' => null,
+                'sent_at' => null,
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Send a notification to a single device token with rich options.
+     *
+     * @param array<string,string> $data
+     * @param array<string,mixed> $options
+     */
+    public function sendToTokenRich(string $token, string $title, string $body, array $data = [], array $options = []): void
+    {
+        $normalizedToken = $this->normalizeToken($token);
+        $normalizedData = $this->normalizeDataPayload($data);
+        $deliveryMode = $this->resolveDeliveryMode($normalizedData);
+        $notificationType = $this->resolveNotificationType($normalizedData);
+        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
+        $payload = $this->applyRichPayloadOverrides($payload, $options);
         $source = $this->resolveDispatchSource();
         $recipient = $this->resolveRecipientContexts([$normalizedToken])[$normalizedToken] ?? [];
 

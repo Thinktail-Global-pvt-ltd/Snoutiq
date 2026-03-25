@@ -300,6 +300,147 @@ class PushController extends Controller
         }
     }
 
+    public function richToToken(Request $request, FcmService $push)
+    {
+        $validated = $request->validate([
+            'token' => ['nullable', 'string'],
+            'title' => ['nullable', 'string'],
+            'body' => ['nullable', 'string'],
+            'data' => ['nullable', 'array'],
+            'data.*' => ['nullable'],
+            'deeplink' => ['nullable', 'string', 'max:2048'],
+            'deep_link' => ['nullable', 'string', 'max:2048'],
+            'deepLink' => ['nullable', 'string', 'max:2048'],
+            'link' => ['nullable', 'string', 'max:2048'],
+            'image' => ['nullable', 'string', 'max:2048'],
+            'image_url' => ['nullable', 'string', 'max:2048'],
+            'imageUrl' => ['nullable', 'string', 'max:2048'],
+            'logo' => ['nullable', 'string', 'max:255'],
+            'icon' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $title = $validated['title'] ?? 'Snoutiq Alert';
+        $body = $validated['body'] ?? 'Test push from API';
+        $data = $this->normalizeData($request->input('data', []));
+        if (!isset($data['type'])) {
+            $data['type'] = 'rich_test';
+        }
+
+        $deepLink = $this->firstNonEmptyString([
+            $validated['deepLink'] ?? null,
+            $validated['deep_link'] ?? null,
+            $validated['deeplink'] ?? null,
+            $validated['link'] ?? null,
+            $data['deepLink'] ?? null,
+            $data['deep_link'] ?? null,
+            $data['deeplink'] ?? null,
+            $data['link'] ?? null,
+        ]);
+
+        if ($deepLink !== null) {
+            if (!isset($data['deepLink'])) {
+                $data['deepLink'] = $deepLink;
+            }
+            if (!isset($data['deep_link'])) {
+                $data['deep_link'] = $deepLink;
+            }
+            if (!isset($data['deeplink'])) {
+                $data['deeplink'] = $deepLink;
+            }
+        }
+
+        $image = $this->firstNonEmptyString([
+            $validated['image'] ?? null,
+            $validated['image_url'] ?? null,
+            $validated['imageUrl'] ?? null,
+            $data['image'] ?? null,
+        ]);
+
+        $icon = $this->firstNonEmptyString([
+            $validated['logo'] ?? null,
+            $validated['icon'] ?? null,
+            $data['logo'] ?? null,
+            $data['icon'] ?? null,
+        ]);
+
+        if ($image !== null && !isset($data['image'])) {
+            $data['image'] = $image;
+        }
+        if ($icon !== null) {
+            if (!isset($data['logo'])) {
+                $data['logo'] = $icon;
+            }
+            if (!isset($data['icon'])) {
+                $data['icon'] = $icon;
+            }
+        }
+
+        \Log::info('PushController@richToToken received', [
+            'has_token' => !empty($validated['token']),
+            'token' => isset($validated['token']) ? $this->maskToken($validated['token']) : null,
+            'title' => $title,
+            'body_len' => strlen($body),
+            'data_keys' => array_keys($data),
+            'has_deeplink' => $deepLink !== null,
+            'has_image' => $image !== null,
+            'has_icon' => $icon !== null,
+        ]);
+
+        $options = [
+            'deeplink' => $deepLink,
+            'image' => $image,
+            'icon' => $icon,
+        ];
+
+        try {
+            if (!empty($validated['token'])) {
+                $normalizedToken = $this->normalizeToken($validated['token']);
+                if (!$this->isLikelyFcmToken($normalizedToken)) {
+                    return response()->json([
+                        'error' => 'The provided token does not look like a valid FCM registration token.',
+                    ], 422);
+                }
+                $push->sendToTokenRich($normalizedToken, $title, $body, $data, $options);
+            } else {
+                $userId = Auth::id();
+                if (!$userId) {
+                    return response()->json(['error' => 'Login or pass token'], 422);
+                }
+                $tokens = DeviceToken::where('user_id', $userId)->pluck('token')->all();
+                foreach ($tokens as $t) {
+                    $push->sendToTokenRich($t, $title, $body, $data, $options);
+                }
+            }
+
+            return response()->json([
+                'sent' => true,
+                'success' => true,
+            ]);
+        } catch (MessagingException $e) {
+            \Log::error('FCM rich push failed', [
+                'token' => $validated['token'] ?? null,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'FCM send failed',
+                'details' => $e->getMessage(),
+            ], 500);
+        } catch (Throwable $e) {
+            \Log::error('FCM rich push failed', [
+                'token' => $validated['token'] ?? null,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'FCM send failed',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function ring(Request $request, FcmService $push)
     {
         $validated = $request->validate([
@@ -1067,6 +1208,27 @@ class PushController extends Controller
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param array<int,mixed> $candidates
+     */
+    private function firstNonEmptyString(array $candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $trimmed = trim($candidate);
+            if ($trimmed === '') {
+                continue;
+            }
+
+            return $trimmed;
+        }
+
+        return null;
     }
 
     private function isLikelyFcmToken(string $token): bool

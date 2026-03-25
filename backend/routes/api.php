@@ -2134,6 +2134,7 @@ Route::prefix('push')->group(function () {
     Route::put('/edit-token', [PushController::class, 'editToken']);
     Route::delete('/register-token', [PushController::class, 'unregisterToken']);
     Route::post('/test', [PushController::class, 'testToToken']);
+    Route::post('/rich', [PushController::class, 'richToToken']);
     Route::post('/ring', [PushController::class, 'ring']);
     Route::post('/stop-ring', [PushController::class, 'stopRing']);
 });
