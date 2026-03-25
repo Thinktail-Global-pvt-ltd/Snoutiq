@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class SendUserCreatedReminders extends Command
 {
     protected $signature = 'notifications:pp-user-created {--user_id=}';
-    protected $description = 'Send SNQ_PP_RECORDS_CREATED WhatsApp after a user (pet parent) is created (>=2h ago).';
+    protected $description = 'Send SNQ_PP_RECORDS_CREATED WhatsApp 2 hours after user creation (same-day only).';
 
     public function __construct(private readonly WhatsAppService $whatsApp)
     {
@@ -30,8 +30,9 @@ class SendUserCreatedReminders extends Command
         $now = now();
         $forcedUserId = $this->option('user_id');
 
-        $windowStart = $now->copy()->subHours(3);
-        $windowEnd   = $now->copy()->subHours(2);
+        // Run every minute and target users whose creation timestamp is ~2h old.
+        $windowEnd = $now->copy()->subHours(2);
+        $windowStart = $windowEnd->copy()->subMinute();
 
         if ($forcedUserId) {
             $users = User::query()
@@ -54,10 +55,23 @@ class SendUserCreatedReminders extends Command
             'candidates' => $users->count(),
             'at' => $now->toDateTimeString(),
             'forced_user_id' => $forcedUserId,
+            'window_start' => $windowStart->toDateTimeString(),
+            'window_end' => $windowEnd->toDateTimeString(),
         ]);
 
         $sent = 0;
         foreach ($users as $user) {
+            if (! $forcedUserId && $user->created_at) {
+                $createdAt = $user->created_at->copy();
+                $dueAt = $createdAt->copy()->addHours(2);
+
+                // Requirement: send on the same calendar day as user creation.
+                if (! $dueAt->isSameDay($createdAt)) {
+                    $this->log($user->id, 'skipped', $user->phone, null, null, 'due_time_not_same_day');
+                    continue;
+                }
+            }
+
             $phone = $user->phone;
             if (! $phone) {
                 $this->log($user->id, 'skipped', $phone, null, null, 'missing_phone');

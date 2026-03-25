@@ -107,6 +107,10 @@ class Kernel extends ConsoleKernel
             ->everyMinute()
             ->withoutOverlapping();
 
+        $schedule->command('notifications:pp-user-created')
+            ->everyMinute()
+            ->withoutOverlapping();
+
         $schedule->command('notifications:pp-user-continuity')
             ->everyFiveMinutes()
             ->withoutOverlapping();
