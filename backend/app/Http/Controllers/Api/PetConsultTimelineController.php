@@ -149,7 +149,7 @@ class PetConsultTimelineController extends Controller
                 return $item;
             });
 
-        return response()->json([
+        $responsePayload = [
             'success' => true,
             'filters' => [
                 'pet_id' => $petId,
@@ -171,7 +171,11 @@ class PetConsultTimelineController extends Controller
                 'deworming' => $dewormingTimelineItems->pluck('record')->values(),
                 'timeline' => $timeline,
             ],
-        ]);
+        ];
+
+        $responsePayload['pdf_view'] = $this->buildLifelinePdfViewModel($responsePayload);
+
+        return response()->json($responsePayload);
     }
 
     /**
@@ -732,6 +736,79 @@ class PetConsultTimelineController extends Controller
         }
 
         return null;
+    }
+
+    private function buildLifelinePdfViewModel(array $payload): array
+    {
+        $pet = is_array(data_get($payload, 'data.pet')) ? data_get($payload, 'data.pet') : [];
+        $timeline = collect(data_get($payload, 'data.timeline', []))
+            ->filter(fn ($item) => is_array($item))
+            ->values();
+
+        $petName = trim((string) ($pet['name'] ?? 'Pet'));
+        if ($petName === '') {
+            $petName = 'Pet';
+        }
+
+        $lastVaccination = $this->resolveLastVaccinationSummary($pet);
+        $lastDeworming = $this->resolveLastDewormingSummary($pet);
+        $ongoingTreatments = $this->resolveOngoingTreatments($payload);
+
+        $excludeRecordIds = array_values(array_filter(array_map(
+            fn ($item) => $item['record_id'] ?? null,
+            $ongoingTreatments
+        ), fn ($id) => $id !== null && $id !== ''));
+
+        if ($excludeRecordIds !== []) {
+            $timeline = $timeline->filter(function (array $item) use ($excludeRecordIds) {
+                $recordId = $item['record_id'] ?? null;
+                return $recordId === null || $recordId === '' || !in_array($recordId, $excludeRecordIds, true);
+            })->values();
+        }
+
+        $grouped = $timeline
+            ->groupBy(function (array $item) {
+                $year = trim((string) ($item['year'] ?? ''));
+                return $year !== '' ? $year : 'Earlier';
+            })
+            ->sortByDesc(function (Collection $items, string $year) {
+                return is_numeric($year) ? (int) $year : -1;
+            })
+            ->map(function (Collection $items, string $year) {
+                return [
+                    'year' => $year,
+                    'events' => $items->map(function (array $item) {
+                        $mapped = $this->mapTimelineItemForPdf($item);
+                        $mapped['record_id'] = $item['record_id'] ?? null;
+                        $mapped['event_type'] = $item['event_type'] ?? $item['source'] ?? null;
+                        return $mapped;
+                    })->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'generated_at' => now('Asia/Kolkata')->format('d M Y, h:i A'),
+            'pet' => [
+                'name' => $petName,
+                'species' => $pet['pet_type'] ?? $pet['type'] ?? null,
+                'breed' => $pet['breed'] ?? null,
+                'dob' => $this->formatPdfDate($pet['pet_dob'] ?? $pet['dob'] ?? null),
+                'weight' => $this->formatPetWeight($pet['weight'] ?? null),
+                'neutered' => $this->formatYesNo($pet['is_neutered'] ?? $pet['is_nuetered'] ?? null),
+                'owner_name' => $pet['owner_name'] ?? null,
+                'owner_city' => $pet['owner_city'] ?? null,
+                'last_vaccination' => [
+                    'name' => $lastVaccination['name'] ?? null,
+                    'date' => $this->formatPdfDate($lastVaccination['date'] ?? null),
+                    'doctor' => $lastVaccination['doctor'] ?? null,
+                ],
+                'last_deworming_date' => $this->formatPdfDate($lastDeworming['date'] ?? null),
+            ],
+            'ongoing_treatments' => $ongoingTreatments,
+            'medical_history' => $grouped,
+        ];
     }
 
     private function formatPetWeight($weight): string
