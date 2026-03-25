@@ -1202,7 +1202,7 @@ class PetConsultTimelineController extends Controller
         $petName = $petNameRaw !== '' ? $petNameRaw : 'Pet';
         $species = trim((string) ($pet['pet_type'] ?? $pet['type'] ?? ''));
         $breed = trim((string) ($pet['breed'] ?? ''));
-        $age = $this->formatPetAge($pet);
+        $dobValue = $this->formatPdfDate($pet['pet_dob'] ?? $pet['dob'] ?? null);
         $weight = $this->formatPetWeight($pet['weight'] ?? null);
         $neutered = $this->formatYesNo($pet['is_neutered'] ?? $pet['is_nuetered'] ?? null);
         $ownerName = trim((string) ($pet['owner_name'] ?? ''));
@@ -1498,7 +1498,7 @@ CSS;
         $petNameEsc = $this->e($petName);
         $speciesEsc = $this->e($species !== '' ? $species : 'Pet');
         $breedEsc = $this->e($breed !== '' ? $breed : '—');
-        $ageEsc = $this->e($age);
+        $dobEsc = $this->e($dobValue);
         $weightEsc = $this->e($weight);
         $neuteredEsc = $this->e($neutered);
         $ownerNameEsc = $this->e($ownerName !== '' ? $ownerName : '—');
@@ -1549,8 +1549,8 @@ CSS;
                         <div class="info-value">{$breedEsc}</div>
                     </td>
                     <td>
-                        <div class="info-label">Age</div>
-                        <div class="info-value">{$ageEsc}</div>
+                        <div class="info-label">DOB</div>
+                        <div class="info-value">{$dobEsc}</div>
                     </td>
                     <td>
                         <div class="info-label">Weight</div>
