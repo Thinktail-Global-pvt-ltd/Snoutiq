@@ -399,6 +399,11 @@ class PetConsultTimelineController extends Controller
     private function buildPetSummary(Pet $pet): array
     {
         $vaccinationPayload = $this->resolveVaccinationPayloadFromPet($pet);
+        [$ageYears, $ageMonths] = $this->resolveAgeParts(
+            $pet->pet_dob ?? $pet->dob ?? null,
+            $pet->pet_age ?? null,
+            $pet->pet_age_months ?? null
+        );
 
         $owner = null;
         try {
@@ -414,8 +419,8 @@ class PetConsultTimelineController extends Controller
             'breed' => $pet->breed,
             'pet_type' => $pet->pet_type ?? $pet->type ?? null,
             'pet_gender' => $pet->pet_gender ?? $pet->gender ?? null,
-            'pet_age' => $pet->pet_age ?? null,
-            'pet_age_months' => $pet->pet_age_months ?? null,
+            'pet_age' => $ageYears > 0 ? $ageYears : null,
+            'pet_age_months' => $ageMonths > 0 ? $ageMonths : null,
             'pet_dob' => $this->normalizeDateString($pet->pet_dob ?? $pet->dob ?? null),
             'weight' => $pet->weight ?? null,
             'is_neutered' => $pet->is_neutered ?? $pet->is_nuetered ?? null,
@@ -620,26 +625,11 @@ class PetConsultTimelineController extends Controller
 
     private function formatPetAge(array $pet): string
     {
-        $years = 0;
-        $months = 0;
-        $dob = $pet['pet_dob'] ?? $pet['dob'] ?? null;
-        if ($dob) {
-            try {
-                $dobDate = Carbon::parse($dob)->startOfDay();
-                $today = Carbon::today();
-                if ($dobDate->lte($today)) {
-                    $years = $dobDate->diffInYears($today);
-                    $months = $dobDate->copy()->addYears($years)->diffInMonths($today);
-                }
-            } catch (\Throwable $e) {
-                // Ignore invalid DOB formats
-            }
-        }
-
-        if ($years <= 0 && $months <= 0) {
-            $years = is_numeric($pet['pet_age'] ?? null) ? (int) $pet['pet_age'] : 0;
-            $months = is_numeric($pet['pet_age_months'] ?? null) ? (int) $pet['pet_age_months'] : 0;
-        }
+        [$years, $months] = $this->resolveAgeParts(
+            $pet['pet_dob'] ?? $pet['dob'] ?? null,
+            $pet['pet_age'] ?? null,
+            $pet['pet_age_months'] ?? null
+        );
 
         if ($years <= 0 && $months <= 0) {
             return '—';
@@ -654,6 +644,32 @@ class PetConsultTimelineController extends Controller
         }
 
         return implode(' ', $parts);
+    }
+
+    private function resolveAgeParts($dob, $ageYears, $ageMonths): array
+    {
+        $years = 0;
+        $months = 0;
+
+        if ($dob) {
+            try {
+                $dobDate = Carbon::parse($dob)->startOfDay();
+                $today = Carbon::today();
+                if ($dobDate->lte($today)) {
+                    $years = $dobDate->diffInYears($today);
+                    $months = $dobDate->copy()->addYears($years)->diffInMonths($today);
+                }
+            } catch (\Throwable $e) {
+                // Ignore invalid DOB formats
+            }
+        }
+
+        if ($years <= 0 && $months <= 0) {
+            $years = is_numeric($ageYears) ? (int) floor((float) $ageYears) : 0;
+            $months = is_numeric($ageMonths) ? (int) floor((float) $ageMonths) : 0;
+        }
+
+        return [$years, $months];
     }
 
     private function formatPetWeight($weight): string
@@ -916,11 +932,6 @@ class PetConsultTimelineController extends Controller
             return '';
         }
 
-        $encoded = json_encode($medications, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if (is_string($encoded) && $encoded !== '' && $encoded !== '[]') {
-            return $encoded;
-        }
-
         if (!array_is_list($medications)) {
             $medications = [$medications];
         }
@@ -988,7 +999,7 @@ class PetConsultTimelineController extends Controller
             }
 
             $items[] = $label;
-            if (count($items) >= 4) {
+            if (count($items) >= 3) {
                 break;
             }
         }
@@ -1691,7 +1702,7 @@ HTML;
 
             $reason = $reason !== '' ? $this->truncateText($reason, 180) : '—';
             $diagnosis = $diagnosis !== '' ? $this->truncateText($diagnosis, 160) : '—';
-            $medications = $medications !== '' ? $this->truncateText($medications, 260) : '—';
+            $medications = $medications !== '' ? $this->truncateText($medications, 360) : '—';
             $advice = $advice !== '' ? $this->truncateText($advice, 220) : '—';
 
             return [
