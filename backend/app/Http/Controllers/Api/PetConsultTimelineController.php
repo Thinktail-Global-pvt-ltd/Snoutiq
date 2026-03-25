@@ -381,6 +381,13 @@ class PetConsultTimelineController extends Controller
     {
         $vaccinationPayload = $this->resolveVaccinationPayloadFromPet($pet);
 
+        $owner = null;
+        try {
+            $owner = $pet->owner;
+        } catch (\Throwable $e) {
+            $owner = null;
+        }
+
         return [
             'id' => $pet->id,
             'user_id' => $pet->user_id,
@@ -388,9 +395,18 @@ class PetConsultTimelineController extends Controller
             'breed' => $pet->breed,
             'pet_type' => $pet->pet_type ?? $pet->type ?? null,
             'pet_gender' => $pet->pet_gender ?? $pet->gender ?? null,
+            'pet_age' => $pet->pet_age ?? null,
+            'pet_age_months' => $pet->pet_age_months ?? null,
+            'pet_dob' => $this->normalizeDateString($pet->pet_dob ?? $pet->dob ?? null),
+            'weight' => $pet->weight ?? null,
+            'is_neutered' => $pet->is_neutered ?? $pet->is_nuetered ?? null,
+            'owner_name' => $owner?->name ?? null,
+            'owner_city' => $owner?->city ?? null,
             'deworming_yes_no' => $pet->deworming_yes_no ?? null,
             'last_deworming_date' => $this->normalizeDateString($pet->last_deworming_date ?? null),
             'next_deworming_date' => $this->normalizeDateString($pet->next_deworming_date ?? null),
+            'last_vaccenated_date' => $this->normalizeDateString($pet->last_vaccenated_date ?? null),
+            'vaccination_date' => $this->normalizeDateString($pet->vaccination_date ?? null),
             'vaccination_payload' => $vaccinationPayload,
         ];
     }
@@ -582,6 +598,414 @@ class PetConsultTimelineController extends Controller
         }
     }
 
+    private function formatPetAge(array $pet): string
+    {
+        $years = is_numeric($pet['pet_age'] ?? null) ? (int) $pet['pet_age'] : 0;
+        $months = is_numeric($pet['pet_age_months'] ?? null) ? (int) $pet['pet_age_months'] : 0;
+
+        if ($years <= 0 && $months <= 0) {
+            $dob = $pet['pet_dob'] ?? $pet['dob'] ?? null;
+            if ($dob) {
+                try {
+                    $dobDate = Carbon::parse($dob)->startOfDay();
+                    $today = Carbon::today();
+                    if ($dobDate->lte($today)) {
+                        $years = $dobDate->diffInYears($today);
+                        $months = $dobDate->copy()->addYears($years)->diffInMonths($today);
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore invalid DOB formats
+                }
+            }
+        }
+
+        if ($years <= 0 && $months <= 0) {
+            return '—';
+        }
+
+        $parts = [];
+        if ($years > 0) {
+            $parts[] = $years . ' year' . ($years === 1 ? '' : 's');
+        }
+        if ($months > 0) {
+            $parts[] = $months . ' month' . ($months === 1 ? '' : 's');
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function formatPetWeight($weight): string
+    {
+        if ($weight === null || $weight === '') {
+            return '—';
+        }
+
+        if (is_numeric($weight)) {
+            $value = (float) $weight;
+            if ($value <= 0) {
+                return '—';
+            }
+            $formatted = fmod($value, 1.0) === 0.0 ? number_format($value, 0) : number_format($value, 1);
+            return $formatted . ' kg';
+        }
+
+        $raw = trim((string) $weight);
+        return $raw !== '' ? $raw : '—';
+    }
+
+    private function formatYesNo($value): string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'Yes' : 'No';
+        }
+
+        if (is_numeric($value)) {
+            return ((int) $value) === 1 ? 'Yes' : 'No';
+        }
+
+        $normalized = strtolower(trim((string) $value, " \t\n\r\0\x0B\"'"));
+        if (in_array($normalized, ['yes', 'y', 'true', '1'], true)) {
+            return 'Yes';
+        }
+        if (in_array($normalized, ['no', 'n', 'false', '0'], true)) {
+            return 'No';
+        }
+
+        $raw = trim((string) $value);
+        return $raw !== '' ? $raw : '—';
+    }
+
+    private function resolveLastVaccinationSummary(array $pet): array
+    {
+        $payload = $pet['vaccination_payload'] ?? null;
+        $vaccinationNode = null;
+
+        if (is_array($payload)) {
+            $vaccinationNode = $payload['vaccination'] ?? $payload;
+        }
+
+        $latest = null;
+        $latestTimestamp = null;
+        $index = 0;
+
+        if (is_array($vaccinationNode)) {
+            foreach ($vaccinationNode as $key => $entry) {
+                $record = is_array($entry) ? $entry : ['value' => $entry];
+                $lastDate = $this->normalizeDateString(
+                    $record['last_date']
+                        ?? $record['lastDate']
+                        ?? $record['date']
+                        ?? $record['date_given']
+                        ?? null
+                );
+
+                if (!$lastDate) {
+                    $index++;
+                    continue;
+                }
+
+                try {
+                    $timestamp = Carbon::parse($lastDate)->getTimestamp();
+                } catch (\Throwable $e) {
+                    $timestamp = null;
+                }
+
+                if ($timestamp === null) {
+                    $index++;
+                    continue;
+                }
+
+                if ($latestTimestamp === null || $timestamp > $latestTimestamp) {
+                    $latestTimestamp = $timestamp;
+                    $latest = [
+                        'name' => $this->resolveVaccinationName($key, $record, $index),
+                        'date' => $lastDate,
+                        'doctor' => $record['doctor']
+                            ?? $record['doctor_name']
+                            ?? $record['vet']
+                            ?? $record['administered_by']
+                            ?? null,
+                    ];
+                }
+                $index++;
+            }
+        }
+
+        if ($latest === null) {
+            $fallbackDate = $this->normalizeDateString($pet['last_vaccenated_date'] ?? $pet['vaccination_date'] ?? null);
+            if ($fallbackDate) {
+                $latest = [
+                    'name' => 'Vaccination',
+                    'date' => $fallbackDate,
+                    'doctor' => null,
+                ];
+            }
+        }
+
+        return $latest ?? [
+            'name' => '—',
+            'date' => null,
+            'doctor' => null,
+        ];
+    }
+
+    private function resolveLastDewormingSummary(array $pet): array
+    {
+        $lastDate = $this->normalizeDateString($pet['last_deworming_date'] ?? null);
+
+        return [
+            'name' => 'Deworming',
+            'date' => $lastDate,
+            'doctor' => null,
+        ];
+    }
+
+    private function normalizeMixedValue($value, int $limit = 4): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_string($value)) {
+            return trim($value);
+        }
+
+        if (is_numeric($value)) {
+            return (string) $value;
+        }
+
+        if (is_array($value)) {
+            if (array_is_list($value)) {
+                $parts = [];
+                foreach ($value as $entry) {
+                    $piece = $this->normalizeMixedValue($entry, $limit);
+                    if ($piece !== '') {
+                        $parts[] = $piece;
+                    }
+                    if (count($parts) >= $limit) {
+                        break;
+                    }
+                }
+                return implode(', ', $parts);
+            }
+
+            foreach (['value', 'label', 'text', 'name', 'title'] as $key) {
+                if (isset($value[$key])) {
+                    $candidate = $this->normalizeMixedValue($value[$key], $limit);
+                    if ($candidate !== '') {
+                        return $candidate;
+                    }
+                }
+            }
+
+            $parts = [];
+            foreach ($value as $entry) {
+                $piece = $this->normalizeMixedValue($entry, $limit);
+                if ($piece !== '') {
+                    $parts[] = $piece;
+                }
+                if (count($parts) >= $limit) {
+                    break;
+                }
+            }
+
+            return implode(', ', $parts);
+        }
+
+        return '';
+    }
+
+    private function extractStringFromArray(array $source, array $keys): string
+    {
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $source)) {
+                continue;
+            }
+
+            $value = $this->normalizeMixedValue($source[$key]);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function formatMedicationsSummary($medications): string
+    {
+        if (is_string($medications)) {
+            return trim($medications);
+        }
+
+        if (is_array($medications)) {
+            $items = [];
+            if (!array_is_list($medications)) {
+                $single = $this->normalizeMixedValue($medications);
+                if ($single !== '') {
+                    return $single;
+                }
+                $medications = [$medications];
+            }
+
+            foreach ($medications as $medication) {
+                if (is_string($medication)) {
+                    $items[] = trim($medication);
+                    continue;
+                }
+                if (!is_array($medication)) {
+                    $candidate = $this->normalizeMixedValue($medication);
+                    if ($candidate !== '') {
+                        $items[] = $candidate;
+                    }
+                    continue;
+                }
+
+                $name = $this->extractStringFromArray($medication, ['name', 'medicine', 'drug', 'title']);
+                $dosage = $this->extractStringFromArray($medication, ['dosage', 'dose', 'strength']);
+                $item = $name !== '' ? $name : $this->normalizeMixedValue($medication);
+                if ($dosage !== '') {
+                    $item .= ' (' . $dosage . ')';
+                }
+                if ($item !== '') {
+                    $items[] = $item;
+                }
+            }
+
+            $items = array_values(array_filter($items, fn ($item) => $item !== ''));
+            if ($items !== []) {
+                return implode(', ', array_slice($items, 0, 4));
+            }
+        }
+
+        return '';
+    }
+
+    private function resolveOngoingTreatments(array $payload): array
+    {
+        $prescriptions = collect(data_get($payload, 'data.prescriptions', []))
+            ->filter(fn ($item) => is_array($item))
+            ->values();
+
+        if ($prescriptions->isEmpty()) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($prescriptions as $prescription) {
+            $diagnosisStatus = strtolower(trim((string) ($prescription['diagnosis_status'] ?? '')));
+            $isChronic = filter_var($prescription['is_chronic'] ?? false, FILTER_VALIDATE_BOOL);
+            $followUpRequired = filter_var($prescription['follow_up_required'] ?? false, FILTER_VALIDATE_BOOL);
+
+            $hasTreatmentInfo = $this->extractStringFromArray($prescription, [
+                'treatment_plan',
+                'home_care',
+                'doctor_treatment',
+                'follow_up_notes',
+            ]) !== '' || $this->formatMedicationsSummary($prescription['medications_json'] ?? null) !== '';
+
+            $isOngoing = $isChronic || $diagnosisStatus === 'chronic' || $followUpRequired || $hasTreatmentInfo;
+
+            if (!$isOngoing) {
+                continue;
+            }
+
+            $items[] = $this->mapPrescriptionToOngoingTreatment($prescription);
+            if (count($items) >= 3) {
+                break;
+            }
+        }
+
+        if ($items === [] && $prescriptions->isNotEmpty()) {
+            $items[] = $this->mapPrescriptionToOngoingTreatment($prescriptions->first());
+        }
+
+        return $items;
+    }
+
+    private function mapPrescriptionToOngoingTreatment(array $prescription): array
+    {
+        $reason = $this->extractStringFromArray($prescription, [
+            'visit_notes',
+            'exam_notes',
+            'history_snapshot',
+            'follow_up_notes',
+        ]);
+        $diagnosis = $this->extractStringFromArray($prescription, ['diagnosis', 'disease_name']);
+        $medications = $this->formatMedicationsSummary($prescription['medications_json'] ?? null);
+        $advice = $this->extractStringFromArray($prescription, [
+            'home_care',
+            'treatment_plan',
+            'doctor_treatment',
+            'follow_up_notes',
+        ]);
+
+        $lastFollowUp = $this->formatPdfDate(
+            $prescription['follow_up_date']
+                ?? $prescription['updated_at']
+                ?? $prescription['created_at']
+                ?? null,
+            '—'
+        );
+
+        $doctor = $prescription['doctor_name'] ?? $prescription['doctor_id'] ?? null;
+
+        return [
+            'record_id' => $prescription['id'] ?? null,
+            'type' => 'On-going Treatment',
+            'status' => 'Active',
+            'last_follow_up' => $lastFollowUp,
+            'doctor' => $doctor,
+            'reason' => $reason !== '' ? $reason : '—',
+            'diagnosis' => $diagnosis !== '' ? $diagnosis : '—',
+            'medications' => $medications !== '' ? $medications : '—',
+            'advice' => $advice !== '' ? $advice : '—',
+        ];
+    }
+
+    private function buildOngoingTreatmentCardsHtml(array $items): string
+    {
+        if ($items === []) {
+            return '';
+        }
+
+        $html = '';
+
+        foreach ($items as $item) {
+            $doctorLabel = '';
+            if (!empty($item['doctor'])) {
+                $doctorLabel = '<div class="event-meta"><span class="event-meta-label">Doctor ID</span><div class="event-meta-value">'
+                    . $this->e((string) $item['doctor']) . '</div></div>';
+            }
+
+            $html .= '<div class="ongoing-card">';
+            $html .= '<div class="ongoing-header"><table class="full-table"><tr>';
+            $html .= '<td><table class="icon-table"><tr>';
+            $html .= '<td class="icon-cell"><div class="icon-badge amber-bg amber-text">Rx</div></td>';
+            $html .= '<td><div class="event-type amber-text">'.$this->e((string) ($item['type'] ?? 'On-going Treatment')).'</div>';
+            $html .= '<div class="event-date amber-text">Status: '.$this->e((string) ($item['status'] ?? 'Active')).'</div>';
+            if (!empty($item['last_follow_up'])) {
+                $html .= '<div class="event-date muted">Last Follow-up: '.$this->e((string) $item['last_follow_up']).'</div>';
+            }
+            $html .= '</td></tr></table></td>';
+            $html .= '<td class="right-cell">'.$doctorLabel.'</td>';
+            $html .= '</tr></table></div>';
+            $html .= '<div class="card-body">';
+            $html .= '<table class="grid-table"><tr>';
+            $html .= '<td><div class="event-label">Reported symptom</div><div class="event-value">'.$this->e((string) ($item['reason'] ?? '—')).'</div></td>';
+            $html .= '<td><div class="event-label">Diagnosis</div><div class="event-value">'.$this->e((string) ($item['diagnosis'] ?? '—')).'</div></td>';
+            $html .= '<td><div class="event-label">Medications</div><div class="event-value">'.$this->e((string) ($item['medications'] ?? '—')).'</div></td>';
+            $html .= '<td><div class="event-label">Vet Advice & Home Care</div><div class="event-value">'.$this->e((string) ($item['advice'] ?? '—')).'</div></td>';
+            $html .= '</tr></table></div></div>';
+        }
+
+        return $html;
+    }
+
     private function buildLifelinePdfHtml(array $payload): string
     {
         $pet = is_array(data_get($payload, 'data.pet')) ? data_get($payload, 'data.pet') : [];
@@ -591,220 +1015,315 @@ class PetConsultTimelineController extends Controller
 
         $petNameRaw = trim((string) ($pet['name'] ?? 'Pet'));
         $petName = $petNameRaw !== '' ? $petNameRaw : 'Pet';
-        $petSummaryParts = array_values(array_filter([
-            trim((string) ($pet['breed'] ?? '')),
-            trim((string) ($pet['pet_type'] ?? '')),
-            trim((string) ($pet['pet_gender'] ?? '')),
-        ], fn (string $value) => $value !== ''));
-        $petSummary = $petSummaryParts !== []
-            ? implode(' · ', $petSummaryParts)
-            : 'Pet health history';
+        $species = trim((string) ($pet['pet_type'] ?? $pet['type'] ?? ''));
+        $breed = trim((string) ($pet['breed'] ?? ''));
+        $age = $this->formatPetAge($pet);
+        $weight = $this->formatPetWeight($pet['weight'] ?? null);
+        $neutered = $this->formatYesNo($pet['is_neutered'] ?? $pet['is_nuetered'] ?? null);
+        $ownerName = trim((string) ($pet['owner_name'] ?? ''));
+        $ownerCity = trim((string) ($pet['owner_city'] ?? ''));
 
-        $counts = is_array(data_get($payload, 'counts')) ? data_get($payload, 'counts') : [];
-        $timelineCount = (int) ($counts['timeline'] ?? $timeline->count());
-        $consultCount = (int) ($counts['video_consultations'] ?? 0);
-        $prescriptionCount = (int) ($counts['prescriptions'] ?? 0);
+        $lastVaccination = $this->resolveLastVaccinationSummary($pet);
+        $lastVaccinationName = $lastVaccination['name'] ?? '—';
+        $lastVaccinationDate = $this->formatPdfDate($lastVaccination['date'] ?? null);
+        $lastVaccinationDoctor = trim((string) ($lastVaccination['doctor'] ?? ''));
+        if ($lastVaccinationDoctor === '') {
+            $lastVaccinationDoctor = 'Not recorded';
+        }
 
-        $nextDue = $this->resolveNextDueDetails($payload);
-        $nextTitle = $nextDue['title'] ?? 'No upcoming reminder';
-        $nextSubtitle = $nextDue['subtitle'] ?? 'Your upcoming vaccine/deworming reminders will appear here.';
+        $lastDeworming = $this->resolveLastDewormingSummary($pet);
+        $lastDewormingName = $lastDeworming['name'] ?? 'Deworming';
+        $lastDewormingDate = $this->formatPdfDate($lastDeworming['date'] ?? null);
+        $lastDewormingDoctor = trim((string) ($lastDeworming['doctor'] ?? ''));
+        if ($lastDewormingDoctor === '') {
+            $lastDewormingDoctor = 'Not recorded';
+        }
 
-        $activeTreatment = $this->resolveActiveTreatmentSummary($payload);
-        $activeTreatmentHtml = $activeTreatment !== null
-            ? '<div class="active-chip"><div class="active-dot"></div><div><div class="active-title">Ongoing treatment</div><div class="active-sub">'.$this->e($activeTreatment).'</div></div></div>'
-            : '';
+        $ongoingTreatments = $this->resolveOngoingTreatments($payload);
+        $ongoingHtml = $this->buildOngoingTreatmentCardsHtml($ongoingTreatments);
+        $excludeRecordIds = array_values(array_filter(array_map(
+            fn ($item) => $item['record_id'] ?? null,
+            $ongoingTreatments
+        ), fn ($id) => $id !== null && $id !== ''));
 
-        $timelineHtml = $this->buildTimelineCardsHtml($timeline);
+        $timelineHtml = $this->buildTimelineCardsHtml($timeline, $excludeRecordIds);
         $generatedAt = $this->e(now('Asia/Kolkata')->format('d M Y, h:i A'));
 
+        $ongoingSection = '';
+        if ($ongoingHtml !== '') {
+            $ongoingSection = <<<HTML
+            <div class="section-title"><span class="section-bar section-amber"></span>On-going Treatment</div>
+            <div class="section-block">
+                {$ongoingHtml}
+            </div>
+HTML;
+        }
+
         $style = <<<CSS
+@page { margin: 24px; }
 body {
     margin: 0;
     padding: 0;
-    background: #d8d6cf;
+    background: #f1f5f9;
     font-family: DejaVu Sans, sans-serif;
-    color: #18180f;
-    font-size: 12px;
+    color: #0f172a;
+    font-size: 11px;
 }
-.wrap {
-    padding: 20px;
-}
-.phone {
+.container {
     width: 100%;
     max-width: 760px;
     margin: 0 auto;
-    background: #f5f4f0;
-    border-radius: 22px;
-    border: 1px solid #d8d6cf;
-    overflow: hidden;
 }
-.topbar {
+.header {
     background: #ffffff;
-    border-bottom: 1px solid #e8e7e3;
-    padding: 16px 18px;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
 }
-.title {
-    font-size: 18px;
-    font-weight: 700;
-    color: #18180f;
-}
-.subtitle {
-    font-size: 11px;
-    color: #9c9a94;
-    margin-top: 2px;
-}
-.meta-strip {
-    margin-top: 10px;
-    font-size: 10px;
-    color: #6b6a66;
-}
-.pet-card {
-    margin: 12px;
-    background: #ffffff;
-    border: 1px solid #ecebe7;
-    border-radius: 14px;
-    padding: 12px 14px;
-}
-.pet-name {
-    font-size: 16px;
-    font-weight: 700;
-}
-.pet-sub {
-    font-size: 11px;
-    color: #6b6a66;
-    margin-top: 3px;
-}
-.stats {
-    margin-top: 8px;
-    font-size: 10px;
-    color: #5c5b57;
-}
-.next-banner {
-    margin: 0 12px 12px;
-    background: #1a6fb5;
-    color: #ffffff;
-    border-radius: 14px;
-    padding: 12px 14px;
-}
-.next-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #d7e8f8;
-}
-.next-title {
-    font-size: 14px;
-    font-weight: 700;
-    margin-top: 3px;
-}
-.next-sub {
-    font-size: 11px;
-    color: #dbe8f4;
-    margin-top: 2px;
-}
-.active-chip {
-    margin: 0 12px 14px;
-    background: #fdf2e0;
-    border: 1px solid #f0c060;
-    border-radius: 10px;
-    padding: 10px 12px;
-}
-.active-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #d97706;
-    margin-right: 8px;
-}
-.active-title {
-    display: inline;
-    font-size: 12px;
-    font-weight: 700;
-    color: #a06010;
-}
-.active-sub {
-    margin-top: 4px;
-    font-size: 11px;
-    color: #5c5b57;
-}
-.section-label {
-    padding: 0 12px 8px;
-    font-size: 10px;
-    font-weight: 700;
-    color: #9c9a94;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-.timeline {
-    padding: 0 12px 14px;
-}
-.year-badge {
-    display: inline-block;
-    background: #18180f;
-    color: #ffffff;
-    border-radius: 18px;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 3px 10px;
-    margin: 4px 0 8px;
-}
-.event-table {
+.header-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 0 0 8px;
 }
-.event-icon-col {
-    width: 48px;
-    vertical-align: top;
-    padding-top: 2px;
-}
-.event-icon {
-    width: 36px;
-    height: 36px;
-    line-height: 36px;
+.logo {
+    width: 34px;
+    height: 34px;
+    background: #2563eb;
+    color: #ffffff;
+    border-radius: 10px;
     text-align: center;
-    border-radius: 18px;
-    font-size: 12px;
+    font-weight: 800;
+    font-size: 16px;
+    line-height: 34px;
+}
+.pet-name {
+    font-size: 18px;
+    font-weight: 800;
+}
+.badge {
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 999px;
+    font-size: 9px;
+    padding: 2px 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     font-weight: 700;
 }
-.event-body {
+.subtitle {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #94a3b8;
+    font-weight: 700;
+    margin-top: 2px;
+}
+.meta {
+    font-size: 9px;
+    color: #64748b;
+    text-align: right;
+}
+.card {
     background: #ffffff;
-    border: 1px solid #ecebe7;
-    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+.timeline {
+    margin-bottom: 10px;
+}
+.info-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    font-weight: 700;
+    margin-bottom: 3px;
+}
+.info-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.info-muted {
+    font-size: 9px;
+    color: #94a3b8;
+}
+.divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 12px 0;
+}
+.grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.grid-table td {
+    vertical-align: top;
+    padding-right: 10px;
+}
+.mini-card {
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
+    border-radius: 12px;
+    padding: 10px;
+}
+.icon-badge {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    text-align: center;
+    line-height: 26px;
+    font-weight: 800;
+    font-size: 10px;
+}
+.icon-table {
+    border-collapse: collapse;
+}
+.icon-cell {
+    width: 32px;
+}
+.section-title {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #1e293b;
+    margin: 6px 0 8px;
+}
+.section-bar {
+    display: inline-block;
+    width: 6px;
+    height: 16px;
+    border-radius: 4px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.section-amber { background: #f59e0b; }
+.section-blue { background: #3b82f6; }
+.ongoing-card {
+    background: #ffffff;
+    border: 2px solid #fef3c7;
+    border-radius: 16px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    page-break-inside: avoid;
+}
+.ongoing-header {
+    background: #fffbeb;
+    border-bottom: 1px solid #fde68a;
+    padding: 10px 12px;
+}
+.event-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    page-break-inside: avoid;
+}
+.event-header {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
     padding: 10px 12px;
 }
 .event-type {
     font-size: 9px;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-.event-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: #18180f;
-    margin-top: 2px;
+    letter-spacing: 0.1em;
 }
 .event-date {
-    font-size: 11px;
-    color: #6b6a66;
+    font-size: 9px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     margin-top: 2px;
 }
 .event-meta {
-    font-size: 11px;
-    color: #5c5b57;
-    margin-top: 3px;
+    text-align: right;
 }
-.event-note {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px solid #ecebe7;
+.event-meta-label {
+    font-size: 9px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+}
+.event-meta-value {
     font-size: 10px;
-    color: #6b6a66;
-    line-height: 1.45;
+    font-weight: 800;
+    color: #1e293b;
+}
+.event-label {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #94a3b8;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+}
+.event-value {
+    font-size: 10px;
+    color: #0f172a;
+    line-height: 1.4;
+}
+.card-body {
+    padding: 10px 12px;
+}
+.year-badge {
+    display: inline-block;
+    background: #0f172a;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin: 6px 0;
+}
+.muted { color: #94a3b8; }
+.right-cell { text-align: right; vertical-align: top; }
+.full-table { width: 100%; border-collapse: collapse; }
+.blue-text { color: #2563eb; }
+.blue-bg { background: #dbeafe; }
+.cyan-text { color: #0891b2; }
+.cyan-bg { background: #cffafe; }
+.green-text { color: #059669; }
+.green-bg { background: #dcfce7; }
+.purple-text { color: #7c3aed; }
+.purple-bg { background: #ede9fe; }
+.amber-text { color: #b45309; }
+.amber-bg { background: #fef3c7; }
+.red-text { color: #dc2626; }
+.red-bg { background: #fee2e2; }
+.slate-text { color: #475569; }
+.slate-bg { background: #e2e8f0; }
+.footer {
+    text-align: center;
+    color: #cbd5e1;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    margin-top: 18px;
 }
 CSS;
+
+        $petNameEsc = $this->e($petName);
+        $speciesEsc = $this->e($species !== '' ? $species : 'Pet');
+        $breedEsc = $this->e($breed !== '' ? $breed : '—');
+        $ageEsc = $this->e($age);
+        $weightEsc = $this->e($weight);
+        $neuteredEsc = $this->e($neutered);
+        $ownerNameEsc = $this->e($ownerName !== '' ? $ownerName : '—');
+        $ownerCityEsc = $this->e($ownerCity !== '' ? $ownerCity : '—');
+        $lastVaccinationNameEsc = $this->e($lastVaccinationName);
+        $lastVaccinationDateEsc = $this->e($lastVaccinationDate);
+        $lastVaccinationDoctorEsc = $this->e($lastVaccinationDoctor);
+        $lastDewormingNameEsc = $this->e($lastDewormingName);
+        $lastDewormingDateEsc = $this->e($lastDewormingDate);
+        $lastDewormingDoctorEsc = $this->e($lastDewormingDoctor);
 
         return <<<HTML
 <!DOCTYPE html>
@@ -814,45 +1333,119 @@ CSS;
     <style>{$style}</style>
 </head>
 <body>
-    <div class="wrap">
-        <div class="phone">
-            <div class="topbar">
-                <div class="title">{$this->e($petName)}'s Lifeline</div>
-                <div class="subtitle">Pet health history</div>
-                <div class="meta-strip">Generated on {$generatedAt}</div>
-            </div>
-
-            <div class="pet-card">
-                <div class="pet-name">{$this->e($petName)}</div>
-                <div class="pet-sub">{$this->e($petSummary)}</div>
-                <div class="stats">
-                    Total events: {$this->e((string) $timelineCount)} · Consults: {$this->e((string) $consultCount)} · Prescriptions: {$this->e((string) $prescriptionCount)}
-                </div>
-            </div>
-
-            <div class="next-banner">
-                <div class="next-label">Coming up next</div>
-                <div class="next-title">{$this->e($nextTitle)}</div>
-                <div class="next-sub">{$this->e($nextSubtitle)}</div>
-            </div>
-
-            {$activeTreatmentHtml}
-
-            <div class="section-label">Full Medical History</div>
-            <div class="timeline">
-                {$timelineHtml}
-            </div>
+    <div class="container">
+        <div class="header">
+            <table class="header-table">
+                <tr>
+                    <td>
+                        <table class="icon-table">
+                            <tr>
+                                <td class="icon-cell"><div class="logo">S</div></td>
+                                <td>
+                                    <div class="pet-name">{$petNameEsc}</div>
+                                    <div class="subtitle">Medical Lifeline</div>
+                                </td>
+                                <td style="padding-left:8px;">
+                                    <div class="badge">Species: {$speciesEsc}</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td class="meta">Generated on {$generatedAt}</td>
+                </tr>
+            </table>
         </div>
+
+        <div class="card">
+            <table class="grid-table">
+                <tr>
+                    <td>
+                        <div class="info-label">Breed</div>
+                        <div class="info-value">{$breedEsc}</div>
+                    </td>
+                    <td>
+                        <div class="info-label">Age</div>
+                        <div class="info-value">{$ageEsc}</div>
+                    </td>
+                    <td>
+                        <div class="info-label">Weight</div>
+                        <div class="info-value">{$weightEsc}</div>
+                    </td>
+                    <td>
+                        <div class="info-label">Neutering</div>
+                        <div class="info-value">{$neuteredEsc}</div>
+                    </td>
+                    <td class="right-cell">
+                        <div class="info-label">Pet Parent</div>
+                        <div class="info-value">{$ownerNameEsc}</div>
+                        <div class="info-muted">{$ownerCityEsc}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="divider"></div>
+
+            <table class="grid-table">
+                <tr>
+                    <td>
+                        <div class="mini-card">
+                            <table class="icon-table">
+                                <tr>
+                                    <td class="icon-cell"><div class="icon-badge green-bg green-text">V</div></td>
+                                    <td>
+                                        <div class="info-label">Last Vaccination</div>
+                                        <div class="info-value">{$lastVaccinationNameEsc}</div>
+                                        <div class="info-muted">{$lastVaccinationDateEsc}</div>
+                                        <div class="info-muted">Administered by {$lastVaccinationDoctorEsc}</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="mini-card">
+                            <table class="icon-table">
+                                <tr>
+                                    <td class="icon-cell"><div class="icon-badge purple-bg purple-text">D</div></td>
+                                    <td>
+                                        <div class="info-label">Last Deworming</div>
+                                        <div class="info-value">{$lastDewormingNameEsc}</div>
+                                        <div class="info-muted">{$lastDewormingDateEsc}</div>
+                                        <div class="info-muted">Administered by {$lastDewormingDoctorEsc}</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        {$ongoingSection}
+
+        <div class="section-title"><span class="section-bar section-blue"></span>Medical History</div>
+        <div class="timeline">
+            {$timelineHtml}
+        </div>
+
+        <div class="footer">Pet Lifeline</div>
     </div>
 </body>
 </html>
 HTML;
     }
 
-    private function buildTimelineCardsHtml(Collection $timeline): string
+    private function buildTimelineCardsHtml(Collection $timeline, array $excludeRecordIds = []): string
     {
+        if ($excludeRecordIds !== []) {
+            $timeline = $timeline->filter(function (array $item) use ($excludeRecordIds) {
+                $recordId = $item['record_id'] ?? null;
+                return $recordId === null || $recordId === '' || !in_array($recordId, $excludeRecordIds, true);
+            })->values();
+        }
+
         if ($timeline->isEmpty()) {
-            return '<div class="event-body">No timeline events available for this pet.</div>';
+            return '<div class="card"><div class="info-muted">No timeline events available for this pet.</div></div>';
         }
 
         $grouped = $timeline
@@ -871,23 +1464,57 @@ HTML;
 
             foreach ($items as $item) {
                 $event = $this->mapTimelineItemForPdf($item);
+                $iconClass = $event['badge_class'] ?? 'slate-bg slate-text';
+                $textClass = $event['text_class'] ?? 'slate-text';
 
-                $metaHtml = $event['meta'] !== ''
-                    ? '<div class="event-meta">'.$this->e($event['meta']).'</div>'
-                    : '';
-                $noteHtml = $event['note'] !== ''
-                    ? '<div class="event-note">'.$this->e($event['note']).'</div>'
-                    : '';
+                $doctorHtml = '';
+                if (!empty($event['doctor'])) {
+                    $doctorHtml = '<div class="event-meta"><div class="event-meta-label">Doctor ID</div>'
+                        . '<div class="event-meta-value">'.$this->e((string) $event['doctor']).'</div></div>';
+                }
 
-                $html .= '<table class="event-table"><tr>';
-                $html .= '<td class="event-icon-col"><div class="event-icon" style="background:'.$this->e($event['icon_bg']).';color:'.$this->e($event['icon_color']).';">'.$this->e($event['icon_text']).'</div></td>';
-                $html .= '<td><div class="event-body">';
-                $html .= '<div class="event-type" style="color:'.$this->e($event['icon_color']).';">'.$this->e($event['type_label']).'</div>';
-                $html .= '<div class="event-title">'.$this->e($event['title']).'</div>';
-                $html .= '<div class="event-date">'.$this->e($event['date']).'</div>';
-                $html .= $metaHtml.$noteHtml;
-                $html .= '</div></td>';
-                $html .= '</tr></table>';
+                $header = '<div class="event-header"><table class="full-table"><tr>'
+                    . '<td><table class="icon-table"><tr>'
+                    . '<td class="icon-cell"><div class="icon-badge '.$iconClass.'">'.$this->e((string) $event['icon_text']).'</div></td>'
+                    . '<td><div class="event-type '.$textClass.'">'.$this->e((string) $event['type_label']).'</div>'
+                    . '<div class="event-date">'.$this->e((string) $event['date']).'</div></td>'
+                    . '</tr></table></td>'
+                    . '<td class="right-cell">'.$doctorHtml.'</td>'
+                    . '</tr></table></div>';
+
+                if (($event['layout'] ?? '') === 'consult') {
+                    $html .= '<div class="event-card">'.$header;
+                    $html .= '<div class="card-body"><table class="grid-table"><tr>';
+                    $html .= '<td><div class="event-label">Reported symptom</div><div class="event-value">'.$this->e((string) $event['reason']).'</div></td>';
+                    $html .= '<td><div class="event-label">Diagnosis</div><div class="event-value">'.$this->e((string) $event['diagnosis']).'</div></td>';
+                    $html .= '<td><div class="event-label">Medications</div><div class="event-value">'.$this->e((string) $event['medications']).'</div></td>';
+                    $html .= '<td><div class="event-label">Vet Advice & Home Care</div><div class="event-value">'.$this->e((string) $event['advice']).'</div></td>';
+                    $html .= '</tr></table></div></div>';
+                    continue;
+                }
+
+                $nextDue = $event['next_due'] ?? '';
+                $result = $event['result'] ?? '';
+                $sideHtml = '';
+                if ($nextDue !== '' || $result !== '') {
+                    $sideHtml .= '<td class="right-cell">';
+                    if ($nextDue !== '') {
+                        $sideHtml .= '<div class="event-label">Next Due</div><div class="event-value">'.$this->e((string) $nextDue).'</div>';
+                    }
+                    if ($result !== '') {
+                        $sideHtml .= '<div class="event-label">Result</div><div class="event-value">'.$this->e((string) $result).'</div>';
+                    }
+                    $sideHtml .= '</td>';
+                }
+
+                $details = $event['details'] ?? '';
+                $html .= '<div class="event-card">'.$header;
+                $html .= '<div class="card-body"><table class="full-table"><tr>';
+                $html .= '<td><div class="info-value">'.$this->e((string) ($event['title'] ?? 'Timeline Event')).'</div>';
+                if ($details !== '') {
+                    $html .= '<div class="event-value muted">'.$this->e((string) $details).'</div>';
+                }
+                $html .= '</td>'.$sideHtml.'</tr></table></div></div>';
             }
         }
 
@@ -900,129 +1527,133 @@ HTML;
         $record = is_array($item['record'] ?? null) ? $item['record'] : [];
         $visual = $this->resolveTimelineVisual($eventType);
 
+        $doctor = $record['doctor_name'] ?? $record['doctor'] ?? null;
+        if (($doctor === null || $doctor === '') && isset($record['doctor_id'])) {
+            $doctor = (string) $record['doctor_id'];
+        }
+
+        $date = $this->formatPdfDate($item['event_at'] ?? $item['created_at'] ?? null);
+
+        if (in_array($eventType, ['appointment', 'video_consultation', 'prescription'], true)) {
+            $reason = '';
+            $diagnosis = '';
+            $medications = '';
+            $advice = '';
+
+            if ($eventType === 'appointment') {
+                $notes = is_array($record['notes_decoded'] ?? null) ? $record['notes_decoded'] : [];
+                $reason = $this->extractStringFromArray($notes, ['symptoms', 'reason', 'complaint', 'notes']);
+                $diagnosis = $this->extractStringFromArray($notes, ['diagnosis', 'diagnosis_summary', 'disease']);
+                $medications = $this->extractStringFromArray($notes, ['medications', 'medicines']);
+                $advice = $this->extractStringFromArray($notes, ['advice', 'instructions', 'home_care', 'follow_up']);
+            } elseif ($eventType === 'video_consultation') {
+                $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
+                $reason = $this->extractStringFromArray($metadata, ['symptoms', 'reason', 'complaint', 'notes']);
+                $diagnosis = $this->extractStringFromArray($metadata, ['diagnosis', 'diagnosis_summary', 'disease']);
+                $medications = $this->formatMedicationsSummary($metadata['medications'] ?? null);
+                $advice = $this->extractStringFromArray($metadata, ['advice', 'instructions', 'home_care', 'follow_up']);
+            } else {
+                $reason = $this->extractStringFromArray($record, ['visit_notes', 'exam_notes', 'history_snapshot', 'follow_up_notes']);
+                $diagnosis = $this->extractStringFromArray($record, ['diagnosis', 'disease_name']);
+                $medications = $this->formatMedicationsSummary($record['medications_json'] ?? null);
+                $advice = $this->extractStringFromArray($record, ['home_care', 'treatment_plan', 'doctor_treatment', 'follow_up_notes']);
+            }
+
+            $reason = $reason !== '' ? $this->truncateText($reason, 160) : '—';
+            $diagnosis = $diagnosis !== '' ? $this->truncateText($diagnosis, 140) : '—';
+            $medications = $medications !== '' ? $this->truncateText($medications, 140) : '—';
+            $advice = $advice !== '' ? $this->truncateText($advice, 160) : '—';
+
+            return [
+                'layout' => 'consult',
+                'type_label' => $visual['label'],
+                'icon_text' => $visual['icon'],
+                'badge_class' => $visual['badge_class'],
+                'text_class' => $visual['text_class'],
+                'date' => $date,
+                'doctor' => $doctor,
+                'reason' => $reason,
+                'diagnosis' => $diagnosis,
+                'medications' => $medications,
+                'advice' => $advice,
+            ];
+        }
+
         $title = 'Timeline Event';
-        $metaParts = [];
-        $note = '';
+        $details = '';
+        $nextDue = '';
+        $result = '';
 
         if ($eventType === 'vaccination') {
-            $title = trim((string) ($record['vaccine_name'] ?? 'Vaccination'));
-            if ($title === '') {
-                $title = 'Vaccination';
-            }
-
+            $title = trim((string) ($record['vaccine_name'] ?? 'Vaccination')) ?: 'Vaccination';
             $last = $this->formatPdfDate($record['last_date'] ?? null, '');
             $next = $this->formatPdfDate($record['next_due'] ?? null, '');
+            $status = trim((string) ($record['status'] ?? ''));
+            $detailsParts = [];
             if ($last !== '') {
-                $metaParts[] = 'Last: '.$last;
+                $detailsParts[] = 'Last: '.$last;
             }
             if ($next !== '') {
-                $metaParts[] = 'Next due: '.$next;
+                $detailsParts[] = 'Next due: '.$next;
+                $nextDue = $next;
             }
-
-            $status = trim((string) ($record['status'] ?? ''));
             if ($status !== '') {
-                $metaParts[] = 'Status: '.ucwords(str_replace(['_', '-'], ' ', $status));
+                $detailsParts[] = 'Status: '.ucwords(str_replace(['_', '-'], ' ', $status));
+                $result = ucwords(str_replace(['_', '-'], ' ', $status));
             }
+            $details = implode(' · ', $detailsParts);
         } elseif ($eventType === 'deworming') {
             $title = 'Deworming';
             $last = $this->formatPdfDate($record['last_deworming_date'] ?? null, '');
             $next = $this->formatPdfDate($record['next_deworming_date'] ?? null, '');
+            $status = trim((string) ($record['deworming_status'] ?? ''));
+            $detailsParts = [];
             if ($last !== '') {
-                $metaParts[] = 'Last: '.$last;
+                $detailsParts[] = 'Last: '.$last;
             }
             if ($next !== '') {
-                $metaParts[] = 'Next due: '.$next;
+                $detailsParts[] = 'Next due: '.$next;
+                $nextDue = $next;
             }
-
-            $status = trim((string) ($record['deworming_status'] ?? ''));
             if ($status !== '') {
-                $metaParts[] = 'Status: '.ucwords(str_replace(['_', '-'], ' ', $status));
+                $detailsParts[] = 'Status: '.ucwords(str_replace(['_', '-'], ' ', $status));
+                $result = ucwords(str_replace(['_', '-'], ' ', $status));
             }
-        } elseif ($eventType === 'video_consultation') {
-            $title = 'Online Vet Consultation';
-            $transactionId = $record['id'] ?? $item['record_id'] ?? null;
-            if ($transactionId !== null && $transactionId !== '') {
-                $metaParts[] = 'Transaction #'.$transactionId;
-            }
-
-            $status = trim((string) ($record['status'] ?? ''));
-            if ($status !== '') {
-                $metaParts[] = 'Status: '.ucwords(str_replace(['_', '-'], ' ', $status));
-            }
-
-            $amountPaise = $record['actual_amount_paid_by_consumer_paise'] ?? $record['amount_paise'] ?? null;
-            if (is_numeric($amountPaise) && (int) $amountPaise > 0) {
-                $metaParts[] = 'Amount: INR '.number_format(((int) $amountPaise) / 100, 2, '.', ',');
-            }
-        } elseif ($eventType === 'appointment') {
-            $title = 'Clinic Appointment';
-
-            $status = trim((string) ($record['status'] ?? ''));
-            if ($status !== '') {
-                $metaParts[] = 'Status: '.ucwords(str_replace(['_', '-'], ' ', $status));
-            }
-
-            $doctor = $record['doctor_name'] ?? $record['doctor_id'] ?? null;
-            if ($doctor !== null && $doctor !== '') {
-                $metaParts[] = 'Doctor: '.$doctor;
-            }
-
-            $notes = is_array($record['notes_decoded'] ?? null) ? $record['notes_decoded'] : [];
-            foreach (['symptoms', 'reason', 'complaint', 'notes'] as $key) {
-                if (isset($notes[$key]) && is_string($notes[$key]) && trim($notes[$key]) !== '') {
-                    $note = trim($notes[$key]);
-                    break;
-                }
-            }
-        } elseif ($eventType === 'prescription') {
-            $title = 'Prescription Added';
-            $prescriptionId = $record['id'] ?? $item['record_id'] ?? null;
-            if ($prescriptionId !== null && $prescriptionId !== '') {
-                $metaParts[] = 'Prescription #'.$prescriptionId;
-            }
-
-            $doctor = $record['doctor_name'] ?? $record['doctor_id'] ?? null;
-            if ($doctor !== null && $doctor !== '') {
-                $metaParts[] = 'Doctor: '.$doctor;
-            }
-
-            foreach (['prescription', 'prescription_text', 'diagnosis', 'advice', 'notes'] as $key) {
-                if (isset($record[$key]) && is_string($record[$key]) && trim($record[$key]) !== '') {
-                    $note = trim($record[$key]);
-                    break;
-                }
-            }
+            $details = implode(' · ', $detailsParts);
         } else {
-            $title = ucwords(str_replace(['_', '-'], ' ', $eventType));
-            $recordId = $item['record_id'] ?? null;
-            if ($recordId !== null && $recordId !== '') {
-                $metaParts[] = 'Record #'.$recordId;
+            $title = $this->extractStringFromArray($record, ['title', 'name', 'summary']);
+            if ($title === '') {
+                $title = ucwords(str_replace(['_', '-'], ' ', $eventType));
             }
+            $details = $this->extractStringFromArray($record, ['details', 'description', 'notes']);
         }
 
-        $note = $this->truncateText($note, 220);
-
         return [
+            'layout' => 'simple',
             'type_label' => $visual['label'],
             'icon_text' => $visual['icon'],
-            'icon_color' => $visual['color'],
-            'icon_bg' => $visual['bg'],
+            'badge_class' => $visual['badge_class'],
+            'text_class' => $visual['text_class'],
+            'date' => $date,
+            'doctor' => $doctor,
             'title' => $title,
-            'date' => $this->formatPdfDate($item['event_at'] ?? $item['created_at'] ?? null),
-            'meta' => implode(' · ', $metaParts),
-            'note' => $note,
+            'details' => $this->truncateText($details, 220),
+            'next_due' => $nextDue,
+            'result' => $result,
         ];
     }
 
     private function resolveTimelineVisual(string $eventType): array
     {
         return match ($eventType) {
-            'vaccination' => ['label' => 'Vaccination', 'icon' => 'V', 'color' => '#2d7a4f', 'bg' => '#e8f5ef'],
-            'deworming' => ['label' => 'Deworming', 'icon' => 'D', 'color' => '#5e4bb5', 'bg' => '#eeecfd'],
-            'video_consultation' => ['label' => 'Video Consult', 'icon' => 'VC', 'color' => '#1a6fb5', 'bg' => '#e6f1fb'],
-            'appointment' => ['label' => 'Clinic Visit', 'icon' => 'A', 'color' => '#0d4a82', 'bg' => '#d8eaf8'],
-            'prescription' => ['label' => 'Prescription', 'icon' => 'Rx', 'color' => '#a06010', 'bg' => '#fdf2e0'],
-            default => ['label' => 'Timeline', 'icon' => '•', 'color' => '#6b6a66', 'bg' => '#f3f2ef'],
+            'vaccination' => ['label' => 'Vaccination', 'icon' => 'V', 'badge_class' => 'green-bg green-text', 'text_class' => 'green-text'],
+            'deworming' => ['label' => 'Deworming', 'icon' => 'D', 'badge_class' => 'purple-bg purple-text', 'text_class' => 'purple-text'],
+            'video_consultation' => ['label' => 'Video Consult', 'icon' => 'VC', 'badge_class' => 'cyan-bg cyan-text', 'text_class' => 'cyan-text'],
+            'appointment' => ['label' => 'Clinic Appointment', 'icon' => 'A', 'badge_class' => 'blue-bg blue-text', 'text_class' => 'blue-text'],
+            'prescription' => ['label' => 'Prescription', 'icon' => 'Rx', 'badge_class' => 'amber-bg amber-text', 'text_class' => 'amber-text'],
+            'lab_report', 'lab', 'lab_reports' => ['label' => 'Lab Report', 'icon' => 'L', 'badge_class' => 'slate-bg slate-text', 'text_class' => 'slate-text'],
+            'surgery' => ['label' => 'Surgery', 'icon' => 'S', 'badge_class' => 'red-bg red-text', 'text_class' => 'red-text'],
+            default => ['label' => 'Timeline', 'icon' => '•', 'badge_class' => 'slate-bg slate-text', 'text_class' => 'slate-text'],
         };
     }
 
