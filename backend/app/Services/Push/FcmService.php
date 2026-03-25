@@ -239,30 +239,6 @@ class FcmService
      */
     private function applyRichPayloadOverrides(array $payload, array $options): array
     {
-        $deeplink = $this->stringifyValue($options['deeplink'] ?? null, 2048);
-        if ($deeplink !== null) {
-            if (!isset($payload['fcm_options']) || !is_array($payload['fcm_options'])) {
-                $payload['fcm_options'] = [];
-            }
-            $payload['fcm_options']['link'] = $deeplink;
-
-            if (!isset($payload['android']) || !is_array($payload['android'])) {
-                $payload['android'] = [];
-            }
-            if (!isset($payload['android']['fcm_options']) || !is_array($payload['android']['fcm_options'])) {
-                $payload['android']['fcm_options'] = [];
-            }
-            $payload['android']['fcm_options']['link'] = $deeplink;
-
-            if (!isset($payload['apns']) || !is_array($payload['apns'])) {
-                $payload['apns'] = [];
-            }
-            if (!isset($payload['apns']['fcm_options']) || !is_array($payload['apns']['fcm_options'])) {
-                $payload['apns']['fcm_options'] = [];
-            }
-            $payload['apns']['fcm_options']['link'] = $deeplink;
-        }
-
         $canDecorateNotification = array_key_exists('notification', $payload);
         $image = $this->stringifyValue($options['image'] ?? null, 2048);
         if ($image !== null && $canDecorateNotification) {
