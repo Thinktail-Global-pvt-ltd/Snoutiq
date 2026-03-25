@@ -399,6 +399,10 @@ class PetConsultTimelineController extends Controller
     private function buildPetSummary(Pet $pet): array
     {
         $vaccinationPayload = $this->resolveVaccinationPayloadFromPet($pet);
+        $hasAgeInput = !empty($pet->pet_dob)
+            || !empty($pet->dob)
+            || $pet->pet_age !== null
+            || $pet->pet_age_months !== null;
         [$ageYears, $ageMonths] = $this->resolveAgeParts(
             $pet->pet_dob ?? $pet->dob ?? null,
             $pet->pet_age ?? null,
@@ -419,8 +423,8 @@ class PetConsultTimelineController extends Controller
             'breed' => $pet->breed,
             'pet_type' => $pet->pet_type ?? $pet->type ?? null,
             'pet_gender' => $pet->pet_gender ?? $pet->gender ?? null,
-            'pet_age' => $ageYears > 0 ? $ageYears : null,
-            'pet_age_months' => $ageMonths > 0 ? $ageMonths : null,
+            'pet_age' => $hasAgeInput ? $ageYears : null,
+            'pet_age_months' => $hasAgeInput ? $ageMonths : null,
             'pet_dob' => $this->normalizeDateString($pet->pet_dob ?? $pet->dob ?? null),
             'weight' => $pet->weight ?? null,
             'is_neutered' => $pet->is_neutered ?? $pet->is_nuetered ?? null,
