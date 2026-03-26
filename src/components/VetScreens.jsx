@@ -103,6 +103,19 @@ const INPUT_BASE_CLASS =
 const CARD_CLASS =
   "bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(11,77,103,0.08)] transition-all duration-300";
 
+const PRESCRIPTION_TEXTAREA_MAX_LENGTH = 500;
+
+const autoResizeTextarea = (element) => {
+  if (!element) return;
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
+};
+
+const getRemainingCharacters = (
+  value = "",
+  max = PRESCRIPTION_TEXTAREA_MAX_LENGTH,
+) => Math.max(max - String(value || "").length, 0);
+
 const SPECIALIZATION_OPTIONS = [
   "Dogs",
   "Cats",
@@ -2427,6 +2440,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [isAffectedSystemMenuOpen, setIsAffectedSystemMenuOpen] =
     useState(false);
   const affectedSystemMenuRef = useRef(null);
+  const historyTextareaRef = useRef(null);
+  const diagnosisTextareaRef = useRef(null);
+  const adviceTextareaRef = useRef(null);
 
   useEffect(() => {
     if (authFromProps) {
@@ -2456,6 +2472,25 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       document.removeEventListener("mousedown", handlePointerDown);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showPrescriptionModal || prescriptionView !== "edit") return;
+    autoResizeTextarea(historyTextareaRef.current);
+  }, [
+    showPrescriptionModal,
+    prescriptionView,
+    prescriptionForm.historySnapshot,
+  ]);
+
+  useEffect(() => {
+    if (!showPrescriptionModal || prescriptionView !== "edit") return;
+    autoResizeTextarea(diagnosisTextareaRef.current);
+  }, [showPrescriptionModal, prescriptionView, prescriptionForm.diagnosis]);
+
+  useEffect(() => {
+    if (!showPrescriptionModal || prescriptionView !== "edit") return;
+    autoResizeTextarea(adviceTextareaRef.current);
+  }, [showPrescriptionModal, prescriptionView, prescriptionForm.homeCare]);
 
   useEffect(() => {
     let active = true;
@@ -3064,8 +3099,20 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     }
   };
 
-  const updatePrescriptionField = (key) => (event) => {
-    setPrescriptionForm((prev) => ({ ...prev, [key]: event.target.value }));
+  const updatePrescriptionField = (key, maxLength = null) => (event) => {
+    const nextValue = event.target.value || "";
+    const finalValue =
+      typeof maxLength === "number"
+        ? nextValue.slice(0, maxLength)
+        : nextValue;
+
+    setPrescriptionForm((prev) => ({ ...prev, [key]: finalValue }));
+    if (
+      typeof maxLength === "number" &&
+      event.target?.tagName === "TEXTAREA"
+    ) {
+      autoResizeTextarea(event.target);
+    }
   };
 
   const toggleChronicMedicalStatus = (event) => {
@@ -4765,14 +4812,32 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             History
                           </label>
                           <textarea
+                            ref={historyTextareaRef}
                             value={prescriptionForm.historySnapshot}
-                            onChange={updatePrescriptionField("historySnapshot")}
-                            rows={2}
-                            placeholder="Pet parent-reported history or concern..."
-                            className={`${INPUT_BASE_CLASS} resize-none border-slate-200 bg-white text-xs focus:border-slate-400 focus:ring-slate-200`}
+                            onChange={updatePrescriptionField(
+                              "historySnapshot",
+                              PRESCRIPTION_TEXTAREA_MAX_LENGTH,
+                            )}
+                            rows={3}
+                            maxLength={PRESCRIPTION_TEXTAREA_MAX_LENGTH}
+                            placeholder="Pet parent-reported history or concern."
+                            className={`${INPUT_BASE_CLASS} min-h-[110px] resize-none overflow-hidden border-slate-200 bg-white text-xs leading-5 focus:border-slate-400 focus:ring-slate-200 md:min-h-[96px]`}
                           />
-                          <p className="mt-1 text-[11px] text-slate-500">
-                            Prefilled from the pet parent details and editable by the vet.
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <p className="text-[11px] text-slate-500">
+                              Prefilled from the pet parent details and editable
+                              by the vet.
+                            </p>
+                            <p className="whitespace-nowrap text-[11px] text-slate-500">
+                              {prescriptionForm.historySnapshot.length} /{" "}
+                              {PRESCRIPTION_TEXTAREA_MAX_LENGTH}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-right text-[11px] text-slate-500">
+                            {getRemainingCharacters(
+                              prescriptionForm.historySnapshot,
+                            )}{" "}
+                            characters left
                           </p>
                         </div>
 
@@ -4782,15 +4847,26 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             <span className="text-rose-500">*</span>
                           </label>
                           <textarea
+                            ref={diagnosisTextareaRef}
                             value={prescriptionForm.diagnosis}
-                            onChange={updatePrescriptionField("diagnosis")}
-                            rows={2}
+                            onChange={updatePrescriptionField(
+                              "diagnosis",
+                              PRESCRIPTION_TEXTAREA_MAX_LENGTH,
+                            )}
+                            rows={3}
+                            maxLength={PRESCRIPTION_TEXTAREA_MAX_LENGTH}
                             placeholder="Possible gastritis, dehydration..."
-                            className={`${INPUT_BASE_CLASS} resize-none border-blue-200 bg-white focus:border-blue-500 focus:ring-blue-200`}
+                            className={`${INPUT_BASE_CLASS} min-h-[110px] resize-none overflow-hidden border-blue-200 bg-white text-xs leading-5 focus:border-blue-400 focus:ring-blue-100 md:min-h-[96px]`}
                           />
-                          <p className="mt-1 text-[11px] text-blue-700">
-                            Highlight the likely diagnosis clearly for medical
-                            records.
+                          <div className="mt-1 flex items-center justify-end">
+                            <p className="whitespace-nowrap text-[11px] text-blue-700">
+                              {prescriptionForm.diagnosis.length} /{" "}
+                              {PRESCRIPTION_TEXTAREA_MAX_LENGTH}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-right text-[11px] text-blue-700">
+                            {getRemainingCharacters(prescriptionForm.diagnosis)}{" "}
+                            characters left
                           </p>
                         </div>
                         <div className="grid sm:grid-cols-2 gap-3 rounded-xl border border-blue-200 bg-blue-50/50 p-3">
@@ -4832,15 +4908,26 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             <span className="text-rose-500">*</span>
                           </label>
                           <textarea
+                            ref={adviceTextareaRef}
                             value={prescriptionForm.homeCare}
-                            onChange={updatePrescriptionField("homeCare")}
+                            onChange={updatePrescriptionField(
+                              "homeCare",
+                              PRESCRIPTION_TEXTAREA_MAX_LENGTH,
+                            )}
                             rows={3}
+                            maxLength={PRESCRIPTION_TEXTAREA_MAX_LENGTH}
                             placeholder="Feed small frequent meals, ensure hydration..."
-                            className={`${INPUT_BASE_CLASS} resize-none border-emerald-200 bg-white focus:border-emerald-500 focus:ring-emerald-200`}
+                            className={`${INPUT_BASE_CLASS} min-h-[110px] resize-none overflow-hidden border-emerald-200 bg-white text-xs leading-5 focus:border-emerald-400 focus:ring-emerald-100 md:min-h-[96px]`}
                           />
-                          <p className="mt-1 text-[11px] text-emerald-700">
-                            Add practical, easy-to-follow advice for the pet
-                            parent.
+                          <div className="mt-1 flex items-center justify-end">
+                            <p className="whitespace-nowrap text-[11px] text-emerald-700">
+                              {prescriptionForm.homeCare.length} /{" "}
+                              {PRESCRIPTION_TEXTAREA_MAX_LENGTH}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-right text-[11px] text-emerald-700">
+                            {getRemainingCharacters(prescriptionForm.homeCare)}{" "}
+                            characters left
                           </p>
                         </div>
                       </div>

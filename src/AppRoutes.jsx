@@ -109,8 +109,9 @@ const NeuteringLP = lazy(() => import("./newflow/NeuteringLP"));
 const VetInsightsHub = lazy(() => import("./newflow/VetInsightsHub"));
 const DrSharmaInterview = lazy(() => import("./newflow/DrSharmaInterview"));
 const DogVomitingPage = lazy(() => import("./newflow/DogVomitingPage"));
-const InvesterPage = lazy(()=> import("./investerPage/Invester.jsx"))
+const InvesterPage = lazy(() => import("./investerPage/Invester.jsx"));
 const OnlineVetConsultationApp = lazy(() => import("./newflow/OnlineVetConsultationApp"));
+const FindVetsNearYou = lazy(() => import("./pages/FindVetsNearYou"));
 
 export default function AppRoutes() {
   return (
@@ -120,6 +121,7 @@ export default function AppRoutes() {
         <Route path="/parents" element={<NewCounsult />} />
         <Route path="/clinics" element={<NewClinics />} />
         <Route path="/vets" element={<NewVets />} />
+        <Route path="/find-vets-near-you" element={<FindVetsNearYou />} />
         <Route
           path="/veterinary-doctor-online-india"
           element={<NewVideoConsultation />}
