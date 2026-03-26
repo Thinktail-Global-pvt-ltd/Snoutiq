@@ -26,8 +26,6 @@ use Illuminate\Support\Collection;
 
 class AdminPanelController extends Controller
 {
-    private const EXCELL_EXPORT_VALID_INVOICE_AMOUNTS = [471, 589];
-
     public function __construct(
         private readonly DoctorAvailabilityService $doctorAvailabilityService,
         private readonly CallAnalyticsService $callAnalyticsService,
@@ -2027,20 +2025,9 @@ class AdminPanelController extends Controller
                 ->route('admin.transactions.excell-export')
                 ->withErrors([
                     'invoice' => sprintf(
-                        'Transaction #%d is pending. Invoice can be generated only after payment is captured.',
-                        $transaction->id
-                    ),
-                ]);
-        }
-
-        if (! $this->isValidExcellExportInvoiceAmount($transaction)) {
-            return redirect()
-                ->route('admin.transactions.excell-export')
-                ->withErrors([
-                    'invoice' => sprintf(
-                        'Transaction #%d has invalid payment amount ₹%d. Invoice is allowed only for ₹471 or ₹589.',
+                        'Transaction #%d status is %s. Invoice can be generated only when payment is captured.',
                         $transaction->id,
-                        $this->resolveExcellExportAmountInRupees($transaction)
+                        strtoupper(trim((string) ($transaction->status ?? 'n/a')))
                     ),
                 ]);
         }
@@ -2191,14 +2178,13 @@ class AdminPanelController extends Controller
     {
         return $transactions->each(function (Transaction $transaction): void {
             $amountInRupees = $this->resolveExcellExportAmountInRupees($transaction);
-            $amountEligible = in_array($amountInRupees, self::EXCELL_EXPORT_VALID_INVOICE_AMOUNTS, true);
             $statusEligible = $this->isExcellExportInvoiceStatusEligible($transaction);
             $transaction->setAttribute('invoice_amount_inr', $amountInRupees);
-            $transaction->setAttribute('invoice_amount_eligible', $amountEligible);
+            $transaction->setAttribute('invoice_amount_eligible', true);
             $transaction->setAttribute('invoice_status_eligible', $statusEligible);
             $transaction->setAttribute(
                 'invoice_eligible',
-                $amountEligible && $statusEligible
+                $statusEligible
             );
         });
     }
@@ -2230,18 +2216,9 @@ class AdminPanelController extends Controller
         return max((int) round(((int) $amountPaise) / 100), 0);
     }
 
-    private function isValidExcellExportInvoiceAmount(Transaction $transaction): bool
-    {
-        return in_array(
-            $this->resolveExcellExportAmountInRupees($transaction),
-            self::EXCELL_EXPORT_VALID_INVOICE_AMOUNTS,
-            true
-        );
-    }
-
     private function isExcellExportInvoiceStatusEligible(Transaction $transaction): bool
     {
-        return strtolower(trim((string) ($transaction->status ?? ''))) !== 'pending';
+        return strtolower(trim((string) ($transaction->status ?? ''))) === 'captured';
     }
 
     private function resolveExcellExportPetRecord(Transaction $transaction): ?Pet
