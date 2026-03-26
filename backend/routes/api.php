@@ -73,6 +73,7 @@ use App\Http\Controllers\Api\PetVaccinationRecordController;
 use App\Http\Controllers\Api\ErrorLogController;
 use App\Http\Controllers\Api\SocketServerController;
 use App\Http\Controllers\Api\WhatsAppMessageController;
+use App\Http\Controllers\Api\FcmBnotificationController;
 use App\Http\Controllers\Api\CallSessionCrudController;
 use App\Http\Controllers\Api\V1\OtpController as V1OtpController;
 use App\Http\Controllers\Api\V1\VaccinationController as V1VaccinationController;
@@ -105,6 +106,7 @@ Route::post('/whatsapp/send/new-year', [WhatsAppMessageController::class, 'sendN
 Route::post('/whatsapp/broadcast/new-year', [WhatsAppMessageController::class, 'broadcastNewYearTemplate']);
 Route::post('/whatsapp/vet-opened-case', [WhatsAppMessageController::class, 'vetOpenedCase']);
 Route::post('/whatsapp/vet-video-consult-test', [WhatsAppMessageController::class, 'vetVideoConsultTest']);
+Route::post('/fcm-notifications/click', [FcmBnotificationController::class, 'store']);
 
 Route::prefix('socket')->group(function () {
     Route::get('/health', [SocketServerController::class, 'health']);
