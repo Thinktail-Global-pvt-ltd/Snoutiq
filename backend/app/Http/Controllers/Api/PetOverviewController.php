@@ -201,6 +201,71 @@ class PetOverviewController extends Controller
     }
 
     /**
+     * GET /api/pets/vaccination-payload
+     * Input: pet_id (query)
+     * Output: vaccination payload from pets.dog_disease_payload.vaccination
+     */
+    public function vaccinationPayload(Request $request)
+    {
+        $rawPetId = $request->query('pet_id', $request->input('pet_id'));
+        $petId = is_numeric($rawPetId) ? (int) $rawPetId : 0;
+
+        if ($petId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_id is required',
+            ], 422);
+        }
+
+        if (!Schema::hasTable('pets')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets table is missing',
+            ], 500);
+        }
+
+        if (!Schema::hasColumn('pets', 'dog_disease_payload')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets.dog_disease_payload column is missing',
+            ], 500);
+        }
+
+        $pet = DB::table('pets')
+            ->select('id', 'dog_disease_payload')
+            ->where('id', $petId)
+            ->first();
+
+        if (!$pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found',
+            ], 404);
+        }
+
+        $dogDiseasePayload = $pet->dog_disease_payload ?? null;
+        if (is_string($dogDiseasePayload)) {
+            $dogDiseasePayload = json_decode($dogDiseasePayload, true);
+        } elseif (is_object($dogDiseasePayload)) {
+            $dogDiseasePayload = json_decode(json_encode($dogDiseasePayload), true);
+        }
+
+        if (!is_array($dogDiseasePayload)) {
+            $dogDiseasePayload = null;
+        }
+
+        $vaccinationValue = is_array($dogDiseasePayload) && array_key_exists('vaccination', $dogDiseasePayload)
+            ? $dogDiseasePayload['vaccination']
+            : null;
+
+        return response()->json([
+            'success' => true,
+            'pet_id' => $petId,
+            'vaccination' => $vaccinationValue,
+        ]);
+    }
+
+    /**
      * POST /api/pets/deworming-vaccination
      * Input: pet_id, deworming_yes_no, last_deworming_date, vaccination_json (or vaccinations_json / vaccination)
      * Saves: deworming_yes_no, last_deworming_date, next_deworming_date, dog_disease_payload.vaccination

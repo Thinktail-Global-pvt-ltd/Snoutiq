@@ -2464,6 +2464,7 @@ Route::get('/vets',             [AdminController::class, 'getVets']);
 
 Route::get('/users/{userId}/pets',  [AdminController::class, 'listPets']);
 Route::post('/users/{userId}/pets', [AdminController::class, 'addPet']);
+Route::get('/pets/vaccination-payload', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationPayload']);
 Route::get('/pets/check/vaccination-deworming-null', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationDewormingNullStatus']);
 Route::post('/pets/check/vaccination-deworming-null', [\App\Http\Controllers\Api\PetOverviewController::class, 'vaccinationDewormingNullStatus']);
 Route::post('/pets/deworming-vaccination', [\App\Http\Controllers\Api\PetOverviewController::class, 'updateDewormingVaccination']);
