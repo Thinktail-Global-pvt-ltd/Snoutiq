@@ -186,7 +186,10 @@ class NotificationChannelService
     private function buildPayloadData(Notification $notification): array
     {
         $payload = $notification->payload ?? [];
-        $payload = array_merge(['notification_type' => $notification->type], $payload);
+        $payload = array_merge([
+            'notification_type' => $notification->type,
+            'notification_id' => (string) $notification->id,
+        ], $payload);
 
         $stringPayload = [];
         foreach ($payload as $key => $value) {

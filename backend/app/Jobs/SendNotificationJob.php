@@ -77,7 +77,10 @@ class SendNotificationJob implements ShouldQueue
 
         $title = $notification->title ?? 'Snoutiq';
         $body = $notification->body ?? 'You have an update from Snoutiq.';
-        $data = ['type' => $notification->type ?? 'notification'];
+        $data = [
+            'type' => $notification->type ?? 'notification',
+            'notification_id' => (string) $notification->id,
+        ];
         if (is_array($payload)) {
             foreach ($payload as $key => $value) {
                 if (is_array($value) || is_object($value)) {

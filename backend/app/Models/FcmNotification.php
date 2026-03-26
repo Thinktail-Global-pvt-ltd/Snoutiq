@@ -34,6 +34,8 @@ class FcmNotification extends Model
         'request_payload',
         'response_payload',
         'sent_at',
+        'clicked',
+        'clicked_at',
     ];
 
     protected $casts = [
@@ -41,5 +43,7 @@ class FcmNotification extends Model
         'request_payload' => 'array',
         'response_payload' => 'array',
         'sent_at' => 'datetime',
+        'clicked' => 'boolean',
+        'clicked_at' => 'datetime',
     ];
 }
