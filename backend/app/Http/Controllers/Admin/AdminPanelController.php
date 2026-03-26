@@ -862,6 +862,130 @@ class AdminPanelController extends Controller
                     $targetUsers->put($userId, $leadUser);
                 }
             }
+
+            // 4) Onboarding/profile completion notifications (user-level).
+            $profileNotificationTypes = ['pp_user_created', 'profile_completion'];
+            $profileTypePlaceholders = implode(',', array_fill(0, count($profileNotificationTypes), '?'));
+
+            if ($targetUsers->isNotEmpty()) {
+                $leadUserIds = $targetUsers
+                    ->keys()
+                    ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                    ->map(fn ($userId) => (int) $userId)
+                    ->values()
+                    ->all();
+
+                if (!empty($leadUserIds)) {
+                    $fcmProfileQuery = FcmNotification::query()
+                        ->select(['id', 'user_id']);
+
+                    if ($supportsNeuteringNotificationJoin) {
+                        $fcmProfileQuery->addSelect('data_payload');
+                    }
+                    if ($fcmHasNotificationType) {
+                        $fcmProfileQuery->addSelect('notification_type');
+                    }
+                    if ($fcmHasStatus) {
+                        $fcmProfileQuery->addSelect('status');
+                    }
+                    if ($fcmHasTitle) {
+                        $fcmProfileQuery->addSelect('title');
+                    }
+                    if ($fcmHasNotificationText) {
+                        $fcmProfileQuery->addSelect('notification_text');
+                    }
+                    if ($fcmHasSentAt) {
+                        $fcmProfileQuery->addSelect('sent_at');
+                    }
+                    if ($fcmHasCreatedAt) {
+                        $fcmProfileQuery->addSelect('created_at');
+                    }
+
+                    $fcmProfileQuery->whereIn('user_id', $leadUserIds)
+                        ->where(function (Builder $query) use ($fcmHasNotificationType, $supportsNeuteringNotificationJoin, $profileTypePlaceholders, $profileNotificationTypes): void {
+                            $hasCondition = false;
+                            if ($fcmHasNotificationType) {
+                                $query->whereRaw(
+                                    "LOWER(TRIM(COALESCE(notification_type, ''))) IN ({$profileTypePlaceholders})",
+                                    $profileNotificationTypes
+                                );
+                                $hasCondition = true;
+                            }
+
+                            if ($supportsNeuteringNotificationJoin) {
+                                $jsonSql = "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_payload, '$.type')), ''))) IN ({$profileTypePlaceholders})";
+                                if ($hasCondition) {
+                                    $query->orWhereRaw($jsonSql, $profileNotificationTypes);
+                                } else {
+                                    $query->whereRaw($jsonSql, $profileNotificationTypes);
+                                }
+                            }
+                        });
+
+                    $fcmProfileRows = $fcmProfileQuery
+                        ->orderByDesc('id')
+                        ->limit($limit)
+                        ->get();
+
+                    foreach ($fcmProfileRows as $fcmRow) {
+                        if (!$isDeliveredNotification($fcmRow)) {
+                            continue;
+                        }
+
+                        $dataPayload = ($supportsNeuteringNotificationJoin && is_array($fcmRow->data_payload))
+                            ? $fcmRow->data_payload
+                            : [];
+                        $notificationType = strtolower(trim($resolveNotificationType($fcmRow, $dataPayload)));
+                        $payloadType = strtolower(trim((string) data_get($dataPayload, 'type')));
+
+                        $effectiveType = $notificationType !== '' && $notificationType !== 'unknown'
+                            ? $notificationType
+                            : $payloadType;
+
+                        if (!in_array($effectiveType, $profileNotificationTypes, true)) {
+                            continue;
+                        }
+
+                        $userIdRaw = $fcmRow->user_id ?? data_get($dataPayload, 'user_id');
+                        if (!is_numeric($userIdRaw)) {
+                            continue;
+                        }
+
+                        $userId = (int) $userIdRaw;
+                        if ($userId <= 0) {
+                            continue;
+                        }
+
+                        if (!$targetUsers->has($userId)) {
+                            $targetUsers->put($userId, $initializeLeadUser(null, $userId));
+                        }
+
+                        $leadUser = $targetUsers->get($userId);
+                        if (!is_array($leadUser)) {
+                            continue;
+                        }
+
+                        $bucket = $effectiveType === 'pp_user_created' ? 'onboarding' : 'profile_completion';
+                        $notificationTitle = $resolveNotificationTitle($fcmRow, $dataPayload);
+                        $notificationText = $resolveNotificationText($fcmRow, $dataPayload);
+                        $timestamp = $resolveNotificationTimestamp($fcmRow);
+
+                        $leadUser['all_notifications'][] = [
+                            'id' => (int) ($fcmRow->id ?? 0),
+                            'notification_title' => $notificationTitle,
+                            'notification_text' => $notificationText,
+                            'notification_type' => $effectiveType,
+                            'timestamp' => $timestamp,
+                            'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
+                            'bucket' => $bucket,
+                            'pet_id' => null,
+                            'call_session' => null,
+                        ];
+
+                        $targetUsers->put($userId, $leadUser);
+                    }
+                }
+            }
         }
 
         $targetUsers = $targetUsers->map(function (array $leadUser): array {

@@ -138,6 +138,8 @@
                         'neutering' => 'Neutering',
                         'follow_up' => 'Follow-up',
                         'vaccination' => 'Vaccination',
+                        'onboarding' => 'Onboarding',
+                        'profile_completion' => 'Profile Completion',
                         default => '',
                     };
 
@@ -166,6 +168,8 @@
                 'neutering' => 'Neutering',
                 'follow_up' => 'Follow-up',
                 'vaccination' => 'Vaccination',
+                'onboarding' => 'Onboarding',
+                'profile_completion' => 'Profile Completion',
                 default => 'Lead',
             };
 
