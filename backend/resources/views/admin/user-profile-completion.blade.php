@@ -15,7 +15,7 @@
                 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
                     <div>
                         <h2 class="h5 mb-1">Users Profile Completion</h2>
-                        <p class="text-muted mb-0">Shows completion percentage and completed/missing profile fields for every user from the users table.</p>
+                        <p class="text-muted mb-0">Shows completion percentage and completed/missing profile fields for users with registered app device tokens.</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">
@@ -26,6 +26,12 @@
                         </button>
                     </div>
                 </div>
+
+                @if(!($deviceTokensTableExists ?? false))
+                    <div class="alert alert-warning py-2 mb-3">
+                        device_tokens table not found, so app-installed users cannot be detected in this environment.
+                    </div>
+                @endif
 
                 <div class="row g-2 align-items-center mb-3">
                     <div class="col-12 col-md-7 col-lg-5">
@@ -71,7 +77,7 @@
                 @if($users->isEmpty())
                     <div class="text-center text-muted py-5">
                         <i class="bi bi-people display-6 d-block mb-2"></i>
-                        <p class="mb-0">No users found.</p>
+                        <p class="mb-0">No users with registered app device tokens found.</p>
                     </div>
                 @else
                     <div class="table-responsive">
@@ -93,6 +99,12 @@
                                             <div class="small text-muted">ID: {{ $user->id }}</div>
                                             <div class="small text-muted">{{ $user->email ?? 'No email' }}</div>
                                             <div class="small text-muted">{{ $user->phone ?? 'No phone' }}</div>
+                                            <div class="small text-muted">App tokens: {{ (int) ($user->app_device_tokens_count ?? 0) }}</div>
+                                            @if(($deviceTokensHasLastSeenAt ?? false) && !empty($user->app_last_seen_at))
+                                                <div class="small text-muted">
+                                                    Last app activity: {{ \Illuminate\Support\Carbon::parse($user->app_last_seen_at)->format('d M Y h:i A') }}
+                                                </div>
+                                            @endif
                                         </td>
                                         <td style="min-width: 220px;">
                                             <div class="progress mb-2" role="progressbar" aria-label="Profile completion">

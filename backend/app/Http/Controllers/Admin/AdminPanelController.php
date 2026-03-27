@@ -57,12 +57,36 @@ class AdminPanelController extends Controller
 
     public function userProfileCompletion(): View
     {
-        $users = User::query()
-            ->select(['id', 'name', 'email', 'phone', 'created_at'])
-            ->orderByDesc('created_at')
-            ->get();
+        $deviceTokensTableExists = Schema::hasTable('device_tokens');
+        $deviceTokensHasUserId = $deviceTokensTableExists && Schema::hasColumn('device_tokens', 'user_id');
+        $deviceTokensHasToken = $deviceTokensTableExists && Schema::hasColumn('device_tokens', 'token');
+        $deviceTokensHasLastSeenAt = $deviceTokensTableExists && Schema::hasColumn('device_tokens', 'last_seen_at');
 
-        return view('admin.user-profile-completion', compact('users'));
+        $usersQuery = User::query()
+            ->select(['id', 'name', 'email', 'phone', 'created_at'])
+            ->orderByDesc('created_at');
+
+        if ($deviceTokensHasUserId && $deviceTokensHasToken) {
+            $tokenScope = static function (Builder $query): void {
+                $query->whereNotNull('token')
+                    ->whereRaw("TRIM(token) <> ''");
+            };
+
+            $usersQuery
+                ->whereHas('deviceTokens', $tokenScope)
+                ->withCount(['deviceTokens as app_device_tokens_count' => $tokenScope]);
+
+            if ($deviceTokensHasLastSeenAt) {
+                $usersQuery->withMax(['deviceTokens as app_last_seen_at' => $tokenScope], 'last_seen_at');
+            }
+        } else {
+            // device_tokens table/columns are not available, so no app-installed users can be derived.
+            $usersQuery->whereRaw('1 = 0');
+        }
+
+        $users = $usersQuery->get();
+
+        return view('admin.user-profile-completion', compact('users', 'deviceTokensTableExists', 'deviceTokensHasLastSeenAt'));
     }
 
     public function leadManagement(Request $request): View
