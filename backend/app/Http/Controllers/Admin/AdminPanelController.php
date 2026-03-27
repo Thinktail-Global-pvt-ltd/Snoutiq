@@ -1085,6 +1085,7 @@ class AdminPanelController extends Controller
         $hasTransactionChannelName = $hasTransactionsTable && Schema::hasColumn('transactions', 'channel_name');
         $hasTransactionCallSession = $hasTransactionsTable && Schema::hasColumn('transactions', 'call_session');
         $hasTransactionPetId = $hasTransactionsTable && Schema::hasColumn('transactions', 'pet_id');
+        $hasTransactionFcmNotificationId = $hasTransactionsTable && Schema::hasColumn('transactions', 'fcm_notification_id');
         $supportsConversionTracking = $hasTransactionUserId && $hasTransactionCreatedAt;
         $convertedUsersCount = 0;
 
@@ -1114,6 +1115,9 @@ class AdminPanelController extends Controller
                 }
                 if ($hasTransactionPetId) {
                     $transactionQuery->addSelect('pet_id');
+                }
+                if ($hasTransactionFcmNotificationId) {
+                    $transactionQuery->addSelect('fcm_notification_id');
                 }
                 if ($hasTransactionMetadata) {
                     $transactionQuery->addSelect('metadata');
@@ -1163,6 +1167,16 @@ class AdminPanelController extends Controller
                         $transactionType = 'unknown';
                     }
 
+                    $transactionFcmNotificationId = null;
+                    if ($hasTransactionFcmNotificationId && is_numeric($leadTransaction->fcm_notification_id)) {
+                        $transactionFcmNotificationId = (int) $leadTransaction->fcm_notification_id;
+                    } elseif ($hasTransactionMetadata) {
+                        $metadataFcmId = data_get($leadTransaction->metadata, 'fcm_notification_id');
+                        if (is_numeric($metadataFcmId)) {
+                            $transactionFcmNotificationId = (int) $metadataFcmId;
+                        }
+                    }
+
                     $sessionKeys = [];
                     $sessionCandidates = [];
                     if ($hasTransactionChannelName) {
@@ -1195,6 +1209,7 @@ class AdminPanelController extends Controller
                         'type' => $transactionType,
                         'status' => $transactionStatus !== '' ? $transactionStatus : null,
                         'pet_id' => $hasTransactionPetId && is_numeric($leadTransaction->pet_id) ? (int) $leadTransaction->pet_id : null,
+                        'fcm_notification_id' => $transactionFcmNotificationId,
                         'session_keys' => array_keys($sessionKeys),
                     ];
                 }
@@ -1238,7 +1253,8 @@ class AdminPanelController extends Controller
                         return $leadUser;
                     }
 
-                    $userNotifications = collect($leadUser['all_notifications'] ?? [])
+                    $allUserNotifications = collect($leadUser['all_notifications'] ?? []);
+                    $userNotifications = $allUserNotifications
                         ->filter(fn (array $item): bool => !empty($item['timestamp']))
                         ->sort(function (array $left, array $right): int {
                             $leftTs = (string) ($left['timestamp'] ?? '');
@@ -1258,8 +1274,25 @@ class AdminPanelController extends Controller
 
                     $matchedNotification = null;
                     $matchedTransaction = null;
+                    $notificationsById = [];
+                    foreach ($allUserNotifications as $notificationRow) {
+                        $notifId = is_numeric($notificationRow['id'] ?? null) ? (int) $notificationRow['id'] : 0;
+                        if ($notifId > 0 && !isset($notificationsById[$notifId])) {
+                            $notificationsById[$notifId] = $notificationRow;
+                        }
+                    }
 
                     foreach ($userTransactions as $userTransaction) {
+                        $directFcmId = is_numeric($userTransaction['fcm_notification_id'] ?? null)
+                            ? (int) $userTransaction['fcm_notification_id']
+                            : 0;
+
+                        if ($directFcmId > 0 && isset($notificationsById[$directFcmId])) {
+                            $matchedNotification = $notificationsById[$directFcmId];
+                            $matchedTransaction = $userTransaction;
+                            break;
+                        }
+
                         $bestForTransaction = null;
 
                         foreach ($userNotifications as $userNotification) {
