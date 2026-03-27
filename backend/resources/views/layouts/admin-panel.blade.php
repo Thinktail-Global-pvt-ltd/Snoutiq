@@ -116,25 +116,13 @@
             </button>
         </div>
         <nav class="admin-nav mb-4">
-            <a href="{{ route('founder.dashboard') }}" target="_blank" rel="noopener" class="{{ request()->is('founder/dashboard') ? 'active' : '' }}">
-                Founder Dashboard
-            </a>
             <a href="{{ route('admin.onboarding.panel') }}" class="{{ request()->routeIs('admin.onboarding.panel') ? 'active' : '' }}">Onboarding Panel</a>
-            <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">Dashboard</a>
-            <a href="{{ route('admin.users') }}" class="{{ request()->routeIs('admin.users') ? 'active' : '' }}">Users</a>
+            <a href="{{ route('admin.users.profile-completion') }}" class="{{ request()->routeIs('admin.users.profile-completion') ? 'active' : '' }}">User Profile Completion</a>
             <a href="{{ route('admin.lead-management') }}" class="{{ request()->routeIs('admin.lead-management') ? 'active' : '' }}">Lead Management</a>
-            <a href="{{ route('admin.pet-parents') }}" class="{{ request()->routeIs('admin.pet-parents') ? 'active' : '' }}">Pet Parents</a>
-            <a href="{{ route('admin.pets') }}" class="{{ request()->routeIs('admin.pets') ? 'active' : '' }}">Pets</a>
             <a href="{{ route('admin.doctors') }}" class="{{ request()->routeIs('admin.doctors') ? 'active' : '' }}">Doctors</a>
             <a href="{{ route('admin.online-doctors') }}" class="{{ request()->routeIs('admin.online-doctors') ? 'active' : '' }}">Online Doctors</a>
-            <a href="{{ route('admin.vet-registrations') }}" class="{{ request()->routeIs('admin.vet-registrations') ? 'active' : '' }}">Vet Registrations</a>
-            <a href="{{ route('admin.vet-registration-report') }}" class="{{ request()->routeIs('admin.vet-registration-report') ? 'active' : '' }}">Vet Registration Report</a>
-            <a href="{{ route('admin.bookings') }}" class="{{ request()->routeIs('admin.bookings') ? 'active' : '' }}">Bookings</a>
             <a href="{{ route('admin.transactions.excell-export') }}" class="{{ request()->routeIs('admin.transactions.excell-export') ? 'active' : '' }}">Excel Export Transactions</a>
             <a href="{{ route('admin.transactions.appointments') }}" class="{{ request()->routeIs('admin.transactions.appointments') ? 'active' : '' }}">Appointment Transactions</a>
-            <a href="{{ route('admin.whatsapp.templates') }}" class="{{ request()->routeIs('admin.whatsapp.templates') ? 'active' : '' }}">WhatsApp Templates</a>
-            <a href="{{ route('admin.supports') }}" class="{{ request()->routeIs('admin.supports') ? 'active' : '' }}">Supports</a>
-            <a href="{{ route('admin.video.slot-overview') }}" class="{{ request()->routeIs('admin.video.slot-overview') ? 'active' : '' }}">Video Slot Overview</a>
             <a href="{{ route('admin.analytics.consultation-lifecycle') }}" class="{{ request()->routeIs('admin.analytics.consultation-lifecycle') ? 'active' : '' }}">Consultation Lifecycle Analytics</a>
             <a href="{{ route('admin.analytics.pincode-heatmap') }}" class="{{ request()->routeIs('admin.analytics.pincode-heatmap') ? 'active' : '' }}">Pincode Heatmap</a>
         </nav>

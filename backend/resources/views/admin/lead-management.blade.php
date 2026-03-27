@@ -148,6 +148,8 @@
                         'notification_title' => trim((string) ($item['notification_title'] ?? '')),
                         'notification_text' => trim((string) ($item['notification_text'] ?? '')),
                         'notification_type' => (string) ($item['notification_type'] ?? 'unknown'),
+                        'clicked' => array_key_exists('clicked', $item) ? (bool) ($item['clicked'] ?? false) : null,
+                        'clicked_at' => (string) ($item['clicked_at'] ?? ''),
                         'bucket' => $bucket,
                         'bucket_label' => $bucketLabel !== '' ? $bucketLabel : '—',
                         'timestamp' => (string) ($item['timestamp'] ?? ''),
@@ -563,12 +565,14 @@
                                 <th>Notification Type</th>
                                 <th>Lead Bucket</th>
                                 <th>Time (Timestamp)</th>
+                                <th>Clicked</th>
+                                <th>Clicked At</th>
                                 <th>Converted</th>
                             </tr>
                         </thead>
                         <tbody id="userNotificationsTableBody">
                             <tr>
-                                <td colspan="6" class="text-muted">No notifications found.</td>
+                                <td colspan="8" class="text-muted">No notifications found.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -661,7 +665,7 @@
         }
 
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="6" class="text-muted">No notifications found.</td></tr>';
+            body.innerHTML = '<tr><td colspan="8" class="text-muted">No notifications found.</td></tr>';
             return;
         }
 
@@ -673,11 +677,18 @@
             const type = escapeHtml(row.notification_type || 'unknown');
             const bucket = escapeHtml(row.bucket_label || '—');
             const ts = escapeHtml(row.timestamp || '—');
+            const clickedValue = row.clicked;
+            const clicked = (clickedValue === null || clickedValue === undefined)
+                ? '<span class="text-muted">—</span>'
+                : (clickedValue ? '<span class="badge text-bg-success">Yes</span>' : '<span class="badge text-bg-secondary">No</span>');
+            const clickedAt = row.clicked_at
+                ? escapeHtml(row.clicked_at)
+                : '<span class="text-muted">—</span>';
             const converted = isTrigger
                 ? '<span class="badge text-bg-success">Converted trigger</span>'
                 : '<span class="text-muted">—</span>';
 
-            return `<tr class="${rowClass}"><td>${title}</td><td>${text}</td><td>${type}</td><td>${bucket}</td><td>${ts}</td><td>${converted}</td></tr>`;
+            return `<tr class="${rowClass}"><td>${title}</td><td>${text}</td><td>${type}</td><td>${bucket}</td><td>${ts}</td><td>${clicked}</td><td>${clickedAt}</td><td>${converted}</td></tr>`;
         }).join('');
     });
 })();

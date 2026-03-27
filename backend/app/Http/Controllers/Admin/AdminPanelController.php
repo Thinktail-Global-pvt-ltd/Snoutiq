@@ -55,6 +55,16 @@ class AdminPanelController extends Controller
         return view('admin.users', compact('users'));
     }
 
+    public function userProfileCompletion(): View
+    {
+        $users = User::query()
+            ->select(['id', 'name', 'email', 'phone', 'created_at'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('admin.user-profile-completion', compact('users'));
+    }
+
     public function leadManagement(Request $request): View
     {
         $filters = $request->validate([
@@ -365,6 +375,8 @@ class AdminPanelController extends Controller
         $fcmHasTitle = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'title');
         $fcmHasNotificationText = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'notification_text');
         $fcmHasNotificationType = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'notification_type');
+        $fcmHasClicked = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'clicked');
+        $fcmHasClickedAt = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'clicked_at');
         $supportsVaccinationNotificationJoin = $supportsFcmNotifications
             && ($fcmHasNotificationType || $supportsNeuteringNotificationJoin);
         $vaccinationReminderType = 'pet_vaccination_upcoming_reminder';
@@ -468,6 +480,12 @@ class AdminPanelController extends Controller
                     if ($fcmHasCreatedAt) {
                         $fcmNeuteringQuery->addSelect('created_at');
                     }
+                    if ($fcmHasClicked) {
+                        $fcmNeuteringQuery->addSelect('clicked');
+                    }
+                    if ($fcmHasClickedAt) {
+                        $fcmNeuteringQuery->addSelect('clicked_at');
+                    }
 
                     $fcmNeuteringRows = $fcmNeuteringQuery
                         ->whereIn('user_id', $neuteringUserIds->all())
@@ -546,6 +564,8 @@ class AdminPanelController extends Controller
                             'notification_type' => $notificationType,
                             'timestamp' => $timestamp,
                             'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
+                            'clicked' => $fcmHasClicked ? (bool) ($fcmRow->clicked ?? false) : null,
+                            'clicked_at' => $fcmHasClickedAt ? $normalizeDateTime($fcmRow->clicked_at ?? null) : null,
                             'bucket' => 'neutering',
                             'pet_id' => $petId,
                             'call_session' => null,
@@ -628,6 +648,12 @@ class AdminPanelController extends Controller
                     if ($fcmHasCreatedAt) {
                         $fcmFollowUpQuery->addSelect('created_at');
                     }
+                    if ($fcmHasClicked) {
+                        $fcmFollowUpQuery->addSelect('clicked');
+                    }
+                    if ($fcmHasClickedAt) {
+                        $fcmFollowUpQuery->addSelect('clicked_at');
+                    }
 
                     $fcmFollowUpRows = $fcmFollowUpQuery
                         ->whereIn('user_id', array_keys($followUpLeadUserIds))
@@ -700,6 +726,8 @@ class AdminPanelController extends Controller
                                 'notification_type' => $notificationType,
                                 'timestamp' => $timestamp,
                                 'status' => $status,
+                                'clicked' => $fcmHasClicked ? (bool) ($fcmRow->clicked ?? false) : null,
+                                'clicked_at' => $fcmHasClickedAt ? $normalizeDateTime($fcmRow->clicked_at ?? null) : null,
                                 'bucket' => 'follow_up',
                                 'pet_id' => null,
                                 'call_session' => $fcmCallSession !== '' ? $fcmCallSession : trim((string) data_get($dataPayload, 'call_session')),
@@ -764,6 +792,12 @@ class AdminPanelController extends Controller
                 }
                 if ($fcmHasCreatedAt) {
                     $fcmVaccinationQuery->addSelect('created_at');
+                }
+                if ($fcmHasClicked) {
+                    $fcmVaccinationQuery->addSelect('clicked');
+                }
+                if ($fcmHasClickedAt) {
+                    $fcmVaccinationQuery->addSelect('clicked_at');
                 }
 
                 $fcmVaccinationRows = $fcmVaccinationQuery
@@ -852,6 +886,8 @@ class AdminPanelController extends Controller
                         'notification_type' => $vaccinationReminderType,
                         'timestamp' => $timestamp,
                         'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
+                        'clicked' => $fcmHasClicked ? (bool) ($fcmRow->clicked ?? false) : null,
+                        'clicked_at' => $fcmHasClickedAt ? $normalizeDateTime($fcmRow->clicked_at ?? null) : null,
                         'bucket' => 'vaccination',
                         'pet_id' => is_numeric($petIdRaw ?? null) ? (int) $petIdRaw : null,
                         'call_session' => null,
@@ -897,6 +933,12 @@ class AdminPanelController extends Controller
                     }
                     if ($fcmHasCreatedAt) {
                         $fcmProfileQuery->addSelect('created_at');
+                    }
+                    if ($fcmHasClicked) {
+                        $fcmProfileQuery->addSelect('clicked');
+                    }
+                    if ($fcmHasClickedAt) {
+                        $fcmProfileQuery->addSelect('clicked_at');
                     }
 
                     $fcmProfileQuery->whereIn('user_id', $leadUserIds)
@@ -975,6 +1017,8 @@ class AdminPanelController extends Controller
                             'notification_type' => $effectiveType,
                             'timestamp' => $timestamp,
                             'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
+                            'clicked' => $fcmHasClicked ? (bool) ($fcmRow->clicked ?? false) : null,
+                            'clicked_at' => $fcmHasClickedAt ? $normalizeDateTime($fcmRow->clicked_at ?? null) : null,
                             'bucket' => $bucket,
                             'pet_id' => null,
                             'call_session' => null,
