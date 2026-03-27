@@ -171,6 +171,9 @@ class LogTodayPrescriptionFollowUps extends Command
             'medical_record_id' => (string) ($prescription->medical_record_id ?? ''),
             'pet_id' => (string) ($prescription->pet_id ?? ''),
             'follow_up_date' => (string) optional($prescription->follow_up_date)->toDateString(),
+            'deepLink' => 'snoutiq://videocall-appointment',
+            'deep_link' => 'snoutiq://videocall-appointment',
+            'deeplink' => 'snoutiq://videocall-appointment',
         ];
 
         $callSession = trim((string) ($prescription->call_session ?? ''));

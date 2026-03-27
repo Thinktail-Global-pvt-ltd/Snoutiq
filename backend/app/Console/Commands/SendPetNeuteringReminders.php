@@ -146,6 +146,9 @@ class SendPetNeuteringReminders extends Command
                         'pet_name' => $petName,
                         'is_neutered' => 'N',
                         'reminder_date' => $today,
+                        'deepLink' => 'snoutiq://videocall-appointment',
+                        'deep_link' => 'snoutiq://videocall-appointment',
+                        'deeplink' => 'snoutiq://videocall-appointment',
                     ]
                 );
 

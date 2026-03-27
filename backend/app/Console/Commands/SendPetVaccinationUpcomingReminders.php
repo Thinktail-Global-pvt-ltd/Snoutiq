@@ -148,6 +148,9 @@ class SendPetVaccinationUpcomingReminders extends Command
                         'next_due' => $targetDueDate,
                         'vaccines' => $vaccineList,
                         'days_left' => (string) max(0, $today->diffInDays(Carbon::parse($targetDueDate), false)),
+                        'deepLink' => 'snoutiq://videocall-appointment',
+                        'deep_link' => 'snoutiq://videocall-appointment',
+                        'deeplink' => 'snoutiq://videocall-appointment',
                     ]
                 );
 

@@ -86,6 +86,7 @@ class SendProfileCompletionReminders extends Command
                         continue;
                     }
 
+                    $deepLink = 'snoutiq://videocall-appointment';
                     $notification = Notification::create([
                         'user_id' => $user->id,
                         'type' => 'profile_completion',
@@ -94,6 +95,9 @@ class SendProfileCompletionReminders extends Command
                         'payload' => [
                             'type' => 'profile_completion',
                             'completion_percent' => $completion,
+                            'deepLink' => $deepLink,
+                            'deep_link' => $deepLink,
+                            'deeplink' => $deepLink,
                         ],
                         'status' => Notification::STATUS_PENDING,
                     ]);

@@ -180,6 +180,7 @@ class SendUserCreatedReminders extends Command
     private function sendFcmNotification(User $user, string $petName, string $doctorName, string $clinicName): array
     {
         try {
+            $deepLink = 'snoutiq://videocall-appointment';
             $notification = Notification::create([
                 'user_id' => $user->id,
                 'pet_id' => null,
@@ -198,6 +199,9 @@ class SendUserCreatedReminders extends Command
                     'pet_name' => $petName,
                     'doctor_name' => $doctorName,
                     'clinic_name' => $clinicName,
+                    'deepLink' => $deepLink,
+                    'deep_link' => $deepLink,
+                    'deeplink' => $deepLink,
                 ],
                 'status' => Notification::STATUS_PENDING,
             ]);
