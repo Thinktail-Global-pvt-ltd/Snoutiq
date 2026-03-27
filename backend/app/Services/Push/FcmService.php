@@ -76,7 +76,42 @@ class FcmService
             $normalized[$key] = (string) $value;
         }
 
+        // Keep an identifier in payload for click-tracking joins when callers
+        // do not pass one explicitly (common in scheduler direct FCM sends).
+        if (!$this->hasPayloadIdentifier($normalized)) {
+            $normalized['notification_id'] = (string) $this->generatePayloadNotificationId();
+        }
+
         return $normalized;
+    }
+
+    /**
+     * @param array<string,string> $payload
+     */
+    private function hasPayloadIdentifier(array $payload): bool
+    {
+        foreach (['notification_id', 'fcm_notification_id'] as $key) {
+            if (!array_key_exists($key, $payload)) {
+                continue;
+            }
+
+            $value = trim((string) ($payload[$key] ?? ''));
+            if ($value !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function generatePayloadNotificationId(): int
+    {
+        // Millisecond epoch + random suffix keeps ids numeric and collision-safe enough
+        // for concurrent scheduler sends.
+        $epochMillis = (int) floor(microtime(true) * 1000);
+        $suffix = random_int(100, 999);
+
+        return ($epochMillis * 1000) + $suffix;
     }
 
     /**
