@@ -27,6 +27,26 @@
                     </div>
                 </div>
 
+                <div class="row g-2 align-items-center mb-3">
+                    <div class="col-12 col-md-7 col-lg-5">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input
+                                type="search"
+                                id="nameFilterInput"
+                                class="form-control"
+                                placeholder="Filter by user name"
+                                value="{{ request('name', '') }}"
+                                autocomplete="off"
+                            >
+                            <button type="button" class="btn btn-outline-secondary" id="clearNameFilterBtn">Clear</button>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-auto">
+                        <span class="text-muted small" id="filteredUsersCount">{{ number_format($users->count()) }} shown</span>
+                    </div>
+                </div>
+
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-4">
                         <div class="border rounded-3 p-3 bg-light-subtle h-100">
@@ -67,7 +87,7 @@
                             </thead>
                             <tbody>
                                 @foreach($users as $user)
-                                    <tr data-user-id="{{ $user->id }}">
+                                    <tr data-user-id="{{ $user->id }}" data-user-name="{{ strtolower((string) ($user->name ?? '')) }}">
                                         <td style="min-width: 220px;">
                                             <div class="fw-semibold">{{ $user->name ?? 'Unnamed user' }}</div>
                                             <div class="small text-muted">ID: {{ $user->id }}</div>
@@ -107,6 +127,9 @@
     const endpoint = @json($profileCompletionApiPath);
     const rows = Array.from(document.querySelectorAll('tr[data-user-id]'));
     const reloadBtn = document.getElementById('reloadProfileCompletionBtn');
+    const nameFilterInput = document.getElementById('nameFilterInput');
+    const clearNameFilterBtn = document.getElementById('clearNameFilterBtn');
+    const filteredUsersCountEl = document.getElementById('filteredUsersCount');
     const processedCountEl = document.getElementById('completionProcessedCount');
     const averageEl = document.getElementById('averageCompletionPercent');
     const failuresEl = document.getElementById('completionFailuresCount');
@@ -172,6 +195,24 @@
         }
 
         container.appendChild(fragment);
+    };
+
+    const applyNameFilter = () => {
+        const term = String(nameFilterInput?.value || '').trim().toLowerCase();
+        let visibleCount = 0;
+
+        rows.forEach((row) => {
+            const rowName = String(row.getAttribute('data-user-name') || '').toLowerCase();
+            const matches = term === '' || rowName.includes(term);
+            row.classList.toggle('d-none', !matches);
+            if (matches) {
+                visibleCount += 1;
+            }
+        });
+
+        if (filteredUsersCountEl) {
+            filteredUsersCountEl.textContent = `${visibleCount} shown`;
+        }
     };
 
     const setPendingRowState = (row) => {
@@ -325,6 +366,21 @@
         });
     }
 
+    if (nameFilterInput) {
+        nameFilterInput.addEventListener('input', applyNameFilter);
+    }
+
+    if (clearNameFilterBtn) {
+        clearNameFilterBtn.addEventListener('click', () => {
+            if (nameFilterInput) {
+                nameFilterInput.value = '';
+                nameFilterInput.focus();
+            }
+            applyNameFilter();
+        });
+    }
+
+    applyNameFilter();
     void startLoading();
 })();
 </script>
