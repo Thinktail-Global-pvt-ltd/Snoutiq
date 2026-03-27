@@ -65,6 +65,8 @@ class PaymentController extends Controller
             'call_session' => 'nullable|string',
             'channel_name' => 'nullable|string',
             'pet_id' => 'nullable|integer',
+            'fcm_notification_id' => 'nullable|integer',
+            'notification_id' => 'nullable|integer',
             'coupon_code' => 'nullable|string|max:100',
             'couponCode' => 'nullable|string|max:100',
             'coupon' => 'nullable|string|max:100',
@@ -127,19 +129,24 @@ class PaymentController extends Controller
             ]);
             $orderArr = $order->toArray();
 
-            $this->recordPendingTransaction(
-                request: $request,
-                order: $orderArr,
-                notes: $notes,
-                context: $context
-            );
-            $videoApointment = $this->recordVideoApointmentOrder(
-                request: $request,
-                order: $orderArr,
-                context: $context,
-                callSession: $callSession,
-                notes: $notes
-            );
+            $videoApointment = DB::transaction(function () use ($request, $orderArr, $notes, $context, $callSession) {
+                $this->recordPendingTransaction(
+                    request: $request,
+                    order: $orderArr,
+                    notes: $notes,
+                    context: $context,
+                    throwOnFailure: true
+                );
+
+                return $this->recordVideoApointmentOrder(
+                    request: $request,
+                    order: $orderArr,
+                    context: $context,
+                    callSession: $callSession,
+                    notes: $notes,
+                    throwOnFailure: true
+                );
+            }, 3);
 
             $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
                 doctorId: $context['doctor_id'] ?? null,
@@ -546,7 +553,7 @@ class PaymentController extends Controller
 
             // Try to fetch payment details (optional)
             $paymentArr = null;
-            $status   = 'verified';
+            $status   = 'captured';
             $amount   = null;
             $currency = 'INR';
             $method   = null;
@@ -569,12 +576,47 @@ class PaymentController extends Controller
                 // ignore network failure
             }
 
+            $normalizedGatewayStatus = strtolower(trim((string) $status));
+            if (
+                $normalizedGatewayStatus === 'authorized'
+                && is_numeric($amount)
+                && (int) $amount > 0
+            ) {
+                try {
+                    $capturedPayment = $api->payment->fetch($data['razorpay_payment_id'])->capture([
+                        'amount' => (int) $amount,
+                        'currency' => $currency ?: 'INR',
+                    ]);
+                    $capturedPaymentArr = $capturedPayment->toArray();
+                    if (is_array($capturedPaymentArr) && $capturedPaymentArr !== []) {
+                        $paymentArr = $capturedPaymentArr;
+                        $status = $capturedPaymentArr['status'] ?? 'captured';
+                        $amount = $capturedPaymentArr['amount'] ?? $amount;
+                        $currency = $capturedPaymentArr['currency'] ?? $currency;
+                        $method = $capturedPaymentArr['method'] ?? $method;
+                        $email = $capturedPaymentArr['email'] ?? $email;
+                        $contact = $capturedPaymentArr['contact'] ?? $contact;
+                    } else {
+                        $status = 'captured';
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+
             try {
                 $order = $api->order->fetch($data['razorpay_order_id']);
-                $orderNotes = $order->toArray()['notes'] ?? [];
+                $orderArray = $order->toArray();
+                $orderNotes = $orderArray['notes'] ?? [];
                 if (is_array($orderNotes) && $orderNotes !== []) {
                     // Keep payment notes preferred when both are present.
                     $notes = array_replace($orderNotes, $notes);
+                }
+                if ((!is_numeric($amount) || (int) $amount <= 0) && is_numeric($orderArray['amount'] ?? null)) {
+                    $amount = (int) $orderArray['amount'];
+                }
+                if (empty($currency) && !empty($orderArray['currency'])) {
+                    $currency = (string) $orderArray['currency'];
                 }
             } catch (\Throwable $e) {
                 // ignore network failure
@@ -592,35 +634,55 @@ class PaymentController extends Controller
             $notes = $this->mergeContextIntoNotes($notes, $context);
             $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
 
-            // Upsert into DB (idempotent on payment_id)
-            $record = Payment::updateOrCreate(
-                ['razorpay_payment_id' => $data['razorpay_payment_id']],
-                [
-                    'razorpay_order_id'  => $data['razorpay_order_id'],
-                    'razorpay_signature' => $data['razorpay_signature'],
-                    'amount'             => $amount,
-                    'currency'           => $currency,
-                    'status'             => $status,
-                    'method'             => $method,
-                    'email'              => $email,
-                    'contact'            => $contact,
-                    'notes'              => $notes ?: null,
-                    'raw_response'       => $paymentArr,
-                ]
-            );
+            [$record, $storedTransaction] = DB::transaction(function () use (
+                $data,
+                $amount,
+                $currency,
+                $status,
+                $method,
+                $email,
+                $contact,
+                $notes,
+                $paymentArr,
+                $request,
+                $context
+            ) {
+                // Upsert into DB (idempotent on payment_id)
+                $record = Payment::updateOrCreate(
+                    ['razorpay_payment_id' => $data['razorpay_payment_id']],
+                    [
+                        'razorpay_order_id'  => $data['razorpay_order_id'],
+                        'razorpay_signature' => $data['razorpay_signature'],
+                        'amount'             => $amount,
+                        'currency'           => $currency,
+                        'status'             => $status,
+                        'method'             => $method,
+                        'email'              => $email,
+                        'contact'            => $contact,
+                        'notes'              => $notes ?: null,
+                        'raw_response'       => $paymentArr,
+                    ]
+                );
 
-            $this->recordTransaction(
-                request: $request,
-                payment: $record,
-                amount: $amount,
-                status: $status,
-                method: $method,
-                notes: $notes,
-                currency: $currency,
-                email: $email,
-                contact: $contact,
-                context: $context
-            );
+                $storedTransaction = $this->recordTransaction(
+                    request: $request,
+                    payment: $record,
+                    amount: $amount,
+                    status: $status,
+                    method: $method,
+                    notes: $notes,
+                    currency: $currency,
+                    email: $email,
+                    contact: $contact,
+                    context: $context
+                );
+
+                if (! $storedTransaction) {
+                    throw new \RuntimeException('Payment verified but transaction update failed.');
+                }
+
+                return [$record, $storedTransaction];
+            }, 3);
 
             // Send WhatsApp after successful payment verification
             $amountInInr = $amount !== null ? (int) round(((int) $amount) / 100) : 0;
@@ -688,6 +750,11 @@ class PaymentController extends Controller
                     'amount'   => $record->amount,
                     'currency' => $record->currency,
                     'db_id'    => $record->id,
+                ],
+                'transaction' => [
+                    'id' => $storedTransaction->id,
+                    'reference' => $storedTransaction->reference,
+                    'status' => $storedTransaction->status,
                 ],
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
@@ -809,11 +876,20 @@ class PaymentController extends Controller
         ];
     }
 
-    protected function recordPendingTransaction(Request $request, array $order, array $notes, array $context): void
+    protected function recordPendingTransaction(
+        Request $request,
+        array $order,
+        array $notes,
+        array $context,
+        bool $throwOnFailure = false
+    ): ?Transaction
     {
         $orderId = $order['id'] ?? null;
         if (! $orderId) {
-            return;
+            if ($throwOnFailure) {
+                throw new \RuntimeException('Missing Razorpay order id while storing pending transaction.');
+            }
+            return null;
         }
 
         $clinicId = $context['clinic_id'] ?? null;
@@ -822,6 +898,9 @@ class PaymentController extends Controller
             $clinicId = $this->resolveClinicId($request, $notes, $context);
         } catch (\Throwable $e) {
             report($e);
+            if ($throwOnFailure) {
+                throw $e;
+            }
         }
 
         $context['clinic_id'] = $clinicId;
@@ -829,6 +908,15 @@ class PaymentController extends Controller
         $userId = $context['user_id'] ?? null;
         $channelName = $context['channel_name'] ?? ($notes['channel_name'] ?? null);
         $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
+        $hasFcmNotificationIdColumn = Schema::hasColumn('transactions', 'fcm_notification_id');
+        $fcmNotificationId = null;
+        if (isset($notes['fcm_notification_id']) && is_numeric($notes['fcm_notification_id'])) {
+            $fcmNotificationId = (int) $notes['fcm_notification_id'];
+        } elseif ($request->filled('fcm_notification_id') && is_numeric($request->input('fcm_notification_id'))) {
+            $fcmNotificationId = (int) $request->input('fcm_notification_id');
+        } elseif ($request->filled('notification_id') && is_numeric($request->input('notification_id'))) {
+            $fcmNotificationId = (int) $request->input('notification_id');
+        }
 
         $transactionType = $this->resolveTransactionType($notes);
         $payoutBreakup = $this->buildExcelExportPayoutBreakup(
@@ -861,6 +949,7 @@ class PaymentController extends Controller
                     'clinic_id' => $clinicId,
                     'user_id' => $userId,
                     'pet_id' => $context['pet_id'] ?? null,
+                    'fcm_notification_id' => $fcmNotificationId,
                 ],
             ];
 
@@ -881,14 +970,23 @@ class PaymentController extends Controller
             if ($hasChannelNameColumn) {
                 $payload['channel_name'] = $channelName;
             }
+            if ($hasFcmNotificationIdColumn) {
+                $payload['fcm_notification_id'] = $fcmNotificationId;
+            }
 
-            Transaction::updateOrCreate(['reference' => $orderId], $payload);
+            return Transaction::updateOrCreate(['reference' => $orderId], $payload);
         } catch (\Throwable $e) {
             report($e);
+            if ($throwOnFailure) {
+                throw $e;
+            }
+            return null;
         }
+
+        return null;
     }
 
-    protected function recordTransaction(Request $request, Payment $payment, ?int $amount, ?string $status, ?string $method, array $notes, ?string $currency, ?string $email, ?string $contact, array $context = []): void
+    protected function recordTransaction(Request $request, Payment $payment, ?int $amount, ?string $status, ?string $method, array $notes, ?string $currency, ?string $email, ?string $contact, array $context = []): ?Transaction
     {
         $clinicId = $context['clinic_id'] ?? null;
 
@@ -905,6 +1003,15 @@ class PaymentController extends Controller
         $callId = $context['call_identifier'] ?? null;
         $channelName = $context['channel_name'] ?? ($notes['channel_name'] ?? null);
         $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
+        $hasFcmNotificationIdColumn = Schema::hasColumn('transactions', 'fcm_notification_id');
+        $fcmNotificationId = null;
+        if (isset($notes['fcm_notification_id']) && is_numeric($notes['fcm_notification_id'])) {
+            $fcmNotificationId = (int) $notes['fcm_notification_id'];
+        } elseif ($request->filled('fcm_notification_id') && is_numeric($request->input('fcm_notification_id'))) {
+            $fcmNotificationId = (int) $request->input('fcm_notification_id');
+        } elseif ($request->filled('notification_id') && is_numeric($request->input('notification_id'))) {
+            $fcmNotificationId = (int) $request->input('notification_id');
+        }
         $transactionType = $this->resolveTransactionType($notes);
         $payoutBreakup = $this->buildExcelExportPayoutBreakup(
             grossPaise: (int) ($amount ?? 0),
@@ -916,16 +1023,21 @@ class PaymentController extends Controller
         try {
             $reference = $payment->razorpay_payment_id ?? $payment->razorpay_order_id;
             if (! $reference) {
-                return;
+                return null;
             }
+
+            $transactionStatus = $this->normalizeTransactionStatus($status);
+            $amountPaise = is_numeric($amount) && (int) $amount > 0
+                ? (int) $amount
+                : null;
 
             $payload = [
                 'clinic_id' => $clinicId,
                 'doctor_id' => $doctorId,
                 'user_id' => $userId,
                 'pet_id' => $petId,
-                'amount_paise' => (int) ($amount ?? 0),
-                'status' => $status ?? 'pending',
+                'amount_paise' => $amountPaise ?? 0,
+                'status' => $transactionStatus,
                 'type' => $transactionType,
                 'payment_method' => $method,
                 'reference' => $reference,
@@ -933,6 +1045,7 @@ class PaymentController extends Controller
                     'order_type' => $transactionType,
                     'order_id' => $payment->razorpay_order_id,
                     'payment_id' => $payment->razorpay_payment_id,
+                    'gateway_status' => is_string($status) ? trim($status) : null,
                     'currency' => $currency,
                     'email' => $email,
                     'contact' => $contact,
@@ -943,6 +1056,7 @@ class PaymentController extends Controller
                     'clinic_id' => $clinicId,
                     'user_id' => $userId,
                     'pet_id' => $petId,
+                    'fcm_notification_id' => $fcmNotificationId,
                 ],
             ];
 
@@ -963,26 +1077,99 @@ class PaymentController extends Controller
             if ($hasChannelNameColumn) {
                 $payload['channel_name'] = $channelName;
             }
-
-            $transaction = null;
-
-            if ($payment->razorpay_payment_id) {
-                $transaction = Transaction::where('reference', $payment->razorpay_payment_id)->first();
+            if ($hasFcmNotificationIdColumn) {
+                $payload['fcm_notification_id'] = $fcmNotificationId;
             }
 
-            if (! $transaction && $payment->razorpay_order_id) {
-                $transaction = Transaction::where('reference', $payment->razorpay_order_id)->first();
-            }
+            return DB::transaction(function () use ($payment, $payload, $amountPaise, $transactionStatus): Transaction {
+                $paymentId = trim((string) ($payment->razorpay_payment_id ?? ''));
+                $orderId = trim((string) ($payment->razorpay_order_id ?? ''));
 
-            if ($transaction) {
-                $transaction->fill($payload);
-                $transaction->save();
-            } else {
-                Transaction::create($payload);
-            }
+                $candidateReferences = collect([$paymentId, $orderId])
+                    ->filter(fn ($value) => $value !== '')
+                    ->values()
+                    ->all();
+
+                $matchedTransactions = Transaction::query()
+                    ->when(!empty($candidateReferences), function ($query) use ($candidateReferences) {
+                        $query->where(function ($inner) use ($candidateReferences) {
+                            $inner->whereIn('reference', $candidateReferences);
+                            foreach ($candidateReferences as $candidateReference) {
+                                $inner->orWhere('metadata->order_id', $candidateReference);
+                                $inner->orWhere('metadata->payment_id', $candidateReference);
+                            }
+                        });
+                    })
+                    ->lockForUpdate()
+                    ->orderByDesc('id')
+                    ->get();
+
+                $primaryTransaction = $matchedTransactions->first();
+
+                if ($primaryTransaction) {
+                    $currentStatus = strtolower(trim((string) ($primaryTransaction->status ?? '')));
+                    if (
+                        $currentStatus !== ''
+                        && $this->isSuccessfulPaymentStatus($currentStatus)
+                        && ! $this->isSuccessfulPaymentStatus($transactionStatus)
+                    ) {
+                        $payload['status'] = $currentStatus;
+                    }
+
+                    if ($amountPaise === null || $amountPaise <= 0) {
+                        unset($payload['amount_paise']);
+                    }
+
+                    $primaryTransaction->fill($payload);
+                    $primaryTransaction->save();
+
+                    if (
+                        $this->isSuccessfulPaymentStatus((string) ($payload['status'] ?? null))
+                        && $matchedTransactions->count() > 1
+                    ) {
+                        $duplicateIds = $matchedTransactions
+                            ->pluck('id')
+                            ->filter(fn ($id) => (int) $id !== (int) $primaryTransaction->id)
+                            ->values()
+                            ->all();
+
+                        if (!empty($duplicateIds)) {
+                            Transaction::query()
+                                ->whereIn('id', $duplicateIds)
+                                ->update([
+                                    'status' => (string) $payload['status'],
+                                    'updated_at' => now(),
+                                ]);
+                        }
+                    }
+
+                    return $primaryTransaction->fresh();
+                }
+
+                if ($amountPaise === null || $amountPaise <= 0) {
+                    $payload['amount_paise'] = 0;
+                }
+
+                return Transaction::create($payload);
+            }, 3);
         } catch (\Throwable $e) {
             report($e);
+            return null;
         }
+    }
+
+    protected function normalizeTransactionStatus(?string $status): string
+    {
+        $normalized = strtolower(trim((string) $status));
+        if ($normalized === '') {
+            return 'pending';
+        }
+
+        if ($this->isSuccessfulPaymentStatus($normalized)) {
+            return 'captured';
+        }
+
+        return $normalized;
     }
 
     protected function transactionPayoutColumnMap(): array
@@ -1115,6 +1302,7 @@ class PaymentController extends Controller
             'doctor_id' => ['doctor_id', 'doctorId'],
             'user_id' => ['user_id', 'userId', 'patient_id', 'patientId'],
             'pet_id' => ['pet_id', 'petId'],
+            'fcm_notification_id' => ['fcm_notification_id', 'notification_id', 'fcmNotificationId', 'notificationId'],
             'gst_number' => ['gst_number', 'gstNumber'],
             'gst_number_given' => ['gst_number_given', 'gstNumberGiven'],
             'vet_template' => ['vet_template', 'vetTemplate', 'vet_template_name'],
@@ -2468,7 +2656,8 @@ HTML;
         array $order,
         array $context,
         ?CallSession $callSession = null,
-        array $notes = []
+        array $notes = [],
+        bool $throwOnFailure = false
     ): ?VideoApointment {
         if (!Schema::hasTable('video_apointment')) {
             return null;
@@ -2507,6 +2696,9 @@ HTML;
             return VideoApointment::create($payload);
         } catch (\Throwable $e) {
             report($e);
+            if ($throwOnFailure) {
+                throw $e;
+            }
             return null;
         }
     }

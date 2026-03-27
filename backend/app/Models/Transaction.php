@@ -19,6 +19,7 @@ class Transaction extends Model
         'actual_amount_paid_by_consumer_paise',
         'payment_to_snoutiq_paise',
         'payment_to_doctor_paise',
+        'fcm_notification_id',
         'status',
         'type',
         'channel_name',
@@ -33,6 +34,7 @@ class Transaction extends Model
         'actual_amount_paid_by_consumer_paise' => 'integer',
         'payment_to_snoutiq_paise' => 'integer',
         'payment_to_doctor_paise' => 'integer',
+        'fcm_notification_id' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
