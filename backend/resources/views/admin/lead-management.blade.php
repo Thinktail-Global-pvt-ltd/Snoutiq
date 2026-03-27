@@ -560,6 +560,7 @@
                     <table class="table table-sm align-middle mb-0">
                         <thead class="table-light">
                             <tr>
+                                <th>FCM ID</th>
                                 <th>Notification Title (Exact)</th>
                                 <th>Notification Text</th>
                                 <th>Notification Type</th>
@@ -572,7 +573,7 @@
                         </thead>
                         <tbody id="userNotificationsTableBody">
                             <tr>
-                                <td colspan="8" class="text-muted">No notifications found.</td>
+                                <td colspan="9" class="text-muted">No notifications found.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -665,13 +666,14 @@
         }
 
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="8" class="text-muted">No notifications found.</td></tr>';
+            body.innerHTML = '<tr><td colspan="9" class="text-muted">No notifications found.</td></tr>';
             return;
         }
 
         body.innerHTML = rows.map((row) => {
             const isTrigger = isConvertedTriggerRow(conversion, row);
             const rowClass = isTrigger ? 'table-success' : '';
+            const fcmId = Number(row.id || 0);
             const title = escapeHtml(row.notification_title || '—');
             const text = escapeHtml(row.notification_text || '—');
             const type = escapeHtml(row.notification_type || 'unknown');
@@ -688,7 +690,7 @@
                 ? '<span class="badge text-bg-success">Converted trigger</span>'
                 : '<span class="text-muted">—</span>';
 
-            return `<tr class="${rowClass}"><td>${title}</td><td>${text}</td><td>${type}</td><td>${bucket}</td><td>${ts}</td><td>${clicked}</td><td>${clickedAt}</td><td>${converted}</td></tr>`;
+            return `<tr class="${rowClass}"><td>${fcmId || '—'}</td><td>${title}</td><td>${text}</td><td>${type}</td><td>${bucket}</td><td>${ts}</td><td>${clicked}</td><td>${clickedAt}</td><td>${converted}</td></tr>`;
         }).join('');
     });
 })();
