@@ -393,7 +393,6 @@
                                     <th>User</th>
                                     <th>User Created At</th>
                                     <th>Prescription Follow-up Date</th>
-                                    <th>Prescription Follow-up Type</th>
                                     <th>Contact</th>
                                     <th>City</th>
                                     <th>Lead Categories</th>
@@ -430,6 +429,10 @@
                                             'vaccination' => 'Vaccination',
                                             default => 'Lead',
                                         };
+                                        $followUpTypeRaw = trim((string) ($leadUser['prescription_follow_up_type'] ?? ''));
+                                        $followUpTypeLabel = $followUpTypeRaw !== ''
+                                            ? \Illuminate\Support\Str::title(str_replace(['_', '-'], ' ', $followUpTypeRaw))
+                                            : '';
                                     @endphp
                                     <tr>
                                         <td data-label="User">
@@ -450,7 +453,6 @@
                                         </td>
                                         <td data-label="User Created At">{{ $formatDateTime($leadUser['user_created_at'] ?? null) }}</td>
                                         <td data-label="Prescription Follow-up Date">{{ $formatDate($leadUser['prescription_follow_up_date'] ?? null) }}</td>
-                                        <td data-label="Prescription Follow-up Type">{{ $leadUser['prescription_follow_up_type'] ?: '—' }}</td>
                                         <td data-label="Contact">
                                             <div>{{ $leadUser['phone'] ?: 'No phone' }}</div>
                                             <div class="text-muted small">{{ $leadUser['email'] ?: 'No email' }}</div>
@@ -479,6 +481,9 @@
                                             @endif
                                             @if(!empty($leadUser['has_vaccination_reminder']))
                                                 <span class="badge text-bg-info">Vaccination Reminder</span>
+                                            @endif
+                                            @if($followUpTypeLabel !== '')
+                                                <span class="badge text-bg-dark">Follow-up Type: {{ $followUpTypeLabel }}</span>
                                             @endif
                                         </td>
                                         <td data-label="Neutering Pets">
