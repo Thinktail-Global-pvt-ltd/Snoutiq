@@ -159,6 +159,7 @@ class AdminPanelController extends Controller
         $hasTransactionMetadata = $hasTransactionsTable && Schema::hasColumn('transactions', 'metadata');
         $hasPrescriptionCallSession = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'call_session');
         $hasPrescriptionFollowUpDate = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'follow_up_date');
+        $hasPrescriptionFollowUpType = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'follow_up_type');
         $hasPrescriptionVideoInclinic = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'video_inclinic');
 
         $transactionSessionColumn = null;
@@ -255,6 +256,7 @@ class AdminPanelController extends Controller
                 'city' => $user?->city,
                 'user_created_at' => null,
                 'prescription_follow_up_date' => null,
+                'prescription_follow_up_type' => null,
                 'has_neutering' => false,
                 'has_video_follow_up' => false,
                 'has_video_follow_up_video' => false,
@@ -1098,20 +1100,37 @@ class AdminPanelController extends Controller
                     ->get(['id', 'name', 'email', 'phone', 'city', 'created_at'])
                     ->keyBy('id');
 
-                $prescriptionFollowUpByUser = collect();
-                if ($hasPrescriptionFollowUpDate && $hasPrescriptionUserId) {
-                    $prescriptionFollowUpByUser = DB::table('prescriptions')
-                        ->selectRaw('user_id, MAX(follow_up_date) as latest_follow_up_date')
+                $latestPrescriptionByUser = collect();
+                if ($hasPrescriptionUserId && ($hasPrescriptionFollowUpDate || $hasPrescriptionFollowUpType)) {
+                    $latestPrescriptionIdByUser = DB::table('prescriptions')
+                        ->selectRaw('user_id, MAX(id) as latest_prescription_id')
                         ->whereIn('user_id', $leadUserIds)
-                        ->whereNotNull('follow_up_date')
-                        ->groupBy('user_id')
-                        ->pluck('latest_follow_up_date', 'user_id');
+                        ->groupBy('user_id');
+
+                    $latestPrescriptionQuery = DB::table('prescriptions as p')
+                        ->joinSub($latestPrescriptionIdByUser, 'latest_prescription_by_user', function ($join): void {
+                            $join->on('latest_prescription_by_user.latest_prescription_id', '=', 'p.id');
+                        })
+                        ->select('p.user_id');
+
+                    if ($hasPrescriptionFollowUpDate) {
+                        $latestPrescriptionQuery->addSelect('p.follow_up_date');
+                    }
+                    if ($hasPrescriptionFollowUpType) {
+                        $latestPrescriptionQuery->addSelect('p.follow_up_type');
+                    }
+
+                    $latestPrescriptionByUser = $latestPrescriptionQuery
+                        ->get()
+                        ->keyBy('user_id');
                 }
 
                 $targetUsers = $targetUsers->map(function (array $leadUser) use (
                     $usersById,
-                    $prescriptionFollowUpByUser,
+                    $latestPrescriptionByUser,
                     $hasUserCreatedAt,
+                    $hasPrescriptionFollowUpDate,
+                    $hasPrescriptionFollowUpType,
                     $normalizeDateTime
                 ): array {
                     $userId = is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0;
@@ -1138,13 +1157,24 @@ class AdminPanelController extends Controller
                         }
                     }
 
-                    if ($prescriptionFollowUpByUser->has($userId)) {
-                        $followUpDateRaw = $prescriptionFollowUpByUser->get($userId);
-                        if (!empty($followUpDateRaw)) {
-                            try {
-                                $leadUser['prescription_follow_up_date'] = \Illuminate\Support\Carbon::parse($followUpDateRaw)->toDateString();
-                            } catch (\Throwable $e) {
-                                $leadUser['prescription_follow_up_date'] = (string) $followUpDateRaw;
+                    if ($latestPrescriptionByUser->has($userId)) {
+                        $latestPrescription = $latestPrescriptionByUser->get($userId);
+
+                        if ($hasPrescriptionFollowUpDate) {
+                            $followUpDateRaw = data_get($latestPrescription, 'follow_up_date');
+                            if (!empty($followUpDateRaw)) {
+                                try {
+                                    $leadUser['prescription_follow_up_date'] = \Illuminate\Support\Carbon::parse($followUpDateRaw)->toDateString();
+                                } catch (\Throwable $e) {
+                                    $leadUser['prescription_follow_up_date'] = (string) $followUpDateRaw;
+                                }
+                            }
+                        }
+
+                        if ($hasPrescriptionFollowUpType) {
+                            $followUpTypeRaw = trim((string) data_get($latestPrescription, 'follow_up_type'));
+                            if ($followUpTypeRaw !== '') {
+                                $leadUser['prescription_follow_up_type'] = $followUpTypeRaw;
                             }
                         }
                     }

@@ -393,6 +393,7 @@
                                     <th>User</th>
                                     <th>User Created At</th>
                                     <th>Prescription Follow-up Date</th>
+                                    <th>Prescription Follow-up Type</th>
                                     <th>Contact</th>
                                     <th>City</th>
                                     <th>Lead Categories</th>
@@ -449,6 +450,7 @@
                                         </td>
                                         <td data-label="User Created At">{{ $formatDateTime($leadUser['user_created_at'] ?? null) }}</td>
                                         <td data-label="Prescription Follow-up Date">{{ $formatDate($leadUser['prescription_follow_up_date'] ?? null) }}</td>
+                                        <td data-label="Prescription Follow-up Type">{{ $leadUser['prescription_follow_up_type'] ?: '—' }}</td>
                                         <td data-label="Contact">
                                             <div>{{ $leadUser['phone'] ?: 'No phone' }}</div>
                                             <div class="text-muted small">{{ $leadUser['email'] ?: 'No email' }}</div>
