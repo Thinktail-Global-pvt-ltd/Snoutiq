@@ -244,6 +244,19 @@
     };
 @endphp
 
+@if(session('status'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ session('status') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+@if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        {{ session('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
 <div class="row g-4">
     <div class="col-12">
         <div class="card border-0 shadow-sm">
@@ -409,6 +422,18 @@
                                         <td data-label="User">
                                             <div class="fw-semibold">{{ $leadUser['name'] ?: 'Unnamed user' }}</div>
                                             <div class="text-muted small">ID: {{ $leadUser['id'] }}</div>
+                                            <form
+                                                method="POST"
+                                                action="{{ route('admin.lead-management.users.delete', ['user' => (int) ($leadUser['id'] ?? 0)]) }}"
+                                                class="mt-2"
+                                                onsubmit="return confirm('Delete this user and related pets, transactions, prescriptions, medical records, and daily care data? This action cannot be undone.')"
+                                            >
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="lead_filter" value="{{ $leadFilter }}">
+                                                <input type="hidden" name="limit" value="{{ $limit }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete User</button>
+                                            </form>
                                         </td>
                                         <td data-label="Contact">
                                             <div>{{ $leadUser['phone'] ?: 'No phone' }}</div>

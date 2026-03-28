@@ -1445,6 +1445,99 @@ class AdminPanelController extends Controller
         ]);
     }
 
+    public function deleteLeadManagementUser(Request $request, User $user): RedirectResponse
+    {
+        $filters = array_filter([
+            'lead_filter' => $request->input('lead_filter'),
+            'limit' => $request->input('limit'),
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        try {
+            DB::transaction(function () use ($user): void {
+                $petIds = collect();
+                if (Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id')) {
+                    $petIds = DB::table('pets')
+                        ->where('user_id', $user->id)
+                        ->pluck('id')
+                        ->filter(fn ($id) => is_numeric($id))
+                        ->map(fn ($id) => (int) $id)
+                        ->values();
+                }
+
+                $deleteByUserId = static function (string $table) use ($user): void {
+                    if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'user_id')) {
+                        return;
+                    }
+
+                    DB::table($table)
+                        ->where('user_id', $user->id)
+                        ->delete();
+                };
+
+                $deleteByPetId = static function (string $table) use ($petIds): void {
+                    if ($petIds->isEmpty() || !Schema::hasTable($table) || !Schema::hasColumn($table, 'pet_id')) {
+                        return;
+                    }
+
+                    DB::table($table)
+                        ->whereIn('pet_id', $petIds->all())
+                        ->delete();
+                };
+
+                // Core entities requested by admin.
+                $deleteByUserId('transactions');
+                $deleteByPetId('transactions');
+
+                $deleteByUserId('prescriptions');
+                $deleteByPetId('prescriptions');
+
+                $deleteByUserId('medical_records');
+                $deleteByPetId('medical_records');
+
+                $deleteByUserId('pet_daily_cares');
+                $deleteByPetId('pet_daily_cares');
+
+                $deleteByUserId('user_observations');
+                $deleteByPetId('user_observations');
+
+                // Common linked operational rows.
+                foreach ([
+                    'notifications',
+                    'fcm_notifications',
+                    'vet_response_reminder_logs',
+                    'device_tokens',
+                    'call_sessions',
+                    'video_apointment',
+                    'payments',
+                    'appointments',
+                    'user_ai_chats',
+                    'user_ai_chat_histories',
+                    'groomer_bookings',
+                    'whatsapp_notifications',
+                    'user_pets',
+                ] as $table) {
+                    $deleteByUserId($table);
+                }
+
+                if ($petIds->isNotEmpty() && Schema::hasTable('pets') && Schema::hasColumn('pets', 'id')) {
+                    DB::table('pets')
+                        ->whereIn('id', $petIds->all())
+                        ->delete();
+                }
+
+                $user->delete();
+            });
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('admin.lead-management', $filters)
+                ->with('error', 'Failed to delete user '.$user->id.': '.$e->getMessage());
+        }
+
+        return redirect()
+            ->route('admin.lead-management', $filters)
+            ->with('status', 'User '.$user->id.' and related data deleted successfully.');
+    }
+
     public function bookings(): View
     {
         $bookings = GroomerBooking::with(['groomerEmployee', 'user'])->orderByDesc('created_at')->get();

@@ -221,6 +221,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
         Route::get('/users/profile-completion', [AdminPanelController::class, 'userProfileCompletion'])->name('admin.users.profile-completion');
         Route::get('/lead-management', [AdminPanelController::class, 'leadManagement'])->name('admin.lead-management');
+        Route::delete('/lead-management/users/{user}', [AdminPanelController::class, 'deleteLeadManagementUser'])->name('admin.lead-management.users.delete');
         Route::get('/pet-parents', [AdminPetParentController::class, 'index'])->name('admin.pet-parents');
         Route::get('/pets', [AdminPanelController::class, 'pets'])->name('admin.pets');
         Route::get('/doctors', [AdminPanelController::class, 'doctors'])->name('admin.doctors');
