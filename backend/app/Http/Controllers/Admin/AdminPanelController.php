@@ -253,6 +253,8 @@ class AdminPanelController extends Controller
                 'email' => $user?->email,
                 'phone' => $user?->phone,
                 'city' => $user?->city,
+                'user_created_at' => null,
+                'prescription_follow_up_date' => null,
                 'has_neutering' => false,
                 'has_video_follow_up' => false,
                 'has_video_follow_up_video' => false,
@@ -1078,6 +1080,79 @@ class AdminPanelController extends Controller
 
             return $leadUser;
         });
+
+        $hasUserCreatedAt = Schema::hasColumn('users', 'created_at');
+        $hasPrescriptionUserId = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'user_id');
+
+        if ($targetUsers->isNotEmpty()) {
+            $leadUserIds = $targetUsers
+                ->keys()
+                ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                ->map(fn ($userId) => (int) $userId)
+                ->values()
+                ->all();
+
+            if (!empty($leadUserIds)) {
+                $usersById = User::query()
+                    ->whereIn('id', $leadUserIds)
+                    ->get(['id', 'name', 'email', 'phone', 'city', 'created_at'])
+                    ->keyBy('id');
+
+                $prescriptionFollowUpByUser = collect();
+                if ($hasPrescriptionFollowUpDate && $hasPrescriptionUserId) {
+                    $prescriptionFollowUpByUser = DB::table('prescriptions')
+                        ->selectRaw('user_id, MAX(follow_up_date) as latest_follow_up_date')
+                        ->whereIn('user_id', $leadUserIds)
+                        ->whereNotNull('follow_up_date')
+                        ->groupBy('user_id')
+                        ->pluck('latest_follow_up_date', 'user_id');
+                }
+
+                $targetUsers = $targetUsers->map(function (array $leadUser) use (
+                    $usersById,
+                    $prescriptionFollowUpByUser,
+                    $hasUserCreatedAt,
+                    $normalizeDateTime
+                ): array {
+                    $userId = is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0;
+                    if ($userId <= 0) {
+                        return $leadUser;
+                    }
+
+                    $userMeta = $usersById->get($userId);
+                    if ($userMeta instanceof User) {
+                        if (empty($leadUser['name'])) {
+                            $leadUser['name'] = $userMeta->name;
+                        }
+                        if (empty($leadUser['email'])) {
+                            $leadUser['email'] = $userMeta->email;
+                        }
+                        if (empty($leadUser['phone'])) {
+                            $leadUser['phone'] = $userMeta->phone;
+                        }
+                        if (empty($leadUser['city'])) {
+                            $leadUser['city'] = $userMeta->city;
+                        }
+                        if ($hasUserCreatedAt) {
+                            $leadUser['user_created_at'] = $normalizeDateTime($userMeta->created_at ?? null);
+                        }
+                    }
+
+                    if ($prescriptionFollowUpByUser->has($userId)) {
+                        $followUpDateRaw = $prescriptionFollowUpByUser->get($userId);
+                        if (!empty($followUpDateRaw)) {
+                            try {
+                                $leadUser['prescription_follow_up_date'] = \Illuminate\Support\Carbon::parse($followUpDateRaw)->toDateString();
+                            } catch (\Throwable $e) {
+                                $leadUser['prescription_follow_up_date'] = (string) $followUpDateRaw;
+                            }
+                        }
+                    }
+
+                    return $leadUser;
+                });
+            }
+        }
 
         $hasTransactionUserId = $hasTransactionsTable && Schema::hasColumn('transactions', 'user_id');
         $hasTransactionCreatedAt = $hasTransactionsTable && Schema::hasColumn('transactions', 'created_at');

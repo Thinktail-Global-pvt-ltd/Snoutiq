@@ -381,6 +381,8 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>User</th>
+                                    <th>User Created At</th>
+                                    <th>Prescription Follow-up Date</th>
                                     <th>Contact</th>
                                     <th>City</th>
                                     <th>Lead Categories</th>
@@ -435,6 +437,8 @@
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete User</button>
                                             </form>
                                         </td>
+                                        <td data-label="User Created At">{{ $formatDateTime($leadUser['user_created_at'] ?? null) }}</td>
+                                        <td data-label="Prescription Follow-up Date">{{ $formatDate($leadUser['prescription_follow_up_date'] ?? null) }}</td>
                                         <td data-label="Contact">
                                             <div>{{ $leadUser['phone'] ?: 'No phone' }}</div>
                                             <div class="text-muted small">{{ $leadUser['email'] ?: 'No email' }}</div>
