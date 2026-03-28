@@ -18,6 +18,7 @@ class FcmService
     private const DELIVERY_MODE_HYBRID = 'hybrid';
     private const DELIVERY_MODE_DATA_ONLY = 'data_only';
     private const DELIVERY_MODE_NOTIFICATION_ONLY = 'notification_only';
+    private const STATUS_PENDING = 'pending';
     private const STATUS_SENT = 'sent';
     private const STATUS_FAILED = 'failed';
     private const STATUS_SKIPPED = 'skipped';
@@ -349,9 +350,9 @@ class FcmService
         $normalizedData = $this->normalizeDataPayload($data);
         $deliveryMode = $this->resolveDeliveryMode($normalizedData);
         $notificationType = $this->resolveNotificationType($normalizedData);
-        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
         $source = $this->resolveDispatchSource();
         $recipient = $this->resolveRecipientContexts([$normalizedToken])[$normalizedToken] ?? [];
+        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
 
         if (!$this->isLikelyFcmToken($normalizedToken)) {
             Log::warning('Skipping FCM send; token rejected as invalid format', [
@@ -383,6 +384,40 @@ class FcmService
             ]);
 
             return;
+        }
+
+        $pendingDispatch = $this->storeDispatchLog([
+            'status' => self::STATUS_PENDING,
+            'target_type' => self::TARGET_TOKEN,
+            'notification_type' => $notificationType,
+            'delivery_mode' => $deliveryMode,
+            'from_source' => $source['source'],
+            'from_file' => $source['file'],
+            'from_line' => $source['line'],
+            'to_target' => $normalizedToken,
+            'to_topic' => null,
+            'device_token_id' => $recipient['device_token_id'] ?? null,
+            'user_id' => $recipient['user_id'] ?? null,
+            'owner_model' => $recipient['owner_model'] ?? null,
+            'title' => $title,
+            'notification_text' => $body,
+            'provider_message_id' => null,
+            'error_code' => null,
+            'error_message' => null,
+            'data_payload' => $normalizedData,
+            'request_payload' => null,
+            'response_payload' => null,
+            'sent_at' => null,
+        ]);
+
+        $dispatchRowId = $pendingDispatch instanceof FcmNotification ? (int) $pendingDispatch->id : null;
+        if ($dispatchRowId !== null && $dispatchRowId > 0) {
+            // Frontend click tracking should use the real fcm_notifications row id.
+            $normalizedData['fcm_notification_id'] = (string) $dispatchRowId;
+            if (!isset($normalizedData['notification_id']) || trim((string) $normalizedData['notification_id']) === '') {
+                $normalizedData['notification_id'] = (string) $dispatchRowId;
+            }
+            $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
         }
 
         $dataOnly = $this->shouldSendDataOnly($normalizedData);
@@ -429,6 +464,7 @@ class FcmService
                 'request_payload' => $payload,
                 'response_payload' => $responsePayload,
                 'sent_at' => now(),
+                'fcm_notification_row_id' => $dispatchRowId,
             ]);
         } catch (MessagingException | FirebaseException | Throwable $e) {
             $this->storeDispatchLog([
@@ -453,6 +489,7 @@ class FcmService
                 'request_payload' => $payload,
                 'response_payload' => null,
                 'sent_at' => null,
+                'fcm_notification_row_id' => $dispatchRowId,
             ]);
 
             throw $e;
@@ -471,10 +508,10 @@ class FcmService
         $normalizedData = $this->normalizeDataPayload($data);
         $deliveryMode = $this->resolveDeliveryMode($normalizedData);
         $notificationType = $this->resolveNotificationType($normalizedData);
-        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
-        $payload = $this->applyRichPayloadOverrides($payload, $options);
         $source = $this->resolveDispatchSource();
         $recipient = $this->resolveRecipientContexts([$normalizedToken])[$normalizedToken] ?? [];
+        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
+        $payload = $this->applyRichPayloadOverrides($payload, $options);
 
         if (!$this->isLikelyFcmToken($normalizedToken)) {
             Log::warning('Skipping FCM send; token rejected as invalid format', [
@@ -506,6 +543,40 @@ class FcmService
             ]);
 
             return;
+        }
+
+        $pendingDispatch = $this->storeDispatchLog([
+            'status' => self::STATUS_PENDING,
+            'target_type' => self::TARGET_TOKEN,
+            'notification_type' => $notificationType,
+            'delivery_mode' => $deliveryMode,
+            'from_source' => $source['source'],
+            'from_file' => $source['file'],
+            'from_line' => $source['line'],
+            'to_target' => $normalizedToken,
+            'to_topic' => null,
+            'device_token_id' => $recipient['device_token_id'] ?? null,
+            'user_id' => $recipient['user_id'] ?? null,
+            'owner_model' => $recipient['owner_model'] ?? null,
+            'title' => $title,
+            'notification_text' => $body,
+            'provider_message_id' => null,
+            'error_code' => null,
+            'error_message' => null,
+            'data_payload' => $normalizedData,
+            'request_payload' => null,
+            'response_payload' => null,
+            'sent_at' => null,
+        ]);
+
+        $dispatchRowId = $pendingDispatch instanceof FcmNotification ? (int) $pendingDispatch->id : null;
+        if ($dispatchRowId !== null && $dispatchRowId > 0) {
+            $normalizedData['fcm_notification_id'] = (string) $dispatchRowId;
+            if (!isset($normalizedData['notification_id']) || trim((string) $normalizedData['notification_id']) === '') {
+                $normalizedData['notification_id'] = (string) $dispatchRowId;
+            }
+            $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
+            $payload = $this->applyRichPayloadOverrides($payload, $options);
         }
 
         $dataOnly = $this->shouldSendDataOnly($normalizedData);
@@ -552,6 +623,7 @@ class FcmService
                 'request_payload' => $payload,
                 'response_payload' => $responsePayload,
                 'sent_at' => now(),
+                'fcm_notification_row_id' => $dispatchRowId,
             ]);
         } catch (MessagingException | FirebaseException | Throwable $e) {
             $this->storeDispatchLog([
@@ -576,6 +648,7 @@ class FcmService
                 'request_payload' => $payload,
                 'response_payload' => null,
                 'sent_at' => null,
+                'fcm_notification_row_id' => $dispatchRowId,
             ]);
 
             throw $e;
@@ -964,10 +1037,10 @@ class FcmService
     /**
      * @param array<string,mixed> $attributes
      */
-    private function storeDispatchLog(array $attributes): void
+    private function storeDispatchLog(array $attributes): ?FcmNotification
     {
         if (self::$notificationTableExists === false) {
-            return;
+            return null;
         }
 
         try {
@@ -1008,7 +1081,21 @@ class FcmService
                 $logPayload['call_session'] = $this->resolveCallSessionForFollowUp($attributes);
             }
 
-            FcmNotification::query()->create($logPayload);
+            $existingRowId = isset($attributes['fcm_notification_row_id']) && is_numeric($attributes['fcm_notification_row_id'])
+                ? (int) $attributes['fcm_notification_row_id']
+                : 0;
+
+            if ($existingRowId > 0) {
+                $existingRow = FcmNotification::query()->find($existingRowId);
+                if ($existingRow instanceof FcmNotification) {
+                    $existingRow->fill($logPayload);
+                    $existingRow->save();
+
+                    return $existingRow;
+                }
+            }
+
+            return FcmNotification::query()->create($logPayload);
         } catch (Throwable $e) {
             if ($this->isMissingTableError($e)) {
                 self::$notificationTableExists = false;
@@ -1020,6 +1107,8 @@ class FcmService
                 'to_target' => $attributes['to_target'] ?? null,
                 'target_type' => $attributes['target_type'] ?? null,
             ]);
+
+            return null;
         }
     }
 
