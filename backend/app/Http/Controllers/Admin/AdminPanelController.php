@@ -1328,7 +1328,110 @@ class AdminPanelController extends Controller
                         return $leadUser;
                     }
 
-                    $allUserNotifications = collect($leadUser['all_notifications'] ?? []);
+                    $allUserNotifications = collect($leadUser['all_notifications'] ?? [])
+                        ->map(function (array $item): array {
+                            $item['converted'] = (bool) ($item['converted'] ?? false);
+                            $item['conversion_transaction_id'] = is_numeric($item['conversion_transaction_id'] ?? null)
+                                ? (int) $item['conversion_transaction_id']
+                                : null;
+                            $item['conversion_transaction_type'] = !empty($item['conversion_transaction_type'])
+                                ? (string) $item['conversion_transaction_type']
+                                : null;
+                            $item['conversion_transaction_status'] = !empty($item['conversion_transaction_status'])
+                                ? (string) $item['conversion_transaction_status']
+                                : null;
+                            $item['conversion_transaction_at'] = !empty($item['conversion_transaction_at'])
+                                ? (string) $item['conversion_transaction_at']
+                                : null;
+                            $item['conversion_lag_minutes'] = is_numeric($item['conversion_lag_minutes'] ?? null)
+                                ? (int) $item['conversion_lag_minutes']
+                                : null;
+
+                            return $item;
+                        })
+                        ->values();
+
+                    if ($allUserNotifications->isEmpty()) {
+                        return $leadUser;
+                    }
+
+                    $notificationsById = [];
+                    foreach ($allUserNotifications as $notificationRow) {
+                        $notifId = is_numeric($notificationRow['id'] ?? null) ? (int) $notificationRow['id'] : 0;
+                        if ($notifId > 0 && !isset($notificationsById[$notifId])) {
+                            $notificationsById[$notifId] = $notificationRow;
+                        }
+                    }
+
+                    $directConversionsByNotificationId = [];
+                    foreach ($userTransactions as $userTransaction) {
+                        $directFcmId = is_numeric($userTransaction['fcm_notification_id'] ?? null)
+                            ? (int) $userTransaction['fcm_notification_id']
+                            : 0;
+                        if ($directFcmId <= 0 || !isset($notificationsById[$directFcmId])) {
+                            continue;
+                        }
+
+                        if (isset($directConversionsByNotificationId[$directFcmId])) {
+                            continue;
+                        }
+
+                        $notificationTs = (string) ($notificationsById[$directFcmId]['timestamp'] ?? '');
+                        $transactionTs = (string) ($userTransaction['created_at'] ?? '');
+
+                        $lagMinutes = null;
+                        if ($notificationTs !== '' && $transactionTs !== '') {
+                            try {
+                                $lagMinutes = \Illuminate\Support\Carbon::parse($notificationTs)
+                                    ->diffInMinutes(\Illuminate\Support\Carbon::parse($transactionTs));
+                            } catch (\Throwable $e) {
+                                $lagMinutes = null;
+                            }
+                        }
+
+                        $directConversionsByNotificationId[$directFcmId] = [
+                            'id' => (int) ($userTransaction['id'] ?? 0),
+                            'type' => (string) ($userTransaction['type'] ?? 'unknown'),
+                            'status' => $userTransaction['status'] ?? null,
+                            'created_at' => $transactionTs !== '' ? $transactionTs : null,
+                            'lag_minutes' => is_numeric($lagMinutes) ? (int) $lagMinutes : null,
+                        ];
+                    }
+
+                    if (!empty($directConversionsByNotificationId)) {
+                        $allUserNotifications = $allUserNotifications
+                            ->map(function (array $notificationRow) use ($directConversionsByNotificationId): array {
+                                $notifId = is_numeric($notificationRow['id'] ?? null) ? (int) $notificationRow['id'] : 0;
+                                if ($notifId <= 0 || !isset($directConversionsByNotificationId[$notifId])) {
+                                    return $notificationRow;
+                                }
+
+                                $transactionMeta = $directConversionsByNotificationId[$notifId];
+                                $notificationRow['converted'] = true;
+                                $notificationRow['conversion_transaction_id'] = (int) ($transactionMeta['id'] ?? 0);
+                                $notificationRow['conversion_transaction_type'] = (string) ($transactionMeta['type'] ?? 'unknown');
+                                $notificationRow['conversion_transaction_status'] = $transactionMeta['status'] ?? null;
+                                $notificationRow['conversion_transaction_at'] = $transactionMeta['created_at'] ?? null;
+                                $notificationRow['conversion_lag_minutes'] = is_numeric($transactionMeta['lag_minutes'] ?? null)
+                                    ? (int) $transactionMeta['lag_minutes']
+                                    : null;
+
+                                return $notificationRow;
+                            })
+                            ->values();
+
+                        $leadUser['all_notifications'] = $allUserNotifications->all();
+                        $leadUser['all_notifications_count'] = $allUserNotifications->count();
+
+                        $notificationsById = [];
+                        foreach ($allUserNotifications as $notificationRow) {
+                            $notifId = is_numeric($notificationRow['id'] ?? null) ? (int) $notificationRow['id'] : 0;
+                            if ($notifId > 0 && !isset($notificationsById[$notifId])) {
+                                $notificationsById[$notifId] = $notificationRow;
+                            }
+                        }
+                    }
+
                     $userNotifications = $allUserNotifications
                         ->filter(fn (array $item): bool => !empty($item['timestamp']))
                         ->sort(function (array $left, array $right): int {
@@ -1349,13 +1452,6 @@ class AdminPanelController extends Controller
 
                     $matchedNotification = null;
                     $matchedTransaction = null;
-                    $notificationsById = [];
-                    foreach ($allUserNotifications as $notificationRow) {
-                        $notifId = is_numeric($notificationRow['id'] ?? null) ? (int) $notificationRow['id'] : 0;
-                        if ($notifId > 0 && !isset($notificationsById[$notifId])) {
-                            $notificationsById[$notifId] = $notificationRow;
-                        }
-                    }
 
                     foreach ($userTransactions as $userTransaction) {
                         $directFcmId = is_numeric($userTransaction['fcm_notification_id'] ?? null)
@@ -1420,6 +1516,37 @@ class AdminPanelController extends Controller
                     $leadUser['conversion_transaction_status'] = $matchedTransaction['status'] ?? null;
                     $leadUser['conversion_transaction_at'] = (string) ($matchedTransaction['created_at'] ?? '');
                     $leadUser['conversion_lag_minutes'] = is_numeric($lagMinutes) ? (int) $lagMinutes : null;
+
+                    $matchedNotificationId = is_numeric($matchedNotification['id'] ?? null)
+                        ? (int) $matchedNotification['id']
+                        : 0;
+                    if ($matchedNotificationId > 0) {
+                        $leadUser['all_notifications'] = collect($leadUser['all_notifications'] ?? [])
+                            ->map(function (array $notificationRow) use (
+                                $matchedNotificationId,
+                                $matchedTransaction,
+                                $lagMinutes
+                            ): array {
+                                $rowNotificationId = is_numeric($notificationRow['id'] ?? null)
+                                    ? (int) $notificationRow['id']
+                                    : 0;
+
+                                if ($rowNotificationId !== $matchedNotificationId) {
+                                    return $notificationRow;
+                                }
+
+                                $notificationRow['converted'] = true;
+                                $notificationRow['conversion_transaction_id'] = (int) ($matchedTransaction['id'] ?? 0);
+                                $notificationRow['conversion_transaction_type'] = (string) ($matchedTransaction['type'] ?? 'unknown');
+                                $notificationRow['conversion_transaction_status'] = $matchedTransaction['status'] ?? null;
+                                $notificationRow['conversion_transaction_at'] = (string) ($matchedTransaction['created_at'] ?? '');
+                                $notificationRow['conversion_lag_minutes'] = is_numeric($lagMinutes) ? (int) $lagMinutes : null;
+
+                                return $notificationRow;
+                            })
+                            ->values()
+                            ->all();
+                    }
 
                     return $leadUser;
                 });

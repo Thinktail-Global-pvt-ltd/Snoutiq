@@ -153,6 +153,16 @@
                         'bucket' => $bucket,
                         'bucket_label' => $bucketLabel !== '' ? $bucketLabel : '—',
                         'timestamp' => (string) ($item['timestamp'] ?? ''),
+                        'converted' => (bool) ($item['converted'] ?? false),
+                        'conversion_transaction_id' => is_numeric($item['conversion_transaction_id'] ?? null)
+                            ? (int) $item['conversion_transaction_id']
+                            : 0,
+                        'conversion_transaction_type' => (string) ($item['conversion_transaction_type'] ?? ''),
+                        'conversion_transaction_status' => (string) ($item['conversion_transaction_status'] ?? ''),
+                        'conversion_transaction_at' => (string) ($item['conversion_transaction_at'] ?? ''),
+                        'conversion_lag_minutes' => is_numeric($item['conversion_lag_minutes'] ?? null)
+                            ? (int) $item['conversion_lag_minutes']
+                            : null,
                     ];
                 })
                 ->values()
@@ -701,13 +711,18 @@
 
         body.innerHTML = rows.map((row) => {
             const isTrigger = isConvertedTriggerRow(conversion, row);
-            const rowClass = isTrigger ? 'table-success' : '';
+            const rowConvertedByTxn = Boolean(row.converted);
+            const rowConverted = rowConvertedByTxn || isTrigger;
+            const rowClass = rowConverted ? 'table-success' : '';
             const fcmId = Number(row.id || 0);
             const title = escapeHtml(row.notification_title || '—');
             const text = escapeHtml(row.notification_text || '—');
             const type = escapeHtml(row.notification_type || 'unknown');
             const bucket = escapeHtml(row.bucket_label || '—');
             const ts = escapeHtml(row.timestamp || '—');
+            const rowTxnId = Number(row.conversion_transaction_id || 0);
+            const rowTxnType = escapeHtml(row.conversion_transaction_type || '');
+            const rowTxnStatus = escapeHtml(row.conversion_transaction_status || '');
             const clickedValue = row.clicked;
             const clicked = (clickedValue === null || clickedValue === undefined)
                 ? '<span class="text-muted">—</span>'
@@ -715,8 +730,12 @@
             const clickedAt = row.clicked_at
                 ? escapeHtml(row.clicked_at)
                 : '<span class="text-muted">—</span>';
-            const converted = isTrigger
-                ? '<span class="badge text-bg-success">Converted trigger</span>'
+            const converted = rowConverted
+                ? `<span class="badge text-bg-success">${isTrigger ? 'Converted trigger' : 'Converted'}</span>${
+                    rowTxnId > 0
+                        ? `<div class="small text-muted mt-1">Txn #${rowTxnId}${rowTxnType !== '' ? ` • ${rowTxnType}` : ''}${rowTxnStatus !== '' ? ` • ${rowTxnStatus}` : ''}</div>`
+                        : ''
+                }`
                 : '<span class="text-muted">—</span>';
 
             return `<tr class="${rowClass}"><td>${fcmId || '—'}</td><td>${title}</td><td>${text}</td><td>${type}</td><td>${bucket}</td><td>${ts}</td><td>${clicked}</td><td>${clickedAt}</td><td>${converted}</td></tr>`;
