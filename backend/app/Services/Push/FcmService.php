@@ -76,32 +76,21 @@ class FcmService
             $normalized[$key] = (string) $value;
         }
 
-        // Keep an identifier in payload for click-tracking joins when callers
-        // do not pass one explicitly (common in scheduler direct FCM sends).
-        if (!$this->hasPayloadIdentifier($normalized)) {
-            $normalized['notification_id'] = (string) $this->generatePayloadNotificationId();
+        $notificationId = trim((string) ($normalized['notification_id'] ?? ''));
+        $fcmNotificationId = trim((string) ($normalized['fcm_notification_id'] ?? ''));
+
+        // Keep identifiers consistent across payload keys used by different clients.
+        if ($notificationId === '' && $fcmNotificationId === '') {
+            $generatedId = (string) $this->generatePayloadNotificationId();
+            $normalized['notification_id'] = $generatedId;
+            $normalized['fcm_notification_id'] = $generatedId;
+        } elseif ($notificationId !== '' && $fcmNotificationId === '') {
+            $normalized['fcm_notification_id'] = $notificationId;
+        } elseif ($notificationId === '' && $fcmNotificationId !== '') {
+            $normalized['notification_id'] = $fcmNotificationId;
         }
 
         return $normalized;
-    }
-
-    /**
-     * @param array<string,string> $payload
-     */
-    private function hasPayloadIdentifier(array $payload): bool
-    {
-        foreach (['notification_id', 'fcm_notification_id'] as $key) {
-            if (!array_key_exists($key, $payload)) {
-                continue;
-            }
-
-            $value = trim((string) ($payload[$key] ?? ''));
-            if ($value !== '') {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function generatePayloadNotificationId(): int

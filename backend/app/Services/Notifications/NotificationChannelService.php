@@ -189,6 +189,7 @@ class NotificationChannelService
         $payload = array_merge([
             'notification_type' => $notification->type,
             'notification_id' => (string) $notification->id,
+            'fcm_notification_id' => (string) $notification->id,
         ], $payload);
 
         $stringPayload = [];

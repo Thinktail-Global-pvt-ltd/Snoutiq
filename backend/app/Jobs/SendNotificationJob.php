@@ -80,6 +80,7 @@ class SendNotificationJob implements ShouldQueue
         $data = [
             'type' => $notification->type ?? 'notification',
             'notification_id' => (string) $notification->id,
+            'fcm_notification_id' => (string) $notification->id,
         ];
         if (is_array($payload)) {
             foreach ($payload as $key => $value) {
@@ -90,6 +91,10 @@ class SendNotificationJob implements ShouldQueue
                 $data[$key] = (string) $value;
             }
         }
+
+        // Keep identifiers stable even if payload contains conflicting keys.
+        $data['notification_id'] = (string) $notification->id;
+        $data['fcm_notification_id'] = (string) $notification->id;
 
         $success = 0;
         $failures = [];
