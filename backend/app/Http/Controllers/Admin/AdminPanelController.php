@@ -1938,8 +1938,8 @@ class AdminPanelController extends Controller
             ->with([
                 'clinic:id,name',
                 'doctor:id,doctor_name,doctor_email,doctor_mobile',
-                'user:id,name,email,phone,city',
-                'pet:id,user_id,name,pet_type,breed',
+                'user:id,name,email,phone,city,created_at',
+                'pet:id,user_id,name,pet_type,breed,created_at',
             ]);
 
         if ($typeFilter !== 'all') {
@@ -2285,6 +2285,19 @@ class AdminPanelController extends Controller
             $reviewSubmittedCaptured = $reviewSubmittedAt !== null || $petFeedbackExists;
             $reviewSubmittedSecure = $petFeedbackExists;
 
+            $userCreatedAt = $this->normalizeLifecycleTimestamp(optional($transaction->user)->created_at);
+            $petAddedAt = $this->normalizeLifecycleTimestamp(optional($transaction->pet)->created_at);
+
+            $transaction->setAttribute('event_user_created_at', $userCreatedAt);
+            $transaction->setAttribute('event_user_created_source', $userCreatedAt ? 'users.created_at' : null);
+            $transaction->setAttribute('event_user_created_captured', $userCreatedAt !== null);
+            $transaction->setAttribute('event_user_created_secure', $userCreatedAt !== null);
+
+            $transaction->setAttribute('event_pet_added_at', $petAddedAt);
+            $transaction->setAttribute('event_pet_added_source', $petAddedAt ? 'pets.created_at' : null);
+            $transaction->setAttribute('event_pet_added_captured', $petAddedAt !== null);
+            $transaction->setAttribute('event_pet_added_secure', $petAddedAt !== null);
+
             $transaction->setAttribute('event_consultation_created_at', $createdAt);
             $transaction->setAttribute('event_consultation_created_source', 'transactions.created_at');
             $transaction->setAttribute('event_consultation_created_captured', $createdAt !== null);
@@ -2347,6 +2360,8 @@ class AdminPanelController extends Controller
         });
 
         $eventDefinitions = [
+            'user_created' => 'User Created',
+            'pet_added' => 'Pet Added',
             'consultation_created' => 'Consultation Created',
             'consultation_assigned_to_vet' => 'Consultation Assigned To Vet',
             'call_started' => 'Call Started',
