@@ -319,12 +319,47 @@ class ClinicsController extends Controller
                 if (Schema::hasColumn('pets', 'reported_symptom')) {
                     $petColumns[] = 'reported_symptom';
                 }
+                if (Schema::hasColumn('pets', 'vaccenated_yes_no')) {
+                    $petColumns[] = 'vaccenated_yes_no';
+                }
+                if (Schema::hasColumn('pets', 'dog_disease_payload')) {
+                    $petColumns[] = 'dog_disease_payload';
+                }
+                if (Schema::hasColumn('pets', 'deworming_yes_no')) {
+                    $petColumns[] = 'deworming_yes_no';
+                }
+                if (Schema::hasColumn('pets', 'last_deworming_date')) {
+                    $petColumns[] = 'last_deworming_date';
+                }
+                if (Schema::hasColumn('pets', 'next_deworming_date')) {
+                    $petColumns[] = 'next_deworming_date';
+                }
+                if (Schema::hasColumn('pets', 'is_neutered')) {
+                    $petColumns[] = 'is_neutered';
+                }
+                if (Schema::hasColumn('pets', 'is_nuetered')) {
+                    $petColumns[] = 'is_nuetered';
+                }
 
                 $petRows = DB::table('pets')
                     ->select($petColumns)
                     ->whereIn($userColumn, $userIds)
                     ->orderBy('name')
                     ->get();
+
+                $petRows = $petRows->map(function ($pet) {
+                    $payload = $this->decodeJsonToArray($pet->dog_disease_payload ?? null);
+                    $pet->vaccination = is_array($payload) ? ($payload['vaccination'] ?? null) : null;
+                    $pet->vaccination_details = $pet->vaccination;
+
+                    $isNeutered = $pet->is_neutered ?? null;
+                    if ($isNeutered === null || $isNeutered === '') {
+                        $isNeutered = $pet->is_nuetered ?? null;
+                    }
+                    $pet->is_neutered = $isNeutered;
+
+                    return $pet;
+                });
 
                 $petMap = $petRows->groupBy('user_id');
             }
@@ -340,6 +375,25 @@ class ClinicsController extends Controller
             'clinic' => $clinic,
             'patients' => $patients,
         ]);
+    }
+
+    private function decodeJsonToArray($value): ?array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_object($value)) {
+            $decoded = json_decode(json_encode($value), true);
+            return is_array($decoded) ? $decoded : null;
+        }
+
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $decoded = json_decode($value, true);
+        return is_array($decoded) ? $decoded : null;
     }
 
     // POST /api/clinics/{id}/doctors

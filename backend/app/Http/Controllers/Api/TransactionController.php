@@ -60,6 +60,7 @@ class TransactionController extends Controller
             ->select('transactions.*')
             ->whereIn('transactions.type', ['video_consult', 'video_call', 'video call', 'appointment'])
             ->where('transactions.doctor_id', $data['doctor_id'])
+            ->whereDate('transactions.created_at', now()->toDateString())
             ->where(function ($query) {
                 $query->whereNull('transactions.status')
                     ->orWhere('transactions.status', '!=', 'pending');
