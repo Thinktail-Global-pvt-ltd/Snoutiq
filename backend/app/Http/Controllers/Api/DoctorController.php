@@ -143,4 +143,46 @@ class DoctorController extends Controller
             'doctor' => $fresh,
         ]);
     }
+
+    // DELETE /api/doctors/{id}
+    public function destroy(int $id)
+    {
+        $doctor = DB::table('doctors')->where('id', $id)->first();
+        if (! $doctor) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+
+        try {
+            DB::table('doctors')->where('id', $id)->delete();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete doctor',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Doctor deleted successfully',
+            'doctor_id' => $id,
+        ]);
+    }
+
+    // DELETE /api/doctors?doctor_id=123
+    public function destroyByDoctorId(Request $request)
+    {
+        $doctorId = (int) ($request->input('doctor_id', $request->query('doctor_id', 0)));
+        if ($doctorId <= 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'doctor_id is required',
+            ], 422);
+        }
+
+        return $this->destroy($doctorId);
+    }
 }

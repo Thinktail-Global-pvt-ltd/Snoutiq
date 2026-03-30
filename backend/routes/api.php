@@ -2505,6 +2505,8 @@ Route::get('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController
 Route::get('/doctors/availability-status', [\App\Http\Controllers\Api\DoctorAvailabilityStatusController::class, 'index']);
 Route::get('/doctors/{id}', [DoctorController::class, 'show']);
 Route::put('/doctors/{id}', [DoctorController::class, 'update']);
+Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
+Route::delete('/doctors', [DoctorController::class, 'destroyByDoctorId']);
 Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
 Route::get('/socket/doctors/{doctor}', [\App\Http\Controllers\Api\SocketDoctorController::class, 'show']);
 
