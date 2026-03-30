@@ -1162,7 +1162,8 @@ class PushController extends Controller
             return 'data_only';
         }
 
-        return 'hybrid';
+        // Incoming call ring pushes should stay data-only unless the caller explicitly opts into another mode.
+        return 'data_only';
     }
 
     private function maskToken(string $token): string
