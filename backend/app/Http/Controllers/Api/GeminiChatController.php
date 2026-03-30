@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Chat;
 use App\Models\ChatRoom;
 use App\Models\Pet;
@@ -167,11 +168,32 @@ class GeminiChatController extends Controller
             $payload['video_calling_upload_file'] = $videoUploadPath;
         }
 
-        DB::table('pets')->where('id', $petRow->id)->update([
+        $updatePayload = [
             'dog_disease_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
-            'video_calling_upload_file' => $videoUploadPath,
             'updated_at' => now(),
-        ]);
+        ];
+        if ($videoUploadPath !== null) {
+            $updatePayload['video_calling_upload_file'] = $videoUploadPath;
+        }
+
+        if (
+            Schema::hasTable('pets')
+            && Schema::hasColumn('pets', 'pet_doc2_blob')
+            && is_string($videoUploadPath)
+            && $videoUploadPath !== ''
+        ) {
+            [$petDoc2Blob, $petDoc2Mime] = $this->extractLocalUploadBlob($videoUploadPath);
+            if ($petDoc2Blob !== null) {
+                $updatePayload['pet_doc2_blob'] = $petDoc2Blob;
+                if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
+                    $updatePayload['pet_doc2_mime'] = $petDoc2Mime ?: 'application/octet-stream';
+                }
+            }
+        }
+
+        DB::table('pets')->where('id', $petRow->id)->update($updatePayload);
+
+        $responseVideoUploadPath = $videoUploadPath ?: ($payload['video_calling_upload_file'] ?? null);
 
         return response()->json([
             'success' => true,
@@ -180,7 +202,7 @@ class GeminiChatController extends Controller
             'suggested_disease' => $inference['suggested_disease'],
             'category' => $inference['category'],
             'dog_disease_payload' => $payload,
-            'video_calling_upload_file' => $videoUploadPath ? $this->buildPetCardUrl($videoUploadPath) : null,
+            'video_calling_upload_file' => $responseVideoUploadPath ? $this->buildPetCardUrl($responseVideoUploadPath) : null,
         ]);
     }
 
@@ -1470,6 +1492,59 @@ PROMPT;
         $file->move($uploadPath, $fileName);
 
         return 'uploads/pet_cards/'.$fileName;
+    }
+
+    private function extractLocalUploadBlob(string $path): array
+    {
+        $value = trim($path);
+        if ($value === '' || preg_match('/^https?:\/\//i', $value)) {
+            return [null, null];
+        }
+
+        // Accept direct data URI payload if a client sends it by mistake as a "path".
+        if (preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s', $value, $matches)) {
+            $mime = strtolower(trim((string) $matches[1]));
+            $rawBase64 = str_replace(' ', '+', (string) $matches[2]);
+            $binary = base64_decode($rawBase64, true);
+            return $binary === false ? [null, null] : [$binary, $mime];
+        }
+
+        $candidates = [];
+        $candidates[] = $value;
+
+        $relative = ltrim($value, '/');
+        if ($relative !== $value) {
+            $candidates[] = $relative;
+        }
+        if (str_starts_with($relative, 'backend/')) {
+            $candidates[] = substr($relative, strlen('backend/'));
+        }
+
+        $checked = [];
+        foreach ($candidates as $candidate) {
+            if ($candidate === '' || isset($checked[$candidate])) {
+                continue;
+            }
+            $checked[$candidate] = true;
+
+            $absolute = str_starts_with($candidate, '/')
+                ? $candidate
+                : public_path($candidate);
+
+            if (!is_string($absolute) || $absolute === '' || !File::exists($absolute)) {
+                continue;
+            }
+
+            $blob = File::get($absolute);
+            if ($blob === false || $blob === null || $blob === '') {
+                continue;
+            }
+
+            $mime = File::mimeType($absolute) ?: 'application/octet-stream';
+            return [$blob, $mime];
+        }
+
+        return [null, null];
     }
 
     private function buildPetCardUrl(?string $value): ?string
