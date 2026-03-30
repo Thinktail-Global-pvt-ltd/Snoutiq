@@ -1,0 +1,5 @@
+{
+  "name": "PetVax: Smart Vaccination Tracker",
+  "description": "A smart vaccination schedule and reminder system for dogs and cats with urgency alerts and consultation prompts.",
+  "requestFramePermissions": []
+}
