@@ -562,6 +562,9 @@ public function pet_update(Request $request, $id)
                 'pet_age_months',
                 'pet_dob',
                 'dob',
+                'deworming_yes_no',
+                'is_neutered',
+                'is_nuetered',
                 'pet_doc1',
                 'pic_link',
             ], fn ($column) => in_array($column, $petColumns, true)));
@@ -615,6 +618,8 @@ public function pet_update(Request $request, $id)
             ['group' => 'pet', 'column' => 'weight',    'label' => 'Weight (kg)'],
             ['group' => 'pet', 'column' => 'pet_doc2_blob', 'label' => 'Pet image'],
             ['group' => 'pet', 'column' => 'dog_disease_payload', 'label' => 'Vaccination payload', 'meta' => 'vaccination'],
+            ['group' => 'pet', 'column' => 'deworming_yes_no', 'label' => 'Deworming status'],
+            ['group' => 'pet', 'column' => 'is_neutered', 'label' => 'Neutered status', 'alternates' => ['is_nuetered']],
         ];
 
         $results = [];
@@ -747,6 +752,8 @@ public function pet_update(Request $request, $id)
                 'pet_age' => $item->pet_age ?? $derivedAgeYears,
                 'pet_age_months' => $item->pet_age_months,
                 'pet_dob' => $petDob,
+                'deworming_yes_no' => $item->deworming_yes_no ?? null,
+                'is_neutered' => $item->is_neutered ?? $item->is_nuetered ?? null,
                 'pet_doc2_blob_url' => $blobUrl,
                 'pet_image_url' => $blobUrl,
             ];
@@ -765,6 +772,8 @@ public function pet_update(Request $request, $id)
                 'pet_age' => $legacyUserPet->pet_age ?? $legacyDerivedAge,
                 'pet_age_months' => $legacyUserPet->pet_age_months ?? null,
                 'pet_dob' => $legacyDob,
+                'deworming_yes_no' => $legacyUserPet->deworming_yes_no ?? null,
+                'is_neutered' => $legacyUserPet->is_neutered ?? $legacyUserPet->is_nuetered ?? null,
                 'pet_doc2_blob_url' => null,
                 'pet_image_url' => null,
             ]]);
@@ -778,6 +787,8 @@ public function pet_update(Request $request, $id)
                 'pet_age' => $user->pet_age ?? null,
                 'pet_age_months' => null,
                 'pet_dob' => null,
+                'deworming_yes_no' => null,
+                'is_neutered' => null,
                 'pet_doc2_blob_url' => null,
                 'pet_image_url' => null,
             ]]);
