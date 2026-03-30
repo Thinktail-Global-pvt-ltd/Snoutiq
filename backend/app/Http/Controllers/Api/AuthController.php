@@ -1949,6 +1949,11 @@ public function login(Request $request)
                 $password
             );
 
+            // Priority rule: doctors first for role=vet.
+            if ($doctorPasswordOk) {
+                $clinicPasswordOk = false;
+            }
+
             if ($clinicPasswordOk) {
                 DB::transaction(function () use (&$plainToken, &$room, $clinicRow, $roomTitle, $tokenExpiresAt) {
                     $plainToken = bin2hex(random_bytes(32));
