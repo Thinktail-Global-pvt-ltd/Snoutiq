@@ -87,6 +87,16 @@ class AuthController extends Controller
             && Schema::hasColumn($table, 'api_token_expires_at');
     }
 
+    private function filterExistingColumns(string $table, array $columns): array
+    {
+        if (!Schema::hasTable($table)) {
+            return [];
+        }
+
+        $existing = Schema::getColumnListing($table);
+        return array_values(array_filter($columns, fn (string $column) => in_array($column, $existing, true)));
+    }
+
     private function assignTokenToModel($model, string $hash, $expiresAt): void
     {
         $table = $model->getTable();
@@ -126,6 +136,40 @@ class AuthController extends Controller
         }
 
         return hash_equals((string) $storedPassword, $providedPassword);
+    }
+
+    private function sanitizeForJson($value)
+    {
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $value[$key] = $this->sanitizeForJson($item);
+            }
+            return $value;
+        }
+
+        if ($value instanceof Collection) {
+            return $this->sanitizeForJson($value->all());
+        }
+
+        if (is_object($value)) {
+            $sanitized = [];
+            foreach (get_object_vars($value) as $key => $item) {
+                $sanitized[$key] = $this->sanitizeForJson($item);
+            }
+            return $sanitized;
+        }
+
+        if (is_string($value) && preg_match('//u', $value) !== 1) {
+            $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+            return is_string($converted) && $converted !== '' ? $converted : null;
+        }
+
+        return $value;
+    }
+
+    private function safeJsonResponse(array $payload, int $status = 200)
+    {
+        return response()->json($this->sanitizeForJson($payload), $status);
     }
 
     private function shouldCheckUniqueness(Request $request): bool
@@ -1848,16 +1892,49 @@ public function login(Request $request)
                 'vet_registerations_temp_id'  => null,
             ]);
 
-            return response()->json($response, 200);
+            return $this->safeJsonResponse($response, 200);
 
         } elseif ($role === 'vet') {
+            $clinicSelectColumns = $this->filterExistingColumns('vet_registerations_temp', [
+                'id',
+                'name',
+                'email',
+                'password',
+                'slug',
+                'address',
+                'city',
+                'clinic_profile',
+                'api_token_hash',
+                'api_token_expires_at',
+                'created_at',
+                'updated_at',
+            ]);
             $clinicRow = DB::table('vet_registerations_temp')
                 ->where('email', $email)
-                ->first();
+                ->first($clinicSelectColumns ?: ['id', 'email', 'password']);
 
+            $doctorSelectColumns = $this->filterExistingColumns('doctors', [
+                'id',
+                'vet_registeration_id',
+                'doctor_name',
+                'doctor_email',
+                'doctor_mobile',
+                'doctor_license',
+                'doctor_image',
+                'doctor_password',
+                'password',
+                'toggle_availability',
+                'doctors_price',
+                'doctor_status',
+                'languages_spoken',
+                'api_token_hash',
+                'api_token_expires_at',
+                'created_at',
+                'updated_at',
+            ]);
             $doctorRow = DB::table('doctors')
                 ->where('doctor_email', $email)
-                ->first();
+                ->first($doctorSelectColumns ?: ['id', 'doctor_email', 'password']);
 
             $receptionistRow = Receptionist::where('email', $email)->first();
             $receptionistRow = Receptionist::where('email', $email)->first();
@@ -1947,7 +2024,7 @@ public function login(Request $request)
                     'doctors'                     => $doctors,
                 ]);
 
-                return response()->json($response, 200);
+                return $this->safeJsonResponse($response, 200);
             }
 
             if ($doctorPasswordOk) {
@@ -2035,7 +2112,7 @@ public function login(Request $request)
                     'doctors'                     => $doctors,
                 ]);
 
-                return response()->json($response, 200);
+                return $this->safeJsonResponse($response, 200);
             }
 
             if ($receptionistPasswordOk) {
@@ -2123,7 +2200,7 @@ public function login(Request $request)
                     'doctors'                     => $doctors,
                 ]);
 
-                return response()->json($response, 200);
+                return $this->safeJsonResponse($response, 200);
             }
 
             if ($clinicRow || $doctorRow || $receptionistRow) {
