@@ -117,6 +117,167 @@ class DoctorScheduleController extends Controller
         ]);
     }
 
+    // GET /api/clinics/{id}/doctor-availability
+    public function getClinicAvailability(Request $request, string $id)
+    {
+        $clinicId = (int) $id;
+        if ($clinicId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid clinic id',
+            ], 422);
+        }
+
+        $serviceType = $request->query('service_type'); // optional filter
+        if ($serviceType && !in_array($serviceType, ['video', 'in_clinic', 'home_visit'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid service_type',
+            ], 422);
+        }
+
+        $doctorIds = DB::table('doctors')
+            ->where('vet_registeration_id', $clinicId)
+            ->pluck('id')
+            ->map(fn ($doctorId) => (int) $doctorId)
+            ->all();
+
+        if (empty($doctorIds)) {
+            return response()->json([
+                'success' => true,
+                'clinic_id' => $clinicId,
+                'service_type' => $serviceType,
+                'availability' => [],
+                'doctor_ids' => [],
+                'doctors_count' => 0,
+            ]);
+        }
+
+        $rows = DB::table('doctor_availability')
+            ->whereIn('doctor_id', $doctorIds)
+            ->where('is_active', 1)
+            ->when($serviceType, function ($q) use ($serviceType) {
+                $q->where('service_type', $serviceType);
+            })
+            ->select([
+                'service_type',
+                'day_of_week',
+                'start_time',
+                'end_time',
+                'break_start',
+                'break_end',
+                'avg_consultation_mins',
+                'max_bookings_per_hour',
+                DB::raw('COUNT(DISTINCT doctor_id) as doctors_covered'),
+            ])
+            ->groupBy([
+                'service_type',
+                'day_of_week',
+                'start_time',
+                'end_time',
+                'break_start',
+                'break_end',
+                'avg_consultation_mins',
+                'max_bookings_per_hour',
+            ])
+            ->orderBy('day_of_week')
+            ->orderBy('start_time')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'clinic_id' => $clinicId,
+            'service_type' => $serviceType,
+            'availability' => $rows,
+            'doctor_ids' => $doctorIds,
+            'doctors_count' => count($doctorIds),
+        ]);
+    }
+
+    // PUT /api/clinics/{id}/doctor-availability
+    public function updateClinicAvailability(Request $request, string $id)
+    {
+        $clinicId = (int) $id;
+        if ($clinicId <= 0) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid clinic id',
+            ], 422);
+        }
+
+        $payload = $request->validate([
+            'availability' => 'required|array|min:1',
+            'availability.*.service_type' => 'required|string|in:video,in_clinic,home_visit',
+            'availability.*.day_of_week' => 'required|integer|min:0|max:6',
+            'availability.*.start_time' => 'required',
+            'availability.*.end_time' => 'required',
+            'availability.*.break_start' => 'nullable',
+            'availability.*.break_end' => 'nullable',
+            'availability.*.avg_consultation_mins' => 'nullable|integer',
+            'availability.*.max_bookings_per_hour' => 'nullable|integer',
+        ]);
+
+        $doctorIds = DB::table('doctors')
+            ->where('vet_registeration_id', $clinicId)
+            ->pluck('id')
+            ->map(fn ($doctorId) => (int) $doctorId)
+            ->all();
+
+        if (empty($doctorIds)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'No doctors found for this clinic',
+            ], 404);
+        }
+
+        DB::transaction(function () use ($doctorIds, $payload) {
+            $serviceTypes = collect($payload['availability'])
+                ->pluck('service_type')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            $deleteQuery = DB::table('doctor_availability')
+                ->whereIn('doctor_id', $doctorIds);
+
+            if (!empty($serviceTypes)) {
+                $deleteQuery->whereIn('service_type', $serviceTypes);
+            }
+
+            $deleteQuery->delete();
+
+            $insertRows = [];
+            foreach ($doctorIds as $doctorId) {
+                foreach ($payload['availability'] as $a) {
+                    $insertRows[] = [
+                        'doctor_id' => $doctorId,
+                        'service_type' => $a['service_type'],
+                        'day_of_week' => $a['day_of_week'],
+                        'start_time' => $a['start_time'],
+                        'end_time' => $a['end_time'],
+                        'break_start' => $a['break_start'] ?? null,
+                        'break_end' => $a['break_end'] ?? null,
+                        'avg_consultation_mins' => $a['avg_consultation_mins'] ?? 20,
+                        'max_bookings_per_hour' => $a['max_bookings_per_hour'] ?? 3,
+                        'is_active' => 1,
+                    ];
+                }
+            }
+
+            if (!empty($insertRows)) {
+                DB::table('doctor_availability')->insert($insertRows);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'clinic_id' => $clinicId,
+            'doctors_updated' => count($doctorIds),
+            'message' => 'Clinic availability updated for all doctors',
+        ]);
+    }
+
     public function slots(Request $request)
     {
         $payload = $request->validate([

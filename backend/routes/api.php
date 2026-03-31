@@ -2413,6 +2413,8 @@ Route::post('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleControlle
 Route::post('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updatePrice']);
 Route::put('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updatePrice']);
 Route::get('/doctors/{id}/schedules/combined', [\App\Http\Controllers\Api\DoctorScheduleSummaryController::class, 'show']);
+Route::get('/clinics/{id}/doctor-availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'getClinicAvailability']);
+Route::put('/clinics/{id}/doctor-availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updateClinicAvailability']);
 
 // Clinics
 Route::get('/clinics', [\App\Http\Controllers\Api\ClinicsController::class, 'index']);

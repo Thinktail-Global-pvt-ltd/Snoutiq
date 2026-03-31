@@ -17,60 +17,26 @@
   <section class="rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50">
     <div class="flex flex-col gap-3 border-b border-slate-100 p-6 md:flex-row md:items-center md:justify-between md:p-8">
       <div>
-        <h2 class="text-lg font-semibold text-slate-900">Configure the doctor roster</h2>
-        <p class="text-sm text-slate-500">Tie availability to the right doctor profile and set default slot logic.</p>
+        <h2 class="text-lg font-semibold text-slate-900">Configure clinic schedule</h2>
+        <p class="text-sm text-slate-500">Set one in-clinic schedule for the whole clinic and apply it to all doctors.</p>
       </div>
       <div class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5 text-xs font-semibold text-indigo-600">
         In-clinic services are pre-selected for this setup
       </div>
     </div>
-    <div class="grid gap-6 p-6 md:grid-cols-2 lg:grid-cols-2 md:p-8">
+    <div class="grid gap-6 p-6 md:grid-cols-1 md:p-8">
       <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="doctor_id">Doctor</label>
-        <select id="doctor_id" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
-          @if(isset($doctors) && $doctors->count())
-            @foreach($doctors as $doc)
-              <option value="{{ $doc->id }}" data-price="{{ $doc->doctors_price ?? '' }}">
-                {{ $doc->doctor_name ?? $doc->name ?? 'Doctor' }}
-              </option>
-            @endforeach
-          @else
-            <option value="">No doctors found for your account</option>
-          @endif
-        </select>
-        {{-- <div class="mt-2 text-xs text-slate-500" id="docIdNote">
-          @if(!empty($vetId))
-            Vet session ID: {{ $vetId }}
-          @endif
-        </div> --}}
-      </div>
-
-      <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
-        <div class="flex items-center justify-between gap-4">
-          <div>
-            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="doctor_price">Doctor price</label>
-            <p class="text-xs text-slate-500">Applies to the doctor selected on the left.</p>
-          </div>
-          <button
-            type="button"
-            id="btnSavePrice"
-            class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1"
-          >
-            Update price
-          </button>
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="clinic_id_view">Clinic</label>
+        <input
+          id="clinic_id_view"
+          type="text"
+          readonly
+          value="Clinic ID: {{ $vetId ?? 'N/A' }}"
+          class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40"
+        >
+        <div class="mt-2 text-xs text-slate-500">
+          This schedule applies to all doctors in this clinic ({{ isset($doctors) ? $doctors->count() : 0 }} total).
         </div>
-        <div class="relative mt-3">
-          <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-sm font-semibold text-slate-500">₹</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            id="doctor_price"
-            class="mt-0 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pl-9 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            placeholder="e.g. 500"
-          >
-        </div>
-        <div class="mt-2 text-xs text-slate-500" id="priceStatus">No price saved yet.</div>
       </div>
     </div>
   </section>
@@ -215,37 +181,8 @@
     breakEnd:   el('#default_break_end'),
     weekends:   el('#allow_weekends')
   };
-  const priceField   = el('#doctor_price');
-  const priceStatus  = el('#priceStatus');
-  const priceButton  = el('#btnSavePrice');
-  let priceDirty     = false;
-  const setPriceStatus = (msg, ok = true) => {
-    if (!priceStatus) return;
-    priceStatus.textContent = msg || '';
-    priceStatus.className = ok
-      ? 'mt-2 text-xs text-emerald-600'
-      : 'mt-2 text-xs text-red-600';
-  };
-  const setSelectedOptionPrice = (price) => {
-    const opt = el('#doctor_id')?.selectedOptions?.[0];
-    if (opt) opt.dataset.price = price ?? '';
-  };
-  const hydratePriceFromOption = () => {
-    const opt = el('#doctor_id')?.selectedOptions?.[0];
-    const raw = opt ? (opt.dataset.price ?? '') : '';
-    const val = raw === '' || raw === undefined ? '' : raw;
-    return val;
-  };
-  const primePriceField = (val) => {
-    if (!priceField) return;
-    priceField.value = (val ?? '') === null ? '' : val;
-    priceDirty = false;
-  };
-  const togglePriceButton = (state) => {
-    if (!priceButton) return;
-    priceButton.disabled = !!state;
-    priceButton.textContent = state ? 'Saving…' : 'Update price';
-  };
+  const CLINIC_ID = Number(@json($vetId ?? null));
+  const getClinicId = () => (Number.isFinite(CLINIC_ID) && CLINIC_ID > 0 ? CLINIC_ID : null);
   let avgConsultationMins = DEFAULT_AVG_CONSULTATION_MINS;
   const weeklyContainer = el('#weeklyCards');
   let weeklyVisible = weeklyContainer ? !weeklyContainer.classList.contains('hidden') : false;
@@ -419,10 +356,6 @@
     d.innerHTML = `<pre style="white-space:pre-wrap">${fmt(payload)}</pre>`;
     d.className = ok ? 'mt-2 text-sm text-green-700' : 'mt-2 text-sm text-red-700';
   };
-  const getSelectedDoctorId = () => {
-    const v = Number(el('#doctor_id')?.value);
-    return Number.isFinite(v) && v > 0 ? v : null;
-  };
   const timeLt = (a, b) => a && b && a < b;
 
   document.addEventListener('DOMContentLoaded', function(){
@@ -446,9 +379,9 @@
   });
 
   async function loadExistingAvailability() {
-    const doctorId = getSelectedDoctorId();
-    if (!doctorId) {
-      setMetaNote('Select a doctor to load availability.');
+    const clinicId = getClinicId();
+    if (!clinicId) {
+      setMetaNote('Clinic session missing. Please log in again.');
       hideWeekly();
       isBootstrapping = false;
       return;
@@ -457,24 +390,11 @@
 
     try {
       isBootstrapping = true;
-      const url  = `${apiBase}/doctors/${doctorId}/availability` + (serviceType ? `?service_type=${encodeURIComponent(serviceType)}` : '');
+      const url  = `${apiBase}/clinics/${clinicId}/doctor-availability` + (serviceType ? `?service_type=${encodeURIComponent(serviceType)}` : '');
       const res  = await fetch(url, { headers: { Accept: 'application/json' } });
       const text = await res.text();
       let json   = null; try { json = JSON.parse(text.replace(/^\uFEFF/, '')); } catch {}
       if (!res.ok) { out('#saveOut', text || 'Failed to load availability', false); return; }
-
-      const doctorPrice = (json && typeof json === 'object') ? json.doctor_price : null;
-      if (priceField) {
-        const fallbackPrice = hydratePriceFromOption();
-        const priceToUse = doctorPrice ?? (fallbackPrice === '' ? '' : fallbackPrice);
-        primePriceField(priceToUse);
-        setPriceStatus(
-          priceToUse !== '' && priceToUse !== null
-            ? `Current price: ₹${priceToUse}`
-            : 'No price saved yet.'
-        );
-        setSelectedOptionPrice(priceToUse);
-      }
 
       const list  = Array.isArray(json?.availability) ? json.availability : [];
       const byDow = new Map(list.map(r => [Number(r.day_of_week), r]));
@@ -614,57 +534,10 @@
     return { availability, validationError };
   }
 
-  async function saveDoctorPrice(autoTriggered = false) {
-    const doctorId = getSelectedDoctorId();
-    if (!doctorId) {
-      setPriceStatus('Select a doctor first.', false);
-      return;
-    }
-    if (!priceField) return;
-
-    const raw = String(priceField.value ?? '').trim();
-    const price = raw === '' ? null : Number(raw);
-    if (raw !== '' && (!Number.isFinite(price) || price < 0)) {
-      setPriceStatus('Enter a valid non-negative amount.', false);
-      priceField.focus();
-      return;
-    }
-
-    togglePriceButton(true);
-    setPriceStatus('Saving price…', true);
-
-    try {
-      const res = await fetch(`${apiBase}/doctors/${doctorId}/price`, {
-        method: 'PUT',
-        headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
-        body: JSON.stringify({ doctor_price: price }),
-      });
-      const text = await res.text();
-      let json = null; try { json = JSON.parse(text); } catch {}
-      if (!res.ok) {
-        const msg = json?.message || json?.error || text || 'Failed to save price';
-        throw new Error(msg);
-      }
-
-      const savedPrice = json?.doctor_price ?? price ?? '';
-      primePriceField(savedPrice === null ? '' : savedPrice);
-      setSelectedOptionPrice(savedPrice);
-      priceDirty = false;
-      setPriceStatus('Price saved for this doctor.', true);
-      if (!autoTriggered && typeof toast === 'function') toast('Doctor price updated');
-    } catch (err) {
-      const msg = err?.message || 'Could not save price';
-      setPriceStatus(msg, false);
-      if (typeof toast === 'function') toast(msg, false);
-    } finally {
-      togglePriceButton(false);
-    }
-  }
-
   async function saveAvailability(autoTriggered = false) {
-    const doctorId = getSelectedDoctorId();
-    if (!doctorId) {
-      if (!autoTriggered) alert('Select a doctor first');
+    const clinicId = getClinicId();
+    if (!clinicId) {
+      if (!autoTriggered) alert('Clinic session missing. Please log in again.');
       return;
     }
 
@@ -682,7 +555,7 @@
     out('#saveOut', autoTriggered ? 'Saving your clinic hours…' : '', true);
 
     try {
-      const res  = await fetch(`${apiBase}/doctors/${doctorId}/availability`, {
+      const res  = await fetch(`${apiBase}/clinics/${clinicId}/doctor-availability`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Accept':'application/json' },
         body: JSON.stringify({ availability })
@@ -742,24 +615,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    const dd = el('#doctor_id');
-    if (dd && dd.options.length && dd.value) {
-      const initialPrice = hydratePriceFromOption();
-      primePriceField(initialPrice);
-      setPriceStatus(
-        initialPrice !== '' && initialPrice !== null
-          ? `Current price: ₹${initialPrice}`
-          : 'No price saved yet.'
-      );
-      loadExistingAvailability();
-    }
-
-    dd?.addEventListener('change', () => {
-      const optPrice = hydratePriceFromOption();
-      primePriceField(optPrice);
-      setPriceStatus('Loading doctor schedule…', true);
-      loadExistingAvailability();
-    });
+    loadExistingAvailability();
 
     els('.js-day-card').forEach(wireDayCard);
     Object.values(defaultFields).forEach(field => {
@@ -780,20 +636,11 @@
     applyDefaultHours(true);
     isBootstrapping = false;
 
-    priceField?.addEventListener('input', () => {
-      priceDirty = true;
-      setPriceStatus('Not saved yet.', false);
-    });
-    priceButton?.addEventListener('click', () => saveDoctorPrice(false));
-
     const manualSave = el('#btnManualSave');
     manualSave?.addEventListener('click', async ()=>{
       toggleManualSaveButton(true);
       try{
         await saveAvailability(false);
-        if (priceDirty) {
-          await saveDoctorPrice(true);
-        }
       }finally{
         toggleManualSaveButton(false);
       }

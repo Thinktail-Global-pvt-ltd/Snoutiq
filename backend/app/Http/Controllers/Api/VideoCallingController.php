@@ -180,10 +180,23 @@ class VideoCallingController extends Controller
         }
 
         $doctorIds = $doctors->pluck('id')->all();
+        $nowIst = now('Asia/Kolkata');
+        $currentDayOfWeek = (int) $nowIst->dayOfWeek;
+        $currentTime = $nowIst->format('H:i:s');
 
         $activeDoctorIds = DB::table('doctor_video_availability')
             ->whereIn('doctor_id', $doctorIds)
             ->where('is_active', 1)
+            ->where('day_of_week', $currentDayOfWeek)
+            ->where('start_time', '<=', $currentTime)
+            ->where('end_time', '>=', $currentTime)
+            ->where(function ($q) use ($currentTime) {
+                // Available only when doctor is outside any configured break window.
+                $q->whereNull('break_start')
+                    ->orWhereNull('break_end')
+                    ->orWhere('break_start', '>', $currentTime)
+                    ->orWhere('break_end', '<=', $currentTime);
+            })
             ->distinct()
             ->pluck('doctor_id');
 
