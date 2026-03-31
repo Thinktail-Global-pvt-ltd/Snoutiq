@@ -25,46 +25,14 @@ class ClinicServicePresetController extends Controller
             ], 422);
         }
 
-        $savedPresets = ClinicServicePreset::query()
+        $presets = ClinicServicePreset::query()
             ->where('clinic_id', $clinicId)
             ->orderBy('name')
             ->get(['id', 'clinic_id', 'name']);
 
-        $merged = collect();
-        $seen = [];
-
-        foreach (self::DEFAULT_PRESETS as $name) {
-            $key = strtolower(trim($name));
-            if ($key === '' || isset($seen[$key])) {
-                continue;
-            }
-            $seen[$key] = true;
-            $merged->push([
-                'id' => null,
-                'clinic_id' => $clinicId,
-                'name' => $name,
-                'is_default' => true,
-            ]);
-        }
-
-        foreach ($savedPresets as $preset) {
-            $name = trim((string) $preset->name);
-            $key = strtolower($name);
-            if ($name === '' || isset($seen[$key])) {
-                continue;
-            }
-            $seen[$key] = true;
-            $merged->push([
-                'id' => $preset->id,
-                'clinic_id' => $preset->clinic_id,
-                'name' => $name,
-                'is_default' => false,
-            ]);
-        }
-
         return response()->json([
             'status' => true,
-            'data' => $merged->values(),
+            'data' => $presets,
         ]);
     }
 
