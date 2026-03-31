@@ -301,195 +301,161 @@ Route::get('/doctors/{doctor}/blob-image', function (Doctor $doctor) {
 })->whereNumber('doctor')->name('api.doctors.blob-image');
 
 Route::get('/exported_from_excell_doctors', function (Request $request) {
-    $vets = VetRegisterationTemp::query()
-        ->where('exported_from_excell', 1)
-        ->with(['doctors' => function ($q) {
-            $q->where('exported_from_excell', 1);
-        }])
-        ->get([
-            'id',
-            'name',
-            'email',
-            'mobile',
-            'exported_from_excell',
-        ]);
+    $doctorId = trim((string) $request->query('doctor_id', ''));
+    $alwaysAvailableDoctorId = 116;
+    $nowIst = \Illuminate\Support\Carbon::now('Asia/Kolkata');
+    $currentDayOfWeek = (int) $nowIst->dayOfWeek;
+    $currentTime = $nowIst->format('H:i:s');
 
-    $timezone = (string) ($request->query('timezone') ?: config('app.timezone', 'UTC'));
-    try {
-        $now = \Carbon\Carbon::now($timezone);
-    } catch (\Throwable $e) {
-        $timezone = (string) config('app.timezone', 'UTC');
-        $now = \Carbon\Carbon::now($timezone);
+    $availableDoctorIds = collect([$alwaysAvailableDoctorId]);
+
+    if (Schema::hasTable('doctor_video_availability')) {
+        $availableDoctorIds = DB::table('doctor_video_availability')
+            ->where('is_active', 1)
+            ->where('day_of_week', $currentDayOfWeek)
+            ->where('start_time', '<=', $currentTime)
+            ->where('end_time', '>=', $currentTime)
+            ->where(function ($q) use ($currentTime) {
+                // Available if no break, or current time falls outside break window.
+                $q->whereNull('break_start')
+                    ->orWhereNull('break_end')
+                    ->orWhere('break_start', '>', $currentTime)
+                    ->orWhere('break_end', '<=', $currentTime);
+            })
+            ->distinct()
+            ->pluck('doctor_id')
+            ->map(fn ($id) => (int) $id)
+            ->push($alwaysAvailableDoctorId)
+            ->unique()
+            ->values();
     }
 
-    $isDoctorOnlineNow = function (Doctor $doctor) use ($now): bool {
-        $rawValue = $doctor->break_do_not_disturb_time_example_2_4_pm;
-        if (is_array($rawValue)) {
-            $breakWindows = array_values(array_filter(array_map(static fn ($item) => trim((string) $item), $rawValue)));
-        } else {
-            $rawString = trim((string) $rawValue);
-            if ($rawString === '') {
-                $breakWindows = [];
-            } else {
-                $decoded = json_decode($rawString, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    $breakWindows = array_values(array_filter(array_map(static fn ($item) => trim((string) $item), $decoded)));
-                } else {
-                    $breakWindows = [$rawString];
-                }
-            }
-        }
+    $doctorsQuery = Doctor::query()
+        ->select(['id', 'video_day_rate', 'video_night_rate'])
+        ->whereIn('id', $availableDoctorIds->all())
+        ->where(function ($q) use ($alwaysAvailableDoctorId) {
+            $q->where('exported_from_excell', 1)
+                ->orWhere('id', $alwaysAvailableDoctorId);
+        });
 
-        if (empty($breakWindows)) {
-            return true;
-        }
+    if ($doctorId !== '') {
+        $doctorsQuery->where('id', (int) $doctorId);
+    }
 
-        $currentMinute = ((int) $now->format('H') * 60) + (int) $now->format('i');
-        $parseTimeToMinutes = static function (string $value): ?int {
-            $normalized = strtoupper(trim($value));
-            $normalized = str_replace(['A.M.', 'P.M.'], ['AM', 'PM'], $normalized);
-            $normalized = preg_replace('/\s+/', ' ', $normalized);
+    $doctors = $doctorsQuery->orderBy('id')->get();
 
-            foreach (['g:i A', 'g A', 'h:i A', 'h A', 'H:i', 'G:i', 'H', 'G'] as $format) {
-                try {
-                    $parsed = \Carbon\Carbon::createFromFormat($format, $normalized);
-                } catch (\Throwable $e) {
-                    $parsed = false;
-                }
+    if ($doctorId !== '' && $doctors->isEmpty()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Doctor not found or not available now',
+        ], 404);
+    }
 
-                if ($parsed !== false) {
-                    return ((int) $parsed->format('H') * 60) + (int) $parsed->format('i');
-                }
-            }
+    $doctorIds = $doctors->pluck('id')->all();
+    $slotsByDoctor = collect();
 
-            return null;
-        };
+    if (Schema::hasTable('doctor_video_availability') && !empty($doctorIds)) {
+        $slotsByDoctor = DB::table('doctor_video_availability')
+            ->whereIn('doctor_id', $doctorIds)
+            ->where('is_active', 1)
+            ->orderBy('doctor_id')
+            ->orderBy('day_of_week')
+            ->orderBy('start_time')
+            ->get([
+                'id',
+                'doctor_id',
+                'day_of_week',
+                'start_time',
+                'end_time',
+                'break_start',
+                'break_end',
+                'avg_consultation_mins',
+                'max_bookings_per_hour',
+                'is_active',
+                'created_at',
+                'updated_at',
+            ])
+            ->groupBy('doctor_id');
+    }
 
-        foreach ($breakWindows as $rawRange) {
-            if (strtolower(trim($rawRange)) === 'no') {
-                return true;
-            }
+    $dayLabels = [
+        0 => 'Sunday',
+        1 => 'Monday',
+        2 => 'Tuesday',
+        3 => 'Wednesday',
+        4 => 'Thursday',
+        5 => 'Friday',
+        6 => 'Saturday',
+    ];
 
-            $normalizedRange = trim(str_replace(['–', '—'], '-', $rawRange));
-            $parts = preg_split('/\s*(?:-|to)\s*/i', $normalizedRange, 2);
-            if (!is_array($parts) || count($parts) !== 2) {
-                continue;
-            }
-
-            $start = trim((string) $parts[0]);
-            $end = trim((string) $parts[1]);
-            if ($start === '' || $end === '') {
-                continue;
-            }
-
-            $startHasMeridiem = (bool) preg_match('/\b(?:AM|PM)\b/i', $start);
-            $endHasMeridiem = (bool) preg_match('/\b(?:AM|PM)\b/i', $end);
-
-            if (!$startHasMeridiem && $endHasMeridiem && preg_match('/\b(AM|PM)\b/i', $end, $match)) {
-                $start .= ' '.strtoupper((string) $match[1]);
-            } elseif (!$endHasMeridiem && $startHasMeridiem && preg_match('/\b(AM|PM)\b/i', $start, $match)) {
-                $end .= ' '.strtoupper((string) $match[1]);
-            }
-
-            $startMinute = $parseTimeToMinutes($start);
-            $endMinute = $parseTimeToMinutes($end);
-            if ($startMinute === null || $endMinute === null) {
-                continue;
-            }
-
-            if ($startMinute === $endMinute) {
-                return false;
-            }
-
-            if ($startMinute < $endMinute) {
-                if ($currentMinute >= $startMinute && $currentMinute < $endMinute) {
-                    return false;
-                }
-            } else {
-                // Overnight break range e.g. 10:00 PM - 02:00 AM
-                if ($currentMinute >= $startMinute || $currentMinute < $endMinute) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    };
-
-    $vets = $vets->map(function (VetRegisterationTemp $vet) use ($isDoctorOnlineNow) {
-        $onlineDoctors = $vet->doctors
-            ->filter(function (Doctor $doctor) use ($isDoctorOnlineNow) {
-                return $isDoctorOnlineNow($doctor);
+    $formatted = $doctors->map(function (Doctor $doctor) use ($slotsByDoctor, $dayLabels) {
+        $availability = collect($slotsByDoctor->get($doctor->id, collect()))
+            ->map(function ($slot) {
+                return [
+                    'id' => (int) ($slot->id ?? 0),
+                    'doctor_id' => (int) ($slot->doctor_id ?? 0),
+                    'day_of_week' => (int) ($slot->day_of_week ?? 0),
+                    'start_time' => $slot->start_time,
+                    'end_time' => $slot->end_time,
+                    'break_start' => $slot->break_start,
+                    'break_end' => $slot->break_end,
+                    'avg_consultation_mins' => $slot->avg_consultation_mins,
+                    'max_bookings_per_hour' => $slot->max_bookings_per_hour,
+                    'is_active' => (int) ($slot->is_active ?? 0),
+                    'created_at' => $slot->created_at,
+                    'updated_at' => $slot->updated_at,
+                ];
             })
             ->values();
 
-        $vet->setRelation('doctors', $onlineDoctors);
-        return $vet;
-    })->filter(function (VetRegisterationTemp $vet) {
-        return $vet->doctors->isNotEmpty();
-    })->values();
+        $availabilityHours = $availability
+            ->groupBy('day_of_week')
+            ->map(function ($slots, $dayOfWeek) use ($dayLabels) {
+                $timeRanges = collect($slots)
+                    ->map(function ($slot) {
+                        $start = !empty($slot['start_time']) ? substr((string) $slot['start_time'], 0, 5) : null;
+                        $end = !empty($slot['end_time']) ? substr((string) $slot['end_time'], 0, 5) : null;
 
-    $baseAppUrl = rtrim((string) config('app.url'), '/');
-    if ($baseAppUrl === '') {
-        $baseAppUrl = rtrim(url('/'), '/');
-    }
+                        if ($start && $end) {
+                            return $start.'-'.$end;
+                        }
+                        if ($start) {
+                            return $start.' onwards';
+                        }
+                        if ($end) {
+                            return 'Until '.$end;
+                        }
 
-    $doctorIds = $vets->flatMap(function (VetRegisterationTemp $vet) {
-        return $vet->doctors->pluck('id');
-    })->filter()->unique()->values();
+                        return null;
+                    })
+                    ->filter()
+                    ->values();
 
-    $reviewsByDoctor = collect();
-    if (Schema::hasTable('reviews') && $doctorIds->isNotEmpty()) {
-        $reviews = \App\Models\Review::query()
-            ->whereIn('doctor_id', $doctorIds->all())
-            ->orderByDesc('id')
-            ->get(['id', 'user_id', 'doctor_id', 'points', 'comment', 'created_at', 'updated_at']);
-
-        $reviewsByDoctor = $reviews->groupBy('doctor_id');
-    }
-
-    $data = $vets->map(function (VetRegisterationTemp $vet) use ($baseAppUrl, $reviewsByDoctor) {
-        $payload = $vet->toArray();
-        $payload['doctors'] = $vet->doctors->map(function (Doctor $doctor) use ($baseAppUrl, $reviewsByDoctor) {
-            $doctorPayload = $doctor->toArray();
-            $doctorReviews = $reviewsByDoctor->get($doctor->id, collect());
-
-            $imagePath = ltrim((string) ($doctor->doctor_image ?? ''), '/');
-            $doctorPayload['doctor_image_url'] = $imagePath !== ''
-                ? $baseAppUrl . '/' . $imagePath
-                : null;
-
-            $doctorPayload['doctor_image_blob_url'] = !empty($doctor->doctor_image_blob)
-                ? route('api.doctors.blob-image', ['doctor' => $doctor->id])
-                : null;
-
-            $doctorPayload['reviews_count'] = (int) $doctorReviews->count();
-            $doctorPayload['average_review_points'] = $doctorReviews->isNotEmpty()
-                ? round((float) $doctorReviews->avg('points'), 2)
-                : null;
-            $doctorPayload['reviews'] = $doctorReviews->map(function (\App\Models\Review $review) {
                 return [
-                    'id' => $review->id,
-                    'user_id' => $review->user_id,
-                    'doctor_id' => $review->doctor_id,
-                    'points' => $review->points,
-                    'comment' => $review->comment,
-                    'created_at' => optional($review->created_at)->toIso8601String(),
-                    'updated_at' => optional($review->updated_at)->toIso8601String(),
+                    'day_of_week' => (int) $dayOfWeek,
+                    'day_name' => $dayLabels[(int) $dayOfWeek] ?? ('Day '.$dayOfWeek),
+                    'slots' => $timeRanges,
                 ];
-            })->values();
+            })
+            ->values();
 
-            return $doctorPayload;
-        })->values();
-
-        return $payload;
+        return [
+            'success' => true,
+            'doctor_id' => (int) $doctor->id,
+            'availability' => $availability->isNotEmpty() ? $availability : null,
+            'availability_hours' => $availabilityHours->isNotEmpty() ? $availabilityHours : null,
+            'day_rate' => $doctor->video_day_rate === null ? null : (float) $doctor->video_day_rate,
+            'night_rate' => $doctor->video_night_rate === null ? null : (float) $doctor->video_night_rate,
+        ];
     })->values();
+
+    if ($doctorId !== '') {
+        return response()->json($formatted->first());
+    }
 
     return response()->json([
         'success' => true,
-        'timezone' => $timezone,
-        'current_time' => $now->format('h:i A'),
-        'data' => $data,
+        'data' => $formatted,
     ]);
 })->name('exported_from_excell_doctors');
 
