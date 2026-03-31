@@ -817,7 +817,7 @@
           <label class="block text-sm font-semibold mb-1">Services Offered</label>
           <div id="service-presets" class="preset-grid bg-gray-50 rounded-lg p-2"></div>
           <div id="service-presets-empty" class="text-xs text-gray-500 mt-2">Loading services...</div>
-          <p class="text-xs text-gray-500 mt-2">Select services and add price for each.</p>
+          <p class="text-xs text-gray-500 mt-2">Prefilled: Vaccination, Deworming, Neutering. You can add more via Other Service.</p>
         </div>
         <div class="md:col-span-2">
           <label class="block text-sm font-semibold mb-1">Other Service (optional)</label>
@@ -1242,12 +1242,9 @@
   const customServiceList = document.getElementById('custom-service-list');
   const presetOtherInput = createForm?.elements['serviceName'] ?? null;
   const GENERIC_SERVICE_PRESETS = [
-    'Preventive Care',
-    'Dental Care',
-    'Surgery',
-    'Emergency Care',
-    'Diagnostics',
-    'Boarding & Grooming',
+    'Vaccination',
+    'Deworming',
+    'Neutering',
   ];
   let customServicePresets = [];
   let presetOptions = [];

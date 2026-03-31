@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\DB;
 
 class ClinicServicePresetController extends Controller
 {
+    private const DEFAULT_PRESETS = [
+        'Vaccination',
+        'Deworming',
+        'Neutering',
+    ];
+
     public function index(Request $request)
     {
         $clinicId = $this->resolveClinicId($request);
@@ -19,14 +25,46 @@ class ClinicServicePresetController extends Controller
             ], 422);
         }
 
-        $presets = ClinicServicePreset::query()
+        $savedPresets = ClinicServicePreset::query()
             ->where('clinic_id', $clinicId)
             ->orderBy('name')
             ->get(['id', 'clinic_id', 'name']);
 
+        $merged = collect();
+        $seen = [];
+
+        foreach (self::DEFAULT_PRESETS as $name) {
+            $key = strtolower(trim($name));
+            if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $merged->push([
+                'id' => null,
+                'clinic_id' => $clinicId,
+                'name' => $name,
+                'is_default' => true,
+            ]);
+        }
+
+        foreach ($savedPresets as $preset) {
+            $name = trim((string) $preset->name);
+            $key = strtolower($name);
+            if ($name === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $merged->push([
+                'id' => $preset->id,
+                'clinic_id' => $preset->clinic_id,
+                'name' => $name,
+                'is_default' => false,
+            ]);
+        }
+
         return response()->json([
             'status' => true,
-            'data' => $presets,
+            'data' => $merged->values(),
         ]);
     }
 
@@ -53,6 +91,23 @@ class ClinicServicePresetController extends Controller
         }
 
         $normalized = strtolower($name);
+        $defaultNames = array_map(static function ($presetName) {
+            return strtolower(trim((string) $presetName));
+        }, self::DEFAULT_PRESETS);
+
+        if (in_array($normalized, $defaultNames, true)) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Preset already exists',
+                'data' => [
+                    'id' => null,
+                    'clinic_id' => $clinicId,
+                    'name' => $name,
+                    'is_default' => true,
+                ],
+            ]);
+        }
+
         $existing = ClinicServicePreset::query()
             ->where('clinic_id', $clinicId)
             ->whereRaw('LOWER(name) = ?', [$normalized])
