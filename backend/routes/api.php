@@ -305,7 +305,6 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
     $alwaysAvailableDoctorId = 116;
     $nowIst = \Illuminate\Support\Carbon::now('Asia/Kolkata');
     $currentDayOfWeek = (int) $nowIst->dayOfWeek;
-    $currentTime = $nowIst->format('H:i:s');
 
     $availableDoctorIds = collect([$alwaysAvailableDoctorId]);
 
@@ -313,15 +312,6 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
         $availableDoctorIds = DB::table('doctor_video_availability')
             ->where('is_active', 1)
             ->where('day_of_week', $currentDayOfWeek)
-            ->where('start_time', '<=', $currentTime)
-            ->where('end_time', '>=', $currentTime)
-            ->where(function ($q) use ($currentTime) {
-                // Available if no break, or current time falls outside break window.
-                $q->whereNull('break_start')
-                    ->orWhereNull('break_end')
-                    ->orWhere('break_start', '>', $currentTime)
-                    ->orWhere('break_end', '<=', $currentTime);
-            })
             ->distinct()
             ->pluck('doctor_id')
             ->map(fn ($id) => (int) $id)
@@ -331,7 +321,6 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
     }
 
     $doctorsQuery = Doctor::query()
-        ->select(['id', 'video_day_rate', 'video_night_rate'])
         ->whereIn('id', $availableDoctorIds->all())
         ->where(function ($q) use ($alwaysAvailableDoctorId) {
             $q->where('exported_from_excell', 1)
@@ -347,110 +336,24 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
     if ($doctorId !== '' && $doctors->isEmpty()) {
         return response()->json([
             'success' => false,
-            'message' => 'Doctor not found or not available now',
+            'message' => 'Doctor not found or not available today',
         ], 404);
     }
 
-    $doctorIds = $doctors->pluck('id')->all();
-    $slotsByDoctor = collect();
+    $formatted = $doctors->map(function (Doctor $doctor) {
+        $item = $doctor->toArray();
+        $item['doctor_image_blob_url'] = empty($doctor->doctor_image_blob)
+            ? null
+            : route('api.doctors.blob-image', ['doctor' => $doctor->id]);
 
-    if (Schema::hasTable('doctor_video_availability') && !empty($doctorIds)) {
-        $slotsByDoctor = DB::table('doctor_video_availability')
-            ->whereIn('doctor_id', $doctorIds)
-            ->where('is_active', 1)
-            ->orderBy('doctor_id')
-            ->orderBy('day_of_week')
-            ->orderBy('start_time')
-            ->get([
-                'id',
-                'doctor_id',
-                'day_of_week',
-                'start_time',
-                'end_time',
-                'break_start',
-                'break_end',
-                'avg_consultation_mins',
-                'max_bookings_per_hour',
-                'is_active',
-                'created_at',
-                'updated_at',
-            ])
-            ->groupBy('doctor_id');
-    }
-
-    $dayLabels = [
-        0 => 'Sunday',
-        1 => 'Monday',
-        2 => 'Tuesday',
-        3 => 'Wednesday',
-        4 => 'Thursday',
-        5 => 'Friday',
-        6 => 'Saturday',
-    ];
-
-    $formatted = $doctors->map(function (Doctor $doctor) use ($slotsByDoctor, $dayLabels) {
-        $availability = collect($slotsByDoctor->get($doctor->id, collect()))
-            ->map(function ($slot) {
-                return [
-                    'id' => (int) ($slot->id ?? 0),
-                    'doctor_id' => (int) ($slot->doctor_id ?? 0),
-                    'day_of_week' => (int) ($slot->day_of_week ?? 0),
-                    'start_time' => $slot->start_time,
-                    'end_time' => $slot->end_time,
-                    'break_start' => $slot->break_start,
-                    'break_end' => $slot->break_end,
-                    'avg_consultation_mins' => $slot->avg_consultation_mins,
-                    'max_bookings_per_hour' => $slot->max_bookings_per_hour,
-                    'is_active' => (int) ($slot->is_active ?? 0),
-                    'created_at' => $slot->created_at,
-                    'updated_at' => $slot->updated_at,
-                ];
-            })
-            ->values();
-
-        $availabilityHours = $availability
-            ->groupBy('day_of_week')
-            ->map(function ($slots, $dayOfWeek) use ($dayLabels) {
-                $timeRanges = collect($slots)
-                    ->map(function ($slot) {
-                        $start = !empty($slot['start_time']) ? substr((string) $slot['start_time'], 0, 5) : null;
-                        $end = !empty($slot['end_time']) ? substr((string) $slot['end_time'], 0, 5) : null;
-
-                        if ($start && $end) {
-                            return $start.'-'.$end;
-                        }
-                        if ($start) {
-                            return $start.' onwards';
-                        }
-                        if ($end) {
-                            return 'Until '.$end;
-                        }
-
-                        return null;
-                    })
-                    ->filter()
-                    ->values();
-
-                return [
-                    'day_of_week' => (int) $dayOfWeek,
-                    'day_name' => $dayLabels[(int) $dayOfWeek] ?? ('Day '.$dayOfWeek),
-                    'slots' => $timeRanges,
-                ];
-            })
-            ->values();
-
-        return [
-            'success' => true,
-            'doctor_id' => (int) $doctor->id,
-            'availability' => $availability->isNotEmpty() ? $availability : null,
-            'availability_hours' => $availabilityHours->isNotEmpty() ? $availabilityHours : null,
-            'day_rate' => $doctor->video_day_rate === null ? null : (float) $doctor->video_day_rate,
-            'night_rate' => $doctor->video_night_rate === null ? null : (float) $doctor->video_night_rate,
-        ];
+        return $item;
     })->values();
 
     if ($doctorId !== '') {
-        return response()->json($formatted->first());
+        return response()->json([
+            'success' => true,
+            'data' => $formatted->first(),
+        ]);
     }
 
     return response()->json([
