@@ -100,13 +100,33 @@ class AdminPanelController extends Controller
         $limit = (int) ($filters['limit'] ?? 250);
         $leadFilter = strtolower((string) ($filters['lead_filter'] ?? 'all'));
 
+        $hasUsersTable = Schema::hasTable('users');
+        $hasUserCity = $hasUsersTable && Schema::hasColumn('users', 'city');
+        $hasUserCreatedAt = $hasUsersTable && Schema::hasColumn('users', 'created_at');
+        $leadUserBaseColumns = ['id', 'name', 'email', 'phone'];
+        if ($hasUserCity) {
+            $leadUserBaseColumns[] = 'city';
+        }
+        $leadUserColumnsWithCreatedAt = $leadUserBaseColumns;
+        if ($hasUserCreatedAt) {
+            $leadUserColumnsWithCreatedAt[] = 'created_at';
+        }
+
         $hasPetsTable = Schema::hasTable('pets');
+        $hasPetBreed = $hasPetsTable && Schema::hasColumn('pets', 'breed');
+        $hasPetCreatedAt = $hasPetsTable && Schema::hasColumn('pets', 'created_at');
         $hasIsNeutered = $hasPetsTable && Schema::hasColumn('pets', 'is_neutered');
         $hasIsNuetered = $hasPetsTable && Schema::hasColumn('pets', 'is_nuetered');
 
         $hasPetType = $hasPetsTable && Schema::hasColumn('pets', 'pet_type');
         $hasLegacyPetType = $hasPetsTable && Schema::hasColumn('pets', 'type');
-        $petLeadBaseColumns = ['id', 'user_id', 'name', 'breed', 'created_at'];
+        $petLeadBaseColumns = ['id', 'user_id', 'name'];
+        if ($hasPetBreed) {
+            $petLeadBaseColumns[] = 'breed';
+        }
+        if ($hasPetCreatedAt) {
+            $petLeadBaseColumns[] = 'created_at';
+        }
         if ($hasPetType) {
             $petLeadBaseColumns[] = 'pet_type';
         }
@@ -148,8 +168,8 @@ class AdminPanelController extends Controller
 
             $neuteringLeads = $neuteringBaseQuery
                 ->select($petColumns)
-                ->with(['owner:id,name,email,phone,city'])
-                ->orderByDesc('created_at')
+                ->with(['owner:' . implode(',', $leadUserBaseColumns)])
+                ->orderByDesc($hasPetCreatedAt ? 'created_at' : 'id')
                 ->limit($limit)
                 ->get();
         }
@@ -224,6 +244,8 @@ class AdminPanelController extends Controller
                     ->count('transactions.id');
             }
 
+            $videoFollowUpRelations = ['user:' . implode(',', $leadUserBaseColumns)];
+
             $videoFollowUpLeads = $videoFollowUpBaseQuery
                 ->select('transactions.*')
                 ->addSelect([
@@ -234,12 +256,7 @@ class AdminPanelController extends Controller
                         ? DB::raw('lead_prescription.video_inclinic')
                         : DB::raw('NULL'),
                 ])
-                ->with([
-                    'clinic:id,name',
-                    'doctor:id,doctor_name,doctor_email,doctor_mobile',
-                    'user:id,name,email,phone,city',
-                    'pet:' . implode(',', $petLeadBaseColumns),
-                ])
+                ->with($videoFollowUpRelations)
                 ->orderBy('lead_prescription.follow_up_date')
                 ->orderByDesc('transactions.id')
                 ->limit($limit)
@@ -844,7 +861,7 @@ class AdminPanelController extends Controller
                             ->values()
                             ->all()
                     )
-                    ->get(['id', 'name', 'email', 'phone', 'city'])
+                    ->get($leadUserBaseColumns)
                     ->keyBy('id');
 
                 foreach ($fcmVaccinationRows as $fcmRow) {
@@ -1084,7 +1101,6 @@ class AdminPanelController extends Controller
             return $leadUser;
         });
 
-        $hasUserCreatedAt = Schema::hasColumn('users', 'created_at');
         $hasPrescriptionUserId = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'user_id');
 
         if ($targetUsers->isNotEmpty()) {
@@ -1098,7 +1114,7 @@ class AdminPanelController extends Controller
             if (!empty($leadUserIds)) {
                 $usersById = User::query()
                     ->whereIn('id', $leadUserIds)
-                    ->get(['id', 'name', 'email', 'phone', 'city', 'created_at'])
+                    ->get($leadUserColumnsWithCreatedAt)
                     ->keyBy('id');
 
                 $latestPrescriptionByUser = collect();
