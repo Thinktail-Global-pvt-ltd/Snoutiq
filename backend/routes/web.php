@@ -221,20 +221,17 @@ Route::prefix('admin')->group(function () {
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
         Route::get('/users/profile-completion', [AdminPanelController::class, 'userProfileCompletion'])->name('admin.users.profile-completion');
         Route::get('/lead-management', function (Request $request) {
-            dd([
-                'stage' => 'lead_management_route_hit',
-                'timestamp' => now()->toDateTimeString(),
-                'path' => $request->path(),
-                'full_url' => $request->fullUrl(),
-                'session_id' => $request->session()->getId(),
-                'session_is_admin' => $request->session()->get('is_admin'),
-                'session_admin_email' => $request->session()->get('admin_email'),
-                'session_role' => $request->session()->get('role'),
-                'app_env' => app()->environment(),
-                'php_sapi' => PHP_SAPI,
-            ]);
-
-            return app(AdminPanelController::class)->leadManagement($request);
+            try {
+                return app(AdminPanelController::class)->leadManagement($request);
+            } catch (\Throwable $e) {
+                dd([
+                    'stage' => 'lead_management_route_controller_exception',
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => array_slice($e->getTrace(), 0, 20),
+                ]);
+            }
         })->name('admin.lead-management');
         Route::delete('/lead-management/users/{user}', [AdminPanelController::class, 'deleteLeadManagementUser'])->name('admin.lead-management.users.delete');
         Route::delete('/lead-management/users/{user}/api', [AdminPanelController::class, 'deleteLeadManagementUserApi'])
