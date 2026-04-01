@@ -221,6 +221,36 @@ Route::prefix('admin')->group(function () {
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
         Route::get('/users/profile-completion', [AdminPanelController::class, 'userProfileCompletion'])->name('admin.users.profile-completion');
         Route::get('/lead-management', function (Request $request) {
+            ini_set('display_errors', '1');
+            ini_set('display_startup_errors', '1');
+            error_reporting(E_ALL);
+
+            $reservedMemory = str_repeat('x', 262144);
+            register_shutdown_function(function () use (&$reservedMemory): void {
+                $reservedMemory = null;
+                $fatal = error_get_last();
+                if (!$fatal) {
+                    return;
+                }
+
+                $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+                if (!in_array((int) ($fatal['type'] ?? 0), $fatalTypes, true)) {
+                    return;
+                }
+
+                while (ob_get_level() > 0) {
+                    @ob_end_clean();
+                }
+
+                http_response_code(500);
+                header('Content-Type: text/plain; charset=UTF-8');
+                echo "lead-management fatal shutdown\n";
+                echo "type: ".($fatal['type'] ?? 'unknown')."\n";
+                echo "message: ".($fatal['message'] ?? '')."\n";
+                echo "file: ".($fatal['file'] ?? '')."\n";
+                echo "line: ".($fatal['line'] ?? '')."\n";
+            });
+
             try {
                 return app(AdminPanelController::class)->leadManagement($request);
             } catch (\Throwable $e) {
