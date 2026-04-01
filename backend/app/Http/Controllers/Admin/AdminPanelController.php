@@ -23,6 +23,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 
 class AdminPanelController extends Controller
@@ -136,42 +137,72 @@ class AdminPanelController extends Controller
 
         $neuteringLeadCount = 0;
         $neuteringLeads = collect();
+        $runtimeWarnings = [];
+        $captureLeadManagementError = static function (string $stage, \Throwable $e) use (&$runtimeWarnings): void {
+            $message = sprintf(
+                '[lead-management][%s] %s (%s:%d)',
+                $stage,
+                $e->getMessage(),
+                $e->getFile(),
+                $e->getLine()
+            );
+
+            try {
+                Log::error('Lead management stage failed', [
+                    'stage' => $stage,
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]);
+            } catch (\Throwable $logError) {
+                // Fall through to PHP error log below.
+            }
+
+            error_log($message);
+            $runtimeWarnings[] = 'Some lead data could not be loaded for "'.$stage.'".';
+        };
 
         if ($hasPetsTable && ($hasIsNeutered || $hasIsNuetered)) {
-            $petColumns = $petLeadBaseColumns;
-            if ($hasIsNeutered) {
-                $petColumns[] = 'is_neutered';
-            }
-            if ($hasIsNuetered) {
-                $petColumns[] = 'is_nuetered';
-            }
+            try {
+                $petColumns = $petLeadBaseColumns;
+                if ($hasIsNeutered) {
+                    $petColumns[] = 'is_neutered';
+                }
+                if ($hasIsNuetered) {
+                    $petColumns[] = 'is_nuetered';
+                }
 
-            $neuteringBaseQuery = Pet::query()
-                ->where(function (Builder $query) use ($hasIsNeutered, $hasIsNuetered): void {
-                    $hasCondition = false;
+                $neuteringBaseQuery = Pet::query()
+                    ->where(function (Builder $query) use ($hasIsNeutered, $hasIsNuetered): void {
+                        $hasCondition = false;
 
-                    if ($hasIsNeutered) {
-                        $query->whereRaw("UPPER(TRIM(COALESCE(is_neutered, ''))) = 'N'");
-                        $hasCondition = true;
-                    }
-
-                    if ($hasIsNuetered) {
-                        if ($hasCondition) {
-                            $query->orWhereRaw("UPPER(TRIM(COALESCE(is_nuetered, ''))) = 'N'");
-                        } else {
-                            $query->whereRaw("UPPER(TRIM(COALESCE(is_nuetered, ''))) = 'N'");
+                        if ($hasIsNeutered) {
+                            $query->whereRaw("UPPER(TRIM(COALESCE(is_neutered, ''))) = 'N'");
+                            $hasCondition = true;
                         }
-                    }
-                });
 
-            $neuteringLeadCount = (clone $neuteringBaseQuery)->count();
+                        if ($hasIsNuetered) {
+                            if ($hasCondition) {
+                                $query->orWhereRaw("UPPER(TRIM(COALESCE(is_nuetered, ''))) = 'N'");
+                            } else {
+                                $query->whereRaw("UPPER(TRIM(COALESCE(is_nuetered, ''))) = 'N'");
+                            }
+                        }
+                    });
 
-            $neuteringLeads = $neuteringBaseQuery
-                ->select($petColumns)
-                ->with(['owner:' . implode(',', $leadUserBaseColumns)])
-                ->orderByDesc($hasPetCreatedAt ? 'created_at' : 'id')
-                ->limit($limit)
-                ->get();
+                $neuteringLeadCount = (clone $neuteringBaseQuery)->count();
+
+                $neuteringLeads = $neuteringBaseQuery
+                    ->select($petColumns)
+                    ->with(['owner:' . implode(',', $leadUserBaseColumns)])
+                    ->orderByDesc($hasPetCreatedAt ? 'created_at' : 'id')
+                    ->limit($limit)
+                    ->get();
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('neutering_leads', $e);
+                $neuteringLeadCount = 0;
+                $neuteringLeads = collect();
+            }
         }
 
         $hasTransactionsTable = Schema::hasTable('transactions');
@@ -202,65 +233,77 @@ class AdminPanelController extends Controller
         $videoFollowUpLeads = collect();
 
         if ($supportsVideoFollowUpLeads) {
-            $latestFollowUpPrescriptionBySession = DB::table('prescriptions as p')
-                ->selectRaw('MAX(p.id) as latest_prescription_id, p.call_session as call_session_key')
-                ->whereNotNull('p.call_session')
-                ->where('p.call_session', '!=', '')
-                ->whereNotNull('p.follow_up_date')
-                ->groupBy('p.call_session');
+            try {
+                $latestFollowUpPrescriptionBySession = DB::table('prescriptions as p')
+                    ->selectRaw('MAX(p.id) as latest_prescription_id, p.call_session as call_session_key')
+                    ->whereNotNull('p.call_session')
+                    ->where('p.call_session', '!=', '')
+                    ->whereNotNull('p.follow_up_date')
+                    ->groupBy('p.call_session');
 
-            $videoFollowUpBaseQuery = Transaction::query()
-                ->where(function (Builder $query) use ($hasTransactionMetadata): void {
-                    $query->whereIn('transactions.type', ['video_consult', 'excell_export_campaign']);
+                $videoFollowUpBaseQuery = Transaction::query()
+                    ->where(function (Builder $query) use ($hasTransactionMetadata): void {
+                        $query->whereIn('transactions.type', ['video_consult', 'excell_export_campaign']);
 
-                    if ($hasTransactionMetadata) {
-                        $query->orWhereIn('transactions.metadata->order_type', ['video_consult', 'excell_export_campaign']);
-                    }
-                })
-                ->whereNotNull("transactions.{$transactionSessionColumn}")
-                ->where("transactions.{$transactionSessionColumn}", '!=', '')
-                ->joinSub($latestFollowUpPrescriptionBySession, 'latest_follow_up_prescription_by_session', function ($join) use ($transactionSessionColumn): void {
-                    $join->on(
-                        'latest_follow_up_prescription_by_session.call_session_key',
+                        if ($hasTransactionMetadata) {
+                            // Avoid DB JSON extraction on malformed legacy payloads.
+                            $query->orWhere(function (Builder $metaQuery): void {
+                                $metaQuery->where('transactions.metadata', 'like', '%"order_type":"video_consult"%')
+                                    ->orWhere('transactions.metadata', 'like', '%"order_type":"excell_export_campaign"%');
+                            });
+                        }
+                    })
+                    ->whereNotNull("transactions.{$transactionSessionColumn}")
+                    ->where("transactions.{$transactionSessionColumn}", '!=', '')
+                    ->joinSub($latestFollowUpPrescriptionBySession, 'latest_follow_up_prescription_by_session', function ($join) use ($transactionSessionColumn): void {
+                        $join->on(
+                            'latest_follow_up_prescription_by_session.call_session_key',
+                            '=',
+                            "transactions.{$transactionSessionColumn}"
+                        );
+                    })
+                    ->join(
+                        'prescriptions as lead_prescription',
+                        'lead_prescription.id',
                         '=',
-                        "transactions.{$transactionSessionColumn}"
+                        'latest_follow_up_prescription_by_session.latest_prescription_id'
                     );
-                })
-                ->join(
-                    'prescriptions as lead_prescription',
-                    'lead_prescription.id',
-                    '=',
-                    'latest_follow_up_prescription_by_session.latest_prescription_id'
-                );
 
-            $videoFollowUpLeadCount = (clone $videoFollowUpBaseQuery)->count('transactions.id');
-            if ($supportsVideoFollowUpModeSplit) {
-                $videoFollowUpVideoLeadCount = (clone $videoFollowUpBaseQuery)
-                    ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('video', 'video_consult', 'video_consultation')")
-                    ->count('transactions.id');
+                $videoFollowUpLeadCount = (clone $videoFollowUpBaseQuery)->count('transactions.id');
+                if ($supportsVideoFollowUpModeSplit) {
+                    $videoFollowUpVideoLeadCount = (clone $videoFollowUpBaseQuery)
+                        ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('video', 'video_consult', 'video_consultation')")
+                        ->count('transactions.id');
 
-                $videoFollowUpInClinicLeadCount = (clone $videoFollowUpBaseQuery)
-                    ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('in_clinic', 'inclinic', 'in-clinic', 'clinic')")
-                    ->count('transactions.id');
+                    $videoFollowUpInClinicLeadCount = (clone $videoFollowUpBaseQuery)
+                        ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('in_clinic', 'inclinic', 'in-clinic', 'clinic')")
+                        ->count('transactions.id');
+                }
+
+                $videoFollowUpRelations = ['user:' . implode(',', $leadUserBaseColumns)];
+
+                $videoFollowUpLeads = $videoFollowUpBaseQuery
+                    ->select('transactions.*')
+                    ->addSelect([
+                        'lead_prescription_id' => DB::raw('lead_prescription.id'),
+                        'lead_follow_up_date' => DB::raw('lead_prescription.follow_up_date'),
+                        'lead_call_session' => DB::raw('lead_prescription.call_session'),
+                        'lead_video_inclinic' => $hasPrescriptionVideoInclinic
+                            ? DB::raw('lead_prescription.video_inclinic')
+                            : DB::raw('NULL'),
+                    ])
+                    ->with($videoFollowUpRelations)
+                    ->orderBy('lead_prescription.follow_up_date')
+                    ->orderByDesc('transactions.id')
+                    ->limit($limit)
+                    ->get();
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('video_follow_up_leads', $e);
+                $videoFollowUpLeadCount = 0;
+                $videoFollowUpVideoLeadCount = 0;
+                $videoFollowUpInClinicLeadCount = 0;
+                $videoFollowUpLeads = collect();
             }
-
-            $videoFollowUpRelations = ['user:' . implode(',', $leadUserBaseColumns)];
-
-            $videoFollowUpLeads = $videoFollowUpBaseQuery
-                ->select('transactions.*')
-                ->addSelect([
-                    'lead_prescription_id' => DB::raw('lead_prescription.id'),
-                    'lead_follow_up_date' => DB::raw('lead_prescription.follow_up_date'),
-                    'lead_call_session' => DB::raw('lead_prescription.call_session'),
-                    'lead_video_inclinic' => $hasPrescriptionVideoInclinic
-                        ? DB::raw('lead_prescription.video_inclinic')
-                        : DB::raw('NULL'),
-                ])
-                ->with($videoFollowUpRelations)
-                ->orderBy('lead_prescription.follow_up_date')
-                ->orderByDesc('transactions.id')
-                ->limit($limit)
-                ->get();
         }
 
         $targetUsers = collect();
@@ -480,6 +523,7 @@ class AdminPanelController extends Controller
         };
 
         if ($supportsFcmNotifications) {
+            try {
             // 1) Neutering notifications: data_payload.pet_id -> neutering lead pets.
             if ($supportsNeuteringNotificationJoin && $neuteringLeads->isNotEmpty()) {
                 $neuteringPetLookup = $neuteringLeads
@@ -787,36 +831,17 @@ class AdminPanelController extends Controller
 
             // 3) Vaccination notifications: fcm_notifications.user_id + notification type.
             if ($supportsVaccinationNotificationJoin) {
-                $vaccinationReminderBaseQuery = FcmNotification::query()
+                $fcmVaccinationQuery = FcmNotification::query()
                     ->whereNotNull('user_id')
                     ->where('user_id', '>', 0)
-                    ->where(function (Builder $query) use ($fcmHasNotificationType, $supportsNeuteringNotificationJoin, $vaccinationReminderType): void {
-                        $hasCondition = false;
-                        if ($fcmHasNotificationType) {
-                            $query->whereRaw(
-                                "LOWER(TRIM(COALESCE(notification_type, ''))) = ?",
-                                [$vaccinationReminderType]
-                            );
-                            $hasCondition = true;
-                        }
-
-                        if ($supportsNeuteringNotificationJoin) {
-                            if ($hasCondition) {
-                                $query->orWhereRaw(
-                                    "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_payload, '$.type')), ''))) = ?",
-                                    [$vaccinationReminderType]
-                                );
-                            } else {
-                                $query->whereRaw(
-                                    "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_payload, '$.type')), ''))) = ?",
-                                    [$vaccinationReminderType]
-                                );
-                            }
-                        }
-                    });
-
-                $fcmVaccinationQuery = (clone $vaccinationReminderBaseQuery)
                     ->select(['id', 'user_id']);
+
+                if ($fcmHasNotificationType) {
+                    $fcmVaccinationQuery->whereRaw(
+                        "LOWER(TRIM(COALESCE(notification_type, ''))) = ?",
+                        [$vaccinationReminderType]
+                    );
+                }
 
                 if ($supportsNeuteringNotificationJoin) {
                     $fcmVaccinationQuery->addSelect('data_payload');
@@ -987,26 +1012,13 @@ class AdminPanelController extends Controller
                         $fcmProfileQuery->addSelect('clicked_at');
                     }
 
-                    $fcmProfileQuery->whereIn('user_id', $leadUserIds)
-                        ->where(function (Builder $query) use ($fcmHasNotificationType, $supportsNeuteringNotificationJoin, $profileTypePlaceholders, $profileNotificationTypes): void {
-                            $hasCondition = false;
-                            if ($fcmHasNotificationType) {
-                                $query->whereRaw(
-                                    "LOWER(TRIM(COALESCE(notification_type, ''))) IN ({$profileTypePlaceholders})",
-                                    $profileNotificationTypes
-                                );
-                                $hasCondition = true;
-                            }
-
-                            if ($supportsNeuteringNotificationJoin) {
-                                $jsonSql = "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data_payload, '$.type')), ''))) IN ({$profileTypePlaceholders})";
-                                if ($hasCondition) {
-                                    $query->orWhereRaw($jsonSql, $profileNotificationTypes);
-                                } else {
-                                    $query->whereRaw($jsonSql, $profileNotificationTypes);
-                                }
-                            }
-                        });
+                    $fcmProfileQuery->whereIn('user_id', $leadUserIds);
+                    if ($fcmHasNotificationType) {
+                        $fcmProfileQuery->whereRaw(
+                            "LOWER(TRIM(COALESCE(notification_type, ''))) IN ({$profileTypePlaceholders})",
+                            $profileNotificationTypes
+                        );
+                    }
 
                     $fcmProfileRows = $fcmProfileQuery
                         ->orderByDesc('id')
@@ -1074,6 +1086,9 @@ class AdminPanelController extends Controller
                     }
                 }
             }
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('fcm_notification_joins', $e);
+            }
         }
 
         $targetUsers = $targetUsers->map(function (array $leadUser): array {
@@ -1104,100 +1119,104 @@ class AdminPanelController extends Controller
         $hasPrescriptionUserId = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'user_id');
 
         if ($targetUsers->isNotEmpty()) {
-            $leadUserIds = $targetUsers
-                ->keys()
-                ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
-                ->map(fn ($userId) => (int) $userId)
-                ->values()
-                ->all();
+            try {
+                $leadUserIds = $targetUsers
+                    ->keys()
+                    ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                    ->map(fn ($userId) => (int) $userId)
+                    ->values()
+                    ->all();
 
-            if (!empty($leadUserIds)) {
-                $usersById = User::query()
-                    ->whereIn('id', $leadUserIds)
-                    ->get($leadUserColumnsWithCreatedAt)
-                    ->keyBy('id');
+                if (!empty($leadUserIds)) {
+                    $usersById = User::query()
+                        ->whereIn('id', $leadUserIds)
+                        ->get($leadUserColumnsWithCreatedAt)
+                        ->keyBy('id');
 
-                $latestPrescriptionByUser = collect();
-                if ($hasPrescriptionUserId && ($hasPrescriptionFollowUpDate || $hasPrescriptionFollowUpType)) {
-                    $latestPrescriptionIdByUser = DB::table('prescriptions')
-                        ->selectRaw('user_id, MAX(id) as latest_prescription_id')
-                        ->whereIn('user_id', $leadUserIds)
-                        ->groupBy('user_id');
+                    $latestPrescriptionByUser = collect();
+                    if ($hasPrescriptionUserId && ($hasPrescriptionFollowUpDate || $hasPrescriptionFollowUpType)) {
+                        $latestPrescriptionIdByUser = DB::table('prescriptions')
+                            ->selectRaw('user_id, MAX(id) as latest_prescription_id')
+                            ->whereIn('user_id', $leadUserIds)
+                            ->groupBy('user_id');
 
-                    $latestPrescriptionQuery = DB::table('prescriptions as p')
-                        ->joinSub($latestPrescriptionIdByUser, 'latest_prescription_by_user', function ($join): void {
-                            $join->on('latest_prescription_by_user.latest_prescription_id', '=', 'p.id');
-                        })
-                        ->select('p.user_id');
-
-                    if ($hasPrescriptionFollowUpDate) {
-                        $latestPrescriptionQuery->addSelect('p.follow_up_date');
-                    }
-                    if ($hasPrescriptionFollowUpType) {
-                        $latestPrescriptionQuery->addSelect('p.follow_up_type');
-                    }
-
-                    $latestPrescriptionByUser = $latestPrescriptionQuery
-                        ->get()
-                        ->keyBy('user_id');
-                }
-
-                $targetUsers = $targetUsers->map(function (array $leadUser) use (
-                    $usersById,
-                    $latestPrescriptionByUser,
-                    $hasUserCreatedAt,
-                    $hasPrescriptionFollowUpDate,
-                    $hasPrescriptionFollowUpType,
-                    $normalizeDateTime
-                ): array {
-                    $userId = is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0;
-                    if ($userId <= 0) {
-                        return $leadUser;
-                    }
-
-                    $userMeta = $usersById->get($userId);
-                    if ($userMeta instanceof User) {
-                        if (empty($leadUser['name'])) {
-                            $leadUser['name'] = $userMeta->name;
-                        }
-                        if (empty($leadUser['email'])) {
-                            $leadUser['email'] = $userMeta->email;
-                        }
-                        if (empty($leadUser['phone'])) {
-                            $leadUser['phone'] = $userMeta->phone;
-                        }
-                        if (empty($leadUser['city'])) {
-                            $leadUser['city'] = $userMeta->city;
-                        }
-                        if ($hasUserCreatedAt) {
-                            $leadUser['user_created_at'] = $normalizeDateTime($userMeta->created_at ?? null);
-                        }
-                    }
-
-                    if ($latestPrescriptionByUser->has($userId)) {
-                        $latestPrescription = $latestPrescriptionByUser->get($userId);
+                        $latestPrescriptionQuery = DB::table('prescriptions as p')
+                            ->joinSub($latestPrescriptionIdByUser, 'latest_prescription_by_user', function ($join): void {
+                                $join->on('latest_prescription_by_user.latest_prescription_id', '=', 'p.id');
+                            })
+                            ->select('p.user_id');
 
                         if ($hasPrescriptionFollowUpDate) {
-                            $followUpDateRaw = data_get($latestPrescription, 'follow_up_date');
-                            if (!empty($followUpDateRaw)) {
-                                try {
-                                    $leadUser['prescription_follow_up_date'] = \Illuminate\Support\Carbon::parse($followUpDateRaw)->toDateString();
-                                } catch (\Throwable $e) {
-                                    $leadUser['prescription_follow_up_date'] = (string) $followUpDateRaw;
+                            $latestPrescriptionQuery->addSelect('p.follow_up_date');
+                        }
+                        if ($hasPrescriptionFollowUpType) {
+                            $latestPrescriptionQuery->addSelect('p.follow_up_type');
+                        }
+
+                        $latestPrescriptionByUser = $latestPrescriptionQuery
+                            ->get()
+                            ->keyBy('user_id');
+                    }
+
+                    $targetUsers = $targetUsers->map(function (array $leadUser) use (
+                        $usersById,
+                        $latestPrescriptionByUser,
+                        $hasUserCreatedAt,
+                        $hasPrescriptionFollowUpDate,
+                        $hasPrescriptionFollowUpType,
+                        $normalizeDateTime
+                    ): array {
+                        $userId = is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0;
+                        if ($userId <= 0) {
+                            return $leadUser;
+                        }
+
+                        $userMeta = $usersById->get($userId);
+                        if ($userMeta instanceof User) {
+                            if (empty($leadUser['name'])) {
+                                $leadUser['name'] = $userMeta->name;
+                            }
+                            if (empty($leadUser['email'])) {
+                                $leadUser['email'] = $userMeta->email;
+                            }
+                            if (empty($leadUser['phone'])) {
+                                $leadUser['phone'] = $userMeta->phone;
+                            }
+                            if (empty($leadUser['city'])) {
+                                $leadUser['city'] = $userMeta->city;
+                            }
+                            if ($hasUserCreatedAt) {
+                                $leadUser['user_created_at'] = $normalizeDateTime($userMeta->created_at ?? null);
+                            }
+                        }
+
+                        if ($latestPrescriptionByUser->has($userId)) {
+                            $latestPrescription = $latestPrescriptionByUser->get($userId);
+
+                            if ($hasPrescriptionFollowUpDate) {
+                                $followUpDateRaw = data_get($latestPrescription, 'follow_up_date');
+                                if (!empty($followUpDateRaw)) {
+                                    try {
+                                        $leadUser['prescription_follow_up_date'] = \Illuminate\Support\Carbon::parse($followUpDateRaw)->toDateString();
+                                    } catch (\Throwable $e) {
+                                        $leadUser['prescription_follow_up_date'] = (string) $followUpDateRaw;
+                                    }
+                                }
+                            }
+
+                            if ($hasPrescriptionFollowUpType) {
+                                $followUpTypeRaw = trim((string) data_get($latestPrescription, 'follow_up_type'));
+                                if ($followUpTypeRaw !== '') {
+                                    $leadUser['prescription_follow_up_type'] = $followUpTypeRaw;
                                 }
                             }
                         }
 
-                        if ($hasPrescriptionFollowUpType) {
-                            $followUpTypeRaw = trim((string) data_get($latestPrescription, 'follow_up_type'));
-                            if ($followUpTypeRaw !== '') {
-                                $leadUser['prescription_follow_up_type'] = $followUpTypeRaw;
-                            }
-                        }
-                    }
-
-                    return $leadUser;
-                });
+                        return $leadUser;
+                    });
+                }
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('lead_user_enrichment', $e);
             }
         }
 
@@ -1212,16 +1231,17 @@ class AdminPanelController extends Controller
         $convertedUsersCount = 0;
 
         if ($supportsConversionTracking && $targetUsers->isNotEmpty()) {
-            $leadUserIds = $targetUsers
-                ->keys()
-                ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
-                ->map(fn ($userId) => (int) $userId)
-                ->values()
-                ->all();
+            try {
+                $leadUserIds = $targetUsers
+                    ->keys()
+                    ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                    ->map(fn ($userId) => (int) $userId)
+                    ->values()
+                    ->all();
 
-            if (!empty($leadUserIds)) {
-                $transactionQuery = Transaction::query()
-                    ->select(['id', 'user_id', 'created_at']);
+                if (!empty($leadUserIds)) {
+                    $transactionQuery = Transaction::query()
+                        ->select(['id', 'user_id', 'created_at']);
 
                 if ($hasTransactionType) {
                     $transactionQuery->addSelect('type');
@@ -1598,9 +1618,13 @@ class AdminPanelController extends Controller
                     return $leadUser;
                 });
 
-                $convertedUsersCount = $targetUsers
-                    ->filter(fn (array $leadUser) => (bool) ($leadUser['conversion_captured'] ?? false))
-                    ->count();
+                    $convertedUsersCount = $targetUsers
+                        ->filter(fn (array $leadUser) => (bool) ($leadUser['conversion_captured'] ?? false))
+                        ->count();
+                }
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('conversion_tracking', $e);
+                $convertedUsersCount = 0;
             }
         }
 
@@ -1665,6 +1689,7 @@ class AdminPanelController extends Controller
         return view('admin.lead-management', [
             'filteredTargetUsers' => $filteredTargetUsers,
             'leadFilter' => $leadFilter,
+            'runtimeWarnings' => array_values(array_unique($runtimeWarnings)),
             'summary' => [
                 'neutering_leads' => $neuteringLeadCount,
                 'video_follow_up_leads' => $videoFollowUpLeadCount,

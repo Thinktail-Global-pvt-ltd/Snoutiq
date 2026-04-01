@@ -266,6 +266,16 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 @endif
+@if(!empty($runtimeWarnings ?? []))
+    <div class="alert alert-warning" role="alert">
+        <div class="fw-semibold mb-1">Some lead modules were skipped due to backend errors.</div>
+        <ul class="mb-0 ps-3">
+            @foreach(($runtimeWarnings ?? []) as $warning)
+                <li>{{ $warning }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
 
 <div class="row g-4">
     <div class="col-12">
