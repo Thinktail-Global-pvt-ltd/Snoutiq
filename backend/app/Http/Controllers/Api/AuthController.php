@@ -40,6 +40,9 @@ use Illuminate\Support\Collection;
 
 class AuthController extends Controller
 {
+    private const REVIEW_ACCESS_PHONE = '918602180052';
+    private const REVIEW_ACCESS_OTP = '0000';
+
     public function __construct(private readonly WhatsAppService $whatsApp)
     {
     }
@@ -212,6 +215,12 @@ class AuthController extends Controller
         }
 
         return $digits;
+    }
+
+    private function isReviewerAccessPhone(?string $normalizedPhone): bool
+    {
+        return $normalizedPhone !== null
+            && hash_equals(self::REVIEW_ACCESS_PHONE, $normalizedPhone);
     }
 
     private function extractGeo(Request $request): array
@@ -602,7 +611,12 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            if (! $this->whatsApp->isConfigured()) {
+            $isReviewNumber = $this->isReviewerAccessPhone($normalizedPhone);
+            if ($isReviewNumber) {
+                $otp = self::REVIEW_ACCESS_OTP;
+            }
+
+            if (! $isReviewNumber && ! $this->whatsApp->isConfigured()) {
                 if (!config('app.debug')) {
                     return response()->json([
                         'message' => 'WhatsApp channel is temporarily unavailable',
@@ -613,7 +627,7 @@ class AuthController extends Controller
                 Log::warning('otp.whatsapp.unconfigured', ['phone' => $normalizedPhone]);
             }
 
-            if ($this->shouldCheckUniqueness($request)) {
+            if ($this->shouldCheckUniqueness($request) && ! $isReviewNumber) {
                 $exists = User::query()
                     ->where('phone', $normalizedPhone)
                     ->orWhere('phone', $rawValue)
@@ -626,20 +640,22 @@ class AuthController extends Controller
                 }
             }
 
-            try {
-                $this->whatsApp->sendOtpTemplate($normalizedPhone, $otp);
-            } catch (\Throwable $e) {
-                Log::error('otp.whatsapp.failed', [
-                    'phone' => $normalizedPhone,
-                    'error' => $e->getMessage(),
-                ]);
+            if (! $isReviewNumber) {
+                try {
+                    $this->whatsApp->sendOtpTemplate($normalizedPhone, $otp);
+                } catch (\Throwable $e) {
+                    Log::error('otp.whatsapp.failed', [
+                        'phone' => $normalizedPhone,
+                        'error' => $e->getMessage(),
+                    ]);
 
-                // In non-debug environments, return a clear failure instead of a 500
-                if (!config('app.debug')) {
-                    return response()->json([
-                        'message' => 'Unable to send OTP at this time. Please try again shortly.',
-                        'code'    => 'WHATSAPP_SEND_FAILED',
-                    ], 503);
+                    // In non-debug environments, return a clear failure instead of a 500
+                    if (!config('app.debug')) {
+                        return response()->json([
+                            'message' => 'Unable to send OTP at this time. Please try again shortly.',
+                            'code'    => 'WHATSAPP_SEND_FAILED',
+                        ], 503);
+                    }
                 }
             }
 
