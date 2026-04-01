@@ -481,6 +481,7 @@ class AdminPanelController extends Controller
         $supportsVaccinationNotificationJoin = $supportsFcmNotifications
             && ($fcmHasNotificationType || $supportsNeuteringNotificationJoin);
         $vaccinationReminderType = 'pet_vaccination_upcoming_reminder';
+        $maxFcmScanRows = min(max($limit * 20, 2000), 10000);
 
         $resolveNotificationTitle = static function ($fcmRow, array $dataPayload = []) use ($fcmHasTitle): ?string {
             $titleRaw = trim((string) (
@@ -593,6 +594,7 @@ class AdminPanelController extends Controller
                         ->whereIn('user_id', $neuteringUserIds->all())
                         ->whereNotNull('data_payload')
                         ->orderByDesc('id')
+                        ->limit($maxFcmScanRows)
                         ->get();
 
                     foreach ($fcmNeuteringRows as $fcmRow) {
@@ -760,6 +762,7 @@ class AdminPanelController extends Controller
                     $fcmFollowUpRows = $fcmFollowUpQuery
                         ->whereIn('user_id', array_keys($followUpLeadUserIds))
                         ->orderByDesc('id')
+                        ->limit($maxFcmScanRows)
                         ->get();
 
                     foreach ($fcmFollowUpRows as $fcmRow) {
