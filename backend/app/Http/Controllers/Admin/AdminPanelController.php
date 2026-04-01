@@ -95,10 +95,13 @@ class AdminPanelController extends Controller
     {
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
             'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,video_follow_up_video,video_follow_up_in_clinic,vaccination,both'],
         ]);
 
         $limit = (int) ($filters['limit'] ?? 250);
+        $perPage = (int) ($filters['per_page'] ?? 50);
+        $page = max((int) $request->query('page', 1), 1);
         $leadFilter = strtolower((string) ($filters['lead_filter'] ?? 'all'));
 
         $hasUsersTable = Schema::hasTable('users');
@@ -1677,6 +1680,21 @@ class AdminPanelController extends Controller
             })
             ->values();
 
+        $totalFilteredUsers = $filteredTargetUsers->count();
+        $lastPage = max((int) ceil($totalFilteredUsers / max($perPage, 1)), 1);
+        $page = min($page, $lastPage);
+
+        $filteredTargetUsers = new \Illuminate\Pagination\LengthAwarePaginator(
+            $filteredTargetUsers->forPage($page, $perPage)->values(),
+            $totalFilteredUsers,
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->except('page'),
+            ]
+        );
+
         $neuteringNotifiedUsersCount = $targetUsers
             ->filter(fn (array $leadUser) => (bool) ($leadUser['has_neutering'] ?? false))
             ->filter(fn (array $leadUser) => (int) ($leadUser['neutering_notification_count'] ?? 0) > 0)
@@ -1696,12 +1714,13 @@ class AdminPanelController extends Controller
                 'video_follow_up_video_leads' => $videoFollowUpVideoLeadCount,
                 'video_follow_up_in_clinic_leads' => $videoFollowUpInClinicLeadCount,
                 'target_users' => $targetUsers->count(),
-                'filtered_users' => $filteredTargetUsers->count(),
+                'filtered_users' => $totalFilteredUsers,
                 'neutering_notified_users' => $neuteringNotifiedUsersCount,
                 'vaccination_notified_users' => $vaccinationNotifiedUsersCount,
                 'converted_users' => $convertedUsersCount,
             ],
             'limit' => $limit,
+            'perPage' => $perPage,
             'leadConfig' => [
                 'supports_neutering' => $hasIsNeutered || $hasIsNuetered,
                 'supports_video_follow_up' => $supportsVideoFollowUpLeads,
@@ -1724,6 +1743,8 @@ class AdminPanelController extends Controller
         $filters = array_filter([
             'lead_filter' => $request->input('lead_filter'),
             'limit' => $request->input('limit'),
+            'per_page' => $request->input('per_page'),
+            'page' => $request->input('page'),
         ], static fn ($value) => $value !== null && $value !== '');
         $userId = (int) $user->id;
 

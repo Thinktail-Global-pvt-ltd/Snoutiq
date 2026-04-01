@@ -1034,8 +1034,12 @@ public function register(Request $request)
     $ownerName = $request->input('pet_owner_name') ?? $request->input('fullName') ?? $user->name;
     $userBlobColumnsReady = $this->userPetDoc2BlobColumnsReady();
     $petBlobColumnsReady = $this->petPetDoc2BlobColumnsReady();
-    $hasNewDoc2Upload = $request->hasFile('pet_doc2');
+    // Prefer pet_doc2 for blob storage, but fallback to pet_doc1 for backward compatibility.
+    $hasNewDoc2Upload = $request->hasFile('pet_doc2') || $request->hasFile('pet_doc1');
     [$doc2Blob, $doc2Mime] = $this->extractPetDocumentBlob($request, 'pet_doc2');
+    if ($doc2Blob === null) {
+        [$doc2Blob, $doc2Mime] = $this->extractPetDocumentBlob($request, 'pet_doc1');
+    }
 
     $doc1Path = null;
     $doc2Path = null;

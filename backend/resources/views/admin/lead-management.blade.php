@@ -128,7 +128,13 @@
 
     $activeFilterLabel = $filterLabels[$leadFilter] ?? $filterLabels['all'];
     $todayDate = \Illuminate\Support\Carbon::today()->toDateString();
-    $notificationsByUser = collect($filteredTargetUsers ?? [])
+    $currentPageUsers = $filteredTargetUsers instanceof \Illuminate\Pagination\LengthAwarePaginator
+        ? collect($filteredTargetUsers->items())
+        : collect($filteredTargetUsers ?? []);
+    $currentPageNumber = $filteredTargetUsers instanceof \Illuminate\Pagination\LengthAwarePaginator
+        ? (int) $filteredTargetUsers->currentPage()
+        : 1;
+    $notificationsByUser = $currentPageUsers
         ->mapWithKeys(function (array $leadUser): array {
             $userId = (string) ((int) ($leadUser['id'] ?? 0));
             $notifications = collect($leadUser['all_notifications'] ?? [])
@@ -172,7 +178,7 @@
         })
         ->all();
 
-    $conversionsByUser = collect($filteredTargetUsers ?? [])
+    $conversionsByUser = $currentPageUsers
         ->mapWithKeys(function (array $leadUser): array {
             $userId = (string) ((int) ($leadUser['id'] ?? 0));
             $bucket = trim((string) ($leadUser['conversion_notification_bucket'] ?? ''));
@@ -300,6 +306,12 @@
 
                         <label for="limit" class="small text-muted text-nowrap mb-0">Rows per category</label>
                         <input id="limit" name="limit" type="number" class="form-control form-control-sm" min="25" max="1000" value="{{ $limit }}" style="width: 110px;">
+                        <label for="per_page" class="small text-muted text-nowrap mb-0">Users per page</label>
+                        <select id="per_page" name="per_page" class="form-select form-select-sm" style="min-width: 110px;">
+                            @foreach([25, 50, 100, 150, 200] as $size)
+                                <option value="{{ $size }}" @selected(((int) ($perPage ?? 50)) === $size)>{{ $size }}</option>
+                            @endforeach
+                        </select>
                         <button type="submit" class="btn btn-sm btn-primary">Apply</button>
                     </form>
                 </div>
@@ -390,7 +402,7 @@
                     </div>
                 </div>
 
-                @if($filteredTargetUsers->isEmpty())
+                @if($currentPageUsers->isEmpty())
                     <div class="text-center text-muted py-4">
                         <i class="bi bi-filter-circle display-6 d-block mb-2"></i>
                         <p class="mb-0">No users match the selected lead filter.</p>
@@ -414,7 +426,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($filteredTargetUsers as $leadUser)
+                                @foreach($currentPageUsers as $leadUser)
                                     @php
                                         $nextFollowUpDate = $leadUser['next_follow_up_date'] ?? null;
                                         $nextVideoFollowUpDate = $leadUser['next_video_follow_up_date'] ?? null;
@@ -458,6 +470,8 @@
                                                 @method('DELETE')
                                                 <input type="hidden" name="lead_filter" value="{{ $leadFilter }}">
                                                 <input type="hidden" name="limit" value="{{ $limit }}">
+                                                <input type="hidden" name="per_page" value="{{ $perPage ?? 50 }}">
+                                                <input type="hidden" name="page" value="{{ $currentPageNumber }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete User</button>
                                             </form>
                                         </td>
@@ -596,6 +610,36 @@
                             </tbody>
                         </table>
                     </div>
+                    @if($filteredTargetUsers instanceof \Illuminate\Pagination\LengthAwarePaginator && $filteredTargetUsers->total() > 0)
+                        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mt-3">
+                            <div class="text-muted small">
+                                Showing
+                                {{ number_format((int) ($filteredTargetUsers->firstItem() ?? 0)) }}
+                                to
+                                {{ number_format((int) ($filteredTargetUsers->lastItem() ?? 0)) }}
+                                of
+                                {{ number_format((int) $filteredTargetUsers->total()) }}
+                                users
+                                • Page {{ (int) $filteredTargetUsers->currentPage() }} / {{ (int) $filteredTargetUsers->lastPage() }}
+                            </div>
+                            <div class="btn-group" role="group" aria-label="Lead pagination">
+                                <a
+                                    href="{{ $filteredTargetUsers->onFirstPage() ? '#' : $filteredTargetUsers->previousPageUrl() }}"
+                                    class="btn btn-sm btn-outline-primary {{ $filteredTargetUsers->onFirstPage() ? 'disabled' : '' }}"
+                                    @if($filteredTargetUsers->onFirstPage()) aria-disabled="true" tabindex="-1" @endif
+                                >
+                                    Previous
+                                </a>
+                                <a
+                                    href="{{ $filteredTargetUsers->hasMorePages() ? $filteredTargetUsers->nextPageUrl() : '#' }}"
+                                    class="btn btn-sm btn-outline-primary {{ $filteredTargetUsers->hasMorePages() ? '' : 'disabled' }}"
+                                    @if(!$filteredTargetUsers->hasMorePages()) aria-disabled="true" tabindex="-1" @endif
+                                >
+                                    Next
+                                </a>
+                            </div>
+                        </div>
+                    @endif
                 @endif
             </div>
         </div>
