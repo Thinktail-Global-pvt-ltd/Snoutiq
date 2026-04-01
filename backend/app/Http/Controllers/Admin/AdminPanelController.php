@@ -93,6 +93,7 @@ class AdminPanelController extends Controller
 
     public function leadManagement(Request $request): View
     {
+        try {
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
@@ -142,6 +143,14 @@ class AdminPanelController extends Controller
         $neuteringLeads = collect();
         $runtimeWarnings = [];
         $captureLeadManagementError = static function (string $stage, \Throwable $e) use (&$runtimeWarnings): void {
+            dd([
+                'stage' => $stage,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => array_slice($e->getTrace(), 0, 20),
+            ]);
+
             $message = sprintf(
                 '[lead-management][%s] %s (%s:%d)',
                 $stage,
@@ -1736,6 +1745,15 @@ class AdminPanelController extends Controller
                 ],
             ],
         ]);
+        } catch (\Throwable $e) {
+            dd([
+                'stage' => 'lead_management_unhandled',
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => array_slice($e->getTrace(), 0, 20),
+            ]);
+        }
     }
 
     public function deleteLeadManagementUser(Request $request, User $user): RedirectResponse
