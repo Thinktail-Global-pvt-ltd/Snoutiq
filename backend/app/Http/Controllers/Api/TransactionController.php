@@ -58,7 +58,7 @@ class TransactionController extends Controller
 
         $transactionsQuery = Transaction::query()
             ->select('transactions.*')
-            ->whereIn('transactions.type', ['video_consult', 'video_call', 'video call', 'appointment'])
+            ->whereIn('transactions.type', ['video_consult', 'video_call', 'video call', 'appointment', 'appointments'])
             ->where('transactions.doctor_id', $data['doctor_id'])
             ->whereDate('transactions.created_at', now()->toDateString())
             ->where(function ($query) {
@@ -229,7 +229,7 @@ class TransactionController extends Controller
     {
         $normalized = strtolower(trim($type));
 
-        return in_array($normalized, ['video_consult', 'video_call', 'video call', 'appointment'], true);
+        return in_array($normalized, ['video_consult', 'video_call', 'video call', 'appointment', 'appointments'], true);
     }
 
     protected function hasMatchingPrescriptionForTransaction(Transaction $tx, Collection $prescriptionChannelSet): bool

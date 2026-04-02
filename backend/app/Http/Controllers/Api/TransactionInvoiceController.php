@@ -246,7 +246,7 @@ class TransactionInvoiceController extends Controller
         }
 
         return match ($normalized) {
-            'video_consult', 'video_call', 'video call', 'appointment' => 'Online Vet Consultation',
+            'video_consult', 'video_call', 'video call', 'appointment', 'appointments' => 'Online Vet Consultation',
             'excell_export_campaign' => 'Consultation (Excel Export Campaign)',
             default => ucwords(str_replace(['_', '-'], ' ', $normalized)),
         };

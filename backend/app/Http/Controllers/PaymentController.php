@@ -2293,7 +2293,8 @@ class PaymentController extends Controller
         $normalized = strtolower(str_replace(['-', ' '], '_', $trimmed));
 
         return match ($normalized) {
-            'video_consultation', 'video_consult', 'video_call', 'appointment' => 'video_consult',
+            'video_consultation', 'video_consult', 'video_call' => 'video_consult',
+            'appointment', 'appointments' => 'appointments',
             'excel_export_campaign' => 'excell_export_campaign',
             default => $normalized,
         };
