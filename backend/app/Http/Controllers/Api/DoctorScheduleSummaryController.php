@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DoctorScheduleSummaryController extends Controller
 {
@@ -25,7 +26,7 @@ class DoctorScheduleSummaryController extends Controller
         }
 
         $doctor = DB::table('doctors')
-            ->select('id', 'doctor_name', 'video_day_rate', 'video_night_rate')
+            ->select('id', 'doctor_name', 'vet_registeration_id', 'video_day_rate', 'video_night_rate')
             ->where('id', $doctorId)
             ->first();
 
@@ -54,11 +55,13 @@ class DoctorScheduleSummaryController extends Controller
         // Group identical video slots across days so applied-to-all-days setups
         // return one logical slot with a days array instead of 7 duplicates.
         $videoAggregated = $this->aggregateSlotsByTime($videoAvailability);
+        $completion = $this->buildThreeWayCompletionStatus($doctorId, (int) ($doctor->vet_registeration_id ?? 0));
 
         return response()->json([
             'success' => true,
             'doctor_id' => $doctorId,
             'doctor_name' => $doctor->doctor_name,
+            'clinic_id' => (int) ($doctor->vet_registeration_id ?? 0),
             'clinic_schedule' => [
                 'service_type' => 'in_clinic',
                 'availability' => $clinicAvailability,
@@ -69,6 +72,49 @@ class DoctorScheduleSummaryController extends Controller
                 'day_rate' => $doctor->video_day_rate === null ? null : (float) $doctor->video_day_rate,
                 'night_rate' => $doctor->video_night_rate === null ? null : (float) $doctor->video_night_rate,
             ],
+            'completion' => $completion,
+        ]);
+    }
+
+    /**
+     * GET /api/doctors/{id}/schedules/completion
+     *
+     * Returns completion status of the three setup blocks:
+     * 1) doctor video schedule (doctor_id scoped)
+     * 2) clinic in-clinic schedule (clinic scoped via doctors.vet_registeration_id)
+     * 3) clinic services (clinic scoped via doctors.vet_registeration_id)
+     */
+    public function completion(Request $request, string $id)
+    {
+        $doctorId = (int) $id;
+        if ($doctorId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'doctor_id must be a positive integer',
+            ], 422);
+        }
+
+        $doctor = DB::table('doctors')
+            ->select('id', 'doctor_name', 'vet_registeration_id')
+            ->where('id', $doctorId)
+            ->first();
+
+        if (!$doctor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+
+        $clinicId = (int) ($doctor->vet_registeration_id ?? 0);
+        $completion = $this->buildThreeWayCompletionStatus($doctorId, $clinicId);
+
+        return response()->json([
+            'success' => true,
+            'doctor_id' => $doctorId,
+            'doctor_name' => $doctor->doctor_name,
+            'clinic_id' => $clinicId,
+            'completion' => $completion,
         ]);
     }
 
@@ -121,5 +167,85 @@ class DoctorScheduleSummaryController extends Controller
         });
 
         return array_values($grouped);
+    }
+
+    private function buildThreeWayCompletionStatus(int $doctorId, int $clinicId): array
+    {
+        $videoRows = 0;
+        if (Schema::hasTable('doctor_video_availability')) {
+            $videoQuery = DB::table('doctor_video_availability')
+                ->where('doctor_id', $doctorId);
+            if (Schema::hasColumn('doctor_video_availability', 'is_active')) {
+                $videoQuery->where('is_active', 1);
+            }
+            $videoRows = (int) $videoQuery->count();
+        }
+
+        // Fallback for legacy storage where video rows could be inside doctor_availability.
+        if ($videoRows === 0 && Schema::hasTable('doctor_availability')) {
+            $videoFallback = DB::table('doctor_availability')
+                ->where('doctor_id', $doctorId)
+                ->where('service_type', 'video');
+            if (Schema::hasColumn('doctor_availability', 'is_active')) {
+                $videoFallback->where('is_active', 1);
+            }
+            $videoRows = (int) $videoFallback->count();
+        }
+
+        $clinicDoctorIds = [];
+        if ($clinicId > 0 && Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'vet_registeration_id')) {
+            $clinicDoctorIds = DB::table('doctors')
+                ->where('vet_registeration_id', $clinicId)
+                ->pluck('id')
+                ->map(fn ($value) => (int) $value)
+                ->filter(fn ($value) => $value > 0)
+                ->values()
+                ->all();
+        }
+
+        $inClinicRows = 0;
+        if (!empty($clinicDoctorIds) && Schema::hasTable('doctor_availability')) {
+            $inClinicQuery = DB::table('doctor_availability')
+                ->whereIn('doctor_id', $clinicDoctorIds)
+                ->where('service_type', 'in_clinic');
+            if (Schema::hasColumn('doctor_availability', 'is_active')) {
+                $inClinicQuery->where('is_active', 1);
+            }
+            $inClinicRows = (int) $inClinicQuery->count();
+        }
+
+        $serviceRows = 0;
+        if ($clinicId > 0 && Schema::hasTable('groomer_services') && Schema::hasColumn('groomer_services', 'user_id')) {
+            $serviceQuery = DB::table('groomer_services')
+                ->where('user_id', $clinicId);
+            if (Schema::hasColumn('groomer_services', 'name')) {
+                $serviceQuery->whereNotNull('name')->whereRaw("TRIM(name) <> ''");
+            }
+            $serviceRows = (int) $serviceQuery->count();
+        }
+
+        $videoCompleted = $videoRows > 0;
+        $inClinicCompleted = $inClinicRows > 0;
+        $servicesCompleted = $serviceRows > 0;
+
+        return [
+            'video_schedule' => [
+                'completed' => $videoCompleted,
+                'rows' => $videoRows,
+                'scope' => 'doctor',
+            ],
+            'in_clinic_schedule' => [
+                'completed' => $inClinicCompleted,
+                'rows' => $inClinicRows,
+                'scope' => 'clinic',
+                'clinic_doctors_count' => count($clinicDoctorIds),
+            ],
+            'services' => [
+                'completed' => $servicesCompleted,
+                'rows' => $serviceRows,
+                'scope' => 'clinic',
+            ],
+            'all_completed' => $videoCompleted && $inClinicCompleted && $servicesCompleted,
+        ];
     }
 }
