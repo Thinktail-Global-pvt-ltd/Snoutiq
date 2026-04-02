@@ -40,22 +40,14 @@ class ClinicServicePresetController extends Controller
             ]);
         }
 
-        $defaultNames = $this->normalizedDefaultPresetNames();
         $query = DB::table('groomer_services')
-            ->selectRaw('MIN(id) as id, user_id as clinic_id, MIN(TRIM(name)) as name, LOWER(TRIM(name)) as name_key')
+            ->selectRaw('id, user_id as clinic_id, TRIM(name) as name')
             ->where('user_id', $clinicId)
             ->whereNotNull('name')
             ->whereRaw("TRIM(name) <> ''");
 
-        if ($defaultNames !== []) {
-            $placeholders = implode(',', array_fill(0, count($defaultNames), '?'));
-            $query->whereRaw("LOWER(TRIM(name)) NOT IN ({$placeholders})", $defaultNames);
-        }
-
         $presets = $query
-            ->groupBy('user_id')
-            ->groupByRaw('LOWER(TRIM(name))')
-            ->orderBy('name_key')
+            ->orderByDesc('id')
             ->get()
             ->map(static function ($row) {
                 return [

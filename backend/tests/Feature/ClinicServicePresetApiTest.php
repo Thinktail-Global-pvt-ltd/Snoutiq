@@ -29,7 +29,7 @@ class ClinicServicePresetApiTest extends TestCase
             ->assertJsonPath('status', true);
 
         $names = collect($response->json('data'))->pluck('name')->values()->all();
-        $this->assertSame(['Physiotherapy', 'X-Ray'], $names);
+        $this->assertSame(['Physiotherapy', 'X-Ray', 'Deworming', 'Vaccination'], $names);
     }
 
     public function test_index_resolves_clinic_by_owner_user_id_when_user_id_is_provided(): void
