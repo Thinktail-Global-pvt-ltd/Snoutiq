@@ -55,7 +55,7 @@ class DoctorScheduleSummaryController extends Controller
         // Group identical video slots across days so applied-to-all-days setups
         // return one logical slot with a days array instead of 7 duplicates.
         $videoAggregated = $this->aggregateSlotsByTime($videoAvailability);
-        $completion = $this->buildThreeWayCompletionStatus($doctorId, (int) ($doctor->vet_registeration_id ?? 0), false);
+        $completion = $this->buildThreeWayCompletionStatus($doctorId, (int) ($doctor->vet_registeration_id ?? 0));
 
         return response()->json([
             'success' => true,
@@ -107,7 +107,7 @@ class DoctorScheduleSummaryController extends Controller
         }
 
         $clinicId = (int) ($doctor->vet_registeration_id ?? 0);
-        $completion = $this->buildThreeWayCompletionStatus($doctorId, $clinicId, true);
+        $completion = $this->buildThreeWayCompletionStatus($doctorId, $clinicId);
 
         return response()->json([
             'success' => true,
@@ -169,28 +169,16 @@ class DoctorScheduleSummaryController extends Controller
         return array_values($grouped);
     }
 
-    private function buildThreeWayCompletionStatus(int $doctorId, int $clinicId, bool $withRows = false): array
+    private function buildThreeWayCompletionStatus(int $doctorId, int $clinicId): array
     {
         $videoRows = 0;
-        $videoSource = 'doctor_video_availability';
-        $videoData = collect();
-
         if (Schema::hasTable('doctor_video_availability')) {
             $videoQuery = DB::table('doctor_video_availability')
                 ->where('doctor_id', $doctorId);
             if (Schema::hasColumn('doctor_video_availability', 'is_active')) {
                 $videoQuery->where('is_active', 1);
             }
-
-            if ($withRows) {
-                $videoData = $videoQuery
-                    ->orderBy('day_of_week')
-                    ->orderBy('start_time')
-                    ->get();
-                $videoRows = $videoData->count();
-            } else {
-                $videoRows = (int) $videoQuery->count();
-            }
+            $videoRows = (int) $videoQuery->count();
         }
 
         // Fallback for legacy storage where video rows could be inside doctor_availability.
@@ -201,17 +189,7 @@ class DoctorScheduleSummaryController extends Controller
             if (Schema::hasColumn('doctor_availability', 'is_active')) {
                 $videoFallback->where('is_active', 1);
             }
-
-            if ($withRows) {
-                $videoData = $videoFallback
-                    ->orderBy('day_of_week')
-                    ->orderBy('start_time')
-                    ->get();
-                $videoRows = $videoData->count();
-            } else {
-                $videoRows = (int) $videoFallback->count();
-            }
-            $videoSource = 'doctor_availability';
+            $videoRows = (int) $videoFallback->count();
         }
 
         $clinicDoctorIds = [];
@@ -226,7 +204,6 @@ class DoctorScheduleSummaryController extends Controller
         }
 
         $inClinicRows = 0;
-        $inClinicData = collect();
         if (!empty($clinicDoctorIds) && Schema::hasTable('doctor_availability')) {
             $inClinicQuery = DB::table('doctor_availability')
                 ->whereIn('doctor_id', $clinicDoctorIds)
@@ -234,71 +211,41 @@ class DoctorScheduleSummaryController extends Controller
             if (Schema::hasColumn('doctor_availability', 'is_active')) {
                 $inClinicQuery->where('is_active', 1);
             }
-
-            if ($withRows) {
-                $inClinicData = $inClinicQuery
-                    ->orderBy('doctor_id')
-                    ->orderBy('day_of_week')
-                    ->orderBy('start_time')
-                    ->get();
-                $inClinicRows = $inClinicData->count();
-            } else {
-                $inClinicRows = (int) $inClinicQuery->count();
-            }
+            $inClinicRows = (int) $inClinicQuery->count();
         }
 
         $serviceRows = 0;
-        $servicesData = collect();
         if ($clinicId > 0 && Schema::hasTable('groomer_services') && Schema::hasColumn('groomer_services', 'user_id')) {
             $serviceQuery = DB::table('groomer_services')
                 ->where('user_id', $clinicId);
             if (Schema::hasColumn('groomer_services', 'name')) {
                 $serviceQuery->whereNotNull('name')->whereRaw("TRIM(name) <> ''");
             }
-
-            if ($withRows) {
-                $servicesData = $serviceQuery
-                    ->orderByDesc('id')
-                    ->get();
-                $serviceRows = $servicesData->count();
-            } else {
-                $serviceRows = (int) $serviceQuery->count();
-            }
+            $serviceRows = (int) $serviceQuery->count();
         }
 
         $videoCompleted = $videoRows > 0;
         $inClinicCompleted = $inClinicRows > 0;
         $servicesCompleted = $serviceRows > 0;
 
-        $result = [
+        return [
             'video_schedule' => [
                 'completed' => $videoCompleted,
                 'rows' => $videoRows,
                 'scope' => 'doctor',
-                'table' => $videoSource,
             ],
             'in_clinic_schedule' => [
                 'completed' => $inClinicCompleted,
                 'rows' => $inClinicRows,
                 'scope' => 'clinic',
-                'table' => 'doctor_availability',
                 'clinic_doctors_count' => count($clinicDoctorIds),
             ],
             'services' => [
                 'completed' => $servicesCompleted,
                 'rows' => $serviceRows,
                 'scope' => 'clinic',
-                'table' => 'groomer_services',
             ],
             'all_completed' => $videoCompleted && $inClinicCompleted && $servicesCompleted,
         ];
-
-        if ($withRows) {
-            $result['video_schedule']['data'] = $videoData->map(fn ($row) => (array) $row)->values();
-            $result['in_clinic_schedule']['data'] = $inClinicData->map(fn ($row) => (array) $row)->values();
-            $result['services']['data'] = $servicesData->map(fn ($row) => (array) $row)->values();
-        }
-
-        return $result;
     }
 }

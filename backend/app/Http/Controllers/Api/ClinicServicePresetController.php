@@ -40,21 +40,17 @@ class ClinicServicePresetController extends Controller
             ]);
         }
 
-        $query = DB::table('groomer_services')
-            ->selectRaw('id, user_id as clinic_id, TRIM(name) as name')
+        $presets = DB::table('groomer_services')
             ->where('user_id', $clinicId)
-            ->whereNotNull('name')
-            ->whereRaw("TRIM(name) <> ''");
-
-        $presets = $query
             ->orderByDesc('id')
             ->get()
             ->map(static function ($row) {
-                return [
-                    'id' => isset($row->id) ? (int) $row->id : null,
-                    'clinic_id' => isset($row->clinic_id) ? (int) $row->clinic_id : null,
-                    'name' => $row->name ?? null,
-                ];
+                $data = (array) $row;
+                // Keep backward compatibility for consumers expecting clinic_id.
+                if (!array_key_exists('clinic_id', $data)) {
+                    $data['clinic_id'] = isset($data['user_id']) ? (int) $data['user_id'] : null;
+                }
+                return $data;
             })
             ->values();
 
