@@ -42,7 +42,7 @@ class ClinicServicePresetController extends Controller
 
         $defaultNames = $this->normalizedDefaultPresetNames();
         $query = DB::table('groomer_services')
-            ->selectRaw('MIN(id) as id, user_id as clinic_id, TRIM(name) as name')
+            ->selectRaw('MIN(id) as id, user_id as clinic_id, MIN(TRIM(name)) as name, LOWER(TRIM(name)) as name_key')
             ->where('user_id', $clinicId)
             ->whereNotNull('name')
             ->whereRaw("TRIM(name) <> ''");
@@ -55,7 +55,7 @@ class ClinicServicePresetController extends Controller
         $presets = $query
             ->groupBy('user_id')
             ->groupByRaw('LOWER(TRIM(name))')
-            ->orderByRaw('LOWER(TRIM(name))')
+            ->orderBy('name_key')
             ->get()
             ->map(static function ($row) {
                 return [
