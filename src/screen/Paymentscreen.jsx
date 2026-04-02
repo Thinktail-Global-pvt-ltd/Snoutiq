@@ -90,7 +90,7 @@ const STATIC_CLINIC_ID = 115;
 const STATIC_SERVICE_ID = "consult_basic";
 const STATIC_RATE_TYPE = "day";
 const STATIC_SLOT_LABEL = "Day (8 AM - 10 PM)";
-const STATIC_CONSULTATION_AMOUNT = 499;
+const STATIC_CONSULTATION_AMOUNT = 599;
 const STATIC_SERVICE_AMOUNT = 0;
 const STATIC_DISCOUNT_AMOUNT = 100;
 const GST_RATE = 0.18;
@@ -514,11 +514,11 @@ export const PaymentScreen = ({
                           <div className="flex items-center gap-2">
                             {discountAmount > 0 ? (
                               <span className="text-[11px] text-gray-400 line-through">
-                                Rs 499
+                                Rs 599
                               </span>
                             ) : null}
                             <span className="text-base font-bold text-gray-900">
-                              Rs 399
+                              Rs 499
                             </span>
                           </div>
                         </div>

@@ -134,8 +134,8 @@ function getCurrentPrice() {
 }
 
 const PAYMENT_AMOUNTS = {
-  standard: 499,
-  discounted: 399,
+  standard: 599,
+  discounted: 499,
 };
 
 const formatInr = (value) => {
@@ -309,7 +309,7 @@ const HERO_REVIEW_CARDS = [
   },
   {
     name: "Ananya K.",
-    text: "₹399 for a proper video consultation is very reasonable. The vet gave a full assessment and told me exactly what to do next. Really impressed.",
+    text: "₹499 for a proper video consultation is very reasonable. The vet gave a full assessment and told me exactly what to do next. Really impressed.",
   },
 ];
 
@@ -521,10 +521,10 @@ export default function VideoConsultLP() {
     offers: {
       "@type": "Offer",
       priceCurrency: "INR",
-      price: "399",
+      price: "499",
       availability: "https://schema.org/InStock",
       description:
-        "Standard online consultation fee ₹499. Current payable price ₹399 after ₹100 off. Same pricing applies throughout the day.",
+        "Standard online consultation fee ₹599. Current payable price ₹499 after ₹100 off. Same pricing applies throughout the day.",
     },
     aggregateRating: {
       "@type": "AggregateRating",
@@ -614,7 +614,7 @@ export default function VideoConsultLP() {
       "@type": "Offer",
       name: "Online Vet Consultation",
       priceCurrency: "INR",
-      price: "399",
+      price: "499",
       availability: "https://schema.org/InStock",
       url: CANONICAL,
     },
@@ -1109,7 +1109,7 @@ const consultFormRef = useRef(null);
                 },
                 {
                   n: "02",
-                  title: "Pay securely (₹399)",
+                  title: "Pay securely (₹499)",
                   desc: "UPI, card or netbanking. No hidden charges.",
                   extra: "No subscription. No recurring fee.",
                 },
@@ -1310,7 +1310,7 @@ const consultFormRef = useRef(null);
                 },
                 {
                   q: "How much does it cost?",
-                  a: "Online consultation is ₹399 after ₹100 off on the standard ₹499 consultation fee. Same pricing applies throughout the day. No hidden fees.",
+                  a: "Online consultation is ₹499 after ₹100 off on the standard ₹599 consultation fee. Same pricing applies throughout the day. No hidden fees.",
                 },
                 {
                   q: "How quickly will the vet connect?",
@@ -1318,7 +1318,7 @@ const consultFormRef = useRef(null);
                 },
                 {
                   q: "What happens after the consultation?",
-                  a: "The vet shares a complete care plan covering what to do next, what to watch out for, and follow-up if needed — all included in the ₹399 fee.",
+                  a: "The vet shares a complete care plan covering what to do next, what to watch out for, and follow-up if needed — all included in the ₹499 fee.",
                 },
                 {
                   q: "What animals can I consult for?",
