@@ -26,7 +26,14 @@ class ClinicServicePresetController extends Controller
             ], 422);
         }
 
-        if (!Schema::hasTable('clinic_service_presets')) {
+        if (!Schema::hasTable('groomer_services')) {
+            return response()->json([
+                'status' => true,
+                'data' => [],
+            ]);
+        }
+
+        if (!Schema::hasColumn('groomer_services', 'user_id') || !Schema::hasColumn('groomer_services', 'name')) {
             return response()->json([
                 'status' => true,
                 'data' => [],
@@ -34,17 +41,30 @@ class ClinicServicePresetController extends Controller
         }
 
         $defaultNames = $this->normalizedDefaultPresetNames();
-        $placeholders = implode(',', array_fill(0, count($defaultNames), '?'));
-
-        $query = ClinicServicePreset::query()
-            ->where('clinic_id', $clinicId)
-            ->orderBy('name');
+        $query = DB::table('groomer_services')
+            ->selectRaw('MIN(id) as id, user_id as clinic_id, TRIM(name) as name')
+            ->where('user_id', $clinicId)
+            ->whereNotNull('name')
+            ->whereRaw("TRIM(name) <> ''");
 
         if ($defaultNames !== []) {
+            $placeholders = implode(',', array_fill(0, count($defaultNames), '?'));
             $query->whereRaw("LOWER(TRIM(name)) NOT IN ({$placeholders})", $defaultNames);
         }
 
-        $presets = $query->get(['id', 'clinic_id', 'name']);
+        $presets = $query
+            ->groupBy('user_id')
+            ->groupByRaw('LOWER(TRIM(name))')
+            ->orderByRaw('LOWER(TRIM(name))')
+            ->get()
+            ->map(static function ($row) {
+                return [
+                    'id' => isset($row->id) ? (int) $row->id : null,
+                    'clinic_id' => isset($row->clinic_id) ? (int) $row->clinic_id : null,
+                    'name' => $row->name ?? null,
+                ];
+            })
+            ->values();
 
         return response()->json([
             'status' => true,

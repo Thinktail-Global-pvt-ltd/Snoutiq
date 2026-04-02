@@ -13,39 +13,15 @@ class ClinicServicePresetApiTest extends TestCase
 
     public function test_index_returns_only_custom_presets_for_clinic_id(): void
     {
-        if (!Schema::hasTable('clinic_service_presets')) {
-            $this->markTestSkipped('clinic_service_presets table does not exist.');
+        if (!Schema::hasTable('groomer_services')) {
+            $this->markTestSkipped('groomer_services table does not exist.');
         }
 
         $this->createClinic(101);
-
-        $now = now();
-        DB::table('clinic_service_presets')->insert([
-            [
-                'clinic_id' => 101,
-                'name' => 'Vaccination',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'clinic_id' => 101,
-                'name' => 'Deworming',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'clinic_id' => 101,
-                'name' => 'X-Ray',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'clinic_id' => 101,
-                'name' => 'Physiotherapy',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-        ]);
+        $this->createGroomerService(101, 'Vaccination');
+        $this->createGroomerService(101, 'Deworming');
+        $this->createGroomerService(101, 'X-Ray');
+        $this->createGroomerService(101, 'Physiotherapy');
 
         $response = $this->getJson('/api/clinic-service-presets?clinic_id=101');
 
@@ -58,8 +34,8 @@ class ClinicServicePresetApiTest extends TestCase
 
     public function test_index_resolves_clinic_by_owner_user_id_when_user_id_is_provided(): void
     {
-        if (!Schema::hasTable('clinic_service_presets')) {
-            $this->markTestSkipped('clinic_service_presets table does not exist.');
+        if (!Schema::hasTable('groomer_services')) {
+            $this->markTestSkipped('groomer_services table does not exist.');
         }
 
         if (!Schema::hasColumn('vet_registerations_temp', 'owner_user_id')) {
@@ -67,13 +43,8 @@ class ClinicServicePresetApiTest extends TestCase
         }
 
         $this->createClinic(202, ['owner_user_id' => 9002]);
-
-        DB::table('clinic_service_presets')->insert([
-            'clinic_id' => 202,
-            'name' => 'Laser Therapy',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $this->createUser(9002);
+        $this->createGroomerService(202, 'Laser Therapy');
 
         $response = $this->getJson('/api/clinic-service-presets?user_id=9002');
 
@@ -86,8 +57,8 @@ class ClinicServicePresetApiTest extends TestCase
 
     public function test_index_resolves_clinic_by_doctor_id_when_user_id_is_provided(): void
     {
-        if (!Schema::hasTable('clinic_service_presets')) {
-            $this->markTestSkipped('clinic_service_presets table does not exist.');
+        if (!Schema::hasTable('groomer_services')) {
+            $this->markTestSkipped('groomer_services table does not exist.');
         }
 
         $this->createClinic(303);
@@ -100,12 +71,7 @@ class ClinicServicePresetApiTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        DB::table('clinic_service_presets')->insert([
-            'clinic_id' => 303,
-            'name' => 'Nutrition Plan',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $this->createGroomerService(303, 'Nutrition Plan');
 
         $response = $this->getJson('/api/clinic-service-presets?user_id=77');
 
@@ -118,8 +84,8 @@ class ClinicServicePresetApiTest extends TestCase
 
     public function test_index_prefers_direct_clinic_id_when_user_id_collides_with_doctor_id(): void
     {
-        if (!Schema::hasTable('clinic_service_presets')) {
-            $this->markTestSkipped('clinic_service_presets table does not exist.');
+        if (!Schema::hasTable('groomer_services')) {
+            $this->markTestSkipped('groomer_services table does not exist.');
         }
 
         $this->createClinic(1);
@@ -133,21 +99,8 @@ class ClinicServicePresetApiTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $now = now();
-        DB::table('clinic_service_presets')->insert([
-            [
-                'clinic_id' => 1,
-                'name' => 'Clinic One Service',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'clinic_id' => 2,
-                'name' => 'Clinic Two Service',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-        ]);
+        $this->createGroomerService(1, 'Clinic One Service');
+        $this->createGroomerService(2, 'Clinic Two Service');
 
         $response = $this->getJson('/api/clinic-service-presets?user_id=1');
 
@@ -160,6 +113,8 @@ class ClinicServicePresetApiTest extends TestCase
 
     private function createClinic(int $id, array $overrides = []): void
     {
+        $this->createUser($id);
+
         $payload = array_merge([
             'id' => $id,
             'name' => 'Clinic '.$id,
@@ -170,5 +125,76 @@ class ClinicServicePresetApiTest extends TestCase
         ], $overrides);
 
         DB::table('vet_registerations_temp')->insert($payload);
+    }
+
+    private function createUser(int $id): void
+    {
+        if (DB::table('users')->where('id', $id)->exists()) {
+            return;
+        }
+
+        DB::table('users')->insert([
+            'id' => $id,
+            'name' => 'User '.$id,
+            'email' => "user{$id}@example.test",
+            'phone' => '90000'.str_pad((string) $id, 5, '0', STR_PAD_LEFT),
+            'role' => 'vet',
+            'password' => bcrypt('secret'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createCategory(int $clinicId): int
+    {
+        $existing = DB::table('groomer_service_categories')
+            ->where('user_id', $clinicId)
+            ->value('id');
+        if ($existing) {
+            return (int) $existing;
+        }
+
+        $id = (int) DB::table('groomer_service_categories')->insertGetId([
+            'name' => 'General',
+            'user_id' => $clinicId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    private function createGroomerService(int $clinicId, string $name): void
+    {
+        $categoryId = $this->createCategory($clinicId);
+
+        $payload = [
+            'user_id' => $clinicId,
+            'groomer_service_category_id' => $categoryId,
+            'name' => $name,
+            'description' => null,
+            'pet_type' => 'Dog',
+            'price' => 100,
+            'duration' => 30,
+            'status' => 'Active',
+            'service_pic' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('groomer_services', 'price_min')) {
+            $payload['price_min'] = 100;
+        }
+        if (Schema::hasColumn('groomer_services', 'price_max')) {
+            $payload['price_max'] = 100;
+        }
+        if (Schema::hasColumn('groomer_services', 'price_after_service')) {
+            $payload['price_after_service'] = 0;
+        }
+        if (Schema::hasColumn('groomer_services', 'main_service')) {
+            $payload['main_service'] = 'custom_service';
+        }
+
+        DB::table('groomer_services')->insert($payload);
     }
 }
