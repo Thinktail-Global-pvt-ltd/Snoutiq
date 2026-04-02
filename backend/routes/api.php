@@ -2414,6 +2414,8 @@ Route::post('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleCont
 Route::put('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updatePrice']);
 Route::get('/doctors/{id}/schedules/combined', [\App\Http\Controllers\Api\DoctorScheduleSummaryController::class, 'show']);
 Route::get('/doctors/{id}/schedules/completion', [\App\Http\Controllers\Api\DoctorScheduleSummaryController::class, 'completion']);
+Route::delete('/doctors/{id}/schedules/completion/reset', [\App\Http\Controllers\Api\DoctorScheduleSummaryController::class, 'resetCompletionData']);
+Route::post('/doctors/{id}/schedules/completion/reset', [\App\Http\Controllers\Api\DoctorScheduleSummaryController::class, 'resetCompletionData']);
 Route::get('/clinics/{id}/doctor-availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'getClinicAvailability']);
 Route::put('/clinics/{id}/doctor-availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updateClinicAvailability']);
 

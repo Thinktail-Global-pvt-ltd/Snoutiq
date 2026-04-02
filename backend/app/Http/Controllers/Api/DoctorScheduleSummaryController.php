@@ -119,6 +119,101 @@ class DoctorScheduleSummaryController extends Controller
     }
 
     /**
+     * DELETE|POST /api/doctors/{id}/schedules/completion/reset
+     *
+     * Clears the data blocks used by completion calculation:
+     * 1) doctor video schedule for this doctor
+     * 2) clinic in-clinic schedule for all doctors in this doctor's clinic
+     * 3) clinic services for this doctor's clinic
+     */
+    public function resetCompletionData(Request $request, string $id)
+    {
+        $doctorId = (int) $id;
+        if ($doctorId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'doctor_id must be a positive integer',
+            ], 422);
+        }
+
+        $doctor = DB::table('doctors')
+            ->select('id', 'doctor_name', 'vet_registeration_id')
+            ->where('id', $doctorId)
+            ->first();
+
+        if (!$doctor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+
+        $clinicId = (int) ($doctor->vet_registeration_id ?? 0);
+        $clinicDoctorIds = [];
+        if ($clinicId > 0 && Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'vet_registeration_id')) {
+            $clinicDoctorIds = DB::table('doctors')
+                ->where('vet_registeration_id', $clinicId)
+                ->pluck('id')
+                ->map(fn ($value) => (int) $value)
+                ->filter(fn ($value) => $value > 0)
+                ->values()
+                ->all();
+        }
+
+        $deleted = [
+            'doctor_video_availability_rows' => 0,
+            'doctor_availability_video_rows' => 0,
+            'doctor_availability_in_clinic_rows' => 0,
+            'groomer_services_rows' => 0,
+        ];
+
+        DB::transaction(function () use ($doctorId, $clinicId, $clinicDoctorIds, &$deleted) {
+            if (Schema::hasTable('doctor_video_availability')) {
+                $query = DB::table('doctor_video_availability')
+                    ->where('doctor_id', $doctorId);
+                $deleted['doctor_video_availability_rows'] = (int) $query->count();
+                $query->delete();
+            }
+
+            if (Schema::hasTable('doctor_availability')) {
+                $videoQuery = DB::table('doctor_availability')
+                    ->where('doctor_id', $doctorId)
+                    ->where('service_type', 'video');
+                $deleted['doctor_availability_video_rows'] = (int) $videoQuery->count();
+                $videoQuery->delete();
+
+                if (!empty($clinicDoctorIds)) {
+                    $inClinicQuery = DB::table('doctor_availability')
+                        ->whereIn('doctor_id', $clinicDoctorIds)
+                        ->where('service_type', 'in_clinic');
+                    $deleted['doctor_availability_in_clinic_rows'] = (int) $inClinicQuery->count();
+                    $inClinicQuery->delete();
+                }
+            }
+
+            if ($clinicId > 0 && Schema::hasTable('groomer_services') && Schema::hasColumn('groomer_services', 'user_id')) {
+                $servicesQuery = DB::table('groomer_services')
+                    ->where('user_id', $clinicId);
+                $deleted['groomer_services_rows'] = (int) $servicesQuery->count();
+                $servicesQuery->delete();
+            }
+        });
+
+        $completion = $this->buildThreeWayCompletionStatus($doctorId, $clinicId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Completion-linked schedule data reset successfully.',
+            'doctor_id' => $doctorId,
+            'doctor_name' => $doctor->doctor_name,
+            'clinic_id' => $clinicId,
+            'clinic_doctors_affected' => count($clinicDoctorIds),
+            'deleted' => $deleted,
+            'completion' => $completion,
+        ]);
+    }
+
+    /**
      * Collapse repeated slots (same timing + settings) across days into one row with a days list.
      */
     private function aggregateSlotsByTime($rows): array
