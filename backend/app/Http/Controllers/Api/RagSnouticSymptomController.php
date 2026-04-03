@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class RagSnouticSymptomController extends Controller
 {
@@ -117,6 +118,11 @@ class RagSnouticSymptomController extends Controller
             'query' => ['nullable', 'string', 'required_without:question'],
             'pet_name' => ['nullable', 'string', 'max:255', 'required_without:name'],
             'name' => ['nullable', 'string', 'max:255'],
+            'owner_name' => ['nullable', 'string', 'max:255'],
+            'user_name' => ['nullable', 'string', 'max:255'],
+            'phone_number' => ['nullable', 'string', 'max:32'],
+            'phone' => ['nullable', 'string', 'max:32'],
+            'mobile' => ['nullable', 'string', 'max:32'],
             'species' => ['nullable', 'string', 'max:100'],
             'pet_species' => ['nullable', 'string', 'max:100'],
             'pet_type' => ['nullable', 'string', 'max:100'],
@@ -151,6 +157,15 @@ class RagSnouticSymptomController extends Controller
             $vaccinationSummary = $this->buildVaccinationSummary($vaccination);
         }
 
+        $persistedEntity = $this->persistUserAndPetFromPageData(
+            validated: $validated,
+            petName: trim((string) $petName)
+        );
+        $resolvedUserId = $persistedEntity['user_id'] ?? ($validated['user_id'] ?? null);
+        $resolvedPetId = $persistedEntity['pet_id'] ?? ($validated['pet_id'] ?? null);
+        $resolvedPhoneNumber = $persistedEntity['phone_number']
+            ?? $this->normalizePhoneNumber($this->firstFilled($validated, ['phone_number', 'phone', 'mobile']));
+
         $payloadInput = [
             'name' => trim((string) $petName),
             'species' => (string) ($this->firstFilled($validated, ['species', 'pet_species', 'pet_type']) ?? 'Dog'),
@@ -166,8 +181,9 @@ class RagSnouticSymptomController extends Controller
         $requestPayload = $this->symptomService->normalizePayload($payloadInput);
 
         $formValues = [
-            'user_id' => $validated['user_id'] ?? null,
-            'pet_id' => $validated['pet_id'] ?? null,
+            'user_id' => $resolvedUserId,
+            'pet_id' => $resolvedPetId,
+            'phone_number' => $resolvedPhoneNumber,
             'question' => trim((string) $query),
             'pet_name' => trim((string) $petName),
             'pet_breed' => $this->firstFilled($validated, ['pet_breed', 'breed']),
@@ -188,13 +204,13 @@ class RagSnouticSymptomController extends Controller
 
         $body = [
             'success' => $queryResult['success'],
-            'pet_id' => null,
+            'pet_id' => $resolvedPetId,
             'data' => [
-                'prefill_pet_id' => null,
+                'prefill_pet_id' => $resolvedPetId,
                 'prefill_data' => [
-                    'pet_id' => $validated['pet_id'] ?? null,
+                    'pet_id' => $resolvedPetId,
                     'pet' => [
-                        'id' => $validated['pet_id'] ?? null,
+                        'id' => $resolvedPetId,
                         'name' => trim((string) $petName),
                         'breed' => $this->firstFilled($validated, ['pet_breed', 'breed']),
                         'species' => $this->firstFilled($validated, ['species', 'pet_species', 'pet_type']) ?? 'Dog',
@@ -209,6 +225,13 @@ class RagSnouticSymptomController extends Controller
                 'error' => $error,
                 'response_data' => $responseData,
                 'symptom_data' => data_get($responseData, 'data', []),
+                'persisted' => [
+                    'phone_number' => $resolvedPhoneNumber,
+                    'user_id' => $resolvedUserId,
+                    'pet_id' => $resolvedPetId,
+                    'user_created' => (bool) ($persistedEntity['user_created'] ?? false),
+                    'pet_created' => (bool) ($persistedEntity['pet_created'] ?? false),
+                ],
             ],
         ];
 
@@ -407,6 +430,253 @@ PROMPT;
         return $parts === [] ? 'Vaccination data provided.' : implode('; ', $parts);
     }
 
+    /**
+     * Persist user/pet when phone number is submitted in page-data payload.
+     * Returns resolved IDs and create flags.
+     */
+    private function persistUserAndPetFromPageData(array $validated, string $petName): array
+    {
+        $resolvedPhone = $this->normalizePhoneNumber($this->firstFilled($validated, ['phone_number', 'phone', 'mobile']));
+        $resolvedUserId = is_numeric($validated['user_id'] ?? null) ? (int) $validated['user_id'] : null;
+        $resolvedPetId = is_numeric($validated['pet_id'] ?? null) ? (int) $validated['pet_id'] : null;
+
+        $userCreated = false;
+        $petCreated = false;
+
+        if (!Schema::hasTable('users') || !Schema::hasTable('pets')) {
+            return [
+                'phone_number' => $resolvedPhone,
+                'user_id' => $resolvedUserId,
+                'pet_id' => $resolvedPetId,
+                'user_created' => $userCreated,
+                'pet_created' => $petCreated,
+            ];
+        }
+
+        try {
+            $userRow = null;
+            if ($resolvedUserId !== null && $resolvedUserId > 0) {
+                $userRow = DB::table('users')
+                    ->where('id', $resolvedUserId)
+                    ->first();
+            }
+
+            if (!$userRow && $resolvedPhone !== null && Schema::hasColumn('users', 'phone')) {
+                $rawPhone = trim((string) ($this->firstFilled($validated, ['phone_number', 'phone', 'mobile']) ?? ''));
+                $userRow = DB::table('users')
+                    ->where('phone', $resolvedPhone)
+                    ->when($rawPhone !== '', function ($q) use ($rawPhone) {
+                        $q->orWhere('phone', $rawPhone);
+                    })
+                    ->orderByDesc('id')
+                    ->first();
+            }
+
+            if (!$userRow && $resolvedPhone !== null) {
+                $userPayload = [];
+                $ownerName = trim((string) ($this->firstFilled($validated, ['owner_name', 'user_name']) ?? ''));
+                if (Schema::hasColumn('users', 'name')) {
+                    $userPayload['name'] = $ownerName !== '' ? $ownerName : ('RAG User '.$resolvedPhone);
+                }
+
+                if (Schema::hasColumn('users', 'phone')) {
+                    $userPayload['phone'] = $resolvedPhone;
+                }
+
+                if (Schema::hasColumn('users', 'email')) {
+                    $emailLocal = preg_replace('/[^a-z0-9]/i', '', $resolvedPhone) ?: (string) now()->timestamp;
+                    $emailCandidate = "rag_{$emailLocal}@snoutiq.local";
+                    $suffix = 1;
+                    while (DB::table('users')->where('email', $emailCandidate)->exists()) {
+                        $emailCandidate = "rag_{$emailLocal}_{$suffix}@snoutiq.local";
+                        $suffix++;
+                    }
+                    $userPayload['email'] = $emailCandidate;
+                }
+
+                if (Schema::hasColumn('users', 'password')) {
+                    $userPayload['password'] = bcrypt(Str::random(32));
+                }
+
+                if (Schema::hasColumn('users', 'role')) {
+                    $userPayload['role'] = 'pet';
+                }
+
+                if (Schema::hasColumn('users', 'phone_verified_at')) {
+                    $userPayload['phone_verified_at'] = now();
+                }
+
+                if (Schema::hasColumn('users', 'created_at')) {
+                    $userPayload['created_at'] = now();
+                }
+                if (Schema::hasColumn('users', 'updated_at')) {
+                    $userPayload['updated_at'] = now();
+                }
+
+                if (!empty($userPayload)) {
+                    $newUserId = (int) DB::table('users')->insertGetId($userPayload);
+                    if ($newUserId > 0) {
+                        $userRow = DB::table('users')->where('id', $newUserId)->first();
+                        $userCreated = $userRow !== null;
+                    }
+                }
+            }
+
+            if ($userRow) {
+                $resolvedUserId = (int) $userRow->id;
+            }
+
+            if ($resolvedUserId !== null && $resolvedUserId > 0 && $petName !== '') {
+                $petUserColumn = Schema::hasColumn('pets', 'user_id')
+                    ? 'user_id'
+                    : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+                if ($petUserColumn !== null) {
+                    $petQuery = DB::table('pets')
+                        ->where($petUserColumn, $resolvedUserId);
+
+                    $requestedPetId = is_numeric($validated['pet_id'] ?? null) ? (int) $validated['pet_id'] : 0;
+                    if ($requestedPetId > 0) {
+                        $petQuery->where('id', $requestedPetId);
+                    } else {
+                        $petQuery->whereRaw('LOWER(TRIM(name)) = ?', [strtolower(trim($petName))]);
+                    }
+
+                    $petRow = $petQuery->orderByDesc('id')->first();
+                    $petPayload = [];
+
+                    if (Schema::hasColumn('pets', 'name')) {
+                        $petPayload['name'] = trim($petName);
+                    }
+                    if (Schema::hasColumn('pets', 'breed')) {
+                        $petPayload['breed'] = (string) ($this->firstFilled($validated, ['pet_breed', 'breed']) ?? '');
+                    }
+                    if (Schema::hasColumn('pets', 'pet_age')) {
+                        $petAge = $this->extractInteger($this->firstFilled($validated, ['pet_age', 'age']));
+                        if ($petAge !== null) {
+                            $petPayload['pet_age'] = $petAge;
+                        }
+                    }
+                    if (Schema::hasColumn('pets', 'pet_gender')) {
+                        $petPayload['pet_gender'] = (string) ($this->firstFilled($validated, ['pet_gender', 'sex']) ?? '');
+                    } elseif (Schema::hasColumn('pets', 'gender')) {
+                        $petPayload['gender'] = (string) ($this->firstFilled($validated, ['pet_gender', 'sex']) ?? '');
+                    }
+
+                    $species = (string) ($this->firstFilled($validated, ['species', 'pet_species', 'pet_type']) ?? '');
+                    if ($species !== '') {
+                        if (Schema::hasColumn('pets', 'pet_type')) {
+                            $petPayload['pet_type'] = strtolower(trim($species));
+                        } elseif (Schema::hasColumn('pets', 'type')) {
+                            $petPayload['type'] = strtolower(trim($species));
+                        }
+                    }
+
+                    if (Schema::hasColumn('pets', 'weight')) {
+                        $weight = $this->extractFloat($validated['weight'] ?? null);
+                        if ($weight !== null) {
+                            $petPayload['weight'] = $weight;
+                        }
+                    }
+
+                    if (Schema::hasColumn('pets', 'medical_history') && isset($validated['medical_history'])) {
+                        $petPayload['medical_history'] = $validated['medical_history'];
+                    }
+
+                    if (Schema::hasColumn('pets', 'updated_at')) {
+                        $petPayload['updated_at'] = now();
+                    }
+
+                    if ($petRow) {
+                        if (!empty($petPayload)) {
+                            DB::table('pets')->where('id', $petRow->id)->update($petPayload);
+                        }
+                        $resolvedPetId = (int) $petRow->id;
+                    } else {
+                        $insertPayload = array_merge([$petUserColumn => $resolvedUserId], $petPayload);
+                        if (Schema::hasColumn('pets', 'created_at')) {
+                            $insertPayload['created_at'] = now();
+                        }
+                        if (Schema::hasColumn('pets', 'updated_at')) {
+                            $insertPayload['updated_at'] = now();
+                        }
+
+                        $newPetId = (int) DB::table('pets')->insertGetId($insertPayload);
+                        if ($newPetId > 0) {
+                            $resolvedPetId = $newPetId;
+                            $petCreated = true;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('RAG page-data user/pet persistence failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [
+            'phone_number' => $resolvedPhone,
+            'user_id' => $resolvedUserId,
+            'pet_id' => $resolvedPetId,
+            'user_created' => $userCreated,
+            'pet_created' => $petCreated,
+        ];
+    }
+
+    private function normalizePhoneNumber(mixed $phone): ?string
+    {
+        if (!is_scalar($phone)) {
+            return null;
+        }
+
+        $raw = trim((string) $phone);
+        if ($raw === '') {
+            return null;
+        }
+
+        $normalized = preg_replace('/[^0-9+]/', '', $raw);
+        if ($normalized === null || $normalized === '') {
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    private function extractInteger(mixed $value): ?int
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        if (is_string($value) && preg_match('/-?\d+/', $value, $matches) === 1) {
+            return (int) $matches[0];
+        }
+
+        return null;
+    }
+
+    private function extractFloat(mixed $value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        if (is_string($value) && preg_match('/-?\d+(?:\.\d+)?/', $value, $matches) === 1) {
+            return (float) $matches[0];
+        }
+
+        return null;
+    }
+
     private function persistPageDataLog(
         Request $request,
         array $validated,
@@ -421,8 +691,12 @@ PROMPT;
         }
 
         try {
-            $userId = is_numeric($validated['user_id'] ?? null) ? (int) $validated['user_id'] : null;
-            $petId = is_numeric($validated['pet_id'] ?? null) ? (int) $validated['pet_id'] : null;
+            $userId = is_numeric($formValues['user_id'] ?? null)
+                ? (int) $formValues['user_id']
+                : (is_numeric($validated['user_id'] ?? null) ? (int) $validated['user_id'] : null);
+            $petId = is_numeric($formValues['pet_id'] ?? null)
+                ? (int) $formValues['pet_id']
+                : (is_numeric($validated['pet_id'] ?? null) ? (int) $validated['pet_id'] : null);
             $petName = trim((string) ($this->firstFilled($validated, ['pet_name', 'name']) ?? ''));
 
             DB::table('rag_symptom_checker_logs')->insert([
