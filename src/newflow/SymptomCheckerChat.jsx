@@ -10,6 +10,7 @@ import {
 import { apiBaseUrl, apiPost } from "../lib/api";
 
 const EMPTY_PET_FORM = {
+  owner_name: "",
   pet_name: "",
   species: "",
   breed: "",
@@ -557,6 +558,13 @@ function PetDetailsModal({
         <form onSubmit={onSubmit} className="flex-1 overflow-y-auto p-5">
           <div className="grid gap-4 md:grid-cols-2">
             <Field
+              label="Owner Name"
+              name="owner_name"
+              value={petForm.owner_name}
+              onChange={onChange}
+              placeholder="Rahul"
+            />
+            <Field
               label="Pet Name"
               name="pet_name"
               value={petForm.pet_name}
@@ -1093,6 +1101,7 @@ export function SymptomCheckerChat() {
     try {
       const response = await apiPost("/api/rag-snoutic-symptom-checker/page-data", {
         question,
+        owner_name: formValues.owner_name.trim(),
         pet_name: formValues.pet_name.trim(),
         species: formValues.species.trim(),
         breed: formValues.breed.trim(),
