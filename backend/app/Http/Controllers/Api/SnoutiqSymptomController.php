@@ -401,6 +401,21 @@ class SnoutiqSymptomController extends Controller
         return response()->json(['success' => true, 'session_id' => $session_id, 'state' => $state]);
     }
 
+    /**
+     * POST /api/symptom-session/{session_id}/reset
+     * Clears cached triage state for the provided session id.
+     */
+    public function resetSession(Request $request, string $session_id): \Illuminate\Http\JsonResponse
+    {
+        Cache::forget("snoutiq_symptom:{$session_id}");
+
+        return response()->json([
+            'success' => true,
+            'session_id' => $session_id,
+            'message' => 'Session state reset successfully.',
+        ]);
+    }
+
     // =========================================================================
     // PET PROFILE LOADER
     // =========================================================================

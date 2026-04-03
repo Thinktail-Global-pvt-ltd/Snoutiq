@@ -432,6 +432,10 @@ Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request 
     ]);
 })->name('snoutiq.rag-snoutic-symptom-checker');
 
+Route::get('/snoutiq/symptom-checker-web', function () {
+    return view('snoutiq.symptom-checker-web');
+})->name('snoutiq.symptom-checker-web');
+
 // Protected application routes (requires session user)
 Route::middleware([EnsureSessionUser::class])->group(function(){
     Route::get('/profile', function () {
