@@ -84,6 +84,7 @@ use App\Http\Controllers\Api\V1\VaccinationPaymentController as V1VaccinationPay
 use App\Http\Controllers\Api\ClinicFinancialsController;
 use App\Http\Controllers\Api\PetConsultTimelineController;
 use App\Http\Controllers\Api\RagSnouticSymptomController;
+use App\Http\Controllers\Api\SnoutiqSymptomController;
 use App\Services\PetDiseaseInferenceService;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
@@ -1908,7 +1909,10 @@ Route::post('/referrals/download', [ReferralController::class, 'sendDownloadLink
 Route::get('/referrals/{code}', [ReferralController::class, 'showByCode'])->name('api.referrals.lookup');
 Route::post('/downloads/track', [ReferralController::class, 'trackDownload'])->name('api.downloads.track');
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
-Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
+Route::post('/chat/send', [SnoutiqSymptomController::class, 'chatSend']);
+Route::post('/symptom-check', [SnoutiqSymptomController::class, 'check']);
+Route::post('/symptom-followup', [SnoutiqSymptomController::class, 'followup']);
+Route::get('/symptom-session/{session_id}', [SnoutiqSymptomController::class, 'session']);
 Route::post('/chat/dog-disease', [GeminiChatController::class, 'dogDisease']);
 Route::match(['put', 'post'], '/chat/dog-disease/question', [GeminiChatController::class, 'updateDogDiseaseQuestion']);
 Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);
@@ -2258,7 +2262,7 @@ Route::view('/prompt-test-v2', 'prompt-test-v2');
 
 
 // Old chat endpoint (kept as-is)
-Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
+Route::post('/chat/send', [SnoutiqSymptomController::class, 'chatSend']);
 
 // New Unified Intelligence endpoints
 Route::post('/chat/unified', [GeminiChatController::class, 'unifiedProcess']);
