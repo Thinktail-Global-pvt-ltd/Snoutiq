@@ -230,7 +230,9 @@ class RagSnouticSymptomController extends Controller
                     'user_id' => $resolvedUserId,
                     'pet_id' => $resolvedPetId,
                     'user_created' => (bool) ($persistedEntity['user_created'] ?? false),
+                    'user_updated' => (bool) ($persistedEntity['user_updated'] ?? false),
                     'pet_created' => (bool) ($persistedEntity['pet_created'] ?? false),
+                    'pet_updated' => (bool) ($persistedEntity['pet_updated'] ?? false),
                 ],
             ],
         ];
@@ -441,7 +443,9 @@ PROMPT;
         $resolvedPetId = is_numeric($validated['pet_id'] ?? null) ? (int) $validated['pet_id'] : null;
 
         $userCreated = false;
+        $userUpdated = false;
         $petCreated = false;
+        $petUpdated = false;
 
         if (!Schema::hasTable('users') || !Schema::hasTable('pets')) {
             return [
@@ -449,32 +453,73 @@ PROMPT;
                 'user_id' => $resolvedUserId,
                 'pet_id' => $resolvedPetId,
                 'user_created' => $userCreated,
+                'user_updated' => $userUpdated,
                 'pet_created' => $petCreated,
+                'pet_updated' => $petUpdated,
             ];
         }
 
         try {
             $userRow = null;
-            if ($resolvedUserId !== null && $resolvedUserId > 0) {
-                $userRow = DB::table('users')
-                    ->where('id', $resolvedUserId)
-                    ->first();
-            }
+            $rawPhone = trim((string) ($this->firstFilled($validated, ['phone_number', 'phone', 'mobile']) ?? ''));
+            $ownerName = trim((string) ($this->firstFilled($validated, ['owner_name', 'user_name']) ?? ''));
 
-            if (!$userRow && $resolvedPhone !== null && Schema::hasColumn('users', 'phone')) {
-                $rawPhone = trim((string) ($this->firstFilled($validated, ['phone_number', 'phone', 'mobile']) ?? ''));
+            // Phone-first resolution: if phone exists, reuse that user row.
+            if ($resolvedPhone !== null && Schema::hasColumn('users', 'phone')) {
                 $userRow = DB::table('users')
                     ->where('phone', $resolvedPhone)
-                    ->when($rawPhone !== '', function ($q) use ($rawPhone) {
+                    ->when($rawPhone !== '' && $rawPhone !== $resolvedPhone, function ($q) use ($rawPhone) {
                         $q->orWhere('phone', $rawPhone);
                     })
                     ->orderByDesc('id')
                     ->first();
             }
 
+            if (!$userRow && $resolvedUserId !== null && $resolvedUserId > 0) {
+                $userRow = DB::table('users')
+                    ->where('id', $resolvedUserId)
+                    ->first();
+            }
+
+            if ($userRow) {
+                $resolvedUserId = (int) $userRow->id;
+
+                $userUpdatePayload = [];
+                if (Schema::hasColumn('users', 'name') && $ownerName !== '') {
+                    $userUpdatePayload['name'] = $ownerName;
+                }
+
+                if (Schema::hasColumn('users', 'phone') && $resolvedPhone !== null) {
+                    $phoneTakenByOther = DB::table('users')
+                        ->where('phone', $resolvedPhone)
+                        ->where('id', '!=', (int) $userRow->id)
+                        ->exists();
+                    if (!$phoneTakenByOther) {
+                        $userUpdatePayload['phone'] = $resolvedPhone;
+                    }
+                }
+
+                if (
+                    Schema::hasColumn('users', 'phone_verified_at')
+                    && property_exists($userRow, 'phone_verified_at')
+                    && $userRow->phone_verified_at === null
+                    && $resolvedPhone !== null
+                ) {
+                    $userUpdatePayload['phone_verified_at'] = now();
+                }
+
+                if (Schema::hasColumn('users', 'updated_at')) {
+                    $userUpdatePayload['updated_at'] = now();
+                }
+
+                if (!empty($userUpdatePayload)) {
+                    DB::table('users')->where('id', $resolvedUserId)->update($userUpdatePayload);
+                    $userUpdated = true;
+                }
+            }
+
             if (!$userRow && $resolvedPhone !== null) {
                 $userPayload = [];
-                $ownerName = trim((string) ($this->firstFilled($validated, ['owner_name', 'user_name']) ?? ''));
                 if (Schema::hasColumn('users', 'name')) {
                     $userPayload['name'] = $ownerName !== '' ? $ownerName : ('RAG User '.$resolvedPhone);
                 }
@@ -590,6 +635,7 @@ PROMPT;
                     if ($petRow) {
                         if (!empty($petPayload)) {
                             DB::table('pets')->where('id', $petRow->id)->update($petPayload);
+                            $petUpdated = true;
                         }
                         $resolvedPetId = (int) $petRow->id;
                     } else {
@@ -620,7 +666,9 @@ PROMPT;
             'user_id' => $resolvedUserId,
             'pet_id' => $resolvedPetId,
             'user_created' => $userCreated,
+            'user_updated' => $userUpdated,
             'pet_created' => $petCreated,
+            'pet_updated' => $petUpdated,
         ];
     }
 
