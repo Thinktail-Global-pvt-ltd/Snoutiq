@@ -1233,7 +1233,15 @@ PROMPT;
 
         $rooms = ChatRoom::where('user_id', $data['user_id'])
             ->orderBy('updated_at', 'desc')
-            ->get(['id', 'chat_room_token', 'summary', 'created_at', 'updated_at']);
+            ->get([
+                'id',
+                'chat_room_token',
+                'name',
+                'summary',
+                'last_emergency_status',
+                'created_at',
+                'updated_at',
+            ]);
 
         return response()->json([
             'status' => 'success',

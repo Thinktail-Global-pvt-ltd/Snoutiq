@@ -500,11 +500,10 @@
     <aside class="sidebar">
       <div class="side-head">
         <div class="brand"><span class="dot"></span> Snoutiq AI Triage</div>
-        <p class="side-sub">ChatGPT-style symptom workspace with persistent rooms and session context.</p>
+        <p class="side-sub">ChatGPT-style symptom workspace with DB-backed rooms from <code>chat_rooms</code>.</p>
       </div>
       <div class="side-actions">
-        <button id="btnNewChat" class="btn btn-primary" type="button">+ New Chat</button>
-        <button id="btnNewRoom" class="btn btn-soft" type="button">+ New Room</button>
+        <button id="btnNewRoom" class="btn btn-primary" type="button">+ New Room</button>
       </div>
       <div id="roomsList" class="rooms"></div>
     </aside>
@@ -513,12 +512,12 @@
       <header class="main-head">
         <div>
           <h2 id="activeTitle">Symptom Chat</h2>
-          <div class="muted" id="activeMeta">Session: -</div>
+          <div class="muted" id="activeMeta">Room: -</div>
         </div>
         <div class="head-right">
-          <button id="btnLoadSession" class="btn btn-soft" type="button">Load Session</button>
-          <button id="btnRestart" class="btn btn-soft" type="button">Restart Session</button>
-          <button id="btnResetAll" class="btn btn-danger" type="button">Reset All Local</button>
+          <button id="btnRefreshRooms" class="btn btn-soft" type="button">Refresh Rooms</button>
+          <button id="btnReloadRoom" class="btn btn-soft" type="button">Reload Room</button>
+          <button id="btnDeleteRoom" class="btn btn-danger" type="button">Delete Room</button>
         </div>
       </header>
 
@@ -545,12 +544,16 @@
       </div>
 
       <div class="panel">
-        <h3>Session Controls</h3>
+        <h3>Room Controls</h3>
         <div class="panel-body">
           <div class="grid-1">
             <div>
-              <label for="sessionInput">Session ID</label>
-              <input id="sessionInput" type="text" placeholder="room_xxx or existing session">
+              <label for="roomName">New Room Name (Optional)</label>
+              <input id="roomName" type="text" placeholder="e.g. Vomiting Follow-up">
+            </div>
+            <div>
+              <label for="activeRoomToken">Active Room Token</label>
+              <input id="activeRoomToken" type="text" placeholder="Select a room from sidebar" readonly>
             </div>
             <div>
               <label for="apiToken">Bearer Token (Optional)</label>
@@ -657,8 +660,6 @@
     (function () {
       const backendPrefix = window.location.pathname.startsWith('/backend/') ? '/backend' : '';
       const API_BASE = `${window.location.origin}${backendPrefix}/api`;
-      const STORAGE_ROOMS = 'snoutiq_symptom_web_rooms_v2';
-      const STORAGE_ACTIVE = 'snoutiq_symptom_web_active_room_v2';
 
       const el = {
         roomsList: document.getElementById('roomsList'),
@@ -670,7 +671,8 @@
         chips: document.getElementById('chips'),
 
         apiToken: document.getElementById('apiToken'),
-        sessionInput: document.getElementById('sessionInput'),
+        roomName: document.getElementById('roomName'),
+        activeRoomToken: document.getElementById('activeRoomToken'),
         userId: document.getElementById('userId'),
         petId: document.getElementById('petId'),
         petName: document.getElementById('petName'),
@@ -692,47 +694,32 @@
         contextWindow: document.getElementById('contextWindow'),
 
         btnSend: document.getElementById('btnSend'),
-        btnNewChat: document.getElementById('btnNewChat'),
         btnNewRoom: document.getElementById('btnNewRoom'),
-        btnLoadSession: document.getElementById('btnLoadSession'),
-        btnRestart: document.getElementById('btnRestart'),
-        btnResetAll: document.getElementById('btnResetAll')
+        btnRefreshRooms: document.getElementById('btnRefreshRooms'),
+        btnReloadRoom: document.getElementById('btnReloadRoom'),
+        btnDeleteRoom: document.getElementById('btnDeleteRoom')
       };
 
       const state = {
         rooms: [],
-        activeRoomId: null,
+        activeRoomToken: null,
+        roomChats: {},
+        roomMeta: {},
         busy: false
       };
 
-      function uid(prefix) {
-        return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+      function getUserId() {
+        return Number(el.userId.value || 0);
       }
 
-      function generateSessionId() {
-        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-          return `room_${window.crypto.randomUUID()}`;
-        }
-        return uid('room');
+      function setStatus(message, isError) {
+        el.status.textContent = String(message || '');
+        el.status.classList.toggle('err', !!isError);
       }
 
-      function now() {
-        return Date.now();
-      }
-
-      function formatTime(ts) {
-        if (!ts) return '-';
-        try {
-          return new Date(ts).toLocaleString();
-        } catch (_) {
-          return '-';
-        }
-      }
-
-      function compact(text, len) {
-        const str = String(text || '').trim().replace(/\s+/g, ' ');
-        if (!str) return '-';
-        return str.length > len ? `${str.slice(0, len - 1)}...` : str;
+      function getAuthHeader() {
+        const token = (el.apiToken.value || '').trim();
+        return token ? { Authorization: `Bearer ${token}` } : {};
       }
 
       function escapeHtml(str) {
@@ -751,179 +738,169 @@
         return String(value);
       }
 
-      function setStatus(message, isError) {
-        el.status.textContent = message;
-        el.status.classList.toggle('err', !!isError);
+      function compact(text, len) {
+        const str = String(text || '').trim().replace(/\s+/g, ' ');
+        if (!str) return '-';
+        return str.length > len ? `${str.slice(0, len - 1)}...` : str;
       }
 
-      function getAuthHeader() {
-        const token = (el.apiToken.value || '').trim();
-        return token ? { Authorization: `Bearer ${token}` } : {};
+      function valOrNull(v) {
+        const t = String(v || '').trim();
+        return t ? t : null;
       }
 
-      function saveState() {
-        localStorage.setItem(STORAGE_ROOMS, JSON.stringify(state.rooms));
-        if (state.activeRoomId) {
-          localStorage.setItem(STORAGE_ACTIVE, state.activeRoomId);
-        } else {
-          localStorage.removeItem(STORAGE_ACTIVE);
-        }
-      }
-
-      function normalizeRoom(raw, idx) {
-        const room = raw || {};
-        return {
-          id: room.id || uid('local'),
-          title: room.title || `Chat ${idx + 1}`,
-          session_id: room.session_id || generateSessionId(),
-          messages: Array.isArray(room.messages) ? room.messages : [],
-          context: room.context || null,
-          created_at: room.created_at || now(),
-          updated_at: room.updated_at || now(),
-          manualTitle: !!room.manualTitle
-        };
-      }
-
-      function loadState() {
-        const rawRooms = localStorage.getItem(STORAGE_ROOMS);
-        let parsed = [];
+      function formatTime(value) {
+        if (!value) return '-';
         try {
-          parsed = rawRooms ? JSON.parse(rawRooms) : [];
+          return new Date(value).toLocaleString();
         } catch (_) {
-          parsed = [];
+          return '-';
         }
-
-        state.rooms = Array.isArray(parsed)
-          ? parsed.map((r, i) => normalizeRoom(r, i))
-          : [];
-
-        if (!state.rooms.length) {
-          const first = createRoom({ title: 'New Chat 1' }, false);
-          state.activeRoomId = first.id;
-          saveState();
-          return;
-        }
-
-        const storedActive = localStorage.getItem(STORAGE_ACTIVE);
-        const exists = state.rooms.find((r) => r.id === storedActive);
-        state.activeRoomId = exists ? exists.id : state.rooms[0].id;
-      }
-
-      function createRoom(opts, persist) {
-        const options = opts || {};
-        const room = {
-          id: uid('local_room'),
-          title: options.title || `New Chat ${state.rooms.length + 1}`,
-          session_id: options.session_id || generateSessionId(),
-          messages: [],
-          context: null,
-          created_at: now(),
-          updated_at: now(),
-          manualTitle: !!options.manualTitle
-        };
-
-        state.rooms.unshift(room);
-        state.activeRoomId = room.id;
-
-        if (persist !== false) saveState();
-        return room;
       }
 
       function activeRoom() {
-        return state.rooms.find((r) => r.id === state.activeRoomId) || null;
+        return state.rooms.find((room) => room.chat_room_token === state.activeRoomToken) || null;
       }
 
-      function setActiveRoom(roomId) {
-        const target = state.rooms.find((r) => r.id === roomId);
-        if (!target) return;
-        state.activeRoomId = target.id;
-        el.sessionInput.value = target.session_id || '';
-        saveState();
-        renderAll();
+      function activeChats() {
+        return state.roomChats[state.activeRoomToken] || [];
       }
 
-      function removeRoom(roomId) {
-        const idx = state.rooms.findIndex((r) => r.id === roomId);
-        if (idx === -1) return;
+      function activeMeta() {
+        return state.roomMeta[state.activeRoomToken] || null;
+      }
 
-        state.rooms.splice(idx, 1);
+      function countUserTurns(chats) {
+        return (chats || []).reduce((acc, row) => {
+          return acc + (String(row.question || '').trim() ? 1 : 0);
+        }, 0);
+      }
 
-        if (!state.rooms.length) {
-          const fresh = createRoom({ title: 'New Chat 1' }, false);
-          state.activeRoomId = fresh.id;
-        } else if (state.activeRoomId === roomId) {
-          state.activeRoomId = state.rooms[0].id;
+      function flattenChats(chats) {
+        const output = [];
+        (chats || []).forEach((row) => {
+          if (String(row.question || '').trim()) {
+            output.push({
+              role: 'user',
+              text: row.question,
+              created_at: row.created_at,
+              source: row
+            });
+          }
+          if (String(row.answer || '').trim()) {
+            output.push({
+              role: 'assistant',
+              text: row.answer,
+              created_at: row.created_at,
+              source: row
+            });
+          }
+        });
+        return output;
+      }
+
+      function inferMetaFromChats(chats) {
+        const rows = chats || [];
+        if (!rows.length) {
+          return {
+            routing: '-',
+            severity: '-',
+            score: '-',
+            turn: 0,
+            red_flag_bypass: false,
+            triage_detail: {},
+            buttons: {}
+          };
         }
 
-        saveState();
-        renderAll();
-      }
+        const latest = rows[rows.length - 1];
+        const emergency = String(latest.emergency_status || '').toUpperCase();
+        const routing = emergency === 'EMERGENCY'
+          ? 'emergency'
+          : (emergency === 'IN_CLINIC' ? 'in_clinic' : '-');
 
-      function appendMessage(room, role, text, meta) {
-        if (!room) return;
-        const payload = {
-          id: uid('msg'),
-          role,
-          text: String(text || ''),
-          ts: now(),
-          meta: meta || null
-        };
-        room.messages.push(payload);
-        if (room.messages.length > 200) {
-          room.messages = room.messages.slice(-200);
-        }
-        room.updated_at = now();
-      }
-
-      function autoTitleFromMessage(message) {
-        const plain = String(message || '').trim();
-        if (!plain) return null;
-        const title = plain.length > 34 ? `${plain.slice(0, 34)}...` : plain;
-        return title;
-      }
-
-      function extractContext(res) {
         return {
-          routing: res.routing || res.decision || '-',
-          severity: res.severity || res.symptom_analysis?.severity || '-',
-          score: (res.score ?? '-'),
-          turn: (res.turn ?? '-'),
-          red_flag_bypass: !!res.red_flag_bypass,
-          response: res.response || {},
-          triage_detail: res.triage_detail || {},
-          buttons: res.buttons || {},
-          vet_summary: res.vet_summary || '',
-          updated_at: now()
+          routing,
+          severity: '-',
+          score: '-',
+          turn: countUserTurns(rows),
+          red_flag_bypass: false,
+          triage_detail: {},
+          buttons: {}
         };
       }
 
-      function getContextTurns(room) {
-        if (!room) return 0;
-        const fromContext = Number(room.context?.turn || 0);
-        if (fromContext > 0) return fromContext;
-        const userTurns = room.messages.filter((m) => m.role === 'user').length;
-        return userTurns;
+      function extractMetaFromResponse(res, fallbackTurn) {
+        const analysis = res.symptom_analysis || {};
+        return {
+          routing: res.routing || res.decision || analysis.routing || '-',
+          severity: res.severity || analysis.severity || '-',
+          score: res.score ?? '-',
+          turn: res.turn ?? fallbackTurn ?? '-',
+          red_flag_bypass: !!res.red_flag_bypass,
+          triage_detail: res.triage_detail || {
+            possible_causes: analysis.possible_causes || [],
+            red_flags_found: analysis.red_flags_present || [],
+            india_context: analysis.india_context_note || '',
+            safe_to_wait_hours: 0,
+            image_observation: ''
+          },
+          buttons: res.buttons || {}
+        };
+      }
+
+      async function apiFetch(path, method, body, query) {
+        const upper = String(method || 'GET').toUpperCase();
+        const url = new URL(`${API_BASE}${path}`);
+
+        if (query && typeof query === 'object') {
+          Object.entries(query).forEach(([key, value]) => {
+            if (value === null || value === undefined || value === '') return;
+            url.searchParams.set(key, String(value));
+          });
+        }
+
+        const headers = Object.assign({ Accept: 'application/json' }, getAuthHeader());
+        if (upper !== 'GET') {
+          headers['Content-Type'] = 'application/json';
+        }
+
+        const res = await fetch(url.toString(), {
+          method: upper,
+          headers,
+          body: upper === 'GET' ? undefined : JSON.stringify(body || {})
+        });
+
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.status === 'error' || json.success === false) {
+          const msg = json.message || json.error || `HTTP ${res.status}`;
+          throw new Error(msg);
+        }
+        return json;
       }
 
       function renderRooms() {
         if (!state.rooms.length) {
-          el.roomsList.innerHTML = '<div class="empty">No rooms</div>';
+          el.roomsList.innerHTML = '<div class="empty">No room found for this user. Click New Room.</div>';
           return;
         }
 
         el.roomsList.innerHTML = state.rooms.map((room) => {
-          const isActive = room.id === state.activeRoomId;
-          const last = room.messages.length ? room.messages[room.messages.length - 1].text : '';
+          const token = room.chat_room_token;
+          const isActive = token === state.activeRoomToken;
+          const name = room.name || room.summary || `Room ${room.id}`;
+          const status = room.last_emergency_status ? ` | ${room.last_emergency_status}` : '';
+
           return `
-            <div class="room ${isActive ? 'active' : ''}" data-room-id="${escapeHtml(room.id)}">
+            <div class="room ${isActive ? 'active' : ''}" data-room-token="${escapeHtml(token)}">
               <div class="room-top">
-                <div class="room-title">${escapeHtml(room.title)}</div>
-                <button class="btn btn-soft room-delete" data-room-delete="${escapeHtml(room.id)}" type="button">x</button>
+                <div class="room-title">${escapeHtml(name)}</div>
+                <button class="btn btn-soft room-delete" data-room-delete="${escapeHtml(token)}" type="button">x</button>
               </div>
-              <div class="room-snippet">${escapeHtml(compact(last || room.session_id, 64))}</div>
+              <div class="room-snippet">${escapeHtml(compact((room.summary || '').trim() || token, 72))}</div>
               <div class="room-meta">
-                <span>${escapeHtml(compact(room.session_id, 18))}</span>
-                <span>${escapeHtml(formatTime(room.updated_at))}</span>
+                <span>${escapeHtml(compact(token, 18))}</span>
+                <span>${escapeHtml(formatTime(room.updated_at))}${escapeHtml(status)}</span>
               </div>
             </div>
           `;
@@ -932,37 +909,38 @@
 
       function renderChat() {
         const room = activeRoom();
+        const chats = activeChats();
+        const messages = flattenChats(chats);
 
         if (!room) {
           el.activeTitle.textContent = 'Symptom Chat';
-          el.activeMeta.textContent = 'Session: -';
-          el.chatStream.innerHTML = '<div class="empty">Create a room to start chatting.</div>';
+          el.activeMeta.textContent = 'Room: -';
+          el.activeRoomToken.value = '';
+          el.chatStream.innerHTML = '<div class="empty">Enter user_id and click Refresh Rooms or create a New Room.</div>';
           return;
         }
 
-        el.activeTitle.textContent = room.title;
-        el.activeMeta.textContent = `Session: ${room.session_id}`;
-        el.sessionInput.value = room.session_id || '';
+        el.activeTitle.textContent = room.name || room.summary || `Room ${room.id}`;
+        el.activeMeta.textContent = `Room: ${room.chat_room_token} | Messages: ${messages.length}`;
+        el.activeRoomToken.value = room.chat_room_token || '';
 
-        if (!room.messages.length) {
-          el.chatStream.innerHTML = '<div class="empty">Start with symptom details. First message calls /symptom-check, next messages continue context with /symptom-followup.</div>';
+        if (!messages.length) {
+          el.chatStream.innerHTML = '<div class="empty">No chats in this room yet. Send first symptom query.</div>';
           return;
         }
 
-        el.chatStream.innerHTML = room.messages.map((m) => {
-          const roleLabel = m.role === 'user' ? 'You' : (m.role === 'assistant' ? 'Snoutiq' : 'System');
-          const cls = m.role === 'user' ? 'user' : (m.role === 'assistant' ? 'assistant' : 'system');
-          const sub = m.meta
-            ? ` | ${compact(`routing:${m.meta.routing || '-'} severity:${m.meta.severity || '-'} turn:${m.meta.turn || '-'}`, 44)}`
-            : '';
+        el.chatStream.innerHTML = messages.map((msg) => {
+          const roleLabel = msg.role === 'user' ? 'You' : 'Snoutiq';
+          const cls = msg.role === 'user' ? 'user' : 'assistant';
+          const emergency = msg.source?.emergency_status ? ` | ${msg.source.emergency_status}` : '';
 
           return `
             <div class="msg ${cls}">
               <div class="msg-meta">
                 <span>${escapeHtml(roleLabel)}</span>
-                <span>${escapeHtml(formatTime(m.ts))}${escapeHtml(sub)}</span>
+                <span>${escapeHtml(formatTime(msg.created_at))}${escapeHtml(emergency)}</span>
               </div>
-              ${escapeHtml(m.text)}
+              ${escapeHtml(msg.text)}
             </div>
           `;
         }).join('');
@@ -970,92 +948,80 @@
         el.chatStream.scrollTop = el.chatStream.scrollHeight;
       }
 
-      function renderChips(room) {
-        if (!room || !room.context) {
-          el.chips.innerHTML = '<span class="chip">Waiting for first response</span>';
-          return;
-        }
-
-        const ctx = room.context;
-        const routing = String(ctx.routing || '-').toLowerCase();
-        const severity = String(ctx.severity || '-').toLowerCase();
-
-        const routingClass = routing === 'emergency'
-          ? 'danger'
-          : (routing === 'in_clinic' ? 'warn' : 'ok');
-
-        const severityClass = severity === 'critical'
-          ? 'danger'
-          : (severity === 'moderate' ? 'warn' : 'ok');
-
-        el.chips.innerHTML = `
-          <span class="chip ${routingClass}">Routing: ${escapeHtml(ctx.routing || '-')}</span>
-          <span class="chip ${severityClass}">Severity: ${escapeHtml(ctx.severity || '-')}</span>
-          <span class="chip">Score: ${escapeHtml(String(ctx.score ?? '-'))}</span>
-          <span class="chip">Turn: ${escapeHtml(String(ctx.turn ?? '-'))}</span>
-          <span class="chip">Bypass: ${ctx.red_flag_bypass ? 'yes' : 'no'}</span>
-        `;
-      }
-
-      function renderContextWindow(room) {
-        if (!room || !room.messages.length) {
-          el.contextWindow.innerHTML = '<div class="ctx">No context yet.</div>';
-          return;
-        }
-
-        const items = room.messages.slice(-12);
-        el.contextWindow.innerHTML = items.map((m) => {
-          const cls = m.role === 'user' ? 'user' : 'assistant';
-          const label = m.role === 'user' ? 'You' : (m.role === 'assistant' ? 'Snoutiq' : 'System');
-          return `<div class="ctx ${cls}"><b>${escapeHtml(label)}:</b> ${escapeHtml(compact(m.text, 150))}</div>`;
-        }).join('');
-      }
-
-      function renderCtaLinks(room) {
-        const buttons = room?.context?.buttons || {};
-        const keys = ['primary', 'secondary'];
+      function renderCtaLinks(meta) {
+        const buttons = meta?.buttons || {};
         const links = [];
 
-        keys.forEach((k) => {
-          const btn = buttons[k];
+        ['primary', 'secondary'].forEach((key) => {
+          const btn = buttons[key];
           if (!btn) return;
-          const label = `${btn.label || k} (${btn.type || 'cta'})`;
           const href = btn.deeplink || '#';
+          const label = `${btn.label || key} (${btn.type || 'cta'})`;
           links.push(`<a class="api-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`);
         });
 
         if (!links.length) {
-          el.ctaLinks.innerHTML = '<div class="plain">No quick actions yet.</div>';
+          el.ctaLinks.innerHTML = '<div class="plain">No quick actions in latest response.</div>';
           return;
         }
 
         el.ctaLinks.innerHTML = links.join('');
       }
 
-      function renderDetail(room) {
-        if (!room || !room.context) {
-          el.mRouting.textContent = '-';
-          el.mSeverity.textContent = '-';
-          el.mScore.textContent = '-';
-          el.mTurn.textContent = '-';
-          el.mBypass.textContent = '-';
-          el.mContextTurns.textContent = String(getContextTurns(room));
-          el.triageDetail.textContent = '-';
-          renderCtaLinks(room);
-          renderChips(room);
-          renderContextWindow(room);
+      function renderContextWindow(chats) {
+        const messages = flattenChats(chats);
+        if (!messages.length) {
+          el.contextWindow.innerHTML = '<div class="ctx">No context available.</div>';
           return;
         }
 
-        const ctx = room.context;
-        el.mRouting.textContent = stringify(ctx.routing);
-        el.mSeverity.textContent = stringify(ctx.severity);
-        el.mScore.textContent = stringify(ctx.score);
-        el.mTurn.textContent = stringify(ctx.turn);
-        el.mBypass.textContent = ctx.red_flag_bypass ? 'yes' : 'no';
-        el.mContextTurns.textContent = String(getContextTurns(room));
+        const recent = messages.slice(-12);
+        el.contextWindow.innerHTML = recent.map((msg) => {
+          const cls = msg.role === 'user' ? 'user' : 'assistant';
+          const label = msg.role === 'user' ? 'You' : 'Snoutiq';
+          return `<div class="ctx ${cls}"><b>${escapeHtml(label)}:</b> ${escapeHtml(compact(msg.text, 170))}</div>`;
+        }).join('');
+      }
 
-        const detail = ctx.triage_detail || {};
+      function renderDetail() {
+        const meta = activeMeta();
+        const chats = activeChats();
+        const inferredTurns = countUserTurns(chats);
+
+        if (!meta) {
+          el.mRouting.textContent = '-';
+          el.mSeverity.textContent = '-';
+          el.mScore.textContent = '-';
+          el.mTurn.textContent = String(inferredTurns || 0);
+          el.mContextTurns.textContent = String(inferredTurns || 0);
+          el.mBypass.textContent = '-';
+          el.triageDetail.textContent = '-';
+          el.chips.innerHTML = '<span class="chip">No triage metadata yet</span>';
+          renderCtaLinks(null);
+          renderContextWindow(chats);
+          return;
+        }
+
+        const routing = String(meta.routing || '-').toLowerCase();
+        const severity = String(meta.severity || '-').toLowerCase();
+        const routingClass = routing === 'emergency' ? 'danger' : (routing === 'in_clinic' ? 'warn' : 'ok');
+        const severityClass = severity === 'critical' ? 'danger' : (severity === 'moderate' ? 'warn' : 'ok');
+
+        el.chips.innerHTML = `
+          <span class="chip ${routingClass}">Routing: ${escapeHtml(meta.routing || '-')}</span>
+          <span class="chip ${severityClass}">Severity: ${escapeHtml(meta.severity || '-')}</span>
+          <span class="chip">Score: ${escapeHtml(String(meta.score ?? '-'))}</span>
+          <span class="chip">Turn: ${escapeHtml(String(meta.turn ?? '-'))}</span>
+        `;
+
+        el.mRouting.textContent = stringify(meta.routing);
+        el.mSeverity.textContent = stringify(meta.severity);
+        el.mScore.textContent = stringify(meta.score);
+        el.mTurn.textContent = stringify(meta.turn);
+        el.mContextTurns.textContent = String(inferredTurns || 0);
+        el.mBypass.textContent = meta.red_flag_bypass ? 'yes' : 'no';
+
+        const detail = meta.triage_detail || {};
         el.triageDetail.textContent =
           `Possible causes: ${stringify(detail.possible_causes)}\n` +
           `Red flags: ${stringify(detail.red_flags_found)}\n` +
@@ -1063,66 +1029,201 @@
           `Safe wait (hours): ${stringify(detail.safe_to_wait_hours)}\n` +
           `Image observation: ${stringify(detail.image_observation)}`;
 
-        renderCtaLinks(room);
-        renderChips(room);
-        renderContextWindow(room);
+        renderCtaLinks(meta);
+        renderContextWindow(chats);
       }
 
       function renderAll() {
         renderRooms();
         renderChat();
-        renderDetail(activeRoom());
-        el.btnSend.disabled = state.busy;
+        renderDetail();
+
+        const disabled = state.busy;
+        el.btnSend.disabled = disabled;
+        el.btnNewRoom.disabled = disabled;
+        el.btnRefreshRooms.disabled = disabled;
+        el.btnReloadRoom.disabled = disabled || !state.activeRoomToken;
+        el.btnDeleteRoom.disabled = disabled || !state.activeRoomToken;
       }
 
-      function valOrNull(v) {
-        const t = String(v || '').trim();
-        return t ? t : null;
-      }
+      async function fetchRooms(options) {
+        const opts = options || {};
+        const preserveActive = opts.preserveActive !== false;
+        const preferredToken = opts.preferredToken || null;
+        const loadChats = opts.loadChats !== false;
+        const silent = !!opts.silent;
 
-      function payloadForCheck(message, room) {
-        return {
-          user_id: Number(el.userId.value || 0),
-          pet_id: Number(el.petId.value || 0),
-          message,
-          session_id: room.session_id || null,
-          pet_name: valOrNull(el.petName.value),
-          species: valOrNull(el.species.value),
-          breed: valOrNull(el.breed.value),
-          dob: valOrNull(el.dob.value),
-          sex: valOrNull(el.sex.value),
-          neutered: valOrNull(el.neutered.value),
-          location: valOrNull(el.location.value)
-        };
-      }
-
-      async function apiFetch(path, method, body) {
-        const upper = String(method || 'GET').toUpperCase();
-        const headers = Object.assign({ Accept: 'application/json' }, getAuthHeader());
-        if (upper !== 'GET') {
-          headers['Content-Type'] = 'application/json';
+        const userId = getUserId();
+        if (!userId) {
+          state.rooms = [];
+          state.activeRoomToken = null;
+          state.roomChats = {};
+          state.roomMeta = {};
+          renderAll();
+          setStatus('user_id required to load rooms.', true);
+          return;
         }
 
-        const response = await fetch(`${API_BASE}${path}`, {
-          method: upper,
-          headers,
-          body: upper === 'GET' ? undefined : JSON.stringify(body || {})
+        if (!silent) setStatus('Loading rooms...');
+
+        const res = await apiFetch('/chat/listRooms', 'GET', null, { user_id: userId });
+        state.rooms = Array.isArray(res.rooms) ? res.rooms : [];
+
+        if (!state.rooms.length) {
+          state.activeRoomToken = null;
+          renderAll();
+          setStatus('No rooms found. Create New Room.', false);
+          return;
+        }
+
+        if (preferredToken && state.rooms.some((r) => r.chat_room_token === preferredToken)) {
+          state.activeRoomToken = preferredToken;
+        } else if (!preserveActive || !state.activeRoomToken || !state.rooms.some((r) => r.chat_room_token === state.activeRoomToken)) {
+          state.activeRoomToken = state.rooms[0].chat_room_token;
+        }
+
+        renderAll();
+
+        if (loadChats && state.activeRoomToken) {
+          await loadRoomChats(state.activeRoomToken, { silent: true });
+        }
+
+        if (!silent) setStatus(`Loaded ${state.rooms.length} room(s).`);
+      }
+
+      async function loadRoomChats(token, options) {
+        const opts = options || {};
+        const silent = !!opts.silent;
+        if (!token) return;
+
+        const userId = getUserId();
+        if (!userId) {
+          setStatus('user_id required.', true);
+          return;
+        }
+
+        if (!silent) setStatus(`Loading room ${token} ...`);
+
+        const res = await apiFetch(`/chat-rooms/${encodeURIComponent(token)}/chats`, 'GET', null, {
+          user_id: userId,
+          sort: 'asc'
         });
 
-        const json = await response.json().catch(() => ({}));
-        if (!response.ok || json.success === false) {
-          const msg = json.message || json.error || `HTTP ${response.status}`;
-          throw new Error(msg);
+        const chats = Array.isArray(res.chats) ? res.chats : [];
+        state.activeRoomToken = token;
+        state.roomChats[token] = chats;
+
+        const inferred = inferMetaFromChats(chats);
+        const existing = state.roomMeta[token] || {};
+        state.roomMeta[token] = {
+          ...inferred,
+          ...existing,
+          turn: inferred.turn ?? existing.turn ?? 0,
+          routing: (existing.routing && existing.routing !== '-') ? existing.routing : (inferred.routing ?? '-'),
+          severity: (existing.severity && existing.severity !== '-') ? existing.severity : (inferred.severity ?? '-'),
+          score: (existing.score !== undefined && existing.score !== null && existing.score !== '-')
+            ? existing.score
+            : (inferred.score ?? '-'),
+          red_flag_bypass: existing.red_flag_bypass ?? inferred.red_flag_bypass ?? false,
+          triage_detail: existing.triage_detail || inferred.triage_detail || {},
+          buttons: existing.buttons || inferred.buttons || {}
+        };
+
+        renderAll();
+        if (!silent) setStatus(`Loaded room ${token}.`);
+      }
+
+      async function createNewRoom() {
+        if (state.busy) return;
+
+        const userId = getUserId();
+        if (!userId) {
+          setStatus('user_id required to create room.', true);
+          return;
         }
-        return json;
+
+        const title = valOrNull(el.roomName.value) || `New chat - ${new Date().toLocaleString()}`;
+        state.busy = true;
+        renderAll();
+        setStatus('Creating new room...');
+
+        try {
+          const res = await apiFetch('/chat-rooms/new', 'GET', null, {
+            user_id: userId,
+            title
+          });
+
+          if (!res.chat_room_token) {
+            throw new Error('Room token not returned.');
+          }
+
+          el.roomName.value = '';
+          await fetchRooms({
+            preserveActive: false,
+            preferredToken: res.chat_room_token,
+            loadChats: true,
+            silent: true
+          });
+          setStatus(`Room created in DB: ${res.chat_room_token}`);
+        } catch (err) {
+          setStatus(err.message || 'Failed to create room', true);
+        } finally {
+          state.busy = false;
+          renderAll();
+        }
+      }
+
+      async function deleteRoom(token) {
+        const targetToken = token || state.activeRoomToken;
+        if (!targetToken) {
+          setStatus('No room selected.', true);
+          return;
+        }
+
+        const userId = getUserId();
+        if (!userId) {
+          setStatus('user_id required.', true);
+          return;
+        }
+
+        const ok = window.confirm(`Delete room ${targetToken}? This will remove room chats too.`);
+        if (!ok) return;
+
+        state.busy = true;
+        renderAll();
+        setStatus(`Deleting room ${targetToken} ...`);
+
+        try {
+          await apiFetch(`/chat-rooms/${encodeURIComponent(targetToken)}`, 'DELETE', { user_id: userId });
+          delete state.roomChats[targetToken];
+          delete state.roomMeta[targetToken];
+
+          await fetchRooms({
+            preserveActive: false,
+            loadChats: true,
+            silent: true
+          });
+          setStatus(`Room deleted: ${targetToken}`);
+        } catch (err) {
+          setStatus(err.message || 'Failed to delete room', true);
+        } finally {
+          state.busy = false;
+          renderAll();
+        }
       }
 
       async function sendMessage() {
         if (state.busy) return;
 
-        const room = activeRoom();
-        if (!room) {
-          setStatus('No active room available.', true);
+        const token = state.activeRoomToken;
+        if (!token) {
+          setStatus('Select or create a room first.', true);
+          return;
+        }
+
+        const userId = getUserId();
+        if (!userId) {
+          setStatus('user_id is required.', true);
           return;
         }
 
@@ -1132,226 +1233,129 @@
           return;
         }
 
-        const userId = Number(el.userId.value || 0);
-        if (!userId) {
-          setStatus('user_id is required.', true);
-          return;
-        }
+        const payload = {
+          user_id: userId,
+          question: message,
+          message: message,
+          pet_id: Number(el.petId.value || 0),
+          chat_room_token: token,
+          context_token: token,
+          pet_name: valOrNull(el.petName.value),
+          species: valOrNull(el.species.value),
+          pet_type: valOrNull(el.species.value),
+          breed: valOrNull(el.breed.value),
+          pet_breed: valOrNull(el.breed.value),
+          pet_age: valOrNull(el.dob.value),
+          sex: valOrNull(el.sex.value),
+          neutered: valOrNull(el.neutered.value),
+          pet_location: valOrNull(el.location.value),
+          location: valOrNull(el.location.value)
+        };
 
-        if (!room.session_id) {
-          room.session_id = generateSessionId();
-        }
-
-        appendMessage(room, 'user', message);
-        if (!room.manualTitle && room.messages.length <= 2) {
-          const auto = autoTitleFromMessage(message);
-          if (auto) room.title = auto;
-        }
-
-        el.messageInput.value = '';
         state.busy = true;
-        saveState();
         renderAll();
-        setStatus('Sending...');
+        setStatus('Sending message...');
 
         try {
-          const hasAssistantHistory = room.messages.some((m) => m.role === 'assistant');
-          let res;
+          const res = await apiFetch('/chat/send', 'POST', payload);
+          el.messageInput.value = '';
 
-          if (!hasAssistantHistory) {
-            const body = payloadForCheck(message, room);
-            if (!body.pet_id) {
-              throw new Error('pet_id is required for first message in new chat.');
-            }
-            res = await apiFetch('/symptom-check', 'POST', body);
-          } else {
-            res = await apiFetch('/symptom-followup', 'POST', {
-              user_id: userId,
-              session_id: room.session_id,
-              message
-            });
-          }
-
-          if (res.session_id) {
-            room.session_id = res.session_id;
-          }
-
-          const aiText = res.response?.message || res.chat?.answer || 'No assistant message returned.';
-          appendMessage(room, 'assistant', aiText, {
-            routing: res.routing,
-            severity: res.severity,
-            turn: res.turn
+          const chats = state.roomChats[token] ? [...state.roomChats[token]] : [];
+          chats.push({
+            question: message,
+            answer: res.response?.message || res.chat?.answer || '',
+            emergency_status: res.emergency_status || null,
+            created_at: new Date().toISOString()
           });
+          state.roomChats[token] = chats;
+          state.roomMeta[token] = extractMetaFromResponse(res, countUserTurns(chats));
 
-          room.context = extractContext(res);
-          room.updated_at = now();
-
-          saveState();
           renderAll();
-          setStatus(`Done. Session: ${room.session_id}`);
-        } catch (err) {
-          appendMessage(room, 'system', `Request failed: ${err.message || 'Unknown error'}`);
-          saveState();
-          renderAll();
-          setStatus(err.message || 'Request failed', true);
-        } finally {
-          state.busy = false;
-          renderAll();
-        }
-      }
 
-      async function loadSession() {
-        const room = activeRoom();
-        if (!room) return;
-
-        const sessionId = valOrNull(el.sessionInput.value) || room.session_id;
-        if (!sessionId) {
-          setStatus('Session ID required.', true);
-          return;
-        }
-
-        state.busy = true;
-        renderAll();
-        setStatus(`Loading session ${sessionId} ...`);
-
-        try {
-          const res = await apiFetch(`/symptom-session/${encodeURIComponent(sessionId)}`, 'GET');
-          const history = Array.isArray(res.state?.history) ? res.state.history : [];
-
-          room.session_id = sessionId;
-          room.messages = [];
-
-          history.forEach((h) => {
-            if (h.user || h.message) {
-              appendMessage(room, 'user', h.user || h.message);
-            }
-            if (h.assistant || h.response) {
-              appendMessage(room, 'assistant', h.assistant || h.response, {
-                routing: h.routing || '-',
-                severity: '-',
-                turn: '-'
-              });
-            }
+          await fetchRooms({
+            preserveActive: true,
+            preferredToken: token,
+            loadChats: true,
+            silent: true
           });
-
-          room.context = {
-            routing: history.length ? (history[history.length - 1].routing || '-') : '-',
-            severity: '-',
-            score: res.state?.score ?? '-',
-            turn: history.length,
-            red_flag_bypass: false,
-            response: {},
-            triage_detail: {},
-            buttons: {},
-            vet_summary: '',
-            updated_at: now()
-          };
-
-          room.updated_at = now();
-          saveState();
-          renderAll();
-          setStatus(`Session loaded: ${sessionId}`);
+          setStatus('Message sent and room updated from DB.');
         } catch (err) {
-          setStatus(err.message || 'Failed to load session', true);
+          setStatus(err.message || 'Failed to send message', true);
         } finally {
           state.busy = false;
           renderAll();
         }
       }
 
-      async function restartSession() {
-        const room = activeRoom();
-        if (!room || !room.session_id) {
-          setStatus('No active session to restart.', true);
-          return;
-        }
-
-        state.busy = true;
-        renderAll();
-        setStatus(`Restarting ${room.session_id} ...`);
-
-        try {
-          await apiFetch(`/symptom-session/${encodeURIComponent(room.session_id)}/reset`, 'POST', {});
-          room.messages = [];
-          room.context = null;
-          room.updated_at = now();
-          saveState();
-          renderAll();
-          setStatus(`Session restarted: ${room.session_id}`);
-        } catch (err) {
-          setStatus(err.message || 'Failed to restart session', true);
-        } finally {
-          state.busy = false;
-          renderAll();
-        }
-      }
-
-      function newChat() {
-        createRoom({ title: `New Chat ${state.rooms.length + 1}` });
-        saveState();
-        renderAll();
-        setStatus('New chat created.');
-      }
-
-      function newRoom() {
-        const custom = (window.prompt('Optional custom session_id. Leave blank for auto-generated room id.') || '').trim();
-        if (custom) {
-          const existing = state.rooms.find((r) => r.session_id === custom);
-          if (existing) {
-            setActiveRoom(existing.id);
-            setStatus(`Opened existing local room for ${custom}`);
-            return;
-          }
-        }
-
-        const created = createRoom({
-          title: `Room ${state.rooms.length + 1}`,
-          session_id: custom || generateSessionId(),
-          manualTitle: true
-        });
-
-        saveState();
-        renderAll();
-        setStatus(`New room created: ${created.session_id}`);
-      }
-
-      async function resetAllLocal() {
-        const ok = window.confirm('Clear all local rooms and UI state?');
-        if (!ok) return;
-
-        state.rooms = [];
-        state.activeRoomId = null;
-        localStorage.removeItem(STORAGE_ROOMS);
-        localStorage.removeItem(STORAGE_ACTIVE);
-
-        const first = createRoom({ title: 'New Chat 1' }, false);
-        state.activeRoomId = first.id;
-
-        saveState();
-        renderAll();
-        setStatus('All local data cleared.');
-      }
-
-      el.roomsList.addEventListener('click', function (event) {
-        const deleteId = event.target.getAttribute('data-room-delete');
-        if (deleteId) {
+      el.roomsList.addEventListener('click', async function (event) {
+        const deleteToken = event.target.getAttribute('data-room-delete');
+        if (deleteToken) {
           event.stopPropagation();
-          removeRoom(deleteId);
+          await deleteRoom(deleteToken);
           return;
         }
 
-        const card = event.target.closest('[data-room-id]');
-        if (card) {
-          setActiveRoom(card.getAttribute('data-room-id'));
+        const card = event.target.closest('[data-room-token]');
+        if (!card) return;
+        const token = card.getAttribute('data-room-token');
+        if (!token || token === state.activeRoomToken) return;
+
+        state.activeRoomToken = token;
+        renderAll();
+        try {
+          await loadRoomChats(token, { silent: false });
+        } catch (err) {
+          setStatus(err.message || 'Failed to open room', true);
         }
       });
 
       el.btnSend.addEventListener('click', sendMessage);
-      el.btnNewChat.addEventListener('click', newChat);
-      el.btnNewRoom.addEventListener('click', newRoom);
-      el.btnLoadSession.addEventListener('click', loadSession);
-      el.btnRestart.addEventListener('click', restartSession);
-      el.btnResetAll.addEventListener('click', resetAllLocal);
+      el.btnNewRoom.addEventListener('click', createNewRoom);
+      el.btnRefreshRooms.addEventListener('click', async function () {
+        try {
+          state.busy = true;
+          renderAll();
+          await fetchRooms({ preserveActive: true, loadChats: true, silent: false });
+        } catch (err) {
+          setStatus(err.message || 'Failed to refresh rooms', true);
+        } finally {
+          state.busy = false;
+          renderAll();
+        }
+      });
+      el.btnReloadRoom.addEventListener('click', async function () {
+        if (!state.activeRoomToken) return;
+        try {
+          state.busy = true;
+          renderAll();
+          await loadRoomChats(state.activeRoomToken, { silent: false });
+        } catch (err) {
+          setStatus(err.message || 'Failed to reload room', true);
+        } finally {
+          state.busy = false;
+          renderAll();
+        }
+      });
+      el.btnDeleteRoom.addEventListener('click', function () {
+        deleteRoom(state.activeRoomToken);
+      });
+
+      el.userId.addEventListener('change', async function () {
+        try {
+          state.busy = true;
+          state.rooms = [];
+          state.activeRoomToken = null;
+          state.roomChats = {};
+          state.roomMeta = {};
+          renderAll();
+          await fetchRooms({ preserveActive: false, loadChats: true, silent: false });
+        } catch (err) {
+          setStatus(err.message || 'Failed to load rooms for user', true);
+        } finally {
+          state.busy = false;
+          renderAll();
+        }
+      });
 
       el.messageInput.addEventListener('keydown', function (event) {
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -1360,9 +1364,21 @@
         }
       });
 
-      loadState();
-      renderAll();
-      setStatus('Ready. Pick a room and start chatting.');
+      (async function init() {
+        renderAll();
+        setStatus('Loading rooms from DB...');
+        try {
+          state.busy = true;
+          renderAll();
+          await fetchRooms({ preserveActive: false, loadChats: true, silent: true });
+          setStatus('Ready. Rooms are loaded from chat_rooms table.');
+        } catch (err) {
+          setStatus(err.message || 'Failed to initialize rooms', true);
+        } finally {
+          state.busy = false;
+          renderAll();
+        }
+      })();
     })();
   </script>
 </body>
