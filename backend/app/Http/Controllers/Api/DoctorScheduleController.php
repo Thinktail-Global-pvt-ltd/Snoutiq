@@ -136,6 +136,23 @@ class DoctorScheduleController extends Controller
             ], 422);
         }
 
+        $tz = config('app.timezone') ?: 'Asia/Kolkata';
+        $anchorDateInput = $request->query('date');
+        $days = (int) $request->query('days', $anchorDateInput ? 1 : 7);
+        $days = max(1, min($days, 30));
+        $effectiveServiceType = $serviceType ?: 'in_clinic';
+
+        try {
+            $anchorDate = $anchorDateInput
+                ? Carbon::parse((string) $anchorDateInput, $tz)->startOfDay()
+                : Carbon::now($tz)->startOfDay();
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid date. Use YYYY-MM-DD.',
+            ], 422);
+        }
+
         $doctorIds = DB::table('doctors')
             ->where('vet_registeration_id', $clinicId)
             ->pluck('id')
@@ -150,6 +167,16 @@ class DoctorScheduleController extends Controller
                 'availability' => [],
                 'doctor_ids' => [],
                 'doctors_count' => 0,
+                'date' => $anchorDate->toDateString(),
+                'days' => $days,
+                'effective_service_type' => $effectiveServiceType,
+                'available_dates' => [],
+                'slots' => [],
+                'unique_slots' => [],
+                'slot_capacity' => [],
+                'slots_by_date' => (object) [],
+                'unique_slots_by_date' => (object) [],
+                'slot_capacity_by_date' => (object) [],
             ]);
         }
 
@@ -184,6 +211,84 @@ class DoctorScheduleController extends Controller
             ->orderBy('start_time')
             ->get();
 
+        $now = Carbon::now($tz);
+        $slotsByDate = [];
+        $uniqueSlotsByDate = [];
+        $slotCapacityByDate = [];
+
+        for ($offset = 0; $offset < $days; $offset++) {
+            $slotDate = $anchorDate->copy()->addDays($offset);
+            $slotDateString = $slotDate->toDateString();
+
+            $timeToDoctorIds = [];
+
+            foreach ($doctorIds as $doctorId) {
+                try {
+                    $doctorSlots = $this->buildFreeSlotsForDate($doctorId, $slotDateString, $effectiveServiceType);
+                } catch (\InvalidArgumentException $e) {
+                    $doctorSlots = [];
+                }
+
+                foreach ($doctorSlots as $slotTime) {
+                    $normalizedSlotTime = $this->normalizeSlotTime($slotTime);
+                    if (!$normalizedSlotTime) {
+                        continue;
+                    }
+
+                    // For today's date, keep only present/future times.
+                    if ($slotDate->isSameDay($now)) {
+                        $slotDateTime = Carbon::parse($slotDateString.' '.$normalizedSlotTime, $tz);
+                        if ($slotDateTime->lt($now)) {
+                            continue;
+                        }
+                    }
+
+                    if (!isset($timeToDoctorIds[$normalizedSlotTime])) {
+                        $timeToDoctorIds[$normalizedSlotTime] = [];
+                    }
+                    $timeToDoctorIds[$normalizedSlotTime][] = (int) $doctorId;
+                }
+            }
+
+            ksort($timeToDoctorIds);
+
+            $expandedSlots = [];
+            $uniqueSlots = [];
+            $capacityRows = [];
+
+            foreach ($timeToDoctorIds as $time => $doctorIdsForTime) {
+                $doctorIdsForTime = array_values(array_unique(array_map('intval', $doctorIdsForTime)));
+                $capacity = count($doctorIdsForTime);
+                if ($capacity <= 0) {
+                    continue;
+                }
+
+                $uniqueSlots[] = $time;
+                for ($i = 0; $i < $capacity; $i++) {
+                    $expandedSlots[] = $time;
+                }
+
+                $capacityRows[] = [
+                    'time' => $time,
+                    'available_doctors' => $capacity,
+                    'doctor_ids' => $doctorIdsForTime,
+                ];
+            }
+
+            $slotsByDate[$slotDateString] = $expandedSlots;
+            $uniqueSlotsByDate[$slotDateString] = $uniqueSlots;
+            $slotCapacityByDate[$slotDateString] = $capacityRows;
+        }
+
+        $availableDates = [];
+        foreach ($uniqueSlotsByDate as $dateKey => $slotsForDate) {
+            if (!empty($slotsForDate)) {
+                $availableDates[] = $dateKey;
+            }
+        }
+
+        $primaryDate = $anchorDate->toDateString();
+
         return response()->json([
             'success' => true,
             'clinic_id' => $clinicId,
@@ -191,6 +296,20 @@ class DoctorScheduleController extends Controller
             'availability' => $rows,
             'doctor_ids' => $doctorIds,
             'doctors_count' => count($doctorIds),
+            'date' => $primaryDate,
+            'days' => $days,
+            'effective_service_type' => $effectiveServiceType,
+            'available_dates' => $availableDates,
+            // Expanded slot list: same time can appear multiple times when multiple doctors are free.
+            'slots' => $slotsByDate[$primaryDate] ?? [],
+            // Unique times for UI grouping.
+            'unique_slots' => $uniqueSlotsByDate[$primaryDate] ?? [],
+            // Capacity metadata per time for the selected date.
+            'slot_capacity' => $slotCapacityByDate[$primaryDate] ?? [],
+            // Date-wise maps for multi-day view.
+            'slots_by_date' => (object) $slotsByDate,
+            'unique_slots_by_date' => (object) $uniqueSlotsByDate,
+            'slot_capacity_by_date' => (object) $slotCapacityByDate,
         ]);
     }
 
