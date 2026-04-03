@@ -163,29 +163,17 @@ class DoctorScheduleController extends Controller
             return response()->json([
                 'success' => true,
                 'clinic_id' => $clinicId,
-                'service_type' => $serviceType,
+                'service_type' => $effectiveServiceType,
                 'availability' => [],
                 'doctor_ids' => [],
                 'doctors_count' => 0,
-                'date' => $anchorDate->toDateString(),
-                'days' => $days,
-                'effective_service_type' => $effectiveServiceType,
-                'available_dates' => [],
-                'slots' => [],
-                'unique_slots' => [],
-                'slot_capacity' => [],
-                'slots_by_date' => (object) [],
-                'unique_slots_by_date' => (object) [],
-                'slot_capacity_by_date' => (object) [],
             ]);
         }
 
         $rows = DB::table('doctor_availability')
             ->whereIn('doctor_id', $doctorIds)
             ->where('is_active', 1)
-            ->when($serviceType, function ($q) use ($serviceType) {
-                $q->where('service_type', $serviceType);
-            })
+            ->where('service_type', $effectiveServiceType)
             ->select([
                 'service_type',
                 'day_of_week',
@@ -212,13 +200,27 @@ class DoctorScheduleController extends Controller
             ->get();
 
         $now = Carbon::now($tz);
-        $slotsByDate = [];
-        $uniqueSlotsByDate = [];
-        $slotCapacityByDate = [];
+        $availability = [];
+        $defaultsByDay = [];
+
+        foreach ($rows as $row) {
+            $dow = (int) $row->day_of_week;
+            if (!isset($defaultsByDay[$dow])) {
+                $defaultsByDay[$dow] = [
+                    'avg_consultation_mins' => max(5, (int) ($row->avg_consultation_mins ?? 20)),
+                    'max_bookings_per_hour' => (int) ($row->max_bookings_per_hour ?? 3),
+                ];
+            }
+        }
 
         for ($offset = 0; $offset < $days; $offset++) {
             $slotDate = $anchorDate->copy()->addDays($offset);
             $slotDateString = $slotDate->toDateString();
+            $dow = (int) $slotDate->dayOfWeek;
+            $dayDefaults = $defaultsByDay[$dow] ?? [
+                'avg_consultation_mins' => 20,
+                'max_bookings_per_hour' => 3,
+            ];
 
             $timeToDoctorIds = [];
 
@@ -252,10 +254,6 @@ class DoctorScheduleController extends Controller
 
             ksort($timeToDoctorIds);
 
-            $expandedSlots = [];
-            $uniqueSlots = [];
-            $capacityRows = [];
-
             foreach ($timeToDoctorIds as $time => $doctorIdsForTime) {
                 $doctorIdsForTime = array_values(array_unique(array_map('intval', $doctorIdsForTime)));
                 $capacity = count($doctorIdsForTime);
@@ -263,53 +261,41 @@ class DoctorScheduleController extends Controller
                     continue;
                 }
 
-                $uniqueSlots[] = $time;
-                for ($i = 0; $i < $capacity; $i++) {
-                    $expandedSlots[] = $time;
-                }
+                $slotStart = Carbon::parse($slotDateString.' '.$time, $tz);
+                $slotEnd = $slotStart->copy()
+                    ->addMinutes((int) $dayDefaults['avg_consultation_mins'])
+                    ->format('H:i:s');
 
-                $capacityRows[] = [
-                    'time' => $time,
-                    'available_doctors' => $capacity,
-                    'doctor_ids' => $doctorIdsForTime,
+                $availability[] = [
+                    'service_type' => $effectiveServiceType,
+                    'day_of_week' => $dow,
+                    'start_time' => $time,
+                    'end_time' => $slotEnd,
+                    'break_start' => null,
+                    'break_end' => null,
+                    'avg_consultation_mins' => (int) $dayDefaults['avg_consultation_mins'],
+                    'max_bookings_per_hour' => (int) $dayDefaults['max_bookings_per_hour'],
+                    'doctors_covered' => $capacity,
                 ];
             }
-
-            $slotsByDate[$slotDateString] = $expandedSlots;
-            $uniqueSlotsByDate[$slotDateString] = $uniqueSlots;
-            $slotCapacityByDate[$slotDateString] = $capacityRows;
         }
 
-        $availableDates = [];
-        foreach ($uniqueSlotsByDate as $dateKey => $slotsForDate) {
-            if (!empty($slotsForDate)) {
-                $availableDates[] = $dateKey;
+        usort($availability, function ($a, $b) {
+            $dayCmp = ((int) $a['day_of_week']) <=> ((int) $b['day_of_week']);
+            if ($dayCmp !== 0) {
+                return $dayCmp;
             }
-        }
 
-        $primaryDate = $anchorDate->toDateString();
+            return strcmp((string) $a['start_time'], (string) $b['start_time']);
+        });
 
         return response()->json([
             'success' => true,
             'clinic_id' => $clinicId,
-            'service_type' => $serviceType,
-            'availability' => $rows,
+            'service_type' => $effectiveServiceType,
+            'availability' => $availability,
             'doctor_ids' => $doctorIds,
             'doctors_count' => count($doctorIds),
-            'date' => $primaryDate,
-            'days' => $days,
-            'effective_service_type' => $effectiveServiceType,
-            'available_dates' => $availableDates,
-            // Expanded slot list: same time can appear multiple times when multiple doctors are free.
-            'slots' => $slotsByDate[$primaryDate] ?? [],
-            // Unique times for UI grouping.
-            'unique_slots' => $uniqueSlotsByDate[$primaryDate] ?? [],
-            // Capacity metadata per time for the selected date.
-            'slot_capacity' => $slotCapacityByDate[$primaryDate] ?? [],
-            // Date-wise maps for multi-day view.
-            'slots_by_date' => (object) $slotsByDate,
-            'unique_slots_by_date' => (object) $uniqueSlotsByDate,
-            'slot_capacity_by_date' => (object) $slotCapacityByDate,
         ]);
     }
 
