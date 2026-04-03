@@ -20,18 +20,6 @@ const EMPTY_PET_FORM = {
   medical_history: "",
 };
 
-const YES_RESPONSE_FIELDS = [
-  { key: "service_recommendation", label: "Service Recommendation" },
-  { key: "when_to_see_vet", label: "When To See Vet" },
-  { key: "what_we_found", label: "What We Found" },
-  { key: "additional_notes", label: "Additional Notes" },
-];
-
-const NO_RESPONSE_FIELDS = [
-  { key: "diagnosis_summary", label: "Diagnosis Summary" },
-  { key: "urgency", label: "Urgency" },
-];
-
 const SPECIES_OPTIONS = [
   { label: "Select species", value: "" },
   { label: "Dog", value: "Dog" },
@@ -223,6 +211,17 @@ function getUrgencyClasses(value) {
   return "bg-slate-100 text-slate-700 border-slate-200";
 }
 
+function getConfidenceClasses(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "high") {
+    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  }
+  if (normalized === "medium") {
+    return "bg-sky-100 text-sky-700 border-sky-200";
+  }
+  return "bg-slate-100 text-slate-700 border-slate-200";
+}
+
 function hasYesContent(data) {
   return (
     toText(data?.summary) ||
@@ -249,30 +248,36 @@ function MessageBubble({ message }) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex min-w-0 gap-2.5 ${
+        isUser ? "justify-end" : "justify-start"
+      }`}
+    >
       {!isUser && (
-        <div className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand/20">
-          <SnoutIQIcon className="h-5 w-5" alt="SnoutIQ assistant" />
+        <div className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand/20">
+          <SnoutIQIcon className="h-4.5 w-4.5" alt="SnoutIQ assistant" />
         </div>
       )}
 
       <div
-        className={`max-w-[85%] break-words rounded-2xl p-4 ${
+        className={`min-w-0 break-words rounded-2xl ${
           isUser
-            ? "rounded-tr-none bg-brand text-slate-900"
-            : "rounded-tl-none border border-slate-200 bg-slate-100 text-slate-800"
+            ? "max-w-[84%] rounded-tr-none bg-brand px-3.5 py-3 text-slate-900 sm:max-w-[72%]"
+            : "flex-1 rounded-tl-none border border-slate-200 bg-slate-100/95 px-3 py-2.5 text-slate-800"
         }`}
       >
         {isUser ? (
-          <p className="whitespace-pre-wrap break-words">{message.text}</p>
+          <p className="whitespace-pre-wrap break-words text-[13px] leading-5">
+            {message.text}
+          </p>
         ) : (
           <AssistantMessage message={message} />
         )}
       </div>
 
       {isUser && (
-        <div className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand">
-          <User className="h-5 w-5 text-slate-900" />
+        <div className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand">
+          <User className="h-4.5 w-4.5 text-slate-900" />
         </div>
       )}
     </div>
@@ -309,9 +314,54 @@ function AssistantMessage({ message }) {
   );
 }
 
+function InfoCard({ title, value, compact = false, className = "" }) {
+  if (!value) return null;
+
+  return (
+    <div
+      className={`rounded-xl border border-slate-200 bg-white/85 ${
+        compact ? "p-2.5" : "p-3"
+      } ${className}`.trim()}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {title}
+      </p>
+      <p
+        className={`mt-1.5 break-words text-slate-800 ${
+          compact ? "text-[12.5px] leading-5" : "text-sm leading-relaxed"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function CompactSummary({ title, text, className = "" }) {
+  if (!text) return null;
+
+  return (
+    <div
+      className={`rounded-xl border border-slate-200 bg-white/90 p-2.5 ${className}`.trim()}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {title}
+      </p>
+      <p className="mt-1 break-words text-[12.5px] leading-5 text-slate-800">
+        {text}
+      </p>
+    </div>
+  );
+}
+
 function YesResponseCard({ data }) {
   const immediateSteps = toList(data?.immediate_steps);
   const homeCareTips = toList(data?.home_care_tips);
+  const summary = toText(data?.summary);
+  const serviceRecommendation = toText(data?.service_recommendation);
+  const whenToSeeVet = toText(data?.when_to_see_vet);
+  const whatWeFound = toText(data?.what_we_found);
+  const additionalNotes = toText(data?.additional_notes);
 
   if (!hasYesContent(data)) {
     return (
@@ -322,14 +372,14 @@ function YesResponseCard({ data }) {
   }
 
   return (
-    <div className="space-y-4 text-sm text-slate-800">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center rounded-full border border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
-          Detailed symptom review
+    <div className="space-y-2.5 text-sm text-slate-800">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex items-center rounded-full border border-brand/20 bg-brand/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand">
+          Detailed review
         </span>
         {toText(data?.urgency_level) ? (
           <span
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getUrgencyClasses(
+            className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${getUrgencyClasses(
               data.urgency_level,
             )}`}
           >
@@ -337,50 +387,58 @@ function YesResponseCard({ data }) {
           </span>
         ) : null}
         {toText(data?.confidence) ? (
-          <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+          <span
+            className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${getConfidenceClasses(
+              data.confidence,
+            )}`}
+          >
             Confidence: {formatLabel(data.confidence)}
           </span>
         ) : null}
       </div>
 
-      {toText(data?.summary) ? (
-        <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Summary
-          </p>
-          <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed text-slate-800">
-            {toText(data.summary)}
-          </p>
-        </div>
-      ) : null}
-
-      <div className="grid gap-3 md:grid-cols-2">
-        {YES_RESPONSE_FIELDS.map(({ key, label }) => {
-          const text = toText(data?.[key]);
-          if (!text) return null;
-
-          return (
-            <div
-              key={key}
-              className="rounded-xl border border-slate-200 bg-white/70 p-3"
-            >
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {label}
-              </p>
-              <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed text-slate-800">
-                {text}
-              </p>
-            </div>
-          );
-        })}
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <CompactSummary
+          title="Summary"
+          text={summary}
+          className="sm:col-span-2 xl:col-span-2"
+        />
+        <InfoCard
+          title="Service Recommendation"
+          value={serviceRecommendation}
+          compact
+        />
+        <InfoCard title="When To See Vet" value={whenToSeeVet} compact />
+        <InfoCard
+          title="What We Found"
+          value={whatWeFound}
+          compact
+          className="xl:col-span-2"
+        />
+        <InfoCard
+          title="Additional Notes"
+          value={additionalNotes}
+          compact
+          className="xl:col-span-2"
+        />
       </div>
 
       {immediateSteps.length > 0 ? (
-        <ResponseList title="Immediate Steps" items={immediateSteps} />
+        <ResponseList
+          title="Immediate Steps"
+          items={immediateSteps}
+          compact
+          columns={immediateSteps.length >= 6 ? 3 : immediateSteps.length >= 4 ? 2 : 1}
+        />
       ) : null}
 
       {homeCareTips.length > 0 ? (
-        <ResponseList title="Home Care Tips" items={homeCareTips} />
+        <ResponseList
+          title="Home Care Tips"
+          items={homeCareTips}
+          compact
+          columns={homeCareTips.length >= 6 ? 3 : homeCareTips.length >= 4 ? 2 : 1}
+        />
       ) : null}
     </div>
   );
@@ -390,6 +448,7 @@ function NoResponseCard({ data }) {
   const possibleCauses = toList(data?.possible_causes);
   const recommendedNextSteps = toList(data?.recommended_next_steps);
   const followUpQuestions = toList(data?.follow_up_questions);
+  const diagnosisSummary = toText(data?.diagnosis_summary);
 
   if (!hasNoContent(data)) {
     return (
@@ -400,14 +459,14 @@ function NoResponseCard({ data }) {
   }
 
   return (
-    <div className="space-y-4 text-sm text-slate-800">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+    <div className="space-y-2.5 text-sm text-slate-800">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
           Quick diagnosis
         </span>
         {toText(data?.urgency) ? (
           <span
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getUrgencyClasses(
+            className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${getUrgencyClasses(
               data.urgency,
             )}`}
           >
@@ -416,56 +475,79 @@ function NoResponseCard({ data }) {
         ) : null}
       </div>
 
-      {NO_RESPONSE_FIELDS.map(({ key, label }) => {
-        const text = toText(data?.[key]);
-        if (!text || key === "urgency") return null;
-
-        return (
-          <div
-            key={key}
-            className="rounded-xl border border-slate-200 bg-white/70 p-3"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {label}
-            </p>
-            <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed text-slate-800">
-              {text}
-            </p>
-          </div>
-        );
-      })}
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <CompactSummary
+          title="Diagnosis Summary"
+          text={diagnosisSummary}
+          className="sm:col-span-2 xl:col-span-2"
+        />
+      </div>
 
       {possibleCauses.length > 0 ? (
-        <ResponseList title="Possible Causes" items={possibleCauses} />
+        <ResponseList
+          title="Possible Causes"
+          items={possibleCauses}
+          compact
+          columns={possibleCauses.length >= 6 ? 3 : possibleCauses.length >= 4 ? 2 : 1}
+        />
       ) : null}
 
       {recommendedNextSteps.length > 0 ? (
         <ResponseList
           title="Recommended Next Steps"
           items={recommendedNextSteps}
+          compact
+          columns={
+            recommendedNextSteps.length >= 6
+              ? 3
+              : recommendedNextSteps.length >= 4
+                ? 2
+                : 1
+          }
         />
       ) : null}
 
       {followUpQuestions.length > 0 ? (
-        <ResponseList title="Follow-up Questions" items={followUpQuestions} />
+        <ResponseList
+          title="Follow-up Questions"
+          items={followUpQuestions}
+          compact
+          columns={
+            followUpQuestions.length >= 6 ? 3 : followUpQuestions.length >= 4 ? 2 : 1
+          }
+        />
       ) : null}
     </div>
   );
 }
 
-function ResponseList({ title, items }) {
+function ResponseList({ title, items, compact = false, columns = 1 }) {
   if (!items.length) return null;
 
+  const layoutClass =
+    columns >= 3
+      ? "grid gap-x-4 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3"
+      : columns === 2
+        ? "grid gap-x-4 gap-y-1.5 sm:grid-cols-2"
+        : "space-y-1.5";
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div
+      className={`rounded-xl border border-slate-200 bg-white/75 ${
+        compact ? "p-2.5" : "p-3"
+      }`}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
         {title}
       </p>
-      <ul className="mt-2 space-y-2">
+      <ul className={`mt-2 ${layoutClass}`}>
         {items.map((item, index) => (
-          <li key={`${title}-${index}`} className="flex gap-2 text-slate-800">
-            <span className="mt-[7px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand" />
-            <span className="break-words leading-relaxed">{item}</span>
+          <li
+            key={`${title}-${index}`}
+            className="flex gap-2 text-[12.5px] leading-5 text-slate-800"
+          >
+            <span className="mt-[8px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand" />
+            <span className="break-words">{item}</span>
           </li>
         ))}
       </ul>
@@ -1142,17 +1224,17 @@ export function SymptomCheckerChat() {
 
   return (
     <>
-      <div className="flex h-[600px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-brand/20 bg-brand/10 p-4">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-brand/20 bg-brand/10 px-3.5 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-brand p-2">
-              <SnoutIQIcon className="h-6 w-6" alt="SnoutIQ" />
+            <div className="rounded-full bg-brand p-1.5">
+              <SnoutIQIcon className="h-4.5 w-4.5" alt="SnoutIQ" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">
-                AI Symptom Checker
+              <h3 className="text-[15px] font-bold leading-5 text-slate-900">
+                Snoutiq AI Symptom Checker
               </h3>
-              <p className="flex items-center gap-1 text-sm text-brand">
+              <p className="flex items-center gap-1 text-[11px] text-brand">
                 <AlertTriangle className="h-3 w-3" />
                 Triage only. Not a diagnosis.
               </p>
@@ -1160,17 +1242,17 @@ export function SymptomCheckerChat() {
           </div>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="flex-1 min-h-0 space-y-2.5 overflow-y-auto overscroll-contain p-2.5">
           {messages.length === 0 ? (
-            <div className="mt-10 text-center text-slate-600">
+            <div className="mt-4 text-center text-slate-600">
               <SnoutIQIcon
-                className="mx-auto mb-4 h-12 w-12 opacity-80"
+                className="mx-auto mb-2.5 h-9 w-9 opacity-80"
                 alt="SnoutIQ"
               />
-              <p className="mb-2 text-lg text-slate-900">
+              <p className="mb-1 text-[15px] text-slate-900">
                 Describe your pet&apos;s symptoms below.
               </p>
-              <p className="text-sm">
+              <p className="mx-auto max-w-md text-[11px] leading-5">
                 Example: &quot;My 3-year-old Golden Retriever has been vomiting
                 yellow foam since morning.&quot;
               </p>
@@ -1182,13 +1264,13 @@ export function SymptomCheckerChat() {
           ))}
 
           {loading ? (
-            <div className="flex gap-3 justify-start">
-              <div className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand/20">
-                <SnoutIQIcon className="h-5 w-5" alt="SnoutIQ assistant" />
+            <div className="flex gap-2.5 justify-start">
+              <div className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand/20">
+                <SnoutIQIcon className="h-4.5 w-4.5" alt="SnoutIQ assistant" />
               </div>
-              <div className="flex items-center gap-2 rounded-2xl rounded-tl-none border border-slate-200 bg-slate-100 p-4 text-slate-800">
-                <Loader2 className="h-4 w-4 animate-spin text-brand" />
-                <span className="text-sm">
+              <div className="flex items-center gap-2 rounded-2xl rounded-tl-none border border-slate-200 bg-slate-100 px-3 py-2 text-slate-800">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
+                <span className="text-[12.5px]">
                   {requestType === "yes"
                     ? "Reviewing symptoms with pet details..."
                     : "Preparing concise diagnosis..."}
@@ -1200,7 +1282,7 @@ export function SymptomCheckerChat() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="border-t border-slate-200 bg-white p-4">
+        <div className="shrink-0 border-t border-slate-200 bg-white p-2.5">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <input
               type="text"
@@ -1208,14 +1290,14 @@ export function SymptomCheckerChat() {
               onChange={(event) => setInputValue(event.target.value)}
               placeholder="Describe the symptoms..."
               disabled={isInteractionLocked}
-              className="flex-1 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-900 transition-colors focus:border-brand focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-[13px] text-slate-900 transition-colors focus:border-brand focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={isInteractionLocked || !inputValue.trim()}
-              className="flex items-center justify-center rounded-xl bg-brand p-3 text-slate-900 transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-slate-900 transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Send className="h-5 w-5" />
+              <Send className="h-4 w-4" />
             </button>
           </form>
           {error ? (
