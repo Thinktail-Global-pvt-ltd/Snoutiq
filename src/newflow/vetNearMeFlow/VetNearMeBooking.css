@@ -625,6 +625,17 @@
   overflow: hidden;
 }
 
+.vet-near-me-page .vet-photo.has-image {
+  background: #edf2ff;
+}
+
+.vet-near-me-page .vet-photo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .vet-near-me-page .vet-photo-initials {
   font-family: "Instrument Serif", serif;
   font-size: 40px;

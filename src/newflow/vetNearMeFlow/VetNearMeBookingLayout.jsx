@@ -16,6 +16,7 @@ import {
   VALUE_ROWS,
 } from "./bookingFlowData";
 import { VetNearMeBookingProvider } from "./VetNearMeBookingContext";
+import { loadFeaturedVetsFromApi } from "./featuredVetsApi";
 import logoImage from "../../assets/images/logo.png";
 import "./VetNearMeBooking.css";
 
@@ -52,11 +53,34 @@ function StepIndicator({ currentStep }) {
   );
 }
 
+function FeaturedVetPhoto({ vet }) {
+  const [hasImageError, setHasImageError] = useState(false);
+  const showImage = Boolean(vet.image) && !hasImageError;
+
+  return (
+    <div className={`vet-photo${showImage ? " has-image" : ""}`}>
+      {showImage ? (
+        <img
+          src={vet.image}
+          alt={vet.name}
+          className="vet-photo-image"
+          loading="lazy"
+          onError={() => setHasImageError(true)}
+        />
+      ) : (
+        <div className="vet-photo-initials">{vet.initials}</div>
+      )}
+    </div>
+  );
+}
+
 function VetNearMeBookingPage() {
   const location = useLocation();
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [selectedArea, setSelectedArea] = useState("Gurgaon");
   const [showStickyCta, setShowStickyCta] = useState(false);
+  const [featuredVets, setFeaturedVets] = useState(FEATURED_VETS);
+  const [hasLoadedFeaturedVets, setHasLoadedFeaturedVets] = useState(false);
 
   const currentStep = useMemo(
     () => STEP_NUMBER_BY_PATH[location.pathname] || 1,
@@ -103,6 +127,31 @@ function VetNearMeBookingPage() {
       observer.disconnect();
     };
   }, [currentStep]);
+
+  useEffect(() => {
+    if (currentStep !== 1 || hasLoadedFeaturedVets) return undefined;
+
+    let isCancelled = false;
+
+    loadFeaturedVetsFromApi()
+      .then((items) => {
+        if (!isCancelled && Array.isArray(items) && items.length) {
+          setFeaturedVets(items);
+        }
+      })
+      .catch(() => {
+        // Keep the static fallback cards when the live doctor API is unavailable.
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setHasLoadedFeaturedVets(true);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentStep, hasLoadedFeaturedVets]);
 
   const scrollToForm = () => {
     const formCard = document.getElementById("main-form");
@@ -159,16 +208,6 @@ function VetNearMeBookingPage() {
             <img src={logoImage} alt="Snoutiq" className="logo-image" />
           </div>
           <button type="button" className="nav-call" onClick={scrollToForm}>
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-            </svg>
             Book now
           </button>
         </nav>
@@ -305,24 +344,28 @@ function VetNearMeBookingPage() {
           </p>
 
           <div className="vet-scroll">
-            {FEATURED_VETS.map((vet) => (
-              <article className="vet-card" key={vet.name}>
-                <div className="vet-photo">
-                  <div className="vet-photo-initials">{vet.initials}</div>
-                </div>
+            {featuredVets.map((vet) => (
+              <article className="vet-card" key={vet.id || vet.name}>
+                <FeaturedVetPhoto vet={vet} />
                 <div className="vet-body">
                   <div className="vet-name">{vet.name}</div>
                   <div className="vet-cred">{vet.credentials}</div>
                   <div className="vet-meta">
-                    {vet.tags.map((tag) => (
+                    {(vet.tags || []).map((tag) => (
                       <span className="vet-tag" key={tag}>
                         {tag}
                       </span>
                     ))}
                   </div>
                   <p className="vet-stat">
-                    <b>{vet.statLine1}</b> pets treated · <b>{vet.statLine2}</b>{" "}
-                    repeat calls
+                    <b>{vet.statLine1}</b> {vet.statLabel1 || "pets treated"}
+                    {vet.statLine2 ? (
+                      <>
+                        {" "}
+                        · <b>{vet.statLine2}</b>{" "}
+                        {vet.statLabel2 || "repeat calls"}
+                      </>
+                    ) : null}
                   </p>
                 </div>
               </article>
