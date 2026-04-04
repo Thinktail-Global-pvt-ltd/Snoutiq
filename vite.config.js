@@ -12,8 +12,9 @@ export default defineConfig({
         order: "post",
         handler(html, ctx) {
           const bundle = ctx.bundle || {};
-          const collectChunkFiles = (chunkNames = []) => {
-            const preloadFiles = [];
+          const collectChunkPreloads = (chunkNames = []) => {
+            const moduleFiles = [];
+            const styleFiles = [];
             const visitedImports = new Set();
 
             const collectImports = (fileName) => {
@@ -23,7 +24,15 @@ export default defineConfig({
               if (!chunk || chunk.type !== "chunk") return;
 
               visitedImports.add(fileName);
-              preloadFiles.push(`/${fileName}`);
+              moduleFiles.push(`/${fileName}`);
+
+              chunk.viteMetadata?.importedCss?.forEach((cssFileName) => {
+                const href = `/${cssFileName}`;
+                if (!styleFiles.includes(href)) {
+                  styleFiles.push(href);
+                }
+              });
+
               chunk.imports.forEach(collectImports);
             };
 
@@ -39,11 +48,14 @@ export default defineConfig({
               collectImports(chunk?.fileName);
             });
 
-            return preloadFiles;
+            return {
+              moduleFiles,
+              styleFiles,
+            };
           };
 
-          const homePreloadFiles = collectChunkFiles(["MainLayout", "HomePage"]);
-          const vetNearMePreloadFiles = collectChunkFiles(["RouteModule"]);
+          const homePreloads = collectChunkPreloads(["MainLayout", "HomePage"]);
+          const vetNearMePreloads = collectChunkPreloads(["RouteModule"]);
 
           let transformedHtml = html.replace(
             /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*)>/g,
@@ -52,20 +64,25 @@ export default defineConfig({
               `<noscript><link rel="stylesheet"${preAttrs}href="${href}"${postAttrs}></noscript>`,
           );
 
-          if (homePreloadFiles.length) {
+          if (homePreloads.moduleFiles.length) {
             transformedHtml = transformedHtml.replace(
               "</head>",
               `<script>if(window.location.pathname==="/"){${JSON.stringify(
-                homePreloadFiles,
+                homePreloads.moduleFiles,
               )}.forEach(function(href){var link=document.createElement("link");link.rel="modulepreload";link.href=href;link.crossOrigin="";document.head.appendChild(link);});}</script></head>`,
             );
           }
 
-          if (vetNearMePreloadFiles.length) {
+          if (
+            vetNearMePreloads.styleFiles.length ||
+            vetNearMePreloads.moduleFiles.length
+          ) {
             transformedHtml = transformedHtml.replace(
               "</head>",
               `<script>if(window.location.pathname.startsWith("/vet-near-me-delhi-ncr")){${JSON.stringify(
-                vetNearMePreloadFiles,
+                vetNearMePreloads.styleFiles,
+              )}.forEach(function(href){if(document.querySelector('link[rel="stylesheet"][href="'+href+'"]'))return;var link=document.createElement("link");link.rel="stylesheet";link.href=href;document.head.appendChild(link);});${JSON.stringify(
+                vetNearMePreloads.moduleFiles,
               )}.forEach(function(href){var link=document.createElement("link");link.rel="modulepreload";link.href=href;link.crossOrigin="";document.head.appendChild(link);});}</script></head>`,
             );
           }

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Helmet, HelmetProvider } from "react-helmet-async";
 import { Outlet, useLocation } from "react-router-dom";
 import {
   BOOKING_FLOW_ROUTES,
@@ -15,10 +14,17 @@ import {
   TRUST_PILLS,
   VALUE_ROWS,
 } from "./bookingFlowData";
-import logo from '../../assets/images/dark bg.webp';
 import { VetNearMeBookingProvider } from "./VetNearMeBookingContext";
-import logoImage from "../../assets/images/logo.png";
 import "./VetNearMeBooking.css";
+
+const footerLogoImage = new URL(
+  "../../assets/images/dark bg.webp",
+  import.meta.url
+).href;
+const navLogoImage = new URL(
+  "../../assets/images/logo.png",
+  import.meta.url
+).href;
 
 const STEP_NUMBER_BY_PATH = {
   [BOOKING_FLOW_ROUTES.lead]: 1,
@@ -118,6 +124,32 @@ const buildVetPerformanceStats = (vet = {}) => {
   };
 };
 
+const upsertBookingMetaTag = (attribute, key, content) => {
+  if (typeof document === "undefined") return;
+
+  let tag = document.querySelector(`meta[${attribute}="${key}"]`);
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.setAttribute(attribute, key);
+    document.head.appendChild(tag);
+  }
+
+  tag.setAttribute("content", content);
+};
+
+const upsertBookingCanonical = (href) => {
+  if (typeof document === "undefined") return;
+
+  let canonical = document.querySelector("link[rel='canonical']");
+  if (!canonical) {
+    canonical = document.createElement("link");
+    canonical.setAttribute("rel", "canonical");
+    document.head.appendChild(canonical);
+  }
+
+  canonical.setAttribute("href", href);
+};
+
 function VetNearMeBookingPage() {
   const location = useLocation();
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
@@ -146,6 +178,20 @@ function VetNearMeBookingPage() {
   const isSuccessStep = currentStep === 4;
   const isStandaloneStep =
     currentStep === 2 || currentStep === 3 || isSuccessStep;
+
+  useEffect(() => {
+    const pageTitle = currentStep === 4
+      ? "Booking Confirmed | Vet at Home - Snoutiq"
+      : "Vet Near Me in Delhi NCR | Vet at Home - Snoutiq";
+
+    document.title = pageTitle;
+    upsertBookingMetaTag(
+      "name",
+      "description",
+      "Searched for a vet near me in Delhi NCR? Snoutiq sends verified, experienced veterinarians to your home in Gurgaon, Delhi, Noida and Faridabad. Same-day visits. Rs.999."
+    );
+    upsertBookingCanonical(`https://snoutiq.com${location.pathname}`);
+  }, [currentStep, location.pathname]);
 
   useEffect(() => {
     if (currentStep !== 1) {
@@ -312,8 +358,9 @@ function VetNearMeBookingPage() {
 
   return (
     <>
-      <Helmet>
-        <title>
+      {false ? (
+        <>
+          <title>
           {currentStep === 4
             ? "Booking Confirmed | Vet at Home — Snoutiq"
             : "Vet Near Me in Delhi NCR | Vet at Home — Snoutiq"}
@@ -322,8 +369,9 @@ function VetNearMeBookingPage() {
           name="description"
           content='Searched for a vet near me in Delhi NCR? Snoutiq sends verified, experienced veterinarians to your home in Gurgaon, Delhi, Noida and Faridabad. Same-day visits. ₹999.'
         />
-        <link rel="canonical" href={`https://snoutiq.com${location.pathname}`} />
-      </Helmet>
+          <link rel="canonical" href={`https://snoutiq.com${location.pathname}`} />
+        </>
+      ) : null}
 
       {isStandaloneStep ? (
         <main
@@ -353,7 +401,7 @@ function VetNearMeBookingPage() {
         <nav>
           <div className="logo">
             <img
-              src={logoImage}
+              src={navLogoImage}
               alt="Snoutiq"
               className="logo-image"
               width="96"
@@ -678,7 +726,7 @@ function VetNearMeBookingPage() {
 
         <footer>
           <img
-            src={logo}
+            src={footerLogoImage}
             alt="Snoutiq"
             className="f-logo-image"
             loading="lazy"
@@ -711,10 +759,8 @@ function VetNearMeBookingPage() {
 
 export default function VetNearMeBookingLayout() {
   return (
-    <HelmetProvider>
-      <VetNearMeBookingProvider>
-        <VetNearMeBookingPage />
-      </VetNearMeBookingProvider>
-    </HelmetProvider>
+    <VetNearMeBookingProvider>
+      <VetNearMeBookingPage />
+    </VetNearMeBookingProvider>
   );
 }
