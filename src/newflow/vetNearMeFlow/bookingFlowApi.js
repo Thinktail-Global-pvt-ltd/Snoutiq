@@ -153,3 +153,73 @@ export async function initiatePayment({
     raw: response,
   };
 }
+
+export async function createHomeServiceOrder({
+  bookingId,
+  userId,
+  petId,
+  amount,
+}) {
+  const normalizedAmount = Math.round(Number(amount) || 0);
+
+  const response = await postBookingStep("/api/create-order", {
+    amount: normalizedAmount,
+    amount_paise: normalizedAmount * 100,
+    home_service_booking_id: bookingId,
+    user_id: userId,
+    pet_id: petId,
+    order_type: "home_service",
+  });
+
+  return {
+    ok: Boolean(
+      response?.success && (response?.order_id || response?.order?.id) && response?.key
+    ),
+    key: response?.key ?? "",
+    orderId: response?.order_id ?? response?.order?.id ?? "",
+    amountPaise: response?.order?.amount ?? normalizedAmount * 100,
+    currency: response?.order?.currency ?? "INR",
+    receipt: response?.order?.receipt ?? "",
+    error: response?.error || response?.message || "",
+    raw: response,
+  };
+}
+
+export async function verifyHomeServicePayment({
+  bookingId,
+  userId,
+  petId,
+  razorpayOrderId,
+  razorpayPaymentId,
+  razorpaySignature,
+}) {
+  const response = await postBookingStep("/api/rzp/verify", {
+    razorpay_order_id: razorpayOrderId,
+    razorpay_payment_id: razorpayPaymentId,
+    razorpay_signature: razorpaySignature,
+    home_service_booking_id: bookingId,
+    user_id: userId,
+    pet_id: petId,
+  });
+
+  return {
+    ok: Boolean(response?.success),
+    bookingId:
+      response?.home_service_booking_id ??
+      response?.data?.home_service_booking_id ??
+      bookingId,
+    userId: response?.user_id ?? response?.data?.user_id ?? userId,
+    petId: response?.pet_id ?? response?.data?.pet_id ?? petId,
+    latestCompletedStep: response?.data?.latest_completed_step ?? 3,
+    paymentStatus:
+      response?.payment_status ?? response?.data?.payment_status ?? "paid",
+    bookingReference:
+      response?.booking_reference ??
+      response?.data?.booking_reference ??
+      response?.data?.booking?.booking_reference ??
+      "",
+    paymentReference: razorpayPaymentId || "",
+    error: response?.error || response?.message || "",
+    raw: response,
+  };
+}
