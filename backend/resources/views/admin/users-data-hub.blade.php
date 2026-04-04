@@ -106,6 +106,7 @@
 
     $currentPerPage = (int) request()->query('per_page', $users->perPage());
     $searchQuery = trim((string) request()->query('q', ''));
+    $currentPage = (int) request()->query('page', 1);
 @endphp
 
 <div class="row g-4">
@@ -152,6 +153,13 @@
                         </div>
                     </form>
                 </div>
+
+                @if(session('status'))
+                    <div class="alert alert-success py-2 px-3 mb-3">{{ session('status') }}</div>
+                @endif
+                @if(session('error'))
+                    <div class="alert alert-danger py-2 px-3 mb-3">{{ session('error') }}</div>
+                @endif
 
                 @if($users->isEmpty())
                     <div class="text-center text-muted py-5">
@@ -269,14 +277,28 @@
                                         </td>
 
                                         <td class="text-end">
-                                            <button
-                                                class="btn btn-sm btn-outline-primary"
-                                                type="button"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#{{ $modalId }}"
-                                            >
-                                                View
-                                            </button>
+                                            <div class="d-flex justify-content-end gap-2">
+                                                <button
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    type="button"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#{{ $modalId }}"
+                                                >
+                                                    View
+                                                </button>
+                                                <form
+                                                    method="POST"
+                                                    action="{{ route('admin.users.data-hub.delete', $user) }}"
+                                                    onsubmit="return confirm('Delete user #{{ $user->id }} and all related data? This cannot be undone.');"
+                                                >
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <input type="hidden" name="q" value="{{ $searchQuery }}">
+                                                    <input type="hidden" name="per_page" value="{{ $currentPerPage }}">
+                                                    <input type="hidden" name="page" value="{{ $currentPage }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                                </form>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach

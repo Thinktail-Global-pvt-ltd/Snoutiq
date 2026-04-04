@@ -221,6 +221,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
         Route::get('/users/data-hub', [AdminPanelController::class, 'usersDataHub'])->name('admin.users.data-hub');
         Route::get('/users/data-hub/export-csv', [AdminPanelController::class, 'usersDataHubExportCsv'])->name('admin.users.data-hub.export-csv');
+        Route::delete('/users/data-hub/{user}', [AdminPanelController::class, 'deleteUsersDataHubUser'])->name('admin.users.data-hub.delete');
         Route::get('/users/profile-completion', [AdminPanelController::class, 'userProfileCompletion'])->name('admin.users.profile-completion');
         Route::get('/lead-management', function (Request $request) {
             ini_set('display_errors', '1');

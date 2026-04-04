@@ -555,6 +555,29 @@ class AdminPanelController extends Controller
         ]);
     }
 
+    public function deleteUsersDataHubUser(Request $request, User $user): RedirectResponse
+    {
+        $filters = array_filter([
+            'q' => $request->input('q'),
+            'per_page' => $request->input('per_page'),
+            'page' => $request->input('page'),
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        $userId = (int) $user->id;
+
+        try {
+            $this->deleteLeadManagementUserAndRelatedData($user);
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('admin.users.data-hub', $filters)
+                ->with('error', 'Failed to delete user '.$userId.': '.$e->getMessage());
+        }
+
+        return redirect()
+            ->route('admin.users.data-hub', $filters)
+            ->with('status', 'User '.$userId.' and related data deleted successfully.');
+    }
+
     public function userProfileCompletion(): View
     {
         $deviceTokensTableExists = Schema::hasTable('device_tokens');
@@ -2340,6 +2363,14 @@ class AdminPanelController extends Controller
             $deleteByUserId('prescriptions');
             $deleteByPetId('prescriptions');
 
+            $deleteByUserId('video_apointment');
+            $deleteByPetId('video_apointment');
+
+            $deleteByPetId('appointments');
+
+            $deleteByPetId('home_service_required_by_pet');
+            $deleteByPetId('home_service_required_by_pets');
+
             $deleteByUserId('medical_records');
             $deleteByPetId('medical_records');
 
@@ -2356,9 +2387,7 @@ class AdminPanelController extends Controller
                 'vet_response_reminder_logs',
                 'device_tokens',
                 'call_sessions',
-                'video_apointment',
                 'payments',
-                'appointments',
                 'user_ai_chats',
                 'user_ai_chat_histories',
                 'groomer_bookings',
