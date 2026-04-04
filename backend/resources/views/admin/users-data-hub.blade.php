@@ -138,8 +138,14 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-6 col-lg-3 d-flex gap-2">
+                        <div class="col-12 col-lg-3 d-flex flex-wrap gap-2">
                             <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Apply</button>
+                            <a
+                                href="{{ route('admin.users.data-hub.export-csv', array_filter(['q' => $searchQuery], fn ($value) => $value !== null && $value !== '')) }}"
+                                class="btn btn-sm btn-success"
+                            >
+                                <i class="bi bi-download me-1"></i>Export CSV
+                            </a>
                             @if($searchQuery !== '')
                                 <a href="{{ route('admin.users.data-hub', ['per_page' => $currentPerPage]) }}" class="btn btn-sm btn-outline-secondary">Clear</a>
                             @endif

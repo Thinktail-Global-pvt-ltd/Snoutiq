@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminPanelController extends Controller
 {
@@ -231,6 +232,326 @@ class AdminPanelController extends Controller
             'appointmentsByUser' => $appointmentsByUser,
             'videoConsultsByUser' => $videoConsultsByUser,
             'detailLimit' => 5,
+        ]);
+    }
+
+    public function usersDataHubExportCsv(Request $request): StreamedResponse
+    {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $searchTerm = trim((string) ($validated['q'] ?? ''));
+
+        $supports = [
+            'pets' => Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id'),
+            'transactions' => Schema::hasTable('transactions') && Schema::hasColumn('transactions', 'user_id'),
+            'prescriptions' => Schema::hasTable('prescriptions') && Schema::hasColumn('prescriptions', 'user_id'),
+            'appointments' => Schema::hasTable('appointments') && Schema::hasColumn('appointments', 'pet_id'),
+            'video_apointment' => Schema::hasTable('video_apointment') && Schema::hasColumn('video_apointment', 'user_id'),
+        ];
+
+        $petColumns = ['id', 'user_id', 'name', 'breed', 'created_at'];
+        if ($supports['pets']) {
+            if (Schema::hasColumn('pets', 'pet_type')) {
+                $petColumns[] = 'pet_type';
+            }
+            if (Schema::hasColumn('pets', 'type')) {
+                $petColumns[] = 'type';
+            }
+            if (Schema::hasColumn('pets', 'pet_gender')) {
+                $petColumns[] = 'pet_gender';
+            }
+            if (Schema::hasColumn('pets', 'gender')) {
+                $petColumns[] = 'gender';
+            }
+        }
+
+        $txColumns = ['id', 'user_id', 'pet_id', 'status', 'type', 'amount_paise', 'reference', 'created_at'];
+        if ($supports['transactions'] && Schema::hasColumn('transactions', 'metadata')) {
+            $txColumns[] = 'metadata';
+        }
+
+        $prescriptionColumns = [
+            'id',
+            'user_id',
+            'pet_id',
+            'doctor_id',
+            'diagnosis',
+            'follow_up_date',
+            'video_inclinic',
+            'created_at',
+        ];
+
+        $appointmentColumns = [
+            'id',
+            'pet_id',
+            'doctor_id',
+            'vet_registeration_id',
+            'appointment_date',
+            'appointment_time',
+            'status',
+            'created_at',
+        ];
+
+        $videoColumns = [
+            'id',
+            'user_id',
+            'pet_id',
+            'doctor_id',
+            'clinic_id',
+            'order_id',
+            'call_session',
+            'is_completed',
+            'created_at',
+        ];
+
+        $filename = 'users-data-hub-' . now()->format('Ymd_His') . '.csv';
+
+        return response()->streamDownload(function () use (
+            $searchTerm,
+            $supports,
+            $petColumns,
+            $txColumns,
+            $prescriptionColumns,
+            $appointmentColumns,
+            $videoColumns
+        ): void {
+            $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                return;
+            }
+
+            $clean = static function ($value): string {
+                if ($value === null) {
+                    return '';
+                }
+
+                $text = trim((string) $value);
+                return preg_replace('/\s+/', ' ', $text) ?? $text;
+            };
+
+            $formatInrFromPaise = static function ($paise): string {
+                if (!is_numeric($paise)) {
+                    return 'n/a';
+                }
+
+                return number_format(((int) $paise) / 100, 2);
+            };
+
+            fputcsv($handle, [
+                'user_id',
+                'name',
+                'email',
+                'phone',
+                'role',
+                'joined_at',
+                'pets_count',
+                'pets_details',
+                'transactions_count',
+                'transactions_details',
+                'prescriptions_count',
+                'prescriptions_details',
+                'appointments_count',
+                'appointments_details',
+                'video_consults_count',
+                'video_consults_details',
+            ]);
+
+            $usersQuery = User::query()
+                ->select(['id', 'name', 'email', 'phone', 'role', 'created_at']);
+
+            if ($searchTerm !== '') {
+                $usersQuery->where(function (Builder $query) use ($searchTerm): void {
+                    $searchLike = '%' . $searchTerm . '%';
+                    $query->where('name', 'like', $searchLike)
+                        ->orWhere('email', 'like', $searchLike)
+                        ->orWhere('phone', 'like', $searchLike);
+                });
+            }
+
+            $usersQuery
+                ->orderBy('id')
+                ->chunkById(300, function (Collection $usersChunk) use (
+                    $handle,
+                    $supports,
+                    $petColumns,
+                    $txColumns,
+                    $prescriptionColumns,
+                    $appointmentColumns,
+                    $videoColumns,
+                    $clean,
+                    $formatInrFromPaise
+                ): void {
+                    $userIds = $usersChunk
+                        ->pluck('id')
+                        ->filter(fn ($id) => is_numeric($id))
+                        ->map(fn ($id) => (int) $id)
+                        ->values();
+
+                    $petsByUser = collect();
+                    $petsById = collect();
+                    $transactionsByUser = collect();
+                    $prescriptionsByUser = collect();
+                    $appointmentsByUser = collect();
+                    $videoConsultsByUser = collect();
+
+                    if ($userIds->isNotEmpty()) {
+                        if ($supports['pets']) {
+                            $pets = Pet::query()
+                                ->select(array_unique($petColumns))
+                                ->whereIn('user_id', $userIds->all())
+                                ->orderByDesc('id')
+                                ->get();
+
+                            $petsByUser = $pets->groupBy(fn (Pet $pet) => (int) $pet->user_id);
+                            $petsById = $pets->keyBy(fn (Pet $pet) => (int) $pet->id);
+                        }
+
+                        if ($supports['transactions']) {
+                            $transactionsByUser = Transaction::query()
+                                ->select(array_unique($txColumns))
+                                ->whereIn('user_id', $userIds->all())
+                                ->orderByDesc('id')
+                                ->get()
+                                ->groupBy(fn (Transaction $transaction) => (int) $transaction->user_id);
+                        }
+
+                        if ($supports['prescriptions']) {
+                            $prescriptionsByUser = Prescription::query()
+                                ->select(array_unique($prescriptionColumns))
+                                ->whereIn('user_id', $userIds->all())
+                                ->orderByDesc('id')
+                                ->get()
+                                ->groupBy(fn (Prescription $prescription) => (int) $prescription->user_id);
+                        }
+
+                        if ($supports['video_apointment']) {
+                            $videoConsultsByUser = VideoApointment::query()
+                                ->select(array_unique($videoColumns))
+                                ->whereIn('user_id', $userIds->all())
+                                ->orderByDesc('id')
+                                ->get()
+                                ->groupBy(fn (VideoApointment $videoApointment) => (int) $videoApointment->user_id);
+                        }
+
+                        if ($supports['appointments']) {
+                            $petOwnerByPetId = $petsById->mapWithKeys(
+                                fn (Pet $pet) => [(int) $pet->id => (int) $pet->user_id]
+                            );
+
+                            $petIds = $petOwnerByPetId->keys()->values();
+                            if ($petIds->isNotEmpty()) {
+                                $appointments = Appointment::query()
+                                    ->select(array_unique($appointmentColumns))
+                                    ->whereIn('pet_id', $petIds->all())
+                                    ->orderByDesc('id')
+                                    ->get();
+
+                                $appointmentsByUser = $appointments
+                                    ->groupBy(function (Appointment $appointment) use ($petOwnerByPetId) {
+                                        return (int) ($petOwnerByPetId->get((int) $appointment->pet_id, 0));
+                                    })
+                                    ->filter(fn ($_, $userId) => (int) $userId > 0);
+                            }
+                        }
+                    }
+
+                    foreach ($usersChunk as $user) {
+                        $userId = (int) $user->id;
+
+                        $pets = $petsByUser->get($userId, collect());
+                        $transactions = $transactionsByUser->get($userId, collect());
+                        $prescriptions = $prescriptionsByUser->get($userId, collect());
+                        $appointments = $appointmentsByUser->get($userId, collect());
+                        $videoConsults = $videoConsultsByUser->get($userId, collect());
+
+                        $petsDetails = $supports['pets']
+                            ? $pets->map(function ($pet) use ($clean) {
+                                $petType = $pet->pet_type ?? $pet->type ?? 'n/a';
+                                $petGender = $pet->pet_gender ?? $pet->gender ?? 'n/a';
+
+                                return '#' . $pet->id
+                                    . ':' . $clean($pet->name ?: 'Unnamed')
+                                    . ':' . $clean($petType)
+                                    . ':' . $clean($pet->breed ?: 'n/a')
+                                    . ':' . $clean($petGender);
+                            })->implode(' | ')
+                            : 'table_missing';
+
+                        $transactionsDetails = $supports['transactions']
+                            ? $transactions->map(function ($transaction) use ($clean, $formatInrFromPaise) {
+                                $txType = $transaction->type;
+                                if (!$txType && is_array($transaction->metadata ?? null)) {
+                                    $txType = data_get($transaction->metadata, 'order_type', 'n/a');
+                                }
+                                $txType = $txType ?: 'n/a';
+
+                                return '#' . $transaction->id
+                                    . ':' . $clean($txType)
+                                    . ':' . strtoupper($clean($transaction->status ?: 'n/a'))
+                                    . ':₹' . $formatInrFromPaise($transaction->amount_paise)
+                                    . ':pet_' . ($transaction->pet_id ?: 'n/a')
+                                    . ':' . $clean($transaction->reference ?: 'n/a')
+                                    . ':' . $clean($transaction->created_at);
+                            })->implode(' | ')
+                            : 'table_missing';
+
+                        $prescriptionsDetails = $supports['prescriptions']
+                            ? $prescriptions->map(function ($prescription) use ($clean) {
+                                return '#' . $prescription->id
+                                    . ':pet_' . ($prescription->pet_id ?: 'n/a')
+                                    . ':doc_' . ($prescription->doctor_id ?: 'n/a')
+                                    . ':' . $clean($prescription->diagnosis ?: 'n/a')
+                                    . ':follow_up_' . $clean($prescription->follow_up_date ?: 'n/a')
+                                    . ':mode_' . $clean($prescription->video_inclinic ?: 'n/a');
+                            })->implode(' | ')
+                            : 'table_missing';
+
+                        $appointmentsDetails = $supports['appointments']
+                            ? $appointments->map(function ($appointment) use ($clean) {
+                                return '#' . $appointment->id
+                                    . ':pet_' . ($appointment->pet_id ?: 'n/a')
+                                    . ':doc_' . ($appointment->doctor_id ?: 'n/a')
+                                    . ':' . strtoupper($clean($appointment->status ?: 'n/a'))
+                                    . ':at_' . $clean(($appointment->appointment_date ?: 'n/a') . ' ' . ($appointment->appointment_time ?: ''));
+                            })->implode(' | ')
+                            : 'table_missing';
+
+                        $videoConsultsDetails = $supports['video_apointment']
+                            ? $videoConsults->map(function ($videoConsult) use ($clean) {
+                                return '#' . $videoConsult->id
+                                    . ':pet_' . ($videoConsult->pet_id ?: 'n/a')
+                                    . ':order_' . ($videoConsult->order_id ?: 'n/a')
+                                    . ':call_' . $clean($videoConsult->call_session ?: 'n/a')
+                                    . ':' . ($videoConsult->is_completed ? 'COMPLETED' : 'PENDING');
+                            })->implode(' | ')
+                            : 'table_missing';
+
+                        fputcsv($handle, [
+                            $userId,
+                            $clean($user->name ?: ''),
+                            $clean($user->email ?: ''),
+                            $clean($user->phone ?: ''),
+                            $clean($user->role ?: ''),
+                            $clean($user->created_at),
+                            $supports['pets'] ? $pets->count() : 'N/A',
+                            $petsDetails,
+                            $supports['transactions'] ? $transactions->count() : 'N/A',
+                            $transactionsDetails,
+                            $supports['prescriptions'] ? $prescriptions->count() : 'N/A',
+                            $prescriptionsDetails,
+                            $supports['appointments'] ? $appointments->count() : 'N/A',
+                            $appointmentsDetails,
+                            $supports['video_apointment'] ? $videoConsults->count() : 'N/A',
+                            $videoConsultsDetails,
+                        ]);
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
