@@ -85,6 +85,7 @@ use App\Http\Controllers\Api\ClinicFinancialsController;
 use App\Http\Controllers\Api\PetConsultTimelineController;
 use App\Http\Controllers\Api\RagSnouticSymptomController;
 use App\Http\Controllers\Api\SnoutiqSymptomController;
+use App\Http\Controllers\Api\HomeVetBookingController;
 use App\Services\PetDiseaseInferenceService;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
@@ -117,6 +118,12 @@ Route::prefix('socket')->group(function () {
 });
 
 Route::post('/realtime/heartbeat', [RealtimeController::class, 'heartbeat']);
+
+Route::prefix('home-vet-bookings')->group(function () {
+    Route::post('/step-1', [HomeVetBookingController::class, 'stepOne']);
+    Route::post('/step-2', [HomeVetBookingController::class, 'stepTwo']);
+    Route::post('/step-3', [HomeVetBookingController::class, 'stepThree']);
+});
 
 Route::prefix('calls')->group(function () {
     Route::post('/request', [NewCallController::class, 'request']);
