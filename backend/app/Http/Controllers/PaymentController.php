@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\Pet;
 use App\Models\Prescription;
 use App\Models\VideoApointment;
+use App\Models\HomeServiceRequiredByPet;
 use Illuminate\Support\Str;
 use App\Services\WhatsAppService;
 use App\Services\Push\FcmService;
@@ -58,6 +59,8 @@ class PaymentController extends Controller
             'clinic_id' => 'nullable|integer',
             'doctor_id' => 'nullable|integer',
             'user_id' => 'nullable|integer',
+            'home_service_booking_id' => 'nullable|integer',
+            'booking_id' => 'nullable|integer',
             'service_id' => 'nullable|string',
             'order_type' => 'nullable|string',
             'vet_slug' => 'nullable|string',
@@ -76,9 +79,10 @@ class PaymentController extends Controller
         $notes = $this->mergeClientNotes($request, [
             'via' => 'snoutiq',
         ]);
+        $context = $this->resolveTransactionContext($request, $notes);
+        $notes = $this->mergeContextIntoNotes($notes, $context);
         $transactionType = $this->resolveTransactionType($notes);
         $notes['order_type'] = $transactionType;
-        $context = $this->resolveTransactionContext($request, $notes);
         $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
         $callSession = null;
         $requestedCouponCode = $this->resolveCouponCode($notes);
@@ -949,6 +953,7 @@ class PaymentController extends Controller
                     'clinic_id' => $clinicId,
                     'user_id' => $userId,
                     'pet_id' => $context['pet_id'] ?? null,
+                    'home_service_booking_id' => $context['home_service_booking_id'] ?? null,
                     'fcm_notification_id' => $fcmNotificationId,
                 ],
             ];
@@ -973,8 +978,19 @@ class PaymentController extends Controller
             if ($hasFcmNotificationIdColumn) {
                 $payload['fcm_notification_id'] = $fcmNotificationId;
             }
+            $transaction = Transaction::updateOrCreate(['reference' => $orderId], $payload);
 
-            return Transaction::updateOrCreate(['reference' => $orderId], $payload);
+            $this->updateHomeServiceBookingPaymentState(
+                bookingId: $context['home_service_booking_id'] ?? null,
+                updates: [
+                    'payment_status' => 'pending',
+                    'payment_provider' => 'razorpay',
+                    'payment_reference' => $orderId,
+                    'amount_payable' => ((int) ($order['amount'] ?? 0)) / 100,
+                ]
+            );
+
+            return $transaction;
         } catch (\Throwable $e) {
             report($e);
             if ($throwOnFailure) {
@@ -1056,6 +1072,7 @@ class PaymentController extends Controller
                     'clinic_id' => $clinicId,
                     'user_id' => $userId,
                     'pet_id' => $petId,
+                    'home_service_booking_id' => $context['home_service_booking_id'] ?? null,
                     'fcm_notification_id' => $fcmNotificationId,
                 ],
             ];
@@ -1081,7 +1098,7 @@ class PaymentController extends Controller
                 $payload['fcm_notification_id'] = $fcmNotificationId;
             }
 
-            return DB::transaction(function () use ($payment, $payload, $amountPaise, $transactionStatus): Transaction {
+            $transaction = DB::transaction(function () use ($payment, $payload, $amountPaise, $transactionStatus): Transaction {
                 $paymentId = trim((string) ($payment->razorpay_payment_id ?? ''));
                 $orderId = trim((string) ($payment->razorpay_order_id ?? ''));
 
@@ -1152,6 +1169,20 @@ class PaymentController extends Controller
 
                 return Transaction::create($payload);
             }, 3);
+
+            $this->updateHomeServiceBookingPaymentState(
+                bookingId: $context['home_service_booking_id'] ?? null,
+                updates: [
+                    'payment_status' => $this->isSuccessfulPaymentStatus($transactionStatus) ? 'paid' : $transactionStatus,
+                    'payment_provider' => 'razorpay',
+                    'payment_reference' => $payment->razorpay_payment_id ?? $payment->razorpay_order_id,
+                    'amount_paid' => is_numeric($amount) ? ((int) $amount) / 100 : null,
+                    'amount_payable' => is_numeric($amount) ? ((int) $amount) / 100 : null,
+                    'mark_step3_complete' => $this->isSuccessfulPaymentStatus($transactionStatus),
+                ]
+            );
+
+            return $transaction;
         } catch (\Throwable $e) {
             report($e);
             return null;
@@ -1302,6 +1333,7 @@ class PaymentController extends Controller
             'doctor_id' => ['doctor_id', 'doctorId'],
             'user_id' => ['user_id', 'userId', 'patient_id', 'patientId'],
             'pet_id' => ['pet_id', 'petId'],
+            'home_service_booking_id' => ['home_service_booking_id', 'homeServiceBookingId', 'booking_id', 'bookingId'],
             'fcm_notification_id' => ['fcm_notification_id', 'notification_id', 'fcmNotificationId', 'notificationId'],
             'gst_number' => ['gst_number', 'gstNumber'],
             'gst_number_given' => ['gst_number_given', 'gstNumberGiven'],
@@ -1937,6 +1969,7 @@ class PaymentController extends Controller
             'doctor_id' => $this->toNullableInt($this->firstFilled($request, ['doctor_id', 'doctorId'], $notes)),
             'user_id' => $this->toNullableInt($this->firstFilled($request, ['user_id', 'userId', 'patient_id', 'patientId'], $notes)),
             'pet_id' => $this->toNullableInt($this->firstFilled($request, ['pet_id', 'petId'], $notes)),
+            'home_service_booking_id' => $this->toNullableInt($this->firstFilled($request, ['home_service_booking_id', 'homeServiceBookingId', 'booking_id', 'bookingId'], $notes)),
         ];
 
         if (! $context['user_id'] && $request->user()) {
@@ -1961,6 +1994,8 @@ class PaymentController extends Controller
             $context['clinic_id'] = $this->lookupDoctorClinicId($context['doctor_id']);
         }
 
+        $context = $this->hydrateContextFromHomeServiceBooking($context);
+
         return $context;
     }
 
@@ -1978,6 +2013,15 @@ class PaymentController extends Controller
         }
         if (! ($context['pet_id'] ?? null)) {
             $context['pet_id'] = $this->toNullableInt($notes['pet_id'] ?? $notes['petId'] ?? null);
+        }
+        if (! ($context['home_service_booking_id'] ?? null)) {
+            $context['home_service_booking_id'] = $this->toNullableInt(
+                $notes['home_service_booking_id']
+                ?? $notes['homeServiceBookingId']
+                ?? $notes['booking_id']
+                ?? $notes['bookingId']
+                ?? null
+            );
         }
 
         if ((! ($context['doctor_id'] ?? null) || ! ($context['user_id'] ?? null))
@@ -2001,6 +2045,8 @@ class PaymentController extends Controller
         if (! ($context['clinic_id'] ?? null) && ($context['doctor_id'] ?? null)) {
             $context['clinic_id'] = $this->lookupDoctorClinicId($context['doctor_id']);
         }
+
+        $context = $this->hydrateContextFromHomeServiceBooking($context);
 
         return $context;
     }
@@ -2070,6 +2116,13 @@ class PaymentController extends Controller
                     ?? ($metadata['channel_name'] ?? null)
                     ?? ($metadataNotes['channel_name'] ?? $metadataNotes['channelName'] ?? null);
             }
+
+            if (! ($context['home_service_booking_id'] ?? null)) {
+                $context['home_service_booking_id'] = $this->toNullableInt(
+                    $metadata['home_service_booking_id']
+                    ?? ($metadataNotes['home_service_booking_id'] ?? $metadataNotes['homeServiceBookingId'] ?? $metadataNotes['booking_id'] ?? $metadataNotes['bookingId'] ?? null)
+                );
+            }
         } catch (\Throwable $e) {
             report($e);
         }
@@ -2116,6 +2169,81 @@ class PaymentController extends Controller
         return $context;
     }
 
+    protected function hydrateContextFromHomeServiceBooking(array $context): array
+    {
+        $bookingId = $this->toNullableInt($context['home_service_booking_id'] ?? null);
+        if (! $bookingId || !Schema::hasTable('home_service_required_by_pet')) {
+            return $context;
+        }
+
+        try {
+            $booking = HomeServiceRequiredByPet::query()->find($bookingId);
+            if (! $booking) {
+                return $context;
+            }
+
+            $context['home_service_booking_id'] = (int) $booking->id;
+            if (! ($context['user_id'] ?? null)) {
+                $context['user_id'] = $this->toNullableInt($booking->user_id);
+            }
+            if (! ($context['pet_id'] ?? null)) {
+                $context['pet_id'] = $this->toNullableInt($booking->pet_id);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $context;
+    }
+
+    protected function updateHomeServiceBookingPaymentState($bookingId, array $updates = []): void
+    {
+        $bookingId = $this->toNullableInt($bookingId);
+        if (! $bookingId || !Schema::hasTable('home_service_required_by_pet')) {
+            return;
+        }
+
+        try {
+            /** @var \App\Models\HomeServiceRequiredByPet|null $booking */
+            $booking = HomeServiceRequiredByPet::query()->find($bookingId);
+            if (! $booking) {
+                return;
+            }
+
+            $paymentStatus = trim((string) ($updates['payment_status'] ?? ''));
+            if ($paymentStatus !== '') {
+                $booking->payment_status = $paymentStatus;
+            }
+
+            if (array_key_exists('amount_payable', $updates) && $updates['amount_payable'] !== null) {
+                $booking->amount_payable = (float) $updates['amount_payable'];
+            }
+            if (array_key_exists('amount_paid', $updates) && $updates['amount_paid'] !== null) {
+                $booking->amount_paid = (float) $updates['amount_paid'];
+            }
+
+            $paymentProvider = trim((string) ($updates['payment_provider'] ?? ''));
+            if ($paymentProvider !== '') {
+                $booking->payment_provider = $paymentProvider;
+            }
+
+            $paymentReference = trim((string) ($updates['payment_reference'] ?? ''));
+            if ($paymentReference !== '') {
+                $booking->payment_reference = $paymentReference;
+            }
+
+            if (!empty($updates['mark_step3_complete'])) {
+                $booking->latest_completed_step = max((int) ($booking->latest_completed_step ?? 1), 3);
+                $booking->step3_completed_at = $booking->step3_completed_at ?: now();
+                $booking->confirmed_at = $booking->confirmed_at ?: now();
+            }
+
+            $booking->save();
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     protected function mergeContextIntoNotes(array $notes, array $context): array
     {
         foreach (['clinic_id', 'doctor_id', 'user_id', 'pet_id'] as $key) {
@@ -2138,6 +2266,13 @@ class PaymentController extends Controller
             $channelName = $context['channel_name'] ?? null;
             if ($channelName !== null && $channelName !== '') {
                 $notes['channel_name'] = (string) $channelName;
+            }
+        }
+
+        if (($notes['home_service_booking_id'] ?? null) === null || ($notes['home_service_booking_id'] ?? '') === '') {
+            $bookingId = $context['home_service_booking_id'] ?? null;
+            if ($bookingId !== null && $bookingId !== '') {
+                $notes['home_service_booking_id'] = (string) $bookingId;
             }
         }
 
@@ -2248,6 +2383,22 @@ class PaymentController extends Controller
             return $candidate;
         }
 
+        if (! empty($notes['home_service_booking_id'])) {
+            $bookingId = $this->toNullableInt($notes['home_service_booking_id']);
+            if ($bookingId && Schema::hasTable('home_service_required_by_pet')) {
+                try {
+                    $exists = HomeServiceRequiredByPet::query()
+                        ->where('id', $bookingId)
+                        ->exists();
+                    if ($exists) {
+                        return 'home_service';
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+
         if (! empty($notes['service_id'])) {
             return 'service';
         }
@@ -2295,6 +2446,7 @@ class PaymentController extends Controller
         return match ($normalized) {
             'video_consultation', 'video_consult', 'video_call' => 'video_consult',
             'appointment', 'appointments' => 'appointments',
+            'home_visit', 'home_vet', 'at_home' => 'home_service',
             'excel_export_campaign' => 'excell_export_campaign',
             default => $normalized,
         };
