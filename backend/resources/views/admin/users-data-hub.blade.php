@@ -6,15 +6,26 @@
 <style>
     .hub-table td,
     .hub-table th {
-        vertical-align: middle;
+        vertical-align: top;
     }
     .hub-count {
-        font-size: 0.75rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.1rem;
+        height: 1.55rem;
+        font-size: 0.73rem;
         border-radius: 999px;
-        padding: 0.3rem 0.6rem;
-        font-weight: 600;
+        padding: 0 0.5rem;
+        font-weight: 700;
         background: #eef2ff;
         color: #3730a3;
+    }
+    .hub-preview-line {
+        margin-top: 0.4rem;
+        font-size: 0.78rem;
+        color: #475569;
+        line-height: 1.3;
     }
     .hub-section-title {
         font-size: 0.8rem;
@@ -22,33 +33,16 @@
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: #334155;
-        margin-bottom: 0.65rem;
     }
     .hub-mini-card {
         border: 1px solid #e2e8f0;
-        border-radius: 0.9rem;
+        border-radius: 0.8rem;
         background: #fff;
         padding: 0.85rem;
         height: 100%;
     }
-    .hub-mini-card ul {
-        margin-bottom: 0;
-        padding-left: 1rem;
-    }
-    .hub-mini-card li {
-        margin-bottom: 0.45rem;
-        color: #334155;
-        font-size: 0.86rem;
-    }
-    .hub-mini-card li:last-child {
-        margin-bottom: 0;
-    }
-    .hub-note {
-        font-size: 0.78rem;
-        color: #64748b;
-    }
     .hub-muted {
-        font-size: 0.86rem;
+        font-size: 0.84rem;
         color: #64748b;
         margin-bottom: 0;
     }
@@ -60,6 +54,18 @@
         top: 84px;
         z-index: 2;
         background: #f8fafc;
+    }
+    .hub-section-table th {
+        font-size: 0.72rem;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+    }
+    .hub-section-table td {
+        font-size: 0.8rem;
+        color: #1e293b;
+        white-space: nowrap;
     }
 </style>
 @endpush
@@ -87,24 +93,46 @@
     };
 
     $currentPerPage = (int) request()->query('per_page', $users->perPage());
+    $searchQuery = trim((string) request()->query('q', ''));
+    $previewLimit = 2;
 @endphp
 
 <div class="row g-4">
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                <div class="d-flex flex-column justify-content-between gap-3 mb-3">
                     <div>
                         <h2 class="h5 mb-1">All Users With Related Data</h2>
-                        <p class="text-muted mb-0">Each user includes pets, transactions, prescriptions, appointments, and video consult records.</p>
+                        <p class="text-muted mb-0">Preview + full details for pets, transactions, prescriptions, appointments, and video consult records.</p>
                     </div>
-                    <form method="GET" class="d-flex align-items-center gap-2">
-                        <label for="per_page" class="form-label mb-0 text-muted small">Per page</label>
-                        <select id="per_page" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()">
-                            @foreach([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected($currentPerPage === $size)>{{ $size }}</option>
-                            @endforeach
-                        </select>
+
+                    <form method="GET" class="row g-2 align-items-end">
+                        <div class="col-12 col-lg-7">
+                            <label for="q" class="form-label mb-1 text-muted small">Search users</label>
+                            <input
+                                id="q"
+                                name="q"
+                                type="text"
+                                class="form-control form-control-sm"
+                                value="{{ $searchQuery }}"
+                                placeholder="Search by name, email, phone"
+                            >
+                        </div>
+                        <div class="col-6 col-lg-2">
+                            <label for="per_page" class="form-label mb-1 text-muted small">Per page</label>
+                            <select id="per_page" name="per_page" class="form-select form-select-sm">
+                                @foreach([10, 20, 50, 100] as $size)
+                                    <option value="{{ $size }}" @selected($currentPerPage === $size)>{{ $size }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg-3 d-flex gap-2">
+                            <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Apply</button>
+                            @if($searchQuery !== '')
+                                <a href="{{ route('admin.users.data-hub', ['per_page' => $currentPerPage]) }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                            @endif
+                        </div>
                     </form>
                 </div>
 
@@ -136,7 +164,19 @@
                                         $prescriptions = $prescriptionsByUser->get($userId, collect());
                                         $appointments = $appointmentsByUser->get($userId, collect());
                                         $videoConsults = $videoConsultsByUser->get($userId, collect());
+
+                                        $latestPet = $pets->first();
+                                        $latestTransaction = $transactions->first();
+                                        $latestPrescription = $prescriptions->first();
+                                        $latestAppointment = $appointments->first();
+                                        $latestVideo = $videoConsults->first();
+
                                         $collapseId = 'user-data-'.$userId;
+                                        $petsMoreId = 'pets-more-'.$userId;
+                                        $transactionsMoreId = 'transactions-more-'.$userId;
+                                        $prescriptionsMoreId = 'prescriptions-more-'.$userId;
+                                        $appointmentsMoreId = 'appointments-more-'.$userId;
+                                        $videosMoreId = 'videos-more-'.$userId;
                                     @endphp
 
                                     <tr>
@@ -146,11 +186,75 @@
                                             <div class="small text-muted">{{ $user->phone ?: 'no-phone' }} · {{ str_replace('_', ' ', $user->role ?: 'n/a') }}</div>
                                             <div class="small text-muted">Joined {{ $formatDateTime($user->created_at) }}</div>
                                         </td>
-                                        <td><span class="hub-count">{{ $supports['pets'] ? $pets->count() : 'N/A' }}</span></td>
-                                        <td><span class="hub-count">{{ $supports['transactions'] ? $transactions->count() : 'N/A' }}</span></td>
-                                        <td><span class="hub-count">{{ $supports['prescriptions'] ? $prescriptions->count() : 'N/A' }}</span></td>
-                                        <td><span class="hub-count">{{ $supports['appointments'] ? $appointments->count() : 'N/A' }}</span></td>
-                                        <td><span class="hub-count">{{ $supports['video_apointment'] ? $videoConsults->count() : 'N/A' }}</span></td>
+
+                                        <td>
+                                            <span class="hub-count">{{ $supports['pets'] ? $pets->count() : 'N/A' }}</span>
+                                            <div class="hub-preview-line">
+                                                @if(!$supports['pets'])
+                                                    pets table missing
+                                                @elseif($latestPet)
+                                                    {{ \Illuminate\Support\Str::limit(($latestPet->name ?: 'Unnamed Pet') . ' · ' . ($latestPet->breed ?: ($latestPet->pet_type ?? $latestPet->type ?? 'n/a')), 46) }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            <span class="hub-count">{{ $supports['transactions'] ? $transactions->count() : 'N/A' }}</span>
+                                            <div class="hub-preview-line">
+                                                @if(!$supports['transactions'])
+                                                    transactions table missing
+                                                @elseif($latestTransaction)
+                                                    @php
+                                                        $latestTxType = $latestTransaction->type ?: data_get($latestTransaction->metadata, 'order_type', 'n/a');
+                                                    @endphp
+                                                    {{ strtoupper($latestTransaction->status ?: 'n/a') }} · {{ $formatInrFromPaise($latestTransaction->amount_paise) }} · {{ $latestTxType }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            <span class="hub-count">{{ $supports['prescriptions'] ? $prescriptions->count() : 'N/A' }}</span>
+                                            <div class="hub-preview-line">
+                                                @if(!$supports['prescriptions'])
+                                                    prescriptions table missing
+                                                @elseif($latestPrescription)
+                                                    {{ \Illuminate\Support\Str::limit($latestPrescription->diagnosis ?: 'No diagnosis', 46) }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            <span class="hub-count">{{ $supports['appointments'] ? $appointments->count() : 'N/A' }}</span>
+                                            <div class="hub-preview-line">
+                                                @if(!$supports['appointments'])
+                                                    appointments table missing
+                                                @elseif($latestAppointment)
+                                                    {{ ($latestAppointment->appointment_date ?: 'no-date') . ' ' . ($latestAppointment->appointment_time ?: '') }} · {{ strtoupper($latestAppointment->status ?: 'n/a') }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            <span class="hub-count">{{ $supports['video_apointment'] ? $videoConsults->count() : 'N/A' }}</span>
+                                            <div class="hub-preview-line">
+                                                @if(!$supports['video_apointment'])
+                                                    video_apointment table missing
+                                                @elseif($latestVideo)
+                                                    order {{ $latestVideo->order_id ?: 'n/a' }} · {{ $latestVideo->is_completed ? 'COMPLETED' : 'PENDING' }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </div>
+                                        </td>
+
                                         <td class="text-end">
                                             <button
                                                 class="btn btn-sm btn-outline-primary"
@@ -168,114 +272,333 @@
                                     <tr class="hub-detail-row collapse" id="{{ $collapseId }}">
                                         <td colspan="7">
                                             <div class="row g-3">
-                                                <div class="col-12 col-lg-6">
+                                                <div class="col-12 col-xl-6">
                                                     <div class="hub-mini-card">
-                                                        <div class="hub-section-title">Pets ({{ $supports['pets'] ? $pets->count() : 'N/A' }})</div>
+                                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                                            <div class="hub-section-title mb-0">Pets</div>
+                                                            <span class="hub-count">{{ $supports['pets'] ? $pets->count() : 'N/A' }}</span>
+                                                        </div>
+
                                                         @if(!$supports['pets'])
                                                             <p class="hub-muted">`pets` table not available.</p>
                                                         @elseif($pets->isEmpty())
                                                             <p class="hub-muted">No pets found for this user.</p>
                                                         @else
-                                                            <ul>
-                                                                @foreach($pets->take($detailLimit) as $pet)
-                                                                    @php
-                                                                        $petType = $pet->pet_type ?? $pet->type ?? 'n/a';
-                                                                        $petGender = $pet->pet_gender ?? $pet->gender ?? 'n/a';
-                                                                    @endphp
-                                                                    <li>
-                                                                        <strong>{{ $pet->name ?: 'Unnamed Pet' }}</strong>
-                                                                        · {{ $petType }} · {{ $petGender }}
-                                                                        · {{ $pet->breed ?: 'no-breed' }}
-                                                                        <span class="text-muted">(#{{ $pet->id }})</span>
-                                                                    </li>
-                                                                @endforeach
-                                                            </ul>
-                                                            @if($pets->count() > $detailLimit)
-                                                                <div class="hub-note mt-2">Showing latest {{ $detailLimit }} of {{ $pets->count() }} pets.</div>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm hub-section-table mb-2">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>ID</th>
+                                                                            <th>Name</th>
+                                                                            <th>Type</th>
+                                                                            <th>Breed</th>
+                                                                            <th>Gender</th>
+                                                                            <th>Added</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @foreach($pets->take($previewLimit) as $pet)
+                                                                            @php
+                                                                                $petType = $pet->pet_type ?? $pet->type ?? 'n/a';
+                                                                                $petGender = $pet->pet_gender ?? $pet->gender ?? 'n/a';
+                                                                            @endphp
+                                                                            <tr>
+                                                                                <td>#{{ $pet->id }}</td>
+                                                                                <td>{{ $pet->name ?: 'Unnamed' }}</td>
+                                                                                <td>{{ $petType }}</td>
+                                                                                <td>{{ $pet->breed ?: 'n/a' }}</td>
+                                                                                <td>{{ $petGender }}</td>
+                                                                                <td>{{ $formatDateTime($pet->created_at) }}</td>
+                                                                            </tr>
+                                                                        @endforeach
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+
+                                                            @if($pets->count() > $previewLimit)
+                                                                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $petsMoreId }}" aria-expanded="false" aria-controls="{{ $petsMoreId }}">View More</button>
+                                                                <div class="collapse mt-2" id="{{ $petsMoreId }}">
+                                                                    <div class="table-responsive">
+                                                                        <table class="table table-sm hub-section-table mb-0">
+                                                                            <thead>
+                                                                                <tr>
+                                                                                    <th>ID</th>
+                                                                                    <th>Name</th>
+                                                                                    <th>Type</th>
+                                                                                    <th>Breed</th>
+                                                                                    <th>Gender</th>
+                                                                                    <th>Added</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                @foreach($pets as $pet)
+                                                                                    @php
+                                                                                        $petType = $pet->pet_type ?? $pet->type ?? 'n/a';
+                                                                                        $petGender = $pet->pet_gender ?? $pet->gender ?? 'n/a';
+                                                                                    @endphp
+                                                                                    <tr>
+                                                                                        <td>#{{ $pet->id }}</td>
+                                                                                        <td>{{ $pet->name ?: 'Unnamed' }}</td>
+                                                                                        <td>{{ $petType }}</td>
+                                                                                        <td>{{ $pet->breed ?: 'n/a' }}</td>
+                                                                                        <td>{{ $petGender }}</td>
+                                                                                        <td>{{ $formatDateTime($pet->created_at) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </div>
                                                             @endif
                                                         @endif
                                                     </div>
                                                 </div>
 
-                                                <div class="col-12 col-lg-6">
+                                                <div class="col-12 col-xl-6">
                                                     <div class="hub-mini-card">
-                                                        <div class="hub-section-title">Transactions ({{ $supports['transactions'] ? $transactions->count() : 'N/A' }})</div>
+                                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                                            <div class="hub-section-title mb-0">Transactions</div>
+                                                            <span class="hub-count">{{ $supports['transactions'] ? $transactions->count() : 'N/A' }}</span>
+                                                        </div>
+
                                                         @if(!$supports['transactions'])
                                                             <p class="hub-muted">`transactions` table not available.</p>
                                                         @elseif($transactions->isEmpty())
                                                             <p class="hub-muted">No transactions found for this user.</p>
                                                         @else
-                                                            <ul>
-                                                                @foreach($transactions->take($detailLimit) as $transaction)
-                                                                    @php
-                                                                        $txType = $transaction->type ?: data_get($transaction->metadata, 'order_type', 'n/a');
-                                                                    @endphp
-                                                                    <li>
-                                                                        <strong>#{{ $transaction->id }}</strong>
-                                                                        · {{ $txType }} · {{ strtoupper($transaction->status ?: 'n/a') }}
-                                                                        · {{ $formatInrFromPaise($transaction->amount_paise) }}
-                                                                        <span class="text-muted">({{ $formatDateTime($transaction->created_at) }})</span>
-                                                                    </li>
-                                                                @endforeach
-                                                            </ul>
-                                                            @if($transactions->count() > $detailLimit)
-                                                                <div class="hub-note mt-2">Showing latest {{ $detailLimit }} of {{ $transactions->count() }} transactions.</div>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm hub-section-table mb-2">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>ID</th>
+                                                                            <th>Type</th>
+                                                                            <th>Status</th>
+                                                                            <th>Amount</th>
+                                                                            <th>Pet</th>
+                                                                            <th>Ref</th>
+                                                                            <th>Date</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @foreach($transactions->take($previewLimit) as $transaction)
+                                                                            @php
+                                                                                $txType = $transaction->type ?: data_get($transaction->metadata, 'order_type', 'n/a');
+                                                                                $txPetName = optional($petsById->get((int) ($transaction->pet_id ?? 0)))->name ?: 'n/a';
+                                                                            @endphp
+                                                                            <tr>
+                                                                                <td>#{{ $transaction->id }}</td>
+                                                                                <td>{{ $txType }}</td>
+                                                                                <td>{{ strtoupper($transaction->status ?: 'n/a') }}</td>
+                                                                                <td>{{ $formatInrFromPaise($transaction->amount_paise) }}</td>
+                                                                                <td>{{ $txPetName }}</td>
+                                                                                <td>{{ $transaction->reference ?: 'n/a' }}</td>
+                                                                                <td>{{ $formatDateTime($transaction->created_at) }}</td>
+                                                                            </tr>
+                                                                        @endforeach
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+
+                                                            @if($transactions->count() > $previewLimit)
+                                                                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $transactionsMoreId }}" aria-expanded="false" aria-controls="{{ $transactionsMoreId }}">View More</button>
+                                                                <div class="collapse mt-2" id="{{ $transactionsMoreId }}">
+                                                                    <div class="table-responsive">
+                                                                        <table class="table table-sm hub-section-table mb-0">
+                                                                            <thead>
+                                                                                <tr>
+                                                                                    <th>ID</th>
+                                                                                    <th>Type</th>
+                                                                                    <th>Status</th>
+                                                                                    <th>Amount</th>
+                                                                                    <th>Pet</th>
+                                                                                    <th>Ref</th>
+                                                                                    <th>Date</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                @foreach($transactions as $transaction)
+                                                                                    @php
+                                                                                        $txType = $transaction->type ?: data_get($transaction->metadata, 'order_type', 'n/a');
+                                                                                        $txPetName = optional($petsById->get((int) ($transaction->pet_id ?? 0)))->name ?: 'n/a';
+                                                                                    @endphp
+                                                                                    <tr>
+                                                                                        <td>#{{ $transaction->id }}</td>
+                                                                                        <td>{{ $txType }}</td>
+                                                                                        <td>{{ strtoupper($transaction->status ?: 'n/a') }}</td>
+                                                                                        <td>{{ $formatInrFromPaise($transaction->amount_paise) }}</td>
+                                                                                        <td>{{ $txPetName }}</td>
+                                                                                        <td>{{ $transaction->reference ?: 'n/a' }}</td>
+                                                                                        <td>{{ $formatDateTime($transaction->created_at) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </div>
                                                             @endif
                                                         @endif
                                                     </div>
                                                 </div>
 
-                                                <div class="col-12 col-lg-6">
+                                                <div class="col-12 col-xl-6">
                                                     <div class="hub-mini-card">
-                                                        <div class="hub-section-title">Prescriptions ({{ $supports['prescriptions'] ? $prescriptions->count() : 'N/A' }})</div>
+                                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                                            <div class="hub-section-title mb-0">Prescriptions</div>
+                                                            <span class="hub-count">{{ $supports['prescriptions'] ? $prescriptions->count() : 'N/A' }}</span>
+                                                        </div>
+
                                                         @if(!$supports['prescriptions'])
                                                             <p class="hub-muted">`prescriptions` table not available.</p>
                                                         @elseif($prescriptions->isEmpty())
                                                             <p class="hub-muted">No prescriptions found for this user.</p>
                                                         @else
-                                                            <ul>
-                                                                @foreach($prescriptions->take($detailLimit) as $prescription)
-                                                                    @php
-                                                                        $petName = optional($petsById->get((int) ($prescription->pet_id ?? 0)))->name ?: 'Unknown Pet';
-                                                                    @endphp
-                                                                    <li>
-                                                                        <strong>#{{ $prescription->id }}</strong>
-                                                                        · {{ $petName }}
-                                                                        · {{ $prescription->diagnosis ?: 'no-diagnosis' }}
-                                                                        <span class="text-muted">({{ $formatDateTime($prescription->created_at) }})</span>
-                                                                    </li>
-                                                                @endforeach
-                                                            </ul>
-                                                            @if($prescriptions->count() > $detailLimit)
-                                                                <div class="hub-note mt-2">Showing latest {{ $detailLimit }} of {{ $prescriptions->count() }} prescriptions.</div>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm hub-section-table mb-2">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>ID</th>
+                                                                            <th>Pet</th>
+                                                                            <th>Diagnosis</th>
+                                                                            <th>Follow Up</th>
+                                                                            <th>Mode</th>
+                                                                            <th>Date</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @foreach($prescriptions->take($previewLimit) as $prescription)
+                                                                            @php
+                                                                                $prescriptionPetName = optional($petsById->get((int) ($prescription->pet_id ?? 0)))->name ?: 'Unknown Pet';
+                                                                            @endphp
+                                                                            <tr>
+                                                                                <td>#{{ $prescription->id }}</td>
+                                                                                <td>{{ $prescriptionPetName }}</td>
+                                                                                <td>{{ \Illuminate\Support\Str::limit($prescription->diagnosis ?: 'n/a', 48) }}</td>
+                                                                                <td>{{ $prescription->follow_up_date ?: 'n/a' }}</td>
+                                                                                <td>{{ $prescription->video_inclinic ?: 'n/a' }}</td>
+                                                                                <td>{{ $formatDateTime($prescription->created_at) }}</td>
+                                                                            </tr>
+                                                                        @endforeach
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+
+                                                            @if($prescriptions->count() > $previewLimit)
+                                                                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $prescriptionsMoreId }}" aria-expanded="false" aria-controls="{{ $prescriptionsMoreId }}">View More</button>
+                                                                <div class="collapse mt-2" id="{{ $prescriptionsMoreId }}">
+                                                                    <div class="table-responsive">
+                                                                        <table class="table table-sm hub-section-table mb-0">
+                                                                            <thead>
+                                                                                <tr>
+                                                                                    <th>ID</th>
+                                                                                    <th>Pet</th>
+                                                                                    <th>Diagnosis</th>
+                                                                                    <th>Follow Up</th>
+                                                                                    <th>Mode</th>
+                                                                                    <th>Date</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                @foreach($prescriptions as $prescription)
+                                                                                    @php
+                                                                                        $prescriptionPetName = optional($petsById->get((int) ($prescription->pet_id ?? 0)))->name ?: 'Unknown Pet';
+                                                                                    @endphp
+                                                                                    <tr>
+                                                                                        <td>#{{ $prescription->id }}</td>
+                                                                                        <td>{{ $prescriptionPetName }}</td>
+                                                                                        <td>{{ \Illuminate\Support\Str::limit($prescription->diagnosis ?: 'n/a', 110) }}</td>
+                                                                                        <td>{{ $prescription->follow_up_date ?: 'n/a' }}</td>
+                                                                                        <td>{{ $prescription->video_inclinic ?: 'n/a' }}</td>
+                                                                                        <td>{{ $formatDateTime($prescription->created_at) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </div>
                                                             @endif
                                                         @endif
                                                     </div>
                                                 </div>
 
-                                                <div class="col-12 col-lg-6">
+                                                <div class="col-12 col-xl-6">
                                                     <div class="hub-mini-card">
-                                                        <div class="hub-section-title">Appointments ({{ $supports['appointments'] ? $appointments->count() : 'N/A' }})</div>
+                                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                                            <div class="hub-section-title mb-0">Appointments</div>
+                                                            <span class="hub-count">{{ $supports['appointments'] ? $appointments->count() : 'N/A' }}</span>
+                                                        </div>
+
                                                         @if(!$supports['appointments'])
                                                             <p class="hub-muted">`appointments` table not available.</p>
                                                         @elseif($appointments->isEmpty())
-                                                            <p class="hub-muted">No appointments found for this user’s pets.</p>
+                                                            <p class="hub-muted">No appointments found for this user's pets.</p>
                                                         @else
-                                                            <ul>
-                                                                @foreach($appointments->take($detailLimit) as $appointment)
-                                                                    @php
-                                                                        $appointmentPetName = optional($petsById->get((int) ($appointment->pet_id ?? 0)))->name ?: 'Unknown Pet';
-                                                                    @endphp
-                                                                    <li>
-                                                                        <strong>#{{ $appointment->id }}</strong>
-                                                                        · {{ $appointmentPetName }}
-                                                                        · {{ $appointment->appointment_date ?: 'no-date' }} {{ $appointment->appointment_time ?: '' }}
-                                                                        · {{ strtoupper($appointment->status ?: 'n/a') }}
-                                                                    </li>
-                                                                @endforeach
-                                                            </ul>
-                                                            @if($appointments->count() > $detailLimit)
-                                                                <div class="hub-note mt-2">Showing latest {{ $detailLimit }} of {{ $appointments->count() }} appointments.</div>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm hub-section-table mb-2">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>ID</th>
+                                                                            <th>Pet</th>
+                                                                            <th>Date</th>
+                                                                            <th>Time</th>
+                                                                            <th>Status</th>
+                                                                            <th>Doctor</th>
+                                                                            <th>Created</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @foreach($appointments->take($previewLimit) as $appointment)
+                                                                            @php
+                                                                                $appointmentPetName = optional($petsById->get((int) ($appointment->pet_id ?? 0)))->name ?: 'Unknown Pet';
+                                                                            @endphp
+                                                                            <tr>
+                                                                                <td>#{{ $appointment->id }}</td>
+                                                                                <td>{{ $appointmentPetName }}</td>
+                                                                                <td>{{ $appointment->appointment_date ?: 'n/a' }}</td>
+                                                                                <td>{{ $appointment->appointment_time ?: 'n/a' }}</td>
+                                                                                <td>{{ strtoupper($appointment->status ?: 'n/a') }}</td>
+                                                                                <td>{{ $appointment->doctor_id ?: ($appointment->vet_registeration_id ?: 'n/a') }}</td>
+                                                                                <td>{{ $formatDateTime($appointment->created_at) }}</td>
+                                                                            </tr>
+                                                                        @endforeach
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+
+                                                            @if($appointments->count() > $previewLimit)
+                                                                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $appointmentsMoreId }}" aria-expanded="false" aria-controls="{{ $appointmentsMoreId }}">View More</button>
+                                                                <div class="collapse mt-2" id="{{ $appointmentsMoreId }}">
+                                                                    <div class="table-responsive">
+                                                                        <table class="table table-sm hub-section-table mb-0">
+                                                                            <thead>
+                                                                                <tr>
+                                                                                    <th>ID</th>
+                                                                                    <th>Pet</th>
+                                                                                    <th>Date</th>
+                                                                                    <th>Time</th>
+                                                                                    <th>Status</th>
+                                                                                    <th>Doctor</th>
+                                                                                    <th>Created</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                @foreach($appointments as $appointment)
+                                                                                    @php
+                                                                                        $appointmentPetName = optional($petsById->get((int) ($appointment->pet_id ?? 0)))->name ?: 'Unknown Pet';
+                                                                                    @endphp
+                                                                                    <tr>
+                                                                                        <td>#{{ $appointment->id }}</td>
+                                                                                        <td>{{ $appointmentPetName }}</td>
+                                                                                        <td>{{ $appointment->appointment_date ?: 'n/a' }}</td>
+                                                                                        <td>{{ $appointment->appointment_time ?: 'n/a' }}</td>
+                                                                                        <td>{{ strtoupper($appointment->status ?: 'n/a') }}</td>
+                                                                                        <td>{{ $appointment->doctor_id ?: ($appointment->vet_registeration_id ?: 'n/a') }}</td>
+                                                                                        <td>{{ $formatDateTime($appointment->created_at) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </div>
                                                             @endif
                                                         @endif
                                                     </div>
@@ -283,29 +606,83 @@
 
                                                 <div class="col-12">
                                                     <div class="hub-mini-card">
-                                                        <div class="hub-section-title">Video Consults ({{ $supports['video_apointment'] ? $videoConsults->count() : 'N/A' }})</div>
+                                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                                            <div class="hub-section-title mb-0">Video Consults</div>
+                                                            <span class="hub-count">{{ $supports['video_apointment'] ? $videoConsults->count() : 'N/A' }}</span>
+                                                        </div>
+
                                                         @if(!$supports['video_apointment'])
                                                             <p class="hub-muted">`video_apointment` table not available.</p>
                                                         @elseif($videoConsults->isEmpty())
                                                             <p class="hub-muted">No video consults found for this user.</p>
                                                         @else
-                                                            <ul>
-                                                                @foreach($videoConsults->take($detailLimit) as $videoConsult)
-                                                                    @php
-                                                                        $videoPetName = optional($petsById->get((int) ($videoConsult->pet_id ?? 0)))->name ?: 'Unknown Pet';
-                                                                    @endphp
-                                                                    <li>
-                                                                        <strong>#{{ $videoConsult->id }}</strong>
-                                                                        · {{ $videoPetName }}
-                                                                        · order {{ $videoConsult->order_id ?: 'n/a' }}
-                                                                        · call {{ $videoConsult->call_session ?: 'n/a' }}
-                                                                        · {{ $videoConsult->is_completed ? 'COMPLETED' : 'PENDING' }}
-                                                                        <span class="text-muted">({{ $formatDateTime($videoConsult->created_at) }})</span>
-                                                                    </li>
-                                                                @endforeach
-                                                            </ul>
-                                                            @if($videoConsults->count() > $detailLimit)
-                                                                <div class="hub-note mt-2">Showing latest {{ $detailLimit }} of {{ $videoConsults->count() }} video consults.</div>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm hub-section-table mb-2">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>ID</th>
+                                                                            <th>Pet</th>
+                                                                            <th>Order</th>
+                                                                            <th>Call Session</th>
+                                                                            <th>Status</th>
+                                                                            <th>Doctor</th>
+                                                                            <th>Date</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @foreach($videoConsults->take($previewLimit) as $videoConsult)
+                                                                            @php
+                                                                                $videoPetName = optional($petsById->get((int) ($videoConsult->pet_id ?? 0)))->name ?: 'Unknown Pet';
+                                                                            @endphp
+                                                                            <tr>
+                                                                                <td>#{{ $videoConsult->id }}</td>
+                                                                                <td>{{ $videoPetName }}</td>
+                                                                                <td>{{ $videoConsult->order_id ?: 'n/a' }}</td>
+                                                                                <td>{{ $videoConsult->call_session ?: 'n/a' }}</td>
+                                                                                <td>{{ $videoConsult->is_completed ? 'COMPLETED' : 'PENDING' }}</td>
+                                                                                <td>{{ $videoConsult->doctor_id ?: 'n/a' }}</td>
+                                                                                <td>{{ $formatDateTime($videoConsult->created_at) }}</td>
+                                                                            </tr>
+                                                                        @endforeach
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+
+                                                            @if($videoConsults->count() > $previewLimit)
+                                                                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $videosMoreId }}" aria-expanded="false" aria-controls="{{ $videosMoreId }}">View More</button>
+                                                                <div class="collapse mt-2" id="{{ $videosMoreId }}">
+                                                                    <div class="table-responsive">
+                                                                        <table class="table table-sm hub-section-table mb-0">
+                                                                            <thead>
+                                                                                <tr>
+                                                                                    <th>ID</th>
+                                                                                    <th>Pet</th>
+                                                                                    <th>Order</th>
+                                                                                    <th>Call Session</th>
+                                                                                    <th>Status</th>
+                                                                                    <th>Doctor</th>
+                                                                                    <th>Date</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                @foreach($videoConsults as $videoConsult)
+                                                                                    @php
+                                                                                        $videoPetName = optional($petsById->get((int) ($videoConsult->pet_id ?? 0)))->name ?: 'Unknown Pet';
+                                                                                    @endphp
+                                                                                    <tr>
+                                                                                        <td>#{{ $videoConsult->id }}</td>
+                                                                                        <td>{{ $videoPetName }}</td>
+                                                                                        <td>{{ $videoConsult->order_id ?: 'n/a' }}</td>
+                                                                                        <td>{{ $videoConsult->call_session ?: 'n/a' }}</td>
+                                                                                        <td>{{ $videoConsult->is_completed ? 'COMPLETED' : 'PENDING' }}</td>
+                                                                                        <td>{{ $videoConsult->doctor_id ?: 'n/a' }}</td>
+                                                                                        <td>{{ $formatDateTime($videoConsult->created_at) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </div>
                                                             @endif
                                                         @endif
                                                     </div>

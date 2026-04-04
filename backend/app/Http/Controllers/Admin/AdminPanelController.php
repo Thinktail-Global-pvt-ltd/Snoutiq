@@ -63,12 +63,25 @@ class AdminPanelController extends Controller
     {
         $validated = $request->validate([
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+            'q' => ['nullable', 'string', 'max:255'],
         ]);
 
         $perPage = (int) ($validated['per_page'] ?? 20);
+        $searchTerm = trim((string) ($validated['q'] ?? ''));
 
-        $users = User::query()
-            ->select(['id', 'name', 'email', 'phone', 'role', 'created_at'])
+        $usersQuery = User::query()
+            ->select(['id', 'name', 'email', 'phone', 'role', 'created_at']);
+
+        if ($searchTerm !== '') {
+            $usersQuery->where(function (Builder $query) use ($searchTerm): void {
+                $searchLike = '%' . $searchTerm . '%';
+                $query->where('name', 'like', $searchLike)
+                    ->orWhere('email', 'like', $searchLike)
+                    ->orWhere('phone', 'like', $searchLike);
+            });
+        }
+
+        $users = $usersQuery
             ->orderByDesc('created_at')
             ->paginate($perPage)
             ->withQueryString();
