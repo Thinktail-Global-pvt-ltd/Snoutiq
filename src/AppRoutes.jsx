@@ -112,6 +112,21 @@ const DogVomitingPage = lazy(() => import("./newflow/DogVomitingPage"));
 const InvesterPage = lazy(() => import("./investerPage/Invester.jsx"));
 const OnlineVetConsultationApp = lazy(() => import("./newflow/OnlineVetConsultationApp"));
 const FindVetsNearYou = lazy(() => import("./pages/FindVetsNearYou"));
+const VetNearMeBookingLayout = lazy(() =>
+  import("./newflow/vetNearMeFlow/VetNearMeBookingLayout")
+);
+const VetNearMeLeadPage = lazy(() =>
+  import("./newflow/vetNearMeFlow/VetNearMeLeadPage")
+);
+const VetNearMePetDetailsPage = lazy(() =>
+  import("./newflow/vetNearMeFlow/VetNearMePetDetailsPage")
+);
+const VetNearMePaymentPage = lazy(() =>
+  import("./newflow/vetNearMeFlow/VetNearMePaymentPage")
+);
+const VetNearMeSuccessPage = lazy(() =>
+  import("./newflow/vetNearMeFlow/VetNearMeSuccessPage")
+);
 
 export default function AppRoutes() {
   return (
@@ -122,6 +137,12 @@ export default function AppRoutes() {
         <Route path="/clinics" element={<NewClinics />} />
         <Route path="/vets" element={<NewVets />} />
         <Route path="/find-vets-near-you" element={<FindVetsNearYou />} />
+        <Route path="/vet-near-me-delhi-ncr" element={<VetNearMeBookingLayout />}>
+          <Route index element={<VetNearMeLeadPage />} />
+          <Route path="pet-details" element={<VetNearMePetDetailsPage />} />
+          <Route path="payment" element={<VetNearMePaymentPage />} />
+          <Route path="success" element={<VetNearMeSuccessPage />} />
+        </Route>
         <Route
           path="/veterinary-doctor-online-india"
           element={<NewVideoConsultation />}

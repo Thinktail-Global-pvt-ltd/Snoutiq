@@ -1,0 +1,1196 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap");
+
+.vet-near-me-page,
+.vet-near-me-page *,
+.vet-near-me-page *::before,
+.vet-near-me-page *::after {
+  box-sizing: border-box;
+}
+
+.vet-near-me-page * {
+  margin: 0;
+  padding: 0;
+}
+
+.vet-near-me-page {
+  --ink: #18181b;
+  --ink2: #52525b;
+  --ink3: #a1a1aa;
+  --bg: #f8faff;
+  --white: #fff;
+  --border: #e2e8f0;
+  --teal: #1447e6;
+  --teal-bg: #eef2ff;
+  --teal-mid: #1d4ed8;
+  --amber: #d97706;
+  --amber-bg: #fffbeb;
+  --r: 10px;
+  --rs: 7px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "DM Sans", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.vet-near-me-page h1,
+.vet-near-me-page h2,
+.vet-near-me-page h3 {
+  font-family: "Instrument Serif", Georgia, serif;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.vet-near-me-page button,
+.vet-near-me-page input,
+.vet-near-me-page select,
+.vet-near-me-page textarea {
+  font: inherit;
+}
+
+.vet-near-me-page .bridge-bar {
+  background: var(--teal);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  padding: 10px 20px;
+  line-height: 1.5;
+}
+
+.vet-near-me-page .bridge-bar b {
+  font-weight: 700;
+}
+
+.vet-near-me-page nav {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 99;
+}
+
+.vet-near-me-page .logo {
+  display: flex;
+  align-items: center;
+}
+
+.vet-near-me-page .logo-image {
+  display: block;
+  width: auto;
+  height: 20px;
+}
+
+.vet-near-me-page .nav-call {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  border-radius: 100px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.vet-near-me-page .hero {
+  background: var(--white);
+  padding: 32px 20px 0;
+}
+
+.vet-near-me-page .intent-note {
+  background: var(--amber-bg);
+  border: 1px solid #fde68a;
+  border-radius: var(--rs);
+  padding: 11px 14px;
+  margin-bottom: 22px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.vet-near-me-page .intent-note p {
+  font-size: 13px;
+  color: #78350f;
+  line-height: 1.55;
+}
+
+.vet-near-me-page .intent-note p b {
+  font-weight: 700;
+}
+
+.vet-near-me-page h1.hl {
+  font-size: 36px;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 12px;
+  max-width: 420px;
+}
+
+.vet-near-me-page h1.hl em {
+  font-style: italic;
+  color: var(--teal);
+}
+
+.vet-near-me-page .sub {
+  font-size: 15px;
+  color: var(--ink2);
+  margin-bottom: 24px;
+  line-height: 1.65;
+  max-width: 380px;
+}
+
+.vet-near-me-page .price-block {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.vet-near-me-page .price-now {
+  font-family: "Instrument Serif", serif;
+  font-size: 40px;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.vet-near-me-page .price-was {
+  font-size: 20px;
+  color: var(--ink3);
+  text-decoration: line-through;
+  margin-bottom: 4px;
+}
+
+.vet-near-me-page .price-save {
+  background: #eef2ff;
+  color: #1447e6;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 100px;
+  padding: 3px 10px;
+  letter-spacing: 0.02em;
+  align-self: center;
+}
+
+.vet-near-me-page .price-note {
+  font-size: 12px;
+  color: var(--ink3);
+  margin-bottom: 24px;
+}
+
+.vet-near-me-page .form-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px 18px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
+}
+
+.vet-near-me-page .form-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 16px;
+  font-family: "DM Sans", sans-serif;
+}
+
+.vet-near-me-page .field {
+  margin-bottom: 12px;
+}
+
+.vet-near-me-page .field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink2);
+  margin-bottom: 5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vet-near-me-page .field input,
+.vet-near-me-page .field select,
+.vet-near-me-page .field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.vet-near-me-page .field input,
+.vet-near-me-page .field select {
+  -webkit-appearance: none;
+}
+
+.vet-near-me-page .field input:focus,
+.vet-near-me-page .field select:focus,
+.vet-near-me-page .field textarea:focus {
+  border-color: var(--teal);
+}
+
+.vet-near-me-page .field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%2352525B' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.vet-near-me-page .field textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+.vet-near-me-page .half {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.vet-near-me-page .half .field {
+  margin-bottom: 0;
+}
+
+.vet-near-me-page .cta {
+  width: 100%;
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  border-radius: var(--rs);
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vet-near-me-page .cta:active {
+  background: var(--teal-mid);
+}
+
+.vet-near-me-page .cta-note {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink3);
+  margin-top: 9px;
+  line-height: 1.5;
+}
+
+.vet-near-me-page .cta:disabled,
+.vet-near-me-page .sticky-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.vet-near-me-page .pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 20px;
+  background: var(--white);
+  border-top: 1px solid var(--border);
+}
+
+.vet-near-me-page .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+.vet-near-me-page .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+  flex-shrink: 0;
+}
+
+.vet-near-me-page .features,
+.vet-near-me-page .value,
+.vet-near-me-page .reviews,
+.vet-near-me-page .faq,
+.vet-near-me-page .how {
+  padding: 36px 20px;
+}
+
+.vet-near-me-page .features,
+.vet-near-me-page .adv-wrap,
+.vet-near-me-page .areas,
+.vet-near-me-page .vets,
+.vet-near-me-page .faq {
+  background: var(--bg);
+}
+
+.vet-near-me-page .value,
+.vet-near-me-page .reviews,
+.vet-near-me-page .how {
+  background: var(--white);
+}
+
+.vet-near-me-page .eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 8px;
+  font-family: "DM Sans", sans-serif;
+}
+
+.vet-near-me-page .sec-h {
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 20px;
+}
+
+.vet-near-me-page .sec-h em {
+  font-style: italic;
+}
+
+.vet-near-me-page .feat-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.vet-near-me-page .feat {
+  background: var(--white);
+  padding: 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.vet-near-me-page .feat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--rs);
+  background: var(--teal-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.vet-near-me-page .feat h4,
+.vet-near-me-page .step h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 3px;
+  font-family: "DM Sans", sans-serif;
+}
+
+.vet-near-me-page .feat p,
+.vet-near-me-page .step p {
+  font-size: 13px;
+  color: var(--ink2);
+  line-height: 1.55;
+}
+
+.vet-near-me-page .network {
+  padding: 28px 20px;
+  background: var(--white);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.vet-near-me-page .network h3 {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  font-family: "Instrument Serif", serif;
+}
+
+.vet-near-me-page .network p,
+.vet-near-me-page .value-note,
+.vet-near-me-page .rev-body,
+.vet-near-me-page .faq-a {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.6;
+}
+
+.vet-near-me-page .network-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.vet-near-me-page .area-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.vet-near-me-page .network-pill {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  padding: 5px 12px;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--ink2);
+}
+
+.vet-near-me-page .standard {
+  background: var(--teal);
+  padding: 36px 20px;
+}
+
+.vet-near-me-page .standard .eyebrow {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.vet-near-me-page .standard .sec-h {
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.vet-near-me-page .standard .sec-h em {
+  color: #93c5fd;
+}
+
+.vet-near-me-page .standard-sub {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.vet-near-me-page .checks,
+.vet-near-me-page .steps,
+.vet-near-me-page .ty-steps {
+  display: flex;
+  flex-direction: column;
+}
+
+.vet-near-me-page .checks {
+  gap: 16px;
+}
+
+.vet-near-me-page .ty-steps {
+  gap: 12px;
+}
+
+.vet-near-me-page .chk,
+.vet-near-me-page .step,
+.vet-near-me-page .ty-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.vet-near-me-page .chk-mark,
+.vet-near-me-page .step-n,
+.vet-near-me-page .ty-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vet-near-me-page .chk-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #1447e6;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.vet-near-me-page .chk p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.55;
+}
+
+.vet-near-me-page .chk p strong {
+  color: #fff;
+  display: block;
+  margin-bottom: 2px;
+  font-size: 15px;
+}
+
+.vet-near-me-page .vets {
+  padding: 32px 20px;
+}
+
+.vet-near-me-page .vets-sub {
+  font-size: 14px;
+  color: var(--ink2);
+  margin-bottom: 12px;
+}
+
+.vet-near-me-page .vet-scroll {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  margin-top: 6px;
+  scrollbar-width: none;
+}
+
+.vet-near-me-page .vet-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.vet-near-me-page .vet-card {
+  min-width: 200px;
+  max-width: 220px;
+  background: var(--white);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.vet-near-me-page .vet-photo {
+  width: 100%;
+  height: 160px;
+  background: var(--teal-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.vet-near-me-page .vet-photo-initials {
+  font-family: "Instrument Serif", serif;
+  font-size: 40px;
+  color: var(--teal);
+  font-weight: 400;
+}
+
+.vet-near-me-page .vet-body {
+  padding: 14px;
+}
+
+.vet-near-me-page .vet-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.vet-near-me-page .vet-cred {
+  font-size: 11px;
+  color: var(--ink3);
+  margin-bottom: 10px;
+}
+
+.vet-near-me-page .vet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.vet-near-me-page .vet-tag {
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--bg);
+  color: var(--ink2);
+  border: 1px solid var(--border);
+}
+
+.vet-near-me-page .vet-stat {
+  font-size: 12px;
+  color: var(--ink2);
+  margin-bottom: 3px;
+  line-height: 1.4;
+}
+
+.vet-near-me-page .vet-stat b {
+  color: var(--ink);
+}
+
+.vet-near-me-page .value {
+  border-top: 1px solid var(--border);
+}
+
+.vet-near-me-page .value-note {
+  margin-bottom: 18px;
+  max-width: 480px;
+  line-height: 1.65;
+}
+
+.vet-near-me-page .value-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  min-width: 520px;
+}
+
+.vet-near-me-page .value-table th {
+  padding: 11px 13px;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: left;
+  background: var(--bg);
+}
+
+.vet-near-me-page .value-table td {
+  padding: 11px 13px;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+  text-align: left;
+}
+
+.vet-near-me-page .value-table th:first-child,
+.vet-near-me-page .value-table td:first-child {
+  width: 36%;
+}
+
+.vet-near-me-page .value-label {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.vet-near-me-page .value-good {
+  color: var(--teal);
+  font-weight: 500;
+}
+
+.vet-near-me-page .value-bad {
+  color: var(--ink3);
+  font-size: 12px;
+}
+
+.vet-near-me-page .adv-wrap {
+  padding: 28px 20px;
+}
+
+.vet-near-me-page .adv {
+  background: var(--amber-bg);
+  border: 1px solid #fde68a;
+  border-radius: var(--r);
+  padding: 22px;
+}
+
+.vet-near-me-page .adv-top {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.vet-near-me-page .adv-av {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--amber);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Instrument Serif", serif;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.vet-near-me-page .adv-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vet-near-me-page .adv-role {
+  font-size: 12px;
+  color: var(--ink2);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.vet-near-me-page .adv-quote {
+  font-size: 14px;
+  color: #78350f;
+  font-style: italic;
+  line-height: 1.65;
+}
+
+.vet-near-me-page .steps {
+  gap: 0;
+}
+
+.vet-near-me-page .step {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+
+.vet-near-me-page .step:last-child {
+  border-bottom: none;
+}
+
+.vet-near-me-page .step-n {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.vet-near-me-page .areas {
+  padding: 28px 20px;
+}
+
+.vet-near-me-page .achip {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.vet-near-me-page .achip.on {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+}
+
+.vet-near-me-page .rev {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+.vet-near-me-page .stars {
+  color: #f59e0b;
+  font-size: 13px;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.vet-near-me-page .rev-q {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  font-style: italic;
+  margin-bottom: 6px;
+}
+
+.vet-near-me-page .rev-body {
+  margin-bottom: 12px;
+}
+
+.vet-near-me-page .rev-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vet-near-me-page .rev-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink2);
+}
+
+.vet-near-me-page .pet-tag {
+  background: var(--teal-bg);
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 100px;
+  padding: 2px 9px;
+}
+
+.vet-near-me-page .faq-item {
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+}
+
+.vet-near-me-page .faq-q {
+  width: 100%;
+  background: transparent;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.vet-near-me-page .faq-q::after {
+  content: "+";
+  font-size: 22px;
+  color: var(--teal);
+  font-weight: 300;
+  flex-shrink: 0;
+}
+
+.vet-near-me-page .faq-q.open::after {
+  content: "−";
+}
+
+.vet-near-me-page .faq-a {
+  margin-top: 10px;
+  display: none;
+  line-height: 1.7;
+}
+
+.vet-near-me-page .faq-a.open {
+  display: block;
+}
+
+.vet-near-me-page footer {
+  background: var(--ink);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  padding: 24px 20px 90px;
+  line-height: 1.8;
+}
+
+.vet-near-me-page footer a {
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: none;
+}
+
+.vet-near-me-page .f-logo {
+  font-family: "Instrument Serif", serif;
+  font-size: 20px;
+  color: #fff;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.vet-near-me-page .f-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.vet-near-me-page .fhint {
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 4px;
+}
+
+.vet-near-me-page .cbgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 6px;
+}
+
+.vet-near-me-page .cbitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.vet-near-me-page .cbitem input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--teal);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.vet-near-me-page .steps-indicator {
+  display: flex;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.vet-near-me-page .si-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vet-near-me-page .si-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--ink3);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.vet-near-me-page .si-item.active .si-dot,
+.vet-near-me-page .si-item.done .si-dot {
+  background: var(--teal);
+  color: #fff;
+}
+
+.vet-near-me-page .si-item span {
+  font-size: 10px;
+  color: var(--ink3);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vet-near-me-page .si-item.active span,
+.vet-near-me-page .si-item.done span {
+  color: var(--teal);
+}
+
+.vet-near-me-page .si-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  margin: 0 6px 14px;
+}
+
+.vet-near-me-page .step-back {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: var(--teal);
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vet-near-me-page .sdiv {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin: 20px 0 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.vet-near-me-page .summary-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.vet-near-me-page .sum-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.vet-near-me-page .sum-row:last-child {
+  border-bottom: none;
+}
+
+.vet-near-me-page .sum-label {
+  color: var(--ink2);
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+
+.vet-near-me-page .sum-val {
+  color: var(--ink);
+  font-weight: 500;
+  text-align: right;
+}
+
+.vet-near-me-page .pay-box {
+  background: var(--teal-bg);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--rs);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.vet-near-me-page .pay-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--ink2);
+  padding: 5px 0;
+}
+
+.vet-near-me-page .pay-line.discount {
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.vet-near-me-page .pay-line.total {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  border-top: 1px solid #bfdbfe;
+  margin-top: 6px;
+  padding-top: 10px;
+}
+
+.vet-near-me-page .pay-includes {
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 10px;
+  line-height: 1.5;
+  border-top: 1px solid #bfdbfe;
+  padding-top: 8px;
+}
+
+.vet-near-me-page .refund-note {
+  font-size: 13px;
+  color: var(--ink2);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.vet-near-me-page .pay-cta {
+  background: #1447e6;
+  font-size: 17px;
+  padding: 17px;
+}
+
+.vet-near-me-page .thankyou {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.vet-near-me-page .ty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.vet-near-me-page .thankyou h3 {
+  font-family: "Instrument Serif", serif;
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+.vet-near-me-page .ty-sub {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.6;
+  margin-bottom: 24px;
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.vet-near-me-page .ty-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.vet-near-me-page .ty-step p {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.5;
+}
+
+.vet-near-me-page .sticky {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border-top: 1px solid var(--border);
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+  z-index: 200;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.vet-near-me-page .sticky-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.vet-near-me-page .sticky-left p {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vet-near-me-page .sticky-left small {
+  font-size: 11px;
+  color: var(--ink3);
+}
+
+.vet-near-me-page .sticky-btn {
+  background: var(--amber);
+  color: #fff;
+  border: none;
+  border-radius: var(--rs);
+  padding: 13px 22px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
