@@ -15,6 +15,7 @@ import {
   TRUST_PILLS,
   VALUE_ROWS,
 } from "./bookingFlowData";
+import logo from '../../assets/images/dark bg1.webp';
 import { VetNearMeBookingProvider } from "./VetNearMeBookingContext";
 import { loadFeaturedVetsFromApi } from "./featuredVetsApi";
 import logoImage from "../../assets/images/logo.png";
@@ -357,7 +358,7 @@ function VetNearMeBookingPage() {
                       </span>
                     ))}
                   </div>
-                  <p className="vet-stat">
+                  {/* <p className="vet-stat">
                     <b>{vet.statLine1}</b> {vet.statLabel1 || "pets treated"}
                     {vet.statLine2 ? (
                       <>
@@ -366,7 +367,7 @@ function VetNearMeBookingPage() {
                         {vet.statLabel2 || "repeat calls"}
                       </>
                     ) : null}
-                  </p>
+                  </p> */}
                 </div>
               </article>
             ))}
@@ -526,7 +527,7 @@ function VetNearMeBookingPage() {
         </section>
 
         <footer>
-          <img src={logoImage} alt="Snoutiq" className="f-logo-image" />
+          <img src={logo} alt="Snoutiq" className="f-logo-image" />
           <p>
             Vet near you, at home — across Delhi NCR. A ThinkTail Global Pvt.
             Ltd. product.
