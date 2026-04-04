@@ -42,11 +42,8 @@ export default defineConfig({
             return preloadFiles;
           };
 
-          const homePreloadFiles = collectChunkFiles(["HomePage"]);
-          const vetNearMePreloadFiles = collectChunkFiles([
-            "VetNearMeBookingLayout",
-            "VetNearMeLeadPage",
-          ]);
+          const homePreloadFiles = collectChunkFiles(["MainLayout", "HomePage"]);
+          const vetNearMePreloadFiles = collectChunkFiles(["RouteModule"]);
 
           let transformedHtml = html.replace(
             /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*)>/g,

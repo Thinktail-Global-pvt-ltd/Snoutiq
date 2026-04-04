@@ -13,7 +13,7 @@
 .vet-near-me-page {
   --ink: #18181b;
   --ink2: #52525b;
-  --ink3: #a1a1aa;
+  --ink3: #71717a;
   --bg: #f8faff;
   --white: #fff;
   --border: #e2e8f0;
@@ -526,7 +526,7 @@
 }
 
 .vet-near-me-page .standard .eyebrow {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .vet-near-me-page .standard .sec-h {
@@ -952,14 +952,14 @@
 
 .vet-near-me-page footer {
   background: var(--ink);
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 13px;
   padding: 24px 20px 90px;
   line-height: 1.8;
 }
 
 .vet-near-me-page footer a {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.86);
   text-decoration: none;
 }
 

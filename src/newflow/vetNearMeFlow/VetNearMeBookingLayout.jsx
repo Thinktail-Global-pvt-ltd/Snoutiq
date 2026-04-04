@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Helmet } from "react-helmet-async";
+import { Helmet, HelmetProvider } from "react-helmet-async";
 import { Outlet, useLocation } from "react-router-dom";
 import {
   BOOKING_FLOW_ROUTES,
@@ -17,7 +17,6 @@ import {
 } from "./bookingFlowData";
 import logo from '../../assets/images/dark bg.webp';
 import { VetNearMeBookingProvider } from "./VetNearMeBookingContext";
-import { loadFeaturedVetsFromApi } from "./featuredVetsApi";
 import logoImage from "../../assets/images/logo.png";
 import "./VetNearMeBooking.css";
 
@@ -124,10 +123,12 @@ function VetNearMeBookingPage() {
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [selectedArea, setSelectedArea] = useState("Gurgaon");
   const [showStickyCta, setShowStickyCta] = useState(false);
+  const [showDeferredSections, setShowDeferredSections] = useState(false);
   const [featuredVets, setFeaturedVets] = useState(FEATURED_VETS);
   const [hasLoadedFeaturedVets, setHasLoadedFeaturedVets] = useState(false);
   const [shouldLoadFeaturedVets, setShouldLoadFeaturedVets] = useState(false);
   const hasMountedStepRef = useRef(false);
+  const hasShownDeferredSectionsRef = useRef(false);
   const vetsSectionRef = useRef(null);
 
   const currentStep = useMemo(
@@ -145,6 +146,51 @@ function VetNearMeBookingPage() {
   const isSuccessStep = currentStep === 4;
   const isStandaloneStep =
     currentStep === 2 || currentStep === 3 || isSuccessStep;
+
+  useEffect(() => {
+    if (currentStep !== 1) {
+      return undefined;
+    }
+
+    if (hasShownDeferredSectionsRef.current) {
+      setShowDeferredSections(true);
+      return undefined;
+    }
+
+    let isCancelled = false;
+    let idleCallbackId = null;
+    let timeoutId = null;
+
+    const revealDeferredSections = () => {
+      if (isCancelled) return;
+      hasShownDeferredSectionsRef.current = true;
+      setShowDeferredSections(true);
+    };
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleCallbackId = window.requestIdleCallback(revealDeferredSections, {
+        timeout: 1200,
+      });
+    } else {
+      timeoutId = window.setTimeout(revealDeferredSections, 180);
+    }
+
+    return () => {
+      isCancelled = true;
+
+      if (
+        idleCallbackId !== null &&
+        typeof window !== "undefined" &&
+        "cancelIdleCallback" in window
+      ) {
+        window.cancelIdleCallback(idleCallbackId);
+      }
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [currentStep]);
 
   useEffect(() => {
     if (!hasMountedStepRef.current) {
@@ -190,7 +236,12 @@ function VetNearMeBookingPage() {
   }, [currentStep]);
 
   useEffect(() => {
-    if (currentStep !== 1 || hasLoadedFeaturedVets || shouldLoadFeaturedVets) {
+    if (
+      currentStep !== 1 ||
+      !showDeferredSections ||
+      hasLoadedFeaturedVets ||
+      shouldLoadFeaturedVets
+    ) {
       return undefined;
     }
 
@@ -214,7 +265,12 @@ function VetNearMeBookingPage() {
     return () => {
       observer.disconnect();
     };
-  }, [currentStep, hasLoadedFeaturedVets, shouldLoadFeaturedVets]);
+  }, [
+    currentStep,
+    hasLoadedFeaturedVets,
+    shouldLoadFeaturedVets,
+    showDeferredSections,
+  ]);
 
   useEffect(() => {
     if (currentStep !== 1 || hasLoadedFeaturedVets || !shouldLoadFeaturedVets) {
@@ -223,7 +279,8 @@ function VetNearMeBookingPage() {
 
     let isCancelled = false;
 
-    loadFeaturedVetsFromApi()
+    import("./featuredVetsApi")
+      .then(({ loadFeaturedVetsFromApi }) => loadFeaturedVetsFromApi())
       .then((items) => {
         if (!isCancelled && Array.isArray(items) && items.length) {
           setFeaturedVets(items);
@@ -365,6 +422,8 @@ function VetNearMeBookingPage() {
           ))}
         </div>
 
+        {showDeferredSections ? (
+          <>
         <section className="features">
           <div className="eyebrow">What you get</div>
           <h2 className="sec-h">
@@ -632,6 +691,8 @@ function VetNearMeBookingPage() {
             Ltd. product.
           </p>
         </footer>
+          </>
+        ) : null}
 
         <div className={`sticky${showStickyCta ? " visible" : ""}`}>
           <div className="sticky-left">
@@ -650,8 +711,10 @@ function VetNearMeBookingPage() {
 
 export default function VetNearMeBookingLayout() {
   return (
-    <VetNearMeBookingProvider>
-      <VetNearMeBookingPage />
-    </VetNearMeBookingProvider>
+    <HelmetProvider>
+      <VetNearMeBookingProvider>
+        <VetNearMeBookingPage />
+      </VetNearMeBookingProvider>
+    </HelmetProvider>
   );
 }

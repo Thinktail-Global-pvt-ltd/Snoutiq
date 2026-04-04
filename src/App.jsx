@@ -1,28 +1,29 @@
-import React, { lazy, Suspense, useEffect } from "react";
-import { HelmetProvider } from "react-helmet-async";
+import React, { lazy, Suspense, useEffect, useRef } from "react";
 import {
   BrowserRouter as Router,
   Route,
   Routes,
   useLocation,
 } from "react-router-dom";
-import MainLayout from "./layouts/MainLayout";
 
 const HOME_PATH = "/";
 const VET_NEAR_ME_BASE_PATH = "/vet-near-me-delhi-ncr";
 const NON_HOME_PRELOAD_EVENTS = ["pointerdown", "keydown", "touchstart"];
 let homePagePromise;
+let mainLayoutPromise;
 let appRoutesPromise;
-let vetNearMeLayoutPromise;
-let vetNearMeLeadPagePromise;
-let vetNearMePetDetailsPagePromise;
-let vetNearMePaymentPagePromise;
-let vetNearMeSuccessPagePromise;
+let vetNearMeFlowModulePromise;
 
 const ScrollToTopAndHash = () => {
   const { pathname, hash } = useLocation();
+  const hasNavigatedRef = useRef(false);
 
   useEffect(() => {
+    if (!hasNavigatedRef.current) {
+      hasNavigatedRef.current = true;
+      return;
+    }
+
     if (!hash) {
       window.scrollTo({ top: 0, behavior: "auto" });
       return;
@@ -49,40 +50,29 @@ const LoadingScreen = () => (
 
 const loadHomePage = () =>
   (homePagePromise ??= import("./newflow/HomePage"));
+const loadMainLayout = () =>
+  (mainLayoutPromise ??= import("./layouts/MainLayout"));
 const loadAppRoutes = () => (appRoutesPromise ??= import("./AppRoutes"));
-const loadVetNearMeLayout = () =>
-  (vetNearMeLayoutPromise ??= import("./newflow/vetNearMeFlow/VetNearMeBookingLayout"));
-const loadVetNearMeLeadPage = () =>
-  (vetNearMeLeadPagePromise ??= import("./newflow/vetNearMeFlow/VetNearMeLeadPage"));
-const loadVetNearMePetDetailsPage = () =>
-  (vetNearMePetDetailsPagePromise ??= import("./newflow/vetNearMeFlow/VetNearMePetDetailsPage"));
-const loadVetNearMePaymentPage = () =>
-  (vetNearMePaymentPagePromise ??= import("./newflow/vetNearMeFlow/VetNearMePaymentPage"));
-const loadVetNearMeSuccessPage = () =>
-  (vetNearMeSuccessPagePromise ??= import("./newflow/vetNearMeFlow/VetNearMeSuccessPage"));
+const loadVetNearMeFlowModule = () =>
+  (vetNearMeFlowModulePromise ??= import("./newflow/vetNearMeFlow/RouteModule"));
+
+const lazyNamedExport = (loader, exportName = "default") =>
+  lazy(() =>
+    loader().then((module) => ({
+      default: module[exportName] ?? module.default,
+    }))
+  );
 
 if (typeof window !== "undefined") {
   const currentPath = window.location.pathname;
 
   if (currentPath === HOME_PATH) {
+    void loadMainLayout();
     void loadHomePage();
   }
 
   if (currentPath.startsWith(VET_NEAR_ME_BASE_PATH)) {
-    void loadVetNearMeLayout();
-
-    if (
-      currentPath === VET_NEAR_ME_BASE_PATH ||
-      currentPath === `${VET_NEAR_ME_BASE_PATH}/`
-    ) {
-      void loadVetNearMeLeadPage();
-    } else if (currentPath === `${VET_NEAR_ME_BASE_PATH}/pet-details`) {
-      void loadVetNearMePetDetailsPage();
-    } else if (currentPath === `${VET_NEAR_ME_BASE_PATH}/payment`) {
-      void loadVetNearMePaymentPage();
-    } else if (currentPath === `${VET_NEAR_ME_BASE_PATH}/success`) {
-      void loadVetNearMeSuccessPage();
-    }
+    void loadVetNearMeFlowModule();
   }
 
   const preloadAppRoutes = () => {
@@ -100,21 +90,34 @@ if (typeof window !== "undefined") {
       });
     });
   } else if (!currentPath.startsWith(VET_NEAR_ME_BASE_PATH)) {
+    void loadMainLayout();
     preloadAppRoutes();
   }
 }
 
-const BookingFlowShell = ({ children }) => (
-  <HelmetProvider>{children}</HelmetProvider>
+const MainLayout = lazyNamedExport(loadMainLayout);
+const HomePage = lazyNamedExport(loadHomePage);
+const AppRoutes = lazyNamedExport(loadAppRoutes);
+const VetNearMeBookingLayout = lazyNamedExport(
+  loadVetNearMeFlowModule,
+  "VetNearMeBookingLayout"
 );
-
-const HomePage = lazy(loadHomePage);
-const AppRoutes = lazy(loadAppRoutes);
-const VetNearMeBookingLayout = lazy(loadVetNearMeLayout);
-const VetNearMeLeadPage = lazy(loadVetNearMeLeadPage);
-const VetNearMePetDetailsPage = lazy(loadVetNearMePetDetailsPage);
-const VetNearMePaymentPage = lazy(loadVetNearMePaymentPage);
-const VetNearMeSuccessPage = lazy(loadVetNearMeSuccessPage);
+const VetNearMeLeadPage = lazyNamedExport(
+  loadVetNearMeFlowModule,
+  "VetNearMeLeadPage"
+);
+const VetNearMePetDetailsPage = lazyNamedExport(
+  loadVetNearMeFlowModule,
+  "VetNearMePetDetailsPage"
+);
+const VetNearMePaymentPage = lazyNamedExport(
+  loadVetNearMeFlowModule,
+  "VetNearMePaymentPage"
+);
+const VetNearMeSuccessPage = lazyNamedExport(
+  loadVetNearMeFlowModule,
+  "VetNearMeSuccessPage"
+);
 
 function App() {
   return (
@@ -123,24 +126,21 @@ function App() {
 
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
+          <Route
+            path={`${VET_NEAR_ME_BASE_PATH}`}
+            element={<VetNearMeBookingLayout />}
+          >
+            <Route index element={<VetNearMeLeadPage />} />
+            <Route
+              path="pet-details"
+              element={<VetNearMePetDetailsPage />}
+            />
+            <Route path="payment" element={<VetNearMePaymentPage />} />
+            <Route path="success" element={<VetNearMeSuccessPage />} />
+          </Route>
+
           <Route element={<MainLayout />}>
             <Route path={HOME_PATH} element={<HomePage />} />
-            <Route
-              path={`${VET_NEAR_ME_BASE_PATH}`}
-              element={
-                <BookingFlowShell>
-                  <VetNearMeBookingLayout />
-                </BookingFlowShell>
-              }
-            >
-              <Route index element={<VetNearMeLeadPage />} />
-              <Route
-                path="pet-details"
-                element={<VetNearMePetDetailsPage />}
-              />
-              <Route path="payment" element={<VetNearMePaymentPage />} />
-              <Route path="success" element={<VetNearMeSuccessPage />} />
-            </Route>
             <Route path="*" element={<AppRoutes />} />
           </Route>
         </Routes>
