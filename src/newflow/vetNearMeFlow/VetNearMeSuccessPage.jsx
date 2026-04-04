@@ -23,7 +23,7 @@ export default function VetNearMeSuccessPage() {
       <div className="ty-icon" aria-hidden="true">
         🐾
       </div>
-      <h3>Booking confirmed!</h3>
+      <h2>Booking confirmed!</h2>
       <p className="ty-sub">
         Your Pet Parent Assistant has been assigned and will call you within 15
         minutes to confirm your vet and share arrival time.

@@ -12,7 +12,8 @@ import { useVetNearMeBooking } from "./VetNearMeBookingContext";
 
 export default function VetNearMePetDetailsPage() {
   const navigate = useNavigate();
-  const breedListId = useId();
+  const fieldIdPrefix = useId();
+  const breedListId = `${fieldIdPrefix}-breed-options`;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBreedsLoading, setIsBreedsLoading] = useState(false);
   const [breedOptions, setBreedOptions] = useState([]);
@@ -31,6 +32,19 @@ export default function VetNearMePetDetailsPage() {
     selectedSpecies === "Dog" || selectedSpecies === "Cat";
   const showOtherPetTypeField = selectedSpecies === "Other";
   const shouldShowBreedSelect = usesBreedApi && !breedLoadError;
+  const petNameInputId = `${fieldIdPrefix}-pet-name`;
+  const otherPetTypeInputId = `${fieldIdPrefix}-pet-type`;
+  const breedInputId = `${fieldIdPrefix}-breed`;
+  const dobInputId = `${fieldIdPrefix}-dob`;
+  const sexSelectId = `${fieldIdPrefix}-sex`;
+  const issueTextareaId = `${fieldIdPrefix}-issue`;
+  const symptomsGroupId = `${fieldIdPrefix}-symptoms`;
+  const vaccinationSelectId = `${fieldIdPrefix}-vaccination`;
+  const dewormingInputId = `${fieldIdPrefix}-deworming`;
+  const historyTextareaId = `${fieldIdPrefix}-history`;
+  const medicationsInputId = `${fieldIdPrefix}-medications`;
+  const allergiesInputId = `${fieldIdPrefix}-allergies`;
+  const notesTextareaId = `${fieldIdPrefix}-notes`;
   const selectBreedOptions = bookingState.pet.breed &&
     !breedOptions.includes(bookingState.pet.breed)
     ? [bookingState.pet.breed, ...breedOptions]
@@ -172,7 +186,7 @@ export default function VetNearMePetDetailsPage() {
       >
         &larr; Back
       </button>
-      <h3 style={{ marginBottom: 4 }}>About your pet</h3>
+      <h2 style={{ marginBottom: 4 }}>About your pet</h2>
       <p
         style={{
           fontSize: 13,
@@ -188,10 +202,11 @@ export default function VetNearMePetDetailsPage() {
       <div className="sdiv">Pet profile</div>
       <div className="half">
         <div className="field">
-          <label>
+          <label htmlFor={petNameInputId}>
             Pet&apos;s name <span className="required-mark">*</span>
           </label>
           <input
+            id={petNameInputId}
             type="text"
             className={errors.petName ? "input-error" : ""}
             placeholder="Enter your pet's name"
@@ -208,10 +223,11 @@ export default function VetNearMePetDetailsPage() {
 
         {showOtherPetTypeField ? (
           <div className="field">
-            <label>
+            <label htmlFor={otherPetTypeInputId}>
               Pet type <span className="required-mark">*</span>
             </label>
             <input
+              id={otherPetTypeInputId}
               type="text"
               className={errors.otherPetType ? "input-error" : ""}
               placeholder="Enter your pet type"
@@ -227,8 +243,9 @@ export default function VetNearMePetDetailsPage() {
           </div>
         ) : shouldShowBreedSelect ? (
           <div className="field">
-            <label>Breed</label>
+            <label htmlFor={breedInputId}>Breed</label>
             <input
+              id={breedInputId}
               type="text"
               list={breedListId}
               value={bookingState.pet.breed}
@@ -248,8 +265,9 @@ export default function VetNearMePetDetailsPage() {
           </div>
         ) : (
           <div className="field">
-            <label>Breed</label>
+            <label htmlFor={breedInputId}>Breed</label>
             <input
+              id={breedInputId}
               type="text"
               placeholder="Enter breed"
               value={bookingState.pet.breed}
@@ -266,8 +284,9 @@ export default function VetNearMePetDetailsPage() {
 
       <div className="half">
         <div className="field">
-          <label>Date of birth</label>
+          <label htmlFor={dobInputId}>Date of birth</label>
           <input
+            id={dobInputId}
             type="date"
             value={bookingState.pet.dob}
             onChange={(event) => handlePetChange("dob", event.target.value)}
@@ -275,8 +294,9 @@ export default function VetNearMePetDetailsPage() {
           <div className="fhint">Approximate is fine</div>
         </div>
         <div className="field">
-          <label>Gender</label>
+          <label htmlFor={sexSelectId}>Gender</label>
           <select
+            id={sexSelectId}
             value={bookingState.pet.sex}
             onChange={(event) => handlePetChange("sex", event.target.value)}
           >
@@ -292,11 +312,12 @@ export default function VetNearMePetDetailsPage() {
 
       <div className="sdiv">Today&apos;s concern</div>
       <div className="field">
-        <label>
+        <label htmlFor={issueTextareaId}>
           Describe what you&apos;ve noticed{" "}
           <span className="required-mark">*</span>
         </label>
         <textarea
+          id={issueTextareaId}
           className={errors.issue ? "input-error" : ""}
           placeholder="Enter what you have noticed"
           aria-invalid={Boolean(errors.issue)}
@@ -307,8 +328,8 @@ export default function VetNearMePetDetailsPage() {
           <div className="field-error">{errors.issue}</div>
         ) : null}
       </div>
-      <div className="field">
-        <label>Symptoms (tick all that apply)</label>
+      <fieldset className="field">
+        <legend id={symptomsGroupId}>Symptoms (tick all that apply)</legend>
         <div className="cbgroup">
           {SYMPTOM_OPTIONS.map((option) => (
             <label className="cbitem" key={option.value}>
@@ -322,13 +343,14 @@ export default function VetNearMePetDetailsPage() {
             </label>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       <div className="sdiv">Medical history</div>
       <div className="half">
         <div className="field">
-          <label>Vaccination status</label>
+          <label htmlFor={vaccinationSelectId}>Vaccination status</label>
           <select
+            id={vaccinationSelectId}
             value={bookingState.pet.vaccinationStatus}
             onChange={(event) =>
               handlePetChange("vaccinationStatus", event.target.value)
@@ -343,8 +365,9 @@ export default function VetNearMePetDetailsPage() {
           </select>
         </div>
         <div className="field">
-          <label>Last deworming</label>
+          <label htmlFor={dewormingInputId}>Last deworming</label>
           <input
+            id={dewormingInputId}
             type="date"
             value={bookingState.pet.deworming}
             onChange={(event) =>
@@ -354,8 +377,9 @@ export default function VetNearMePetDetailsPage() {
         </div>
       </div>
       <div className="field">
-        <label>Past illnesses or surgeries</label>
+        <label htmlFor={historyTextareaId}>Past illnesses or surgeries</label>
         <textarea
+          id={historyTextareaId}
           placeholder="Enter past illnesses or surgeries"
           style={{ minHeight: 64 }}
           value={bookingState.pet.history}
@@ -363,8 +387,9 @@ export default function VetNearMePetDetailsPage() {
         />
       </div>
       <div className="field">
-        <label>Current medications</label>
+        <label htmlFor={medicationsInputId}>Current medications</label>
         <input
+          id={medicationsInputId}
           type="text"
           placeholder="Enter current medications"
           value={bookingState.pet.medications}
@@ -374,8 +399,9 @@ export default function VetNearMePetDetailsPage() {
         />
       </div>
       <div className="field">
-        <label>Known allergies</label>
+        <label htmlFor={allergiesInputId}>Known allergies</label>
         <input
+          id={allergiesInputId}
           type="text"
           placeholder="Enter known allergies"
           value={bookingState.pet.allergies}
@@ -383,8 +409,9 @@ export default function VetNearMePetDetailsPage() {
         />
       </div>
       <div className="field">
-        <label>Anything else for the vet</label>
+        <label htmlFor={notesTextareaId}>Anything else for the vet</label>
         <textarea
+          id={notesTextareaId}
           placeholder="Enter anything else for the vet"
           style={{ minHeight: 60 }}
           value={bookingState.pet.notes}

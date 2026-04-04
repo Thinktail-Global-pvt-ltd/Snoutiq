@@ -12,28 +12,41 @@ export default defineConfig({
         order: "post",
         handler(html, ctx) {
           const bundle = ctx.bundle || {};
-          const homeChunk = Object.values(bundle).find(
-            (asset) =>
-              asset &&
-              asset.type === "chunk" &&
-              asset.name === "HomePage" &&
-              typeof asset.fileName === "string",
-          );
-          const homePreloadFiles = [];
-          const visitedHomeImports = new Set();
+          const collectChunkFiles = (chunkNames = []) => {
+            const preloadFiles = [];
+            const visitedImports = new Set();
 
-          const collectHomeImports = (fileName) => {
-            if (!fileName || visitedHomeImports.has(fileName)) return;
+            const collectImports = (fileName) => {
+              if (!fileName || visitedImports.has(fileName)) return;
 
-            const chunk = bundle[fileName];
-            if (!chunk || chunk.type !== "chunk") return;
+              const chunk = bundle[fileName];
+              if (!chunk || chunk.type !== "chunk") return;
 
-            visitedHomeImports.add(fileName);
-            homePreloadFiles.push(`/${fileName}`);
-            chunk.imports.forEach(collectHomeImports);
+              visitedImports.add(fileName);
+              preloadFiles.push(`/${fileName}`);
+              chunk.imports.forEach(collectImports);
+            };
+
+            chunkNames.forEach((chunkName) => {
+              const chunk = Object.values(bundle).find(
+                (asset) =>
+                  asset &&
+                  asset.type === "chunk" &&
+                  asset.name === chunkName &&
+                  typeof asset.fileName === "string",
+              );
+
+              collectImports(chunk?.fileName);
+            });
+
+            return preloadFiles;
           };
 
-          collectHomeImports(homeChunk?.fileName);
+          const homePreloadFiles = collectChunkFiles(["HomePage"]);
+          const vetNearMePreloadFiles = collectChunkFiles([
+            "VetNearMeBookingLayout",
+            "VetNearMeLeadPage",
+          ]);
 
           let transformedHtml = html.replace(
             /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*)>/g,
@@ -47,6 +60,15 @@ export default defineConfig({
               "</head>",
               `<script>if(window.location.pathname==="/"){${JSON.stringify(
                 homePreloadFiles,
+              )}.forEach(function(href){var link=document.createElement("link");link.rel="modulepreload";link.href=href;link.crossOrigin="";document.head.appendChild(link);});}</script></head>`,
+            );
+          }
+
+          if (vetNearMePreloadFiles.length) {
+            transformedHtml = transformedHtml.replace(
+              "</head>",
+              `<script>if(window.location.pathname.startsWith("/vet-near-me-delhi-ncr")){${JSON.stringify(
+                vetNearMePreloadFiles,
               )}.forEach(function(href){var link=document.createElement("link");link.rel="modulepreload";link.href=href;link.crossOrigin="";document.head.appendChild(link);});}</script></head>`,
             );
           }

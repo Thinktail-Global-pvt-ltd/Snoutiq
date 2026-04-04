@@ -269,7 +269,7 @@ function VetNearMeBookingPage() {
       </Helmet>
 
       {isStandaloneStep ? (
-        <div
+        <main
           className={`vet-near-me-page standalone-page${
             isSuccessStep ? " success-page" : ""
           }`}
@@ -285,9 +285,9 @@ function VetNearMeBookingPage() {
               <Outlet />
             </div>
           </div>
-        </div>
+        </main>
       ) : (
-      <div className="vet-near-me-page">
+      <main className="vet-near-me-page">
         <div className="bridge-bar">
           Searched for <b>"vet near me"</b>? A verified vet comes to your home
           anywhere in Delhi NCR — Gurgaon · Delhi · Noida · Faridabad
@@ -378,7 +378,7 @@ function VetNearMeBookingPage() {
               <div className="feat" key={feature.title}>
                 <div className="feat-icon">{feature.icon}</div>
                 <div>
-                  <h4>{feature.title}</h4>
+                  <h3>{feature.title}</h3>
                   <p>{feature.body}</p>
                 </div>
               </div>
@@ -544,7 +544,7 @@ function VetNearMeBookingPage() {
               <div className="step" key={step.title}>
                 <div className="step-n">{index + 1}</div>
                 <div>
-                  <h4>{step.title}</h4>
+                  <h3>{step.title}</h3>
                   <p>{step.body}</p>
                 </div>
               </div>
@@ -642,7 +642,7 @@ function VetNearMeBookingPage() {
             Book now
           </button>
         </div>
-      </div>
+      </main>
       )}
     </>
   );

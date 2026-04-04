@@ -293,7 +293,7 @@ export default function VetNearMePaymentPage() {
       >
         &larr; Back
       </button>
-      <h3 style={{ marginBottom: 16 }}>Confirm your booking</h3>
+      <h2 style={{ marginBottom: 16 }}>Confirm your booking</h2>
 
       <div className="summary-card">
         <div className="sum-row">

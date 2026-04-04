@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { submitLeadStep } from "./bookingFlowApi";
 import {
@@ -15,6 +15,7 @@ const isValidPhone = (value) =>
 
 export default function VetNearMeLeadPage() {
   const navigate = useNavigate();
+  const fieldIdPrefix = useId();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const {
@@ -23,6 +24,11 @@ export default function VetNearMeLeadPage() {
     updateBooking,
     updateProgress,
   } = useVetNearMeBooking();
+  const nameInputId = `${fieldIdPrefix}-lead-name`;
+  const phoneInputId = `${fieldIdPrefix}-lead-phone`;
+  const speciesSelectId = `${fieldIdPrefix}-lead-species`;
+  const areaSelectId = `${fieldIdPrefix}-lead-area`;
+  const reasonTextareaId = `${fieldIdPrefix}-lead-reason`;
 
   const handleLeadChange = (field, value) => {
     updateLead({ [field]: value });
@@ -104,12 +110,13 @@ export default function VetNearMeLeadPage() {
 
   return (
     <div>
-      <h3 style={{ marginBottom: 16 }}>Book a vet near you &mdash; at home</h3>
+      <h2 style={{ marginBottom: 16 }}>Book a vet near you &mdash; at home</h2>
       <div className="field">
-        <label>
+        <label htmlFor={nameInputId}>
           Your name <span className="required-mark">*</span>
         </label>
         <input
+          id={nameInputId}
           type="text"
           className={errors.name ? "input-error" : ""}
           placeholder="Enter your name"
@@ -121,10 +128,11 @@ export default function VetNearMeLeadPage() {
         {errors.name ? <div className="field-error">{errors.name}</div> : null}
       </div>
       <div className="field">
-        <label>
+        <label htmlFor={phoneInputId}>
           Phone number <span className="required-mark">*</span>
         </label>
         <input
+          id={phoneInputId}
           type="tel"
           className={errors.phone ? "input-error" : ""}
           placeholder="Enter your phone number"
@@ -139,10 +147,11 @@ export default function VetNearMeLeadPage() {
       </div>
       <div className="half">
         <div className="field">
-          <label>
+          <label htmlFor={speciesSelectId}>
             Pet type <span className="required-mark">*</span>
           </label>
           <select
+            id={speciesSelectId}
             className={errors.species ? "input-error" : ""}
             aria-invalid={Boolean(errors.species)}
             value={bookingState.lead.species}
@@ -162,10 +171,11 @@ export default function VetNearMeLeadPage() {
           ) : null}
         </div>
         <div className="field">
-          <label>
+          <label htmlFor={areaSelectId}>
             Your area <span className="required-mark">*</span>
           </label>
           <select
+            id={areaSelectId}
             className={errors.area ? "input-error" : ""}
             aria-invalid={Boolean(errors.area)}
             value={bookingState.lead.area}
@@ -182,10 +192,11 @@ export default function VetNearMeLeadPage() {
         </div>
       </div>
       <div className="field">
-        <label>
+        <label htmlFor={reasonTextareaId}>
           Reason for visit <span className="required-mark">*</span>
         </label>
         <textarea
+          id={reasonTextareaId}
           className={errors.reason ? "input-error" : ""}
           placeholder="Enter reason for visit"
           aria-invalid={Boolean(errors.reason)}

@@ -233,8 +233,25 @@
   margin-bottom: 12px;
 }
 
+.vet-near-me-page fieldset.field {
+  min-inline-size: 0;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
 .vet-near-me-page .field label {
   display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink2);
+  margin-bottom: 5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vet-near-me-page fieldset.field legend {
+  padding: 0;
   font-size: 11px;
   font-weight: 700;
   color: var(--ink2);
@@ -440,8 +457,8 @@
   flex-shrink: 0;
 }
 
-.vet-near-me-page .feat h4,
-.vet-near-me-page .step h4 {
+.vet-near-me-page .feat h3,
+.vet-near-me-page .step h3 {
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);
