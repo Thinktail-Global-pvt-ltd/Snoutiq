@@ -784,7 +784,7 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: var(--amber);
+  background: #92400e;
   color: #fff;
   display: flex;
   align-items: center;
@@ -1346,7 +1346,7 @@
 }
 
 .vet-near-me-page .sticky-btn {
-  background: var(--amber);
+  background: #92400e;
   color: #fff;
   border: none;
   border-radius: var(--rs);
