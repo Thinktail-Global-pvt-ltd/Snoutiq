@@ -5,7 +5,6 @@ import {
   AREA_OPTIONS,
   BOOKING_FLOW_ROUTES,
   PET_TYPE_OPTIONS,
-  REASON_OPTIONS,
 } from "./bookingFlowData";
 import { useVetNearMeBooking } from "./VetNearMeBookingContext";
 
@@ -17,16 +16,57 @@ const isValidPhone = (value) =>
 export default function VetNearMeLeadPage() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { bookingState, updateLead, updateProgress } = useVetNearMeBooking();
+  const [errors, setErrors] = useState({});
+  const {
+    bookingState,
+    updateLead,
+    updateBooking,
+    updateProgress,
+  } = useVetNearMeBooking();
 
-  const handleContinue = async () => {
+  const handleLeadChange = (field, value) => {
+    updateLead({ [field]: value });
+
+    setErrors((currentErrors) => {
+      if (!currentErrors[field]) {
+        return currentErrors;
+      }
+
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  };
+
+  const validateLeadForm = () => {
+    const nextErrors = {};
+
     if (!bookingState.lead.name.trim()) {
-      window.alert("Please enter your name.");
-      return;
+      nextErrors.name = "Please enter your name.";
     }
 
     if (!isValidPhone(bookingState.lead.phone)) {
-      window.alert("Please enter a valid phone number.");
+      nextErrors.phone = "Please enter a valid phone number.";
+    }
+
+    if (!bookingState.lead.species) {
+      nextErrors.species = "Please select your pet type.";
+    }
+
+    if (!bookingState.lead.area) {
+      nextErrors.area = "Please select your area.";
+    }
+
+    if (!bookingState.lead.reason.trim()) {
+      nextErrors.reason = "Please enter the reason for visit.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleContinue = async () => {
+    if (!validateLeadForm()) {
       return;
     }
 
@@ -38,8 +78,20 @@ export default function VetNearMeLeadPage() {
         throw new Error("Lead step could not be submitted.");
       }
 
+      updateBooking({
+        bookingId: response.bookingId,
+        userId: response.userId,
+        petId: null,
+        latestCompletedStep: response.latestCompletedStep,
+        paymentStatus: "pending",
+        paymentReference: "",
+        bookingReference: "",
+      });
+
       updateProgress({
         leadSubmitted: true,
+        petDetailsSubmitted: false,
+        paymentCompleted: false,
       });
 
       navigate(BOOKING_FLOW_ROUTES.petDetails);
@@ -52,70 +104,97 @@ export default function VetNearMeLeadPage() {
 
   return (
     <div>
-      <h3 style={{ marginBottom: 16 }}>Book a vet near you — at home</h3>
+      <h3 style={{ marginBottom: 16 }}>Book a vet near you &mdash; at home</h3>
       <div className="field">
-        <label>Your name</label>
+        <label>
+          Your name <span className="required-mark">*</span>
+        </label>
         <input
           type="text"
-          placeholder="Priya Sharma"
+          className={errors.name ? "input-error" : ""}
+          placeholder="Enter your name"
           autoComplete="name"
+          aria-invalid={Boolean(errors.name)}
           value={bookingState.lead.name}
-          onChange={(event) => updateLead({ name: event.target.value })}
+          onChange={(event) => handleLeadChange("name", event.target.value)}
         />
+        {errors.name ? <div className="field-error">{errors.name}</div> : null}
       </div>
       <div className="field">
-        <label>Phone number</label>
+        <label>
+          Phone number <span className="required-mark">*</span>
+        </label>
         <input
           type="tel"
-          placeholder="+91 98xxxxxxxx"
+          className={errors.phone ? "input-error" : ""}
+          placeholder="Enter your phone number"
           autoComplete="tel"
+          aria-invalid={Boolean(errors.phone)}
           value={bookingState.lead.phone}
-          onChange={(event) => updateLead({ phone: event.target.value })}
+          onChange={(event) => handleLeadChange("phone", event.target.value)}
         />
+        {errors.phone ? (
+          <div className="field-error">{errors.phone}</div>
+        ) : null}
       </div>
       <div className="half">
         <div className="field">
-          <label>Pet type</label>
+          <label>
+            Pet type <span className="required-mark">*</span>
+          </label>
           <select
+            className={errors.species ? "input-error" : ""}
+            aria-invalid={Boolean(errors.species)}
             value={bookingState.lead.species}
-            onChange={(event) => updateLead({ species: event.target.value })}
+            onChange={(event) =>
+              handleLeadChange("species", event.target.value)
+            }
           >
-            <option value="">Select</option>
+            <option value="">Select pet type</option>
             {PET_TYPE_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
           </select>
+          {errors.species ? (
+            <div className="field-error">{errors.species}</div>
+          ) : null}
         </div>
         <div className="field">
-          <label>Your area</label>
+          <label>
+            Your area <span className="required-mark">*</span>
+          </label>
           <select
+            className={errors.area ? "input-error" : ""}
+            aria-invalid={Boolean(errors.area)}
             value={bookingState.lead.area}
-            onChange={(event) => updateLead({ area: event.target.value })}
+            onChange={(event) => handleLeadChange("area", event.target.value)}
           >
-            <option value="">Select</option>
+            <option value="">Select your area</option>
             {AREA_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
           </select>
+          {errors.area ? <div className="field-error">{errors.area}</div> : null}
         </div>
       </div>
       <div className="field">
-        <label>Reason for visit</label>
-        <select
+        <label>
+          Reason for visit <span className="required-mark">*</span>
+        </label>
+        <textarea
+          className={errors.reason ? "input-error" : ""}
+          placeholder="Enter reason for visit"
+          aria-invalid={Boolean(errors.reason)}
           value={bookingState.lead.reason}
-          onChange={(event) => updateLead({ reason: event.target.value })}
-        >
-          <option value="">What does your pet need?</option>
-          {REASON_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+          onChange={(event) => handleLeadChange("reason", event.target.value)}
+        />
+        {errors.reason ? (
+          <div className="field-error">{errors.reason}</div>
+        ) : null}
       </div>
       <button
         type="button"
@@ -123,10 +202,10 @@ export default function VetNearMeLeadPage() {
         onClick={handleContinue}
         disabled={isSubmitting}
       >
-        Continue — add pet details →
+        Continue &mdash; add pet details &rarr;
       </button>
       <p className="cta-note">
-        Takes 2 more minutes · Helps your vet prepare before arriving
+        Takes 2 more minutes &middot; Helps your vet prepare before arriving
       </p>
     </div>
   );

@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { initiatePayment } from "./bookingFlowApi";
-import {
-  BOOKING_FLOW_ROUTES,
-  BOOKING_PRICING,
-} from "./bookingFlowData";
+import { BOOKING_FLOW_ROUTES, BOOKING_PRICING } from "./bookingFlowData";
 import { useVetNearMeBooking } from "./VetNearMeBookingContext";
 
-const displayValue = (value, fallback = "—") => {
+const displayValue = (value, fallback = "-") => {
   const text = String(value || "").trim();
   return text || fallback;
 };
@@ -32,23 +29,40 @@ export default function VetNearMePaymentPage() {
     navigate,
   ]);
 
-  const petSummary = [
-    bookingState.pet.petName.trim(),
-    bookingState.lead.species.trim(),
-  ]
+  const petTypeSummary =
+    bookingState.lead.species === "Other"
+      ? bookingState.pet.otherPetType.trim()
+      : bookingState.lead.species.trim();
+
+  const petSummary = [bookingState.pet.petName.trim(), petTypeSummary]
     .filter(Boolean)
     .join(" · ");
 
   const handlePayment = async () => {
+    if (!bookingState.booking.bookingId) {
+      window.alert("Please complete the booking form before payment.");
+      navigate(BOOKING_FLOW_ROUTES.lead, { replace: true });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      const response = await initiatePayment(bookingState);
+      const response = await initiatePayment({
+        bookingId: bookingState.booking.bookingId,
+        amountPayable: BOOKING_PRICING.currentPrice,
+        paymentReference: bookingState.booking.paymentReference,
+      });
 
       if (!response?.ok) {
         throw new Error("Payment could not be started.");
       }
 
       updateBooking({
+        bookingId: response.bookingId,
+        latestCompletedStep: response.latestCompletedStep,
+        paymentStatus: response.paymentStatus,
+        paymentReference:
+          bookingState.booking.paymentReference || `demo-payment-${Date.now()}`,
         bookingReference: response.bookingReference,
       });
 
@@ -71,7 +85,7 @@ export default function VetNearMePaymentPage() {
         className="step-back"
         onClick={() => navigate(BOOKING_FLOW_ROUTES.petDetails)}
       >
-        ← Back
+        &larr; Back
       </button>
       <h3 style={{ marginBottom: 16 }}>Confirm your booking</h3>
 
@@ -107,25 +121,25 @@ export default function VetNearMePaymentPage() {
       <div className="pay-box">
         <div className="pay-line">
           <span>Home vet visit</span>
-          <span>₹{BOOKING_PRICING.originalPrice}</span>
+          <span>&#8377;{BOOKING_PRICING.originalPrice}</span>
         </div>
         <div className="pay-line discount">
-          <span>20% off — limited period</span>
-          <span>−₹{BOOKING_PRICING.discountAmount}</span>
+          <span>20% off &mdash; limited period</span>
+          <span>-&#8377;{BOOKING_PRICING.discountAmount}</span>
         </div>
         <div className="pay-line total">
           <span>Total payable</span>
-          <span>₹{BOOKING_PRICING.currentPrice}</span>
+          <span>&#8377;{BOOKING_PRICING.currentPrice}</span>
         </div>
         <div className="pay-includes">
-          Includes up to ₹200 of essential medicines · Written visit report ·
-          Pet record saved on Snoutiq
+          Includes up to &#8377;200 of essential medicines · Written visit
+          report · Pet record saved on Snoutiq
         </div>
       </div>
 
       <div className="refund-note">
-        🔒 100% refund if we can't confirm a vet in your area after payment. No
-        questions asked.
+        Secure booking with 100% refund if we can&apos;t confirm a vet in your
+        area after payment.
       </div>
 
       <button
@@ -134,7 +148,7 @@ export default function VetNearMePaymentPage() {
         onClick={handlePayment}
         disabled={isSubmitting}
       >
-        Pay ₹{BOOKING_PRICING.currentPrice} securely →
+        Pay &#8377;{BOOKING_PRICING.currentPrice} securely &rarr;
       </button>
       <p className="cta-note">
         Secure payment via Razorpay · UPI / card / net banking

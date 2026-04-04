@@ -6,27 +6,43 @@ import {
 
 const VetNearMeBookingContext = createContext(null);
 
-const mergeBookingState = (storedState = {}) => ({
-  lead: {
-    ...DEFAULT_BOOKING_STATE.lead,
-    ...(storedState.lead || {}),
-  },
-  pet: {
-    ...DEFAULT_BOOKING_STATE.pet,
-    ...(storedState.pet || {}),
-    symptoms: Array.isArray(storedState.pet?.symptoms)
-      ? storedState.pet.symptoms
-      : DEFAULT_BOOKING_STATE.pet.symptoms,
-  },
-  booking: {
+const mergeBookingState = (storedState = {}) => {
+  const mergedBooking = {
     ...DEFAULT_BOOKING_STATE.booking,
     ...(storedState.booking || {}),
-  },
-  progress: {
+  };
+  const mergedProgress = {
     ...DEFAULT_BOOKING_STATE.progress,
     ...(storedState.progress || {}),
-  },
-});
+  };
+  const latestCompletedStep = Number(mergedBooking.latestCompletedStep || 0);
+
+  return {
+    lead: {
+      ...DEFAULT_BOOKING_STATE.lead,
+      ...(storedState.lead || {}),
+    },
+    pet: {
+      ...DEFAULT_BOOKING_STATE.pet,
+      ...(storedState.pet || {}),
+      symptoms: Array.isArray(storedState.pet?.symptoms)
+        ? storedState.pet.symptoms
+        : DEFAULT_BOOKING_STATE.pet.symptoms,
+    },
+    booking: mergedBooking,
+    progress: {
+      ...mergedProgress,
+      leadSubmitted:
+        mergedProgress.leadSubmitted ||
+        Boolean(mergedBooking.bookingId) ||
+        latestCompletedStep >= 1,
+      petDetailsSubmitted:
+        mergedProgress.petDetailsSubmitted || latestCompletedStep >= 2,
+      paymentCompleted:
+        mergedProgress.paymentCompleted || latestCompletedStep >= 3,
+    },
+  };
+};
 
 const readStoredBookingState = () => {
   if (typeof window === "undefined") return DEFAULT_BOOKING_STATE;

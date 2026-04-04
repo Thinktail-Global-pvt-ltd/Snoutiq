@@ -24,6 +24,7 @@ export const DEFAULT_BOOKING_STATE = {
   pet: {
     petName: "",
     breed: "",
+    otherPetType: "",
     dob: "",
     sex: "",
     issue: "",
@@ -36,6 +37,13 @@ export const DEFAULT_BOOKING_STATE = {
     notes: "",
   },
   booking: {
+    bookingId: null,
+    userId: null,
+    petId: null,
+    latestCompletedStep: 0,
+    paymentStatus: "pending",
+    paymentProvider: "razorpay",
+    paymentReference: "",
     bookingReference: "",
   },
   progress: {

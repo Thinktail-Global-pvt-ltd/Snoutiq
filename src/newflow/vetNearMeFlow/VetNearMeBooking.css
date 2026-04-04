@@ -106,6 +106,23 @@
   padding: 32px 20px 0;
 }
 
+.vet-near-me-page.standalone-page {
+  min-height: 100vh;
+}
+
+.vet-near-me-page .standalone-flow {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.vet-near-me-page .standalone-form-card {
+  width: 100%;
+  max-width: 620px;
+}
+
 .vet-near-me-page .intent-note {
   background: var(--amber-bg);
   border: 1px solid #fde68a;
@@ -217,6 +234,10 @@
   text-transform: uppercase;
 }
 
+.vet-near-me-page .required-mark {
+  color: #dc2626;
+}
+
 .vet-near-me-page .field input,
 .vet-near-me-page .field select,
 .vet-near-me-page .field textarea {
@@ -240,6 +261,11 @@
 .vet-near-me-page .field select:focus,
 .vet-near-me-page .field textarea:focus {
   border-color: var(--teal);
+}
+
+.vet-near-me-page .field .input-error,
+.vet-near-me-page .field .input-error:focus {
+  border-color: #dc2626;
 }
 
 .vet-near-me-page .field select {
@@ -914,6 +940,13 @@
   margin-top: 4px;
 }
 
+.vet-near-me-page .field-error {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #dc2626;
+  line-height: 1.4;
+}
+
 .vet-near-me-page .cbgroup {
   display: flex;
   flex-direction: column;
@@ -921,21 +954,53 @@
   margin-top: 6px;
 }
 
+.vet-near-me-page .cbgroup.cbgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
 .vet-near-me-page .cbitem {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  column-gap: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink);
+  line-height: 1.35;
 }
 
 .vet-near-me-page .cbitem input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--teal);
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--white);
   cursor: pointer;
   flex-shrink: 0;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.vet-near-me-page .cbitem input:checked {
+  border-color: var(--teal);
+  background-color: var(--teal);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 7.2l2.2 2.2L11 3.8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.vet-near-me-page .cbitem input:focus-visible {
+  outline: 2px solid rgba(20, 71, 230, 0.18);
+  outline-offset: 2px;
+}
+
+.vet-near-me-page .cbitem span {
+  display: block;
+  white-space: nowrap;
 }
 
 .vet-near-me-page .steps-indicator {

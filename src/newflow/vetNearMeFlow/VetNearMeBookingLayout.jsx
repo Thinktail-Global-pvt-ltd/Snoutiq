@@ -61,6 +61,7 @@ function VetNearMeBookingPage() {
     () => STEP_NUMBER_BY_PATH[location.pathname] || 1,
     [location.pathname]
   );
+  const isStandaloneStep = currentStep === 2 || currentStep === 3;
 
   useEffect(() => {
     const formCard = document.getElementById("main-form");
@@ -97,6 +98,16 @@ function VetNearMeBookingPage() {
         <link rel="canonical" href={`https://snoutiq.com${location.pathname}`} />
       </Helmet>
 
+      {isStandaloneStep ? (
+        <div className="vet-near-me-page standalone-page">
+          <div className="standalone-flow">
+            <div className="form-card standalone-form-card" id="main-form">
+              <StepIndicator currentStep={currentStep} />
+              <Outlet />
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="vet-near-me-page">
         <div className="bridge-bar">
           Searched for <b>"vet near me"</b>? A verified vet comes to your home
@@ -458,6 +469,7 @@ function VetNearMeBookingPage() {
           </button>
         </div>
       </div>
+      )}
     </>
   );
 }
