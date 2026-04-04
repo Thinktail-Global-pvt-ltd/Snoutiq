@@ -15,7 +15,7 @@ import {
   TRUST_PILLS,
   VALUE_ROWS,
 } from "./bookingFlowData";
-import logo from '../../assets/images/dark bg1.webp';
+import logo from '../../assets/images/dark bg.webp';
 import { VetNearMeBookingProvider } from "./VetNearMeBookingContext";
 import { loadFeaturedVetsFromApi } from "./featuredVetsApi";
 import logoImage from "../../assets/images/logo.png";
