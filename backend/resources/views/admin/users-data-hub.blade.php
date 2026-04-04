@@ -27,10 +27,10 @@
         line-height: 1.3;
         color: #475569;
     }
-    .hub-sticky-top {
+    .hub-sticky-top th {
         position: sticky;
-        top: 84px;
-        z-index: 2;
+        top: 0;
+        z-index: 3;
         background: #f8fafc;
     }
     .hub-modal-section {
@@ -72,6 +72,12 @@
         font-size: 0.72rem;
         font-weight: 600;
         padding: 0.3rem 0.55rem;
+    }
+    .hub-pagination .pagination {
+        margin-bottom: 0;
+    }
+    .hub-pagination .page-link {
+        font-size: 0.85rem;
     }
 </style>
 @endpush
@@ -272,8 +278,8 @@
                         </table>
                     </div>
 
-                    <div class="mt-3">
-                        {{ $users->links() }}
+                    <div class="mt-3 hub-pagination d-flex justify-content-end">
+                        {{ $users->onEachSide(1)->links('pagination::bootstrap-5') }}
                     </div>
 
                     @foreach($users as $user)
