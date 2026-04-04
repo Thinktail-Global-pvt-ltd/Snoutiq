@@ -219,6 +219,7 @@ Route::prefix('admin')->group(function () {
     Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
         Route::get('/dashboard', [AdminPanelController::class, 'index'])->name('admin.dashboard');
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
+        Route::get('/users/data-hub', [AdminPanelController::class, 'usersDataHub'])->name('admin.users.data-hub');
         Route::get('/users/profile-completion', [AdminPanelController::class, 'userProfileCompletion'])->name('admin.users.profile-completion');
         Route::get('/lead-management', function (Request $request) {
             ini_set('display_errors', '1');

@@ -9,8 +9,10 @@ use App\Models\Doctor;
 use App\Models\FcmNotification;
 use App\Models\GroomerBooking;
 use App\Models\GroomerProfile;
+use App\Models\Appointment;
 use App\Models\Pet;
 use App\Models\Prescription;
+use App\Models\VideoApointment;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use App\Models\Transaction;
@@ -55,6 +57,168 @@ class AdminPanelController extends Controller
         $users = User::orderByDesc('created_at')->get();
 
         return view('admin.users', compact('users'));
+    }
+
+    public function usersDataHub(Request $request): View
+    {
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+        ]);
+
+        $perPage = (int) ($validated['per_page'] ?? 20);
+
+        $users = User::query()
+            ->select(['id', 'name', 'email', 'phone', 'role', 'created_at'])
+            ->orderByDesc('created_at')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $userIds = $users->getCollection()
+            ->pluck('id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $petsByUser = collect();
+        $petsById = collect();
+        $transactionsByUser = collect();
+        $prescriptionsByUser = collect();
+        $appointmentsByUser = collect();
+        $videoConsultsByUser = collect();
+
+        $supports = [
+            'pets' => Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id'),
+            'transactions' => Schema::hasTable('transactions') && Schema::hasColumn('transactions', 'user_id'),
+            'prescriptions' => Schema::hasTable('prescriptions') && Schema::hasColumn('prescriptions', 'user_id'),
+            'appointments' => Schema::hasTable('appointments') && Schema::hasColumn('appointments', 'pet_id'),
+            'video_apointment' => Schema::hasTable('video_apointment') && Schema::hasColumn('video_apointment', 'user_id'),
+        ];
+
+        if ($userIds->isNotEmpty()) {
+            if ($supports['pets']) {
+                $petColumns = ['id', 'user_id', 'name', 'breed', 'created_at'];
+                if (Schema::hasColumn('pets', 'pet_type')) {
+                    $petColumns[] = 'pet_type';
+                }
+                if (Schema::hasColumn('pets', 'type')) {
+                    $petColumns[] = 'type';
+                }
+                if (Schema::hasColumn('pets', 'pet_gender')) {
+                    $petColumns[] = 'pet_gender';
+                }
+                if (Schema::hasColumn('pets', 'gender')) {
+                    $petColumns[] = 'gender';
+                }
+
+                $pets = Pet::query()
+                    ->select(array_unique($petColumns))
+                    ->whereIn('user_id', $userIds->all())
+                    ->orderByDesc('id')
+                    ->get();
+
+                $petsByUser = $pets->groupBy(fn (Pet $pet) => (int) $pet->user_id);
+                $petsById = $pets->keyBy(fn (Pet $pet) => (int) $pet->id);
+            }
+
+            if ($supports['transactions']) {
+                $txColumns = ['id', 'user_id', 'pet_id', 'doctor_id', 'clinic_id', 'status', 'type', 'amount_paise', 'reference', 'created_at'];
+                if (Schema::hasColumn('transactions', 'metadata')) {
+                    $txColumns[] = 'metadata';
+                }
+
+                $transactionsByUser = Transaction::query()
+                    ->select(array_unique($txColumns))
+                    ->whereIn('user_id', $userIds->all())
+                    ->orderByDesc('id')
+                    ->get()
+                    ->groupBy(fn (Transaction $transaction) => (int) $transaction->user_id);
+            }
+
+            if ($supports['prescriptions']) {
+                $prescriptionColumns = [
+                    'id',
+                    'user_id',
+                    'pet_id',
+                    'doctor_id',
+                    'diagnosis',
+                    'follow_up_date',
+                    'video_inclinic',
+                    'created_at',
+                ];
+
+                $prescriptionsByUser = Prescription::query()
+                    ->select(array_unique($prescriptionColumns))
+                    ->whereIn('user_id', $userIds->all())
+                    ->orderByDesc('id')
+                    ->get()
+                    ->groupBy(fn (Prescription $prescription) => (int) $prescription->user_id);
+            }
+
+            if ($supports['video_apointment']) {
+                $videoColumns = [
+                    'id',
+                    'user_id',
+                    'pet_id',
+                    'doctor_id',
+                    'clinic_id',
+                    'order_id',
+                    'call_session',
+                    'is_completed',
+                    'created_at',
+                ];
+
+                $videoConsultsByUser = VideoApointment::query()
+                    ->select(array_unique($videoColumns))
+                    ->whereIn('user_id', $userIds->all())
+                    ->orderByDesc('id')
+                    ->get()
+                    ->groupBy(fn (VideoApointment $videoApointment) => (int) $videoApointment->user_id);
+            }
+
+            if ($supports['appointments']) {
+                $petOwnerByPetId = $petsById->mapWithKeys(
+                    fn (Pet $pet) => [(int) $pet->id => (int) $pet->user_id]
+                );
+
+                $petIds = $petOwnerByPetId->keys()->values();
+                if ($petIds->isNotEmpty()) {
+                    $appointmentColumns = [
+                        'id',
+                        'pet_id',
+                        'doctor_id',
+                        'vet_registeration_id',
+                        'appointment_date',
+                        'appointment_time',
+                        'status',
+                        'created_at',
+                    ];
+
+                    $appointments = Appointment::query()
+                        ->select(array_unique($appointmentColumns))
+                        ->whereIn('pet_id', $petIds->all())
+                        ->orderByDesc('id')
+                        ->get();
+
+                    $appointmentsByUser = $appointments
+                        ->groupBy(function (Appointment $appointment) use ($petOwnerByPetId) {
+                            return (int) ($petOwnerByPetId->get((int) $appointment->pet_id, 0));
+                        })
+                        ->filter(fn ($_, $userId) => (int) $userId > 0);
+                }
+            }
+        }
+
+        return view('admin.users-data-hub', [
+            'users' => $users,
+            'supports' => $supports,
+            'petsByUser' => $petsByUser,
+            'petsById' => $petsById,
+            'transactionsByUser' => $transactionsByUser,
+            'prescriptionsByUser' => $prescriptionsByUser,
+            'appointmentsByUser' => $appointmentsByUser,
+            'videoConsultsByUser' => $videoConsultsByUser,
+            'detailLimit' => 5,
+        ]);
     }
 
     public function userProfileCompletion(): View
