@@ -388,7 +388,7 @@ function VetNearMeBookingPage() {
 
         <section className="network">
           <div className="eyebrow">Backed by real clinics</div>
-          <h3>Backed by 20+ partner clinics across Delhi NCR</h3>
+          <h2>Backed by 20+ partner clinics across Delhi NCR</h2>
           <p>
             Snoutiq home-visit vets are attached to trusted neighbourhood clinics
             across Gurgaon, Delhi, Noida and Faridabad. When a case needs lab
