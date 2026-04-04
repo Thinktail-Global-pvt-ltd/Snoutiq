@@ -1,6 +1,5 @@
 import React, { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { submitLeadStep } from "./bookingFlowApi";
 import {
   AREA_OPTIONS,
   BOOKING_FLOW_ROUTES,
@@ -78,6 +77,7 @@ export default function VetNearMeLeadPage() {
 
     try {
       setIsSubmitting(true);
+      const { submitLeadStep } = await import("./bookingFlowApi");
       const response = await submitLeadStep(bookingState.lead);
 
       if (!response?.ok) {

@@ -12,7 +12,11 @@ const NON_HOME_PRELOAD_EVENTS = ["pointerdown", "keydown", "touchstart"];
 let homePagePromise;
 let mainLayoutPromise;
 let appRoutesPromise;
-let vetNearMeFlowModulePromise;
+let vetNearMeBookingLayoutPromise;
+let vetNearMeLeadPagePromise;
+let vetNearMePetDetailsPagePromise;
+let vetNearMePaymentPagePromise;
+let vetNearMeSuccessPagePromise;
 
 const ScrollToTopAndHash = () => {
   const { pathname, hash } = useLocation();
@@ -53,8 +57,37 @@ const loadHomePage = () =>
 const loadMainLayout = () =>
   (mainLayoutPromise ??= import("./layouts/MainLayout"));
 const loadAppRoutes = () => (appRoutesPromise ??= import("./AppRoutes"));
-const loadVetNearMeFlowModule = () =>
-  (vetNearMeFlowModulePromise ??= import("./newflow/vetNearMeFlow/RouteModule"));
+const loadVetNearMeBookingLayout = () =>
+  (vetNearMeBookingLayoutPromise ??=
+    import("./newflow/vetNearMeFlow/VetNearMeBookingLayout"));
+const loadVetNearMeLeadPage = () =>
+  (vetNearMeLeadPagePromise ??=
+    import("./newflow/vetNearMeFlow/VetNearMeLeadPage"));
+const loadVetNearMePetDetailsPage = () =>
+  (vetNearMePetDetailsPagePromise ??=
+    import("./newflow/vetNearMeFlow/VetNearMePetDetailsPage"));
+const loadVetNearMePaymentPage = () =>
+  (vetNearMePaymentPagePromise ??=
+    import("./newflow/vetNearMeFlow/VetNearMePaymentPage"));
+const loadVetNearMeSuccessPage = () =>
+  (vetNearMeSuccessPagePromise ??=
+    import("./newflow/vetNearMeFlow/VetNearMeSuccessPage"));
+
+const getVetNearMePageLoader = (pathname = "") => {
+  if (pathname.startsWith(`${VET_NEAR_ME_BASE_PATH}/pet-details`)) {
+    return loadVetNearMePetDetailsPage;
+  }
+
+  if (pathname.startsWith(`${VET_NEAR_ME_BASE_PATH}/payment`)) {
+    return loadVetNearMePaymentPage;
+  }
+
+  if (pathname.startsWith(`${VET_NEAR_ME_BASE_PATH}/success`)) {
+    return loadVetNearMeSuccessPage;
+  }
+
+  return loadVetNearMeLeadPage;
+};
 
 const lazyNamedExport = (loader, exportName = "default") =>
   lazy(() =>
@@ -72,7 +105,8 @@ if (typeof window !== "undefined") {
   }
 
   if (currentPath.startsWith(VET_NEAR_ME_BASE_PATH)) {
-    void loadVetNearMeFlowModule();
+    void loadVetNearMeBookingLayout();
+    void getVetNearMePageLoader(currentPath)();
   }
 
   const preloadAppRoutes = () => {
@@ -98,26 +132,11 @@ if (typeof window !== "undefined") {
 const MainLayout = lazyNamedExport(loadMainLayout);
 const HomePage = lazyNamedExport(loadHomePage);
 const AppRoutes = lazyNamedExport(loadAppRoutes);
-const VetNearMeBookingLayout = lazyNamedExport(
-  loadVetNearMeFlowModule,
-  "VetNearMeBookingLayout"
-);
-const VetNearMeLeadPage = lazyNamedExport(
-  loadVetNearMeFlowModule,
-  "VetNearMeLeadPage"
-);
-const VetNearMePetDetailsPage = lazyNamedExport(
-  loadVetNearMeFlowModule,
-  "VetNearMePetDetailsPage"
-);
-const VetNearMePaymentPage = lazyNamedExport(
-  loadVetNearMeFlowModule,
-  "VetNearMePaymentPage"
-);
-const VetNearMeSuccessPage = lazyNamedExport(
-  loadVetNearMeFlowModule,
-  "VetNearMeSuccessPage"
-);
+const VetNearMeBookingLayout = lazyNamedExport(loadVetNearMeBookingLayout);
+const VetNearMeLeadPage = lazyNamedExport(loadVetNearMeLeadPage);
+const VetNearMePetDetailsPage = lazyNamedExport(loadVetNearMePetDetailsPage);
+const VetNearMePaymentPage = lazyNamedExport(loadVetNearMePaymentPage);
+const VetNearMeSuccessPage = lazyNamedExport(loadVetNearMeSuccessPage);
 
 function App() {
   return (

@@ -55,7 +55,24 @@ export default defineConfig({
           };
 
           const homePreloads = collectChunkPreloads(["MainLayout", "HomePage"]);
-          const vetNearMePreloads = collectChunkPreloads(["RouteModule"]);
+          const vetNearMePreloadsByPath = {
+            "/vet-near-me-delhi-ncr": collectChunkPreloads([
+              "VetNearMeBookingLayout",
+              "VetNearMeLeadPage",
+            ]),
+            "/vet-near-me-delhi-ncr/pet-details": collectChunkPreloads([
+              "VetNearMeBookingLayout",
+              "VetNearMePetDetailsPage",
+            ]),
+            "/vet-near-me-delhi-ncr/payment": collectChunkPreloads([
+              "VetNearMeBookingLayout",
+              "VetNearMePaymentPage",
+            ]),
+            "/vet-near-me-delhi-ncr/success": collectChunkPreloads([
+              "VetNearMeBookingLayout",
+              "VetNearMeSuccessPage",
+            ]),
+          };
 
           let transformedHtml = html.replace(
             /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*)>/g,
@@ -74,16 +91,16 @@ export default defineConfig({
           }
 
           if (
-            vetNearMePreloads.styleFiles.length ||
-            vetNearMePreloads.moduleFiles.length
+            Object.values(vetNearMePreloadsByPath).some(
+              ({ styleFiles, moduleFiles }) =>
+                styleFiles.length || moduleFiles.length,
+            )
           ) {
             transformedHtml = transformedHtml.replace(
               "</head>",
-              `<script>if(window.location.pathname.startsWith("/vet-near-me-delhi-ncr")){${JSON.stringify(
-                vetNearMePreloads.styleFiles,
-              )}.forEach(function(href){if(document.querySelector('link[rel="stylesheet"][href="'+href+'"]'))return;var link=document.createElement("link");link.rel="stylesheet";link.href=href;document.head.appendChild(link);});${JSON.stringify(
-                vetNearMePreloads.moduleFiles,
-              )}.forEach(function(href){var link=document.createElement("link");link.rel="modulepreload";link.href=href;link.crossOrigin="";document.head.appendChild(link);});}</script></head>`,
+              `<script>(function(){var bookingPreloads=${JSON.stringify(
+                vetNearMePreloadsByPath,
+              )};var pathname=window.location.pathname.replace(/\\/$/,"")||"/";var current=bookingPreloads[pathname];if(!current)return;current.styleFiles.forEach(function(href){if(document.querySelector('link[rel="stylesheet"][href="'+href+'"]'))return;var link=document.createElement("link");link.rel="stylesheet";link.href=href;document.head.appendChild(link);});current.moduleFiles.forEach(function(href){var link=document.createElement("link");link.rel="modulepreload";link.href=href;link.crossOrigin="";document.head.appendChild(link);});})();</script></head>`,
             );
           }
 
