@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap");
-
 .vet-near-me-page,
 .vet-near-me-page *,
 .vet-near-me-page *::before,
@@ -28,7 +26,8 @@
   --rs: 7px;
   background: var(--bg);
   color: var(--ink);
-  font-family: "DM Sans", sans-serif;
+  font-family:
+    Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -37,7 +36,7 @@
 .vet-near-me-page h1,
 .vet-near-me-page h2,
 .vet-near-me-page h3 {
-  font-family: "Instrument Serif", Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
   line-height: 1.15;
   letter-spacing: -0.01em;
 }
@@ -183,7 +182,7 @@
 }
 
 .vet-near-me-page .price-now {
-  font-family: "Instrument Serif", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 40px;
   color: var(--ink);
   line-height: 1;
@@ -226,7 +225,8 @@
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 16px;
-  font-family: "DM Sans", sans-serif;
+  font-family:
+    Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
 }
 
 .vet-near-me-page .field {
@@ -396,7 +396,8 @@
   text-transform: uppercase;
   color: var(--teal);
   margin-bottom: 8px;
-  font-family: "DM Sans", sans-serif;
+  font-family:
+    Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
 }
 
 .vet-near-me-page .sec-h {
@@ -445,7 +446,8 @@
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 3px;
-  font-family: "DM Sans", sans-serif;
+  font-family:
+    Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
 }
 
 .vet-near-me-page .feat p,
@@ -466,7 +468,7 @@
   font-size: 20px;
   font-weight: 500;
   margin-bottom: 8px;
-  font-family: "Instrument Serif", serif;
+  font-family: Georgia, "Times New Roman", serif;
 }
 
 .vet-near-me-page .network p,
@@ -637,7 +639,7 @@
 }
 
 .vet-near-me-page .vet-photo-initials {
-  font-family: "Instrument Serif", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 40px;
   color: var(--teal);
   font-weight: 400;
@@ -770,7 +772,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "Instrument Serif", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 20px;
   flex-shrink: 0;
 }
@@ -1235,7 +1237,7 @@
 }
 
 .vet-near-me-page .thankyou h3 {
-  font-family: "Instrument Serif", serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 26px;
   font-weight: 400;
   color: var(--ink);
