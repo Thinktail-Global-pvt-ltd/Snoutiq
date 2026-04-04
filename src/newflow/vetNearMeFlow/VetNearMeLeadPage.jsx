@@ -197,6 +197,7 @@ export default function VetNearMeLeadPage() {
         ) : null}
       </div>
       <button
+        id="lead-form-cta"
         type="button"
         className="cta"
         onClick={handleContinue}

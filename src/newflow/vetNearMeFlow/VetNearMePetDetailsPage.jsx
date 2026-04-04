@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchBreedOptions, submitPetDetailsStep } from "./bookingFlowApi";
 import {
   BOOKING_FLOW_ROUTES,
-  BOOKING_PRICING,
+  BOOKING_TOTAL_PRICE,
   SEX_OPTIONS,
   SYMPTOM_OPTIONS,
   VACCINATION_OPTIONS,
@@ -309,7 +309,7 @@ export default function VetNearMePetDetailsPage() {
       </div>
       <div className="field">
         <label>Symptoms (tick all that apply)</label>
-        <div className="cbgroup cbgrid">
+        <div className="cbgroup">
           {SYMPTOM_OPTIONS.map((option) => (
             <label className="cbitem" key={option.value}>
               <input
@@ -398,7 +398,7 @@ export default function VetNearMePetDetailsPage() {
         onClick={handleContinue}
         disabled={isSubmitting}
       >
-        Review &amp; pay &#8377;{BOOKING_PRICING.currentPrice} &rarr;
+        Review &amp; pay &#8377;{BOOKING_TOTAL_PRICE} &rarr;
       </button>
       <p className="cta-note">
         Almost done. Review your booking summary before paying.

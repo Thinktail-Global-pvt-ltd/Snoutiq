@@ -11,7 +11,15 @@ export const BOOKING_PRICING = {
   currentPrice: 999,
   originalPrice: 1249,
   discountAmount: 250,
+  gstRate: 18,
 };
+
+export const BOOKING_GST_AMOUNT = Math.round(
+  (BOOKING_PRICING.currentPrice * BOOKING_PRICING.gstRate) / 100
+);
+
+export const BOOKING_TOTAL_PRICE =
+  BOOKING_PRICING.currentPrice + BOOKING_GST_AMOUNT;
 
 export const DEFAULT_BOOKING_STATE = {
   lead: {
@@ -251,7 +259,7 @@ export const VALUE_ROWS = [
 
 export const HOW_IT_WORKS_STEPS = [
   {
-    title: "Fill the form or call us",
+    title: "Fill the form",
     body: "Submit your query — pet type, area, what you need. Takes under a minute. No long forms, no account required upfront.",
   },
   {
@@ -260,7 +268,7 @@ export const HOW_IT_WORKS_STEPS = [
   },
   {
     title: "Vet confirmed and on the way",
-    body: "Your assistant identifies the nearest suitable vet, confirms the visit and shares the payment link. Once paid, you're notified when the vet starts moving towards you.",
+    body: "Your assistant identifies the nearest suitable vet, confirms the visit .",
   },
   {
     title: "Vet at your door within 60 minutes",

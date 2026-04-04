@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { initiatePayment } from "./bookingFlowApi";
-import { BOOKING_FLOW_ROUTES, BOOKING_PRICING } from "./bookingFlowData";
+import {
+  BOOKING_FLOW_ROUTES,
+  BOOKING_GST_AMOUNT,
+  BOOKING_PRICING,
+  BOOKING_TOTAL_PRICE,
+} from "./bookingFlowData";
 import { useVetNearMeBooking } from "./VetNearMeBookingContext";
 
 const displayValue = (value, fallback = "-") => {
@@ -49,7 +54,7 @@ export default function VetNearMePaymentPage() {
       setIsSubmitting(true);
       const response = await initiatePayment({
         bookingId: bookingState.booking.bookingId,
-        amountPayable: BOOKING_PRICING.currentPrice,
+        amountPayable: BOOKING_TOTAL_PRICE,
         paymentReference: bookingState.booking.paymentReference,
       });
 
@@ -127,9 +132,17 @@ export default function VetNearMePaymentPage() {
           <span>20% off &mdash; limited period</span>
           <span>-&#8377;{BOOKING_PRICING.discountAmount}</span>
         </div>
+        <div className="pay-line">
+          <span>Amount after discount</span>
+          <span>&#8377;{BOOKING_PRICING.currentPrice}</span>
+        </div>
+        <div className="pay-line">
+          <span>{BOOKING_PRICING.gstRate}% GST</span>
+          <span>+&#8377;{BOOKING_GST_AMOUNT}</span>
+        </div>
         <div className="pay-line total">
           <span>Total payable</span>
-          <span>&#8377;{BOOKING_PRICING.currentPrice}</span>
+          <span>&#8377;{BOOKING_TOTAL_PRICE}</span>
         </div>
         <div className="pay-includes">
           Includes up to &#8377;200 of essential medicines · Written visit
@@ -148,7 +161,7 @@ export default function VetNearMePaymentPage() {
         onClick={handlePayment}
         disabled={isSubmitting}
       >
-        Pay &#8377;{BOOKING_PRICING.currentPrice} securely &rarr;
+        Pay &#8377;{BOOKING_TOTAL_PRICE} securely &rarr;
       </button>
       <p className="cta-note">
         Secure payment via Razorpay · UPI / card / net banking

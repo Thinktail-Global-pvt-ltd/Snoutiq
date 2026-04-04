@@ -56,14 +56,19 @@ function VetNearMeBookingPage() {
   const location = useLocation();
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [selectedArea, setSelectedArea] = useState("Gurgaon");
+  const [showStickyCta, setShowStickyCta] = useState(false);
 
   const currentStep = useMemo(
     () => STEP_NUMBER_BY_PATH[location.pathname] || 1,
     [location.pathname]
   );
-  const isStandaloneStep = currentStep === 2 || currentStep === 3;
+  const isSuccessStep = currentStep === 4;
+  const isStandaloneStep =
+    currentStep === 2 || currentStep === 3 || isSuccessStep;
 
   useEffect(() => {
+    if (isSuccessStep) return;
+
     const formCard = document.getElementById("main-form");
     if (!formCard) return;
 
@@ -71,6 +76,32 @@ function VetNearMeBookingPage() {
       behavior: "smooth",
       block: currentStep === 1 ? "center" : "start",
     });
+  }, [currentStep, isSuccessStep]);
+
+  useEffect(() => {
+    if (currentStep !== 1) {
+      setShowStickyCta(false);
+      return undefined;
+    }
+
+    const leadCta = document.getElementById("lead-form-cta");
+    if (!leadCta) {
+      setShowStickyCta(false);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyCta(!entry.isIntersecting);
+      },
+      { threshold: 0.15 }
+    );
+
+    observer.observe(leadCta);
+
+    return () => {
+      observer.disconnect();
+    };
   }, [currentStep]);
 
   const scrollToForm = () => {
@@ -99,9 +130,18 @@ function VetNearMeBookingPage() {
       </Helmet>
 
       {isStandaloneStep ? (
-        <div className="vet-near-me-page standalone-page">
+        <div
+          className={`vet-near-me-page standalone-page${
+            isSuccessStep ? " success-page" : ""
+          }`}
+        >
           <div className="standalone-flow">
-            <div className="form-card standalone-form-card" id="main-form">
+            <div
+              className={`form-card standalone-form-card${
+                isSuccessStep ? " success-form-card" : ""
+              }`}
+              id="main-form"
+            >
               <StepIndicator currentStep={currentStep} />
               <Outlet />
             </div>
@@ -443,23 +483,14 @@ function VetNearMeBookingPage() {
         </section>
 
         <footer>
-          <span className="f-logo">Snoutiq</span>
+          <img src={logoImage} alt="Snoutiq" className="f-logo-image" />
           <p>
             Vet near you, at home — across Delhi NCR. A ThinkTail Global Pvt.
             Ltd. product.
           </p>
-          <p style={{ marginTop: 6 }}>
-            📞 [[PHONE]] &nbsp;·&nbsp; ✉ [[EMAIL]]
-          </p>
-          <div className="f-links">
-            <a href="#">Privacy</a>
-            <a href="#">Terms</a>
-            <a href="#">Join as a Vet</a>
-            <a href="#">Download App</a>
-          </div>
         </footer>
 
-        <div className="sticky">
+        <div className={`sticky${showStickyCta ? " visible" : ""}`}>
           <div className="sticky-left">
             <p>Vet near you · Home visit · Delhi NCR</p>
             <small>₹999 · 100% refund if vet not confirmed</small>

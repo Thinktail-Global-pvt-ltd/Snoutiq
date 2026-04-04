@@ -123,6 +123,15 @@
   max-width: 620px;
 }
 
+.vet-near-me-page.success-page .standalone-flow {
+  align-items: center;
+}
+
+.vet-near-me-page .success-form-card {
+  max-width: 460px;
+  padding: 28px 22px;
+}
+
 .vet-near-me-page .intent-note {
   background: var(--amber-bg);
   border: 1px solid #fde68a;
@@ -250,6 +259,11 @@
   background: var(--white);
   outline: none;
   transition: border-color 0.15s;
+}
+
+.vet-near-me-page .field input[type="text"],
+.vet-near-me-page .field textarea {
+  text-transform: capitalize;
 }
 
 .vet-near-me-page .field input,
@@ -919,12 +933,11 @@
   text-decoration: none;
 }
 
-.vet-near-me-page .f-logo {
-  font-family: "Instrument Serif", serif;
-  font-size: 20px;
-  color: #fff;
-  margin-bottom: 10px;
+.vet-near-me-page .f-logo-image {
   display: block;
+  width: auto;
+  height: 22px;
+  margin-bottom: 10px;
 }
 
 .vet-near-me-page .f-links {
@@ -960,7 +973,7 @@
   gap: 12px 16px;
 }
 
-.vet-near-me-page .cbitem {
+.vet-near-me-page .field label.cbitem {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
@@ -969,9 +982,12 @@
   font-size: 13px;
   color: var(--ink);
   line-height: 1.35;
+  margin-bottom: 0;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
-.vet-near-me-page .cbitem input {
+.vet-near-me-page .field label.cbitem input {
   width: 28px;
   height: 28px;
   margin: 0;
@@ -985,7 +1001,7 @@
   transition: border-color 0.15s, background-color 0.15s;
 }
 
-.vet-near-me-page .cbitem input:checked {
+.vet-near-me-page .field label.cbitem input:checked {
   border-color: var(--teal);
   background-color: var(--teal);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 7.2l2.2 2.2L11 3.8'/%3E%3C/svg%3E");
@@ -993,14 +1009,14 @@
   background-position: center;
 }
 
-.vet-near-me-page .cbitem input:focus-visible {
+.vet-near-me-page .field label.cbitem input:focus-visible {
   outline: 2px solid rgba(20, 71, 230, 0.18);
   outline-offset: 2px;
 }
 
-.vet-near-me-page .cbitem span {
+.vet-near-me-page .field label.cbitem span {
   display: block;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .vet-near-me-page .steps-indicator {
@@ -1172,7 +1188,7 @@
 
 .vet-near-me-page .thankyou {
   text-align: center;
-  padding: 8px 0;
+  padding: 6px 0;
 }
 
 .vet-near-me-page .ty-icon {
@@ -1192,10 +1208,24 @@
   font-size: 14px;
   color: var(--ink2);
   line-height: 1.6;
-  margin-bottom: 24px;
-  max-width: 300px;
+  margin-bottom: 16px;
+  max-width: 320px;
   margin-left: auto;
   margin-right: auto;
+}
+
+.vet-near-me-page .ty-ref {
+  font-size: 13px;
+  color: var(--ink3);
+  margin-bottom: 18px;
+}
+
+.vet-near-me-page .ty-ref b {
+  color: var(--ink);
+}
+
+.vet-near-me-page .ty-home-btn {
+  margin-top: 0;
 }
 
 .vet-near-me-page .ty-num {
@@ -1227,6 +1257,16 @@
   display: flex;
   gap: 12px;
   align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(100%);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.vet-near-me-page .sticky.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .vet-near-me-page .sticky-left {
