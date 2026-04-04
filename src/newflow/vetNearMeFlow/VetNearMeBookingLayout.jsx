@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Outlet, useLocation } from "react-router-dom";
 import {
@@ -66,6 +66,10 @@ function FeaturedVetPhoto({ vet }) {
           alt={vet.name}
           className="vet-photo-image"
           loading="lazy"
+          decoding="async"
+          fetchPriority="low"
+          width="220"
+          height="160"
           onError={() => setHasImageError(true)}
         />
       ) : (
@@ -122,6 +126,9 @@ function VetNearMeBookingPage() {
   const [showStickyCta, setShowStickyCta] = useState(false);
   const [featuredVets, setFeaturedVets] = useState(FEATURED_VETS);
   const [hasLoadedFeaturedVets, setHasLoadedFeaturedVets] = useState(false);
+  const [shouldLoadFeaturedVets, setShouldLoadFeaturedVets] = useState(false);
+  const hasMountedStepRef = useRef(false);
+  const vetsSectionRef = useRef(null);
 
   const currentStep = useMemo(
     () => STEP_NUMBER_BY_PATH[location.pathname] || 1,
@@ -140,6 +147,11 @@ function VetNearMeBookingPage() {
     currentStep === 2 || currentStep === 3 || isSuccessStep;
 
   useEffect(() => {
+    if (!hasMountedStepRef.current) {
+      hasMountedStepRef.current = true;
+      return;
+    }
+
     if (isSuccessStep) return;
 
     const formCard = document.getElementById("main-form");
@@ -178,7 +190,36 @@ function VetNearMeBookingPage() {
   }, [currentStep]);
 
   useEffect(() => {
-    if (currentStep !== 1 || hasLoadedFeaturedVets) return undefined;
+    if (currentStep !== 1 || hasLoadedFeaturedVets || shouldLoadFeaturedVets) {
+      return undefined;
+    }
+
+    const sectionElement = vetsSectionRef.current;
+    if (!sectionElement) {
+      setShouldLoadFeaturedVets(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setShouldLoadFeaturedVets(true);
+        observer.disconnect();
+      },
+      { rootMargin: "320px 0px" }
+    );
+
+    observer.observe(sectionElement);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [currentStep, hasLoadedFeaturedVets, shouldLoadFeaturedVets]);
+
+  useEffect(() => {
+    if (currentStep !== 1 || hasLoadedFeaturedVets || !shouldLoadFeaturedVets) {
+      return undefined;
+    }
 
     let isCancelled = false;
 
@@ -200,7 +241,7 @@ function VetNearMeBookingPage() {
     return () => {
       isCancelled = true;
     };
-  }, [currentStep, hasLoadedFeaturedVets]);
+  }, [currentStep, hasLoadedFeaturedVets, shouldLoadFeaturedVets]);
 
   const scrollToForm = () => {
     const formCard = document.getElementById("main-form");
@@ -254,7 +295,15 @@ function VetNearMeBookingPage() {
 
         <nav>
           <div className="logo">
-            <img src={logoImage} alt="Snoutiq" className="logo-image" />
+            <img
+              src={logoImage}
+              alt="Snoutiq"
+              className="logo-image"
+              width="96"
+              height="20"
+              decoding="async"
+              fetchPriority="high"
+            />
           </div>
           <button type="button" className="nav-call" onClick={scrollToForm}>
             Book now
@@ -382,7 +431,7 @@ function VetNearMeBookingPage() {
           </div>
         </section>
 
-        <section className="vets">
+        <section className="vets" ref={vetsSectionRef}>
           <div className="eyebrow">Featured vets</div>
           <h2 className="sec-h" style={{ marginBottom: 6 }}>
             The vets your pet will meet
@@ -569,7 +618,15 @@ function VetNearMeBookingPage() {
         </section>
 
         <footer>
-          <img src={logo} alt="Snoutiq" className="f-logo-image" />
+          <img
+            src={logo}
+            alt="Snoutiq"
+            className="f-logo-image"
+            loading="lazy"
+            decoding="async"
+            width="120"
+            height="22"
+          />
           <p>
             Vet near you, at home — across Delhi NCR. A ThinkTail Global Pvt.
             Ltd. product.
