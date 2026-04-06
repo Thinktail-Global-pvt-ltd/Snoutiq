@@ -1607,8 +1607,12 @@
         'per_page' => $perPage ?? 50,
         'page' => $currentPageNumber,
     ];
-    $logActionRouteTemplate = route('admin.lead-management.users.log', ['user' => '__USER_ID__']);
-    $nextActionRouteTemplate = route('admin.lead-management.users.next-action', ['user' => '__USER_ID__']);
+    $logActionRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.log')
+        ? route('admin.lead-management.users.log', ['user' => '__USER_ID__'])
+        : '';
+    $nextActionRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.next-action')
+        ? route('admin.lead-management.users.next-action', ['user' => '__USER_ID__'])
+        : '';
 
     $paginationWindow = [];
     if ($filteredTargetUsers instanceof \Illuminate\Pagination\LengthAwarePaginator && $filteredTargetUsers->total() > 0) {
