@@ -294,9 +294,17 @@ class ReceptionistBookingController extends Controller
      */
     public function appointmentsToday(Request $request)
     {
-        $clinicId = $this->resolveClinicId($request);
+        // Keep this endpoint strictly clinic-id driven; avoid unrelated fallback contexts.
+        $clinicIdRaw = $request->input('clinic_id')
+            ?? $request->query('clinic_id')
+            ?? $request->input('vet_registeration_id')
+            ?? $request->query('vet_registeration_id')
+            ?? $request->input('vet_id')
+            ?? $request->query('vet_id');
+
+        $clinicId = ($clinicIdRaw !== null && $clinicIdRaw !== '') ? (int) $clinicIdRaw : null;
         if (!$clinicId) {
-            return response()->json(['success' => false, 'message' => 'clinic_id or vet_slug required'], 422);
+            return response()->json(['success' => false, 'message' => 'clinic_id required'], 422);
         }
 
         $tz = config('app.timezone') ?? 'UTC';
