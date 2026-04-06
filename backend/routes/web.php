@@ -266,6 +266,10 @@ Route::prefix('admin')->group(function () {
                 ]);
             }
         })->name('admin.lead-management');
+        Route::post('/lead-management/users/{user}/log', [AdminPanelController::class, 'storeLeadManagementLog'])
+            ->name('admin.lead-management.users.log');
+        Route::post('/lead-management/users/{user}/next-action', [AdminPanelController::class, 'storeLeadManagementNextAction'])
+            ->name('admin.lead-management.users.next-action');
         Route::delete('/lead-management/users/{user}', [AdminPanelController::class, 'deleteLeadManagementUser'])->name('admin.lead-management.users.delete');
         Route::delete('/lead-management/users/{user}/api', [AdminPanelController::class, 'deleteLeadManagementUserApi'])
             ->name('admin.lead-management.users.delete.api')
