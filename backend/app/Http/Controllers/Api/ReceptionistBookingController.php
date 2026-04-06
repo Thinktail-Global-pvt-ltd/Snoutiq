@@ -307,10 +307,14 @@ class ReceptionistBookingController extends Controller
             return response()->json(['success' => false, 'message' => 'clinic_id required'], 422);
         }
 
-        $tz = config('app.timezone') ?? 'UTC';
-        $date = $request->query('date', now($tz)->toDateString());
-        $includeRescheduledRaw = strtolower(trim((string) $request->query('include_rescheduled', '1')));
-        $includeRescheduled = !in_array($includeRescheduledRaw, ['0', 'false', 'no', 'off'], true);
+        $date = trim((string) $request->query('date', ''));
+        if ($date !== '') {
+            try {
+                $date = Carbon::parse($date)->toDateString();
+            } catch (\Exception $e) {
+                return response()->json(['success' => false, 'message' => 'Invalid date. Use YYYY-MM-DD'], 422);
+            }
+        }
 
         $latestPrescriptionByAppointment = DB::table('prescriptions')
             ->select('in_clinic_appointment_id', DB::raw('MAX(id) as latest_prescription_id'))
@@ -324,14 +328,6 @@ class ReceptionistBookingController extends Controller
             })
             ->leftJoin('prescriptions as p', 'p.id', '=', 'lp.latest_prescription_id')
             ->where('a.vet_registeration_id', $clinicId)
-            ->where(function ($builder) use ($date, $includeRescheduled) {
-                $builder->whereDate('a.appointment_date', $date);
-                if ($includeRescheduled) {
-                    // Keep rescheduled appointments visible in the receptionist queue
-                    // even when their new date differs from the requested "today" date.
-                    $builder->orWhereRaw('LOWER(TRIM(COALESCE(a.status, ""))) = ?', ['rescheduled']);
-                }
-            })
             ->orderBy('a.appointment_date')
             ->orderBy('a.appointment_time')
             ->select(
@@ -352,6 +348,10 @@ class ReceptionistBookingController extends Controller
                 'p.follow_up_type as prescription_follow_up_type',
                 'p.follow_up_notes as prescription_follow_up_notes'
             );
+
+        if ($date !== '') {
+            $query->whereDate('a.appointment_date', $date);
+        }
 
         $rows = $query->get();
 
@@ -393,7 +393,7 @@ class ReceptionistBookingController extends Controller
 
         return response()->json([
             'success' => true,
-            'date' => $date,
+            'date' => $date !== '' ? $date : 'all',
             'count' => $rows->count(),
             'appointments' => $rows,
         ]);
