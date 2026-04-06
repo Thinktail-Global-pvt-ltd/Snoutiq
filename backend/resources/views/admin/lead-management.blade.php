@@ -1491,6 +1491,43 @@
                 ? \Illuminate\Support\Str::title(str_replace(['_', '-'], ' ', $followUpTypeRaw))
                 : '';
 
+            $crmActivityLogs = collect($leadUser['crm_activity_logs'] ?? [])
+                ->map(function ($item): array {
+                    $row = is_array($item) ? $item : [];
+
+                    return [
+                        'id' => is_numeric($row['id'] ?? null) ? (int) $row['id'] : 0,
+                        'event_type' => trim((string) ($row['event_type'] ?? 'log_action')),
+                        'action_type' => trim((string) ($row['action_type'] ?? '')),
+                        'outcome' => trim((string) ($row['outcome'] ?? '')),
+                        'notes' => trim((string) ($row['notes'] ?? '')),
+                        'event_at' => trim((string) ($row['event_at'] ?? '')),
+                        'due_date' => trim((string) ($row['due_date'] ?? '')),
+                        'assigned_to' => trim((string) ($row['assigned_to'] ?? '')),
+                        'blocker' => trim((string) ($row['blocker'] ?? '')),
+                        'done_by' => trim((string) ($row['done_by'] ?? '')),
+                        'created_by' => trim((string) ($row['created_by'] ?? '')),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            $crmNextActionRaw = is_array($leadUser['crm_next_action'] ?? null)
+                ? $leadUser['crm_next_action']
+                : [];
+            $crmNextAction = !empty($crmNextActionRaw)
+                ? [
+                    'id' => is_numeric($crmNextActionRaw['id'] ?? null) ? (int) $crmNextActionRaw['id'] : 0,
+                    'action' => trim((string) ($crmNextActionRaw['action'] ?? '')),
+                    'details' => trim((string) ($crmNextActionRaw['details'] ?? '')),
+                    'due_date' => trim((string) ($crmNextActionRaw['due_date'] ?? '')),
+                    'assigned_to' => trim((string) ($crmNextActionRaw['assigned_to'] ?? '')),
+                    'blocker' => trim((string) ($crmNextActionRaw['blocker'] ?? '')),
+                    'done_by' => trim((string) ($crmNextActionRaw['done_by'] ?? '')),
+                    'event_at' => trim((string) ($crmNextActionRaw['event_at'] ?? '')),
+                ]
+                : null;
+
             return [
                 'id' => $leadId,
                 'name' => $name !== '' ? $name : 'Unnamed user',
@@ -1543,6 +1580,8 @@
                 'conversion_lag_minutes' => is_numeric($leadUser['conversion_lag_minutes'] ?? null)
                     ? (int) $leadUser['conversion_lag_minutes']
                     : null,
+                'crm_activity_logs' => $crmActivityLogs,
+                'crm_next_action' => $crmNextAction,
             ];
         })
         ->values()
@@ -1568,6 +1607,8 @@
         'per_page' => $perPage ?? 50,
         'page' => $currentPageNumber,
     ];
+    $logActionRouteTemplate = route('admin.lead-management.users.log', ['user' => '__USER_ID__']);
+    $nextActionRouteTemplate = route('admin.lead-management.users.next-action', ['user' => '__USER_ID__']);
 
     $paginationWindow = [];
     if ($filteredTargetUsers instanceof \Illuminate\Pagination\LengthAwarePaginator && $filteredTargetUsers->total() > 0) {
@@ -2007,6 +2048,8 @@
     const leadData = @json($leadRecords);
     const pageMeta = @json($leadPageMeta);
     const deleteRouteTemplate = @json($deleteRouteTemplate);
+    const logActionRouteTemplate = @json($logActionRouteTemplate);
+    const nextActionRouteTemplate = @json($nextActionRouteTemplate);
     const csrfToken = @json(csrf_token());
 
     const listEl = document.getElementById('crmLeadList');
@@ -2035,14 +2078,47 @@
         search: '',
         sortBy: 'next_action',
         selectedLeadId: leadData.length ? Number(leadData[0].id) : null,
-        leads: (leadData || []).map((lead) => ({
-            ...lead,
-            manual_actions: [],
-            manual_services: [],
-            manual_next_action: null,
-            manual_blocker: '',
-            manual_pet_profile: null,
-        })),
+        leads: (leadData || []).map((lead) => {
+            const serverActivities = Array.isArray(lead.crm_activity_logs)
+                ? lead.crm_activity_logs
+                    .map((activity) => ({
+                        id: Number(activity?.id || 0),
+                        event_type: String(activity?.event_type || 'log_action').toLowerCase(),
+                        action_type: String(activity?.action_type || ''),
+                        outcome: String(activity?.outcome || ''),
+                        notes: String(activity?.notes || ''),
+                        event_at: String(activity?.event_at || ''),
+                        due_date: String(activity?.due_date || ''),
+                        assigned_to: String(activity?.assigned_to || ''),
+                        blocker: String(activity?.blocker || ''),
+                        done_by: String(activity?.done_by || ''),
+                        created_by: String(activity?.created_by || ''),
+                    }))
+                    .sort((left, right) => String(right.event_at || '').localeCompare(String(left.event_at || '')))
+                : [];
+
+            const serverNextAction = lead.crm_next_action && typeof lead.crm_next_action === 'object'
+                ? {
+                    id: Number(lead.crm_next_action.id || 0),
+                    action: String(lead.crm_next_action.action || ''),
+                    details: String(lead.crm_next_action.details || ''),
+                    date: String(lead.crm_next_action.due_date || ''),
+                    assignee: String(lead.crm_next_action.assigned_to || ''),
+                    blocker: String(lead.crm_next_action.blocker || ''),
+                    done_by: String(lead.crm_next_action.done_by || ''),
+                    event_at: String(lead.crm_next_action.event_at || ''),
+                }
+                : null;
+
+            return {
+                ...lead,
+                manual_activity: serverActivities,
+                manual_services: [],
+                manual_next_action: serverNextAction,
+                manual_blocker: serverNextAction?.blocker || '',
+                manual_pet_profile: null,
+            };
+        }),
     };
 
     const statusStyles = {
@@ -2074,17 +2150,36 @@
         }, 2200);
     }
 
+    function parseDateValue(value) {
+        if (!value) return null;
+        const raw = String(value).trim();
+        if (raw === '') return null;
+
+        const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+        let parsed = new Date(normalized);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed;
+        }
+
+        parsed = new Date(`${normalized}Z`);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed;
+        }
+
+        return null;
+    }
+
     function formatDate(dateValue) {
         if (!dateValue) return '—';
-        const date = new Date(dateValue);
-        if (Number.isNaN(date.getTime())) return String(dateValue);
+        const date = parseDateValue(dateValue);
+        if (!date) return String(dateValue);
         return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     }
 
     function formatDateTime(dateValue) {
         if (!dateValue) return '—';
-        const date = new Date(dateValue);
-        if (Number.isNaN(date.getTime())) return String(dateValue);
+        const date = parseDateValue(dateValue);
+        if (!date) return String(dateValue);
         return date.toLocaleString('en-IN', {
             day: '2-digit',
             month: 'short',
@@ -2097,8 +2192,8 @@
 
     function formatDateForInput(value) {
         if (!value) return '';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '';
+        const date = parseDateValue(value);
+        if (!date) return '';
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
@@ -2182,7 +2277,7 @@
             + Number(lead.video_follow_up_count || 0)
             + Number(lead.vaccination_notification_count || 0)
             + Number(lead.neutering_notification_count || 0)
-            + Number((lead.manual_actions || []).length);
+            + Number((lead.manual_activity || []).length);
     }
 
     function getLatestTouchTimestamp(lead) {
@@ -2192,8 +2287,8 @@
             .sort()
             .pop() || '';
 
-        const manualTs = (lead.manual_actions || [])
-            .map((item) => String(item.timestamp || ''))
+        const manualTs = (lead.manual_activity || [])
+            .map((item) => String(item.event_at || item.timestamp || ''))
             .filter(Boolean)
             .sort()
             .pop() || '';
@@ -2367,12 +2462,45 @@
             });
         }
 
-        (lead.manual_actions || []).forEach((action) => {
+        (lead.manual_activity || []).forEach((activity) => {
+            const eventType = String(activity.event_type || 'log_action').toLowerCase();
+            const eventAt = String(activity.event_at || activity.timestamp || '');
+
+            if (eventType === 'next_action') {
+                const actionLabel = String(activity.action_type || activity.action || 'Follow-up').trim();
+                const dueDate = String(activity.due_date || '').trim();
+                const assignedTo = String(activity.assigned_to || activity.done_by || '').trim();
+                const details = String(activity.notes || '').trim();
+                const blocker = String(activity.blocker || '').trim();
+
+                const summaryParts = [
+                    details !== '' ? details : null,
+                    dueDate !== '' ? `Due: ${formatDate(dueDate)}` : null,
+                    assignedTo !== '' ? `Assigned: ${assignedTo}` : null,
+                    blocker !== '' ? `Blocker: ${blocker}` : null,
+                ].filter(Boolean);
+
+                items.push({
+                    title: `Next action set - ${actionLabel || 'Follow-up'}`,
+                    text: summaryParts.length ? summaryParts.join(' · ') : 'Next action saved from CRM panel.',
+                    badge: '<span class="crm-pill crm-pill-amber">Next action</span>',
+                    timestamp: eventAt,
+                    icon: '<i class="bi bi-calendar-check"></i>',
+                });
+
+                return;
+            }
+
+            const actionLabel = String(activity.action_type || activity.action || 'Manual action').trim();
+            const outcome = String(activity.outcome || '').trim();
+            const notes = String(activity.notes || '').trim();
+            const actor = String(activity.done_by || activity.by || activity.created_by || 'Admin').trim();
+
             items.push({
-                title: action.action || 'Manual action',
-                text: action.notes || action.outcome || 'Action logged from CRM panel.',
-                badge: `<span class="crm-pill crm-pill-purple">${escapeHtml(action.by || 'Admin')}</span>`,
-                timestamp: action.timestamp || '',
+                title: outcome !== '' ? `${actionLabel} - ${outcome}` : actionLabel || 'Manual action',
+                text: notes || outcome || 'Action logged from CRM panel.',
+                badge: `<span class="crm-pill crm-pill-purple">${escapeHtml(actor || 'Admin')}</span>`,
+                timestamp: eventAt,
                 icon: '<i class="bi bi-journal-text"></i>',
             });
         });
@@ -2390,8 +2518,10 @@
             });
         });
 
+        const hasNextActionActivity = (lead.manual_activity || [])
+            .some((activity) => String(activity.event_type || '').toLowerCase() === 'next_action');
         const next = resolveNextAction(lead);
-        if (next.date) {
+        if (next.date && !hasNextActionActivity) {
             items.push({
                 title: `${next.type} ${next.state.key === 'overdue' ? 'overdue' : 'scheduled'}`,
                 text: next.details || `Action date: ${next.label}`,
@@ -2402,7 +2532,17 @@
         }
 
         return items
-            .sort((left, right) => String(right.timestamp || '').localeCompare(String(left.timestamp || '')))
+            .sort((left, right) => {
+                const leftDate = parseDateValue(left.timestamp || '');
+                const rightDate = parseDateValue(right.timestamp || '');
+                const leftTs = leftDate ? leftDate.getTime() : NaN;
+                const rightTs = rightDate ? rightDate.getTime() : NaN;
+                if (Number.isFinite(leftTs) && Number.isFinite(rightTs) && leftTs !== rightTs) {
+                    return rightTs - leftTs;
+                }
+
+                return String(right.timestamp || '').localeCompare(String(left.timestamp || ''));
+            })
             .slice(0, 18);
     }
 
@@ -2503,8 +2643,9 @@
         const clickedNotifs = Number(lead.clicked_notifications_count || 0);
         const clickRate = totalNotifs > 0 ? Math.round((clickedNotifs / totalNotifs) * 100) : 0;
         const serviceCount = services.length;
-        const daysSinceCreated = lead.created_at
-            ? Math.max(0, Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24)))
+        const createdDate = parseDateValue(lead.created_at || '');
+        const daysSinceCreated = createdDate
+            ? Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)))
             : '—';
 
         const deleteActionUrl = String(deleteRouteTemplate || '').replace('__USER_ID__', String(Number(lead.id)));
@@ -2515,6 +2656,14 @@
         const petNames = (lead.all_pet_names || lead.neutering_pet_names || []).filter(Boolean);
         const firstPet = petNames.length ? petNames[0] : (lead.primary_pet || 'Not provided');
         const petCount = Math.max(Number(petNames.length || 0), Number(lead.neutering_pet_count || 0));
+        const latestLogWithNotes = (lead.manual_activity || [])
+            .find((activity) => {
+                const type = String(activity.event_type || '').toLowerCase();
+                return type === 'log_action' && String(activity.notes || '').trim() !== '';
+            });
+        const latestInternalNote = latestLogWithNotes
+            ? String(latestLogWithNotes.notes || '').trim()
+            : '';
 
         const categoryPills = (lead.category_tags || []).length
             ? (lead.category_tags || []).map((tag) => `<span class="crm-pill crm-pill-blue">${escapeHtml(tag)}</span>`).join(' ')
@@ -2634,8 +2783,8 @@
                     <div class="crm-card">
                         <div class="crm-card-title">Internal Notes</div>
                         <div class="crm-note-box" id="crmLeadNotesBox">
-                            ${(lead.manual_actions || []).length
-                                ? escapeHtml((lead.manual_actions[0] && lead.manual_actions[0].notes) ? lead.manual_actions[0].notes : 'Most recent action added from CRM panel.')
+                            ${latestInternalNote !== ''
+                                ? escapeHtml(latestInternalNote)
                                 : 'Use "Log Action" to keep contextual notes for the next outreach.'}
                         </div>
                     </div>
@@ -2745,14 +2894,25 @@
 
         if (key === 'next') {
             const lead = getSelectedLead();
+            const currentNextAction = lead ? resolveNextAction(lead) : null;
+            const nextActionInput = document.getElementById('crm-next-action');
             const nextDateInput = document.getElementById('crm-next-date');
             const nextDetailInput = document.getElementById('crm-next-details');
             const nextBlockerInput = document.getElementById('crm-next-blocker');
             const nextOwnerInput = document.getElementById('crm-next-owner');
-            if (lead && nextDateInput) nextDateInput.value = formatDateForInput(resolveNextAction(lead).date);
-            if (nextDetailInput) nextDetailInput.value = '';
-            if (nextBlockerInput) nextBlockerInput.value = lead?.manual_blocker || '';
-            if (nextOwnerInput) nextOwnerInput.value = 'Admin';
+            if (currentNextAction && nextDateInput) nextDateInput.value = formatDateForInput(currentNextAction.date);
+            if (nextDetailInput) nextDetailInput.value = currentNextAction?.details || '';
+            if (nextBlockerInput) nextBlockerInput.value = lead?.manual_blocker || currentNextAction?.blocker || '';
+            if (nextOwnerInput) nextOwnerInput.value = currentNextAction?.assignee || 'Admin';
+
+            if (nextActionInput) {
+                const candidateAction = String(currentNextAction?.type || '').trim();
+                const matchingOption = Array.from(nextActionInput.options)
+                    .find((option) => String(option.value).trim().toLowerCase() === candidateAction.toLowerCase());
+                if (matchingOption) {
+                    nextActionInput.value = matchingOption.value;
+                }
+            }
         }
 
         if (key === 'pet') {
@@ -2812,6 +2972,70 @@
         });
     }
 
+    function buildUserRoute(template, userId) {
+        if (!template) return '';
+        return String(template).replace('__USER_ID__', String(Number(userId)));
+    }
+
+    function normalizeActivityPayload(payload, fallback = {}) {
+        if (!payload || typeof payload !== 'object') {
+            return {
+                id: 0,
+                event_type: String(fallback.event_type || 'log_action').toLowerCase(),
+                action_type: String(fallback.action_type || fallback.action || ''),
+                outcome: String(fallback.outcome || ''),
+                notes: String(fallback.notes || fallback.details || ''),
+                event_at: String(fallback.event_at || fallback.timestamp || new Date().toISOString()),
+                due_date: String(fallback.due_date || fallback.date || ''),
+                assigned_to: String(fallback.assigned_to || fallback.assignee || ''),
+                blocker: String(fallback.blocker || ''),
+                done_by: String(fallback.done_by || fallback.by || ''),
+                created_by: String(fallback.created_by || ''),
+            };
+        }
+
+        return {
+            id: Number(payload.id || 0),
+            event_type: String(payload.event_type || fallback.event_type || 'log_action').toLowerCase(),
+            action_type: String(payload.action_type || payload.action || fallback.action_type || fallback.action || ''),
+            outcome: String(payload.outcome || fallback.outcome || ''),
+            notes: String(payload.notes || payload.details || fallback.notes || fallback.details || ''),
+            event_at: String(payload.event_at || payload.timestamp || fallback.event_at || fallback.timestamp || new Date().toISOString()),
+            due_date: String(payload.due_date || fallback.due_date || fallback.date || ''),
+            assigned_to: String(payload.assigned_to || fallback.assigned_to || fallback.assignee || ''),
+            blocker: String(payload.blocker || fallback.blocker || ''),
+            done_by: String(payload.done_by || fallback.done_by || fallback.by || ''),
+            created_by: String(payload.created_by || fallback.created_by || ''),
+        };
+    }
+
+    async function postLeadActivity(url, payload) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (_error) {
+            data = null;
+        }
+
+        if (!response.ok || !data || data.status !== 'success') {
+            const message = data?.message || `Request failed (${response.status})`;
+            throw new Error(message);
+        }
+
+        return data;
+    }
+
     function attachActionSavers() {
         const saveLogBtn = document.getElementById('crmSaveLogAction');
         const saveTxnBtn = document.getElementById('crmSaveTxn');
@@ -2819,7 +3043,7 @@
         const savePetBtn = document.getElementById('crmSavePet');
 
         if (saveLogBtn) {
-            saveLogBtn.addEventListener('click', () => {
+            saveLogBtn.addEventListener('click', async () => {
                 const lead = getSelectedLead();
                 if (!lead) return;
 
@@ -2828,19 +3052,46 @@
                 const notes = String(document.getElementById('crm-log-notes')?.value || '').trim();
                 const doneBy = String(document.getElementById('crm-log-by')?.value || 'Admin').trim() || 'Admin';
                 const timestamp = String(document.getElementById('crm-log-datetime')?.value || '');
+                const apiUrl = buildUserRoute(logActionRouteTemplate, lead.id);
+                if (!apiUrl) {
+                    showToast('Log API route is missing.');
+                    return;
+                }
 
-                lead.manual_actions.unshift({
-                    action,
+                const payload = {
+                    action_type: action,
                     outcome,
                     notes,
-                    by: doneBy,
-                    timestamp: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
-                });
+                    action_at: timestamp || null,
+                    done_by: doneBy,
+                };
 
-                closeModal('log');
-                renderLeadList();
-                renderDetail();
-                showToast('Action logged in CRM panel.');
+                saveLogBtn.disabled = true;
+                try {
+                    const data = await postLeadActivity(apiUrl, payload);
+                    const activity = normalizeActivityPayload(data.activity, {
+                        event_type: 'log_action',
+                        action_type: action,
+                        outcome,
+                        notes,
+                        done_by: doneBy,
+                        event_at: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
+                    });
+
+                    if (!Array.isArray(lead.manual_activity)) {
+                        lead.manual_activity = [];
+                    }
+                    lead.manual_activity.unshift(activity);
+
+                    closeModal('log');
+                    renderLeadList();
+                    renderDetail();
+                    showToast('Action log saved.');
+                } catch (error) {
+                    showToast(error instanceof Error ? error.message : 'Failed to save action log.');
+                } finally {
+                    saveLogBtn.disabled = false;
+                }
             });
         }
 
@@ -2874,7 +3125,7 @@
         }
 
         if (saveNextBtn) {
-            saveNextBtn.addEventListener('click', () => {
+            saveNextBtn.addEventListener('click', async () => {
                 const lead = getSelectedLead();
                 if (!lead) return;
 
@@ -2883,25 +3134,68 @@
                 const date = String(document.getElementById('crm-next-date')?.value || '').trim();
                 const assignee = String(document.getElementById('crm-next-owner')?.value || 'Admin').trim() || 'Admin';
                 const blocker = String(document.getElementById('crm-next-blocker')?.value || '').trim();
+                const apiUrl = buildUserRoute(nextActionRouteTemplate, lead.id);
+                if (!apiUrl) {
+                    showToast('Next action API route is missing.');
+                    return;
+                }
 
                 if (!date) {
                     showToast('Please set a due date before saving next action.');
                     return;
                 }
 
-                lead.manual_next_action = {
+                const payload = {
                     action,
                     details,
-                    date,
-                    assignee,
+                    due_date: date,
+                    assigned_to: assignee,
                     blocker,
                 };
-                lead.manual_blocker = blocker;
 
-                closeModal('next');
-                renderLeadList();
-                renderDetail();
-                showToast('Next action updated in CRM view.');
+                saveNextBtn.disabled = true;
+                try {
+                    const data = await postLeadActivity(apiUrl, payload);
+                    const nextActionPayload = data.next_action && typeof data.next_action === 'object'
+                        ? data.next_action
+                        : null;
+
+                    lead.manual_next_action = {
+                        id: Number(nextActionPayload?.id || 0),
+                        action: String(nextActionPayload?.action || action),
+                        details: String(nextActionPayload?.details || details),
+                        date: String(nextActionPayload?.due_date || date),
+                        assignee: String(nextActionPayload?.assigned_to || assignee),
+                        blocker: String(nextActionPayload?.blocker || blocker),
+                        done_by: String(nextActionPayload?.done_by || assignee),
+                        event_at: String(nextActionPayload?.event_at || new Date().toISOString()),
+                    };
+                    lead.manual_blocker = String(lead.manual_next_action.blocker || '');
+
+                    const activity = normalizeActivityPayload(data.activity, {
+                        event_type: 'next_action',
+                        action_type: action,
+                        notes: details,
+                        due_date: date,
+                        assigned_to: assignee,
+                        blocker,
+                        done_by: assignee,
+                        event_at: new Date().toISOString(),
+                    });
+                    if (!Array.isArray(lead.manual_activity)) {
+                        lead.manual_activity = [];
+                    }
+                    lead.manual_activity.unshift(activity);
+
+                    closeModal('next');
+                    renderLeadList();
+                    renderDetail();
+                    showToast('Next action saved.');
+                } catch (error) {
+                    showToast(error instanceof Error ? error.message : 'Failed to save next action.');
+                } finally {
+                    saveNextBtn.disabled = false;
+                }
             });
         }
 

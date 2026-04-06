@@ -886,6 +886,8 @@ class AdminPanelController extends Controller
                 'conversion_transaction_status' => null,
                 'conversion_transaction_at' => null,
                 'conversion_lag_minutes' => null,
+                'crm_activity_logs' => [],
+                'crm_next_action' => null,
             ];
         };
 
@@ -2164,6 +2166,151 @@ class AdminPanelController extends Controller
             }
         }
 
+        $supportsLeadActivityLogs = Schema::hasTable('lead_management_activity_logs')
+            && Schema::hasColumn('lead_management_activity_logs', 'user_id');
+
+        if ($supportsLeadActivityLogs && $targetUsers->isNotEmpty()) {
+            try {
+                $leadUserIds = $targetUsers
+                    ->keys()
+                    ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                    ->map(fn ($userId) => (int) $userId)
+                    ->values()
+                    ->all();
+
+                if (!empty($leadUserIds)) {
+                    $hasLeadActivityEventType = Schema::hasColumn('lead_management_activity_logs', 'event_type');
+                    $hasLeadActivityActionType = Schema::hasColumn('lead_management_activity_logs', 'action_type');
+                    $hasLeadActivityOutcome = Schema::hasColumn('lead_management_activity_logs', 'outcome');
+                    $hasLeadActivityNotes = Schema::hasColumn('lead_management_activity_logs', 'notes');
+                    $hasLeadActivityEventAt = Schema::hasColumn('lead_management_activity_logs', 'event_at');
+                    $hasLeadActivityDueDate = Schema::hasColumn('lead_management_activity_logs', 'due_date');
+                    $hasLeadActivityAssignedTo = Schema::hasColumn('lead_management_activity_logs', 'assigned_to');
+                    $hasLeadActivityBlocker = Schema::hasColumn('lead_management_activity_logs', 'blocker');
+                    $hasLeadActivityDoneBy = Schema::hasColumn('lead_management_activity_logs', 'done_by');
+                    $hasLeadActivityCreatedBy = Schema::hasColumn('lead_management_activity_logs', 'created_by');
+                    $hasLeadActivityCreatedAt = Schema::hasColumn('lead_management_activity_logs', 'created_at');
+
+                    $activityColumns = ['id', 'user_id'];
+                    if ($hasLeadActivityEventType) {
+                        $activityColumns[] = 'event_type';
+                    }
+                    if ($hasLeadActivityActionType) {
+                        $activityColumns[] = 'action_type';
+                    }
+                    if ($hasLeadActivityOutcome) {
+                        $activityColumns[] = 'outcome';
+                    }
+                    if ($hasLeadActivityNotes) {
+                        $activityColumns[] = 'notes';
+                    }
+                    if ($hasLeadActivityEventAt) {
+                        $activityColumns[] = 'event_at';
+                    }
+                    if ($hasLeadActivityDueDate) {
+                        $activityColumns[] = 'due_date';
+                    }
+                    if ($hasLeadActivityAssignedTo) {
+                        $activityColumns[] = 'assigned_to';
+                    }
+                    if ($hasLeadActivityBlocker) {
+                        $activityColumns[] = 'blocker';
+                    }
+                    if ($hasLeadActivityDoneBy) {
+                        $activityColumns[] = 'done_by';
+                    }
+                    if ($hasLeadActivityCreatedBy) {
+                        $activityColumns[] = 'created_by';
+                    }
+                    if ($hasLeadActivityCreatedAt) {
+                        $activityColumns[] = 'created_at';
+                    }
+
+                    $maxActivityRows = min(max($limit * 20, 3000), 12000);
+                    $activityRows = DB::table('lead_management_activity_logs')
+                        ->select(array_unique($activityColumns))
+                        ->whereIn('user_id', $leadUserIds)
+                        ->orderByDesc($hasLeadActivityEventAt ? 'event_at' : 'id')
+                        ->orderByDesc('id')
+                        ->limit($maxActivityRows)
+                        ->get();
+
+                    $logsPerUser = [];
+                    foreach ($activityRows as $activityRow) {
+                        $userId = is_numeric($activityRow->user_id ?? null) ? (int) $activityRow->user_id : 0;
+                        if ($userId <= 0 || !$targetUsers->has($userId)) {
+                            continue;
+                        }
+
+                        if (!isset($logsPerUser[$userId])) {
+                            $logsPerUser[$userId] = 0;
+                        }
+                        if ($logsPerUser[$userId] >= 50) {
+                            continue;
+                        }
+
+                        $eventType = strtolower(trim((string) ($activityRow->event_type ?? 'log_action')));
+                        if (!in_array($eventType, ['log_action', 'next_action'], true)) {
+                            continue;
+                        }
+
+                        $eventAt = $normalizeDateTime($activityRow->event_at ?? null);
+                        if ($eventAt === null) {
+                            $eventAt = $normalizeDateTime($activityRow->created_at ?? null);
+                        }
+
+                        $dueDate = null;
+                        if (!empty($activityRow->due_date)) {
+                            try {
+                                $dueDate = \Illuminate\Support\Carbon::parse($activityRow->due_date)->toDateString();
+                            } catch (\Throwable $e) {
+                                $dueDate = null;
+                            }
+                        }
+
+                        $activityPayload = [
+                            'id' => (int) ($activityRow->id ?? 0),
+                            'event_type' => $eventType,
+                            'action_type' => trim((string) ($activityRow->action_type ?? '')),
+                            'outcome' => trim((string) ($activityRow->outcome ?? '')),
+                            'notes' => trim((string) ($activityRow->notes ?? '')),
+                            'event_at' => $eventAt,
+                            'due_date' => $dueDate,
+                            'assigned_to' => trim((string) ($activityRow->assigned_to ?? '')),
+                            'blocker' => trim((string) ($activityRow->blocker ?? '')),
+                            'done_by' => trim((string) ($activityRow->done_by ?? '')),
+                            'created_by' => trim((string) ($activityRow->created_by ?? '')),
+                        ];
+
+                        $leadUser = $targetUsers->get($userId);
+                        if (!is_array($leadUser)) {
+                            continue;
+                        }
+
+                        $leadUser['crm_activity_logs'][] = $activityPayload;
+                        $logsPerUser[$userId] = (int) $logsPerUser[$userId] + 1;
+
+                        if ($eventType === 'next_action' && empty($leadUser['crm_next_action'])) {
+                            $leadUser['crm_next_action'] = [
+                                'id' => (int) ($activityRow->id ?? 0),
+                                'action' => trim((string) ($activityRow->action_type ?? '')),
+                                'details' => trim((string) ($activityRow->notes ?? '')),
+                                'due_date' => $dueDate,
+                                'assigned_to' => trim((string) ($activityRow->assigned_to ?? '')),
+                                'blocker' => trim((string) ($activityRow->blocker ?? '')),
+                                'done_by' => trim((string) ($activityRow->done_by ?? '')),
+                                'event_at' => $eventAt,
+                            ];
+                        }
+
+                        $targetUsers->put($userId, $leadUser);
+                    }
+                }
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('lead_activity_logs', $e);
+            }
+        }
+
         $filteredTargetUsers = $targetUsers
             ->values()
             ->filter(function (array $leadUser) use ($leadFilter): bool {
@@ -2280,6 +2427,200 @@ class AdminPanelController extends Controller
         }
     }
 
+    public function storeLeadManagementLog(Request $request, User $user): JsonResponse
+    {
+        if (!Schema::hasTable('lead_management_activity_logs')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lead activity storage table is missing. Please run migrations.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'action_type' => ['required', 'string', 'max:120'],
+            'outcome' => ['nullable', 'string', 'max:120'],
+            'notes' => ['nullable', 'string', 'max:4000'],
+            'action_at' => ['nullable', 'date'],
+            'done_by' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $eventAt = now();
+        if (!empty($validated['action_at'])) {
+            try {
+                $eventAt = \Illuminate\Support\Carbon::parse($validated['action_at']);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Invalid action date/time.',
+                ], 422);
+            }
+        }
+
+        $doneBy = trim((string) ($validated['done_by'] ?? ''));
+        if ($doneBy === '') {
+            $doneBy = trim((string) (session('admin_email', config('admin.email', 'Admin'))));
+            if ($doneBy === '') {
+                $doneBy = 'Admin';
+            }
+        }
+
+        try {
+            $activityId = DB::table('lead_management_activity_logs')->insertGetId([
+                'user_id' => (int) $user->id,
+                'event_type' => 'log_action',
+                'action_type' => trim((string) ($validated['action_type'] ?? '')),
+                'outcome' => trim((string) ($validated['outcome'] ?? '')),
+                'notes' => trim((string) ($validated['notes'] ?? '')),
+                'event_at' => $eventAt->toDateTimeString(),
+                'done_by' => $doneBy,
+                'created_by' => trim((string) session('admin_email', config('admin.email', 'Admin'))),
+                'created_at' => now()->toDateTimeString(),
+                'updated_at' => now()->toDateTimeString(),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to save action log.',
+            ], 500);
+        }
+
+        $activityRow = DB::table('lead_management_activity_logs')
+            ->where('id', $activityId)
+            ->first();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Action log saved.',
+            'activity' => $this->serializeLeadManagementActivity($activityRow),
+        ]);
+    }
+
+    public function storeLeadManagementNextAction(Request $request, User $user): JsonResponse
+    {
+        if (!Schema::hasTable('lead_management_activity_logs')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lead activity storage table is missing. Please run migrations.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'max:120'],
+            'details' => ['nullable', 'string', 'max:4000'],
+            'due_date' => ['required', 'date'],
+            'assigned_to' => ['nullable', 'string', 'max:120'],
+            'blocker' => ['nullable', 'string', 'max:4000'],
+        ]);
+
+        $dueDate = null;
+        try {
+            $dueDate = \Illuminate\Support\Carbon::parse($validated['due_date'])->toDateString();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid due date.',
+            ], 422);
+        }
+
+        $assignedTo = trim((string) ($validated['assigned_to'] ?? ''));
+        if ($assignedTo === '') {
+            $assignedTo = trim((string) (session('admin_email', config('admin.email', 'Admin'))));
+            if ($assignedTo === '') {
+                $assignedTo = 'Admin';
+            }
+        }
+
+        try {
+            $activityId = DB::table('lead_management_activity_logs')->insertGetId([
+                'user_id' => (int) $user->id,
+                'event_type' => 'next_action',
+                'action_type' => trim((string) ($validated['action'] ?? '')),
+                'notes' => trim((string) ($validated['details'] ?? '')),
+                'due_date' => $dueDate,
+                'assigned_to' => $assignedTo,
+                'blocker' => trim((string) ($validated['blocker'] ?? '')),
+                'done_by' => $assignedTo,
+                'created_by' => trim((string) session('admin_email', config('admin.email', 'Admin'))),
+                'event_at' => now()->toDateTimeString(),
+                'created_at' => now()->toDateTimeString(),
+                'updated_at' => now()->toDateTimeString(),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to save next action.',
+            ], 500);
+        }
+
+        $activityRow = DB::table('lead_management_activity_logs')
+            ->where('id', $activityId)
+            ->first();
+
+        $activityPayload = $this->serializeLeadManagementActivity($activityRow);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Next action saved.',
+            'activity' => $activityPayload,
+            'next_action' => [
+                'id' => (int) ($activityPayload['id'] ?? 0),
+                'action' => (string) ($activityPayload['action_type'] ?? ''),
+                'details' => (string) ($activityPayload['notes'] ?? ''),
+                'due_date' => (string) ($activityPayload['due_date'] ?? ''),
+                'assigned_to' => (string) ($activityPayload['assigned_to'] ?? ''),
+                'blocker' => (string) ($activityPayload['blocker'] ?? ''),
+                'done_by' => (string) ($activityPayload['done_by'] ?? ''),
+                'event_at' => (string) ($activityPayload['event_at'] ?? ''),
+            ],
+        ]);
+    }
+
+    private function serializeLeadManagementActivity(?object $row): array
+    {
+        if ($row === null) {
+            return [];
+        }
+
+        $eventAt = null;
+        if (!empty($row->event_at)) {
+            try {
+                $eventAt = \Illuminate\Support\Carbon::parse($row->event_at)->toDateTimeString();
+            } catch (\Throwable $e) {
+                $eventAt = null;
+            }
+        }
+        if ($eventAt === null && !empty($row->created_at)) {
+            try {
+                $eventAt = \Illuminate\Support\Carbon::parse($row->created_at)->toDateTimeString();
+            } catch (\Throwable $e) {
+                $eventAt = null;
+            }
+        }
+
+        $dueDate = null;
+        if (!empty($row->due_date)) {
+            try {
+                $dueDate = \Illuminate\Support\Carbon::parse($row->due_date)->toDateString();
+            } catch (\Throwable $e) {
+                $dueDate = null;
+            }
+        }
+
+        return [
+            'id' => (int) ($row->id ?? 0),
+            'event_type' => strtolower(trim((string) ($row->event_type ?? 'log_action'))),
+            'action_type' => trim((string) ($row->action_type ?? '')),
+            'outcome' => trim((string) ($row->outcome ?? '')),
+            'notes' => trim((string) ($row->notes ?? '')),
+            'event_at' => $eventAt,
+            'due_date' => $dueDate,
+            'assigned_to' => trim((string) ($row->assigned_to ?? '')),
+            'blocker' => trim((string) ($row->blocker ?? '')),
+            'done_by' => trim((string) ($row->done_by ?? '')),
+            'created_by' => trim((string) ($row->created_by ?? '')),
+        ];
+    }
+
     public function deleteLeadManagementUser(Request $request, User $user): RedirectResponse
     {
         $filters = array_filter([
@@ -2393,6 +2734,7 @@ class AdminPanelController extends Controller
                 'groomer_bookings',
                 'whatsapp_notifications',
                 'user_pets',
+                'lead_management_activity_logs',
             ] as $table) {
                 $deleteByUserId($table);
             }
