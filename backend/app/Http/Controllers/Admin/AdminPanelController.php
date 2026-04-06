@@ -617,12 +617,12 @@ class AdminPanelController extends Controller
         try {
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
-            'per_page' => ['nullable', 'integer', 'min:10', 'max:200'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:200'],
             'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,video_follow_up_video,video_follow_up_in_clinic,vaccination,both'],
         ]);
 
         $limit = (int) ($filters['limit'] ?? 250);
-        $perPage = (int) ($filters['per_page'] ?? 50);
+        $perPage = (int) ($filters['per_page'] ?? 5);
         $page = max((int) $request->query('page', 1), 1);
         $leadFilter = strtolower((string) ($filters['lead_filter'] ?? 'all'));
 

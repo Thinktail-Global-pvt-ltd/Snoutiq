@@ -1604,7 +1604,7 @@
     $leadPageMeta = [
         'lead_filter' => $leadFilter,
         'limit' => $limit,
-        'per_page' => $perPage ?? 50,
+        'per_page' => $perPage ?? 5,
         'page' => $currentPageNumber,
     ];
     $logActionRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.log')
@@ -1686,8 +1686,8 @@
 
             <label for="per_page">Page size</label>
             <select id="per_page" name="per_page" class="crm-select" style="width: 105px; min-width: 105px;">
-                @foreach([25, 50, 100, 150, 200] as $size)
-                    <option value="{{ $size }}" @selected(((int) ($perPage ?? 50)) === $size)>{{ $size }}</option>
+                @foreach([5, 10, 25, 50, 100, 150, 200] as $size)
+                    <option value="{{ $size }}" @selected(((int) ($perPage ?? 5)) === $size)>{{ $size }}</option>
                 @endforeach
             </select>
 
