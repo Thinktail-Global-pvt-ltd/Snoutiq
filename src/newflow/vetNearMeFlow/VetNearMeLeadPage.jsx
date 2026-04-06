@@ -110,7 +110,9 @@ export default function VetNearMeLeadPage() {
 
   return (
     <div>
-      <h2 style={{ marginBottom: 16 }}>Book a vet near you &mdash; at home</h2>
+      <h2 style={{ marginBottom: 16 }}>
+        Book a vet at your society in Gurgaon
+      </h2>
       <div className="field">
         <label htmlFor={nameInputId}>
           Your name <span className="required-mark">*</span>
@@ -119,7 +121,7 @@ export default function VetNearMeLeadPage() {
           id={nameInputId}
           type="text"
           className={errors.name ? "input-error" : ""}
-          placeholder="Enter your name"
+          placeholder="Priya Sharma"
           autoComplete="name"
           aria-invalid={Boolean(errors.name)}
           value={bookingState.lead.name}
@@ -135,7 +137,7 @@ export default function VetNearMeLeadPage() {
           id={phoneInputId}
           type="tel"
           className={errors.phone ? "input-error" : ""}
-          placeholder="Enter your phone number"
+          placeholder="+91 98xxxxxxxx"
           autoComplete="tel"
           aria-invalid={Boolean(errors.phone)}
           value={bookingState.lead.phone}
@@ -198,7 +200,7 @@ export default function VetNearMeLeadPage() {
         <textarea
           id={reasonTextareaId}
           className={errors.reason ? "input-error" : ""}
-          placeholder="Enter reason for visit"
+          placeholder="What does your pet need? E.g. sickness, vaccination, annual health check"
           aria-invalid={Boolean(errors.reason)}
           value={bookingState.lead.reason}
           onChange={(event) => handleLeadChange("reason", event.target.value)}

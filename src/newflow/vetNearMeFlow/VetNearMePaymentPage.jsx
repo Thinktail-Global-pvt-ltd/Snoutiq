@@ -185,7 +185,7 @@ export default function VetNearMePaymentPage() {
         currency: orderResponse.currency || "INR",
         order_id: orderResponse.orderId,
         name: "Snoutiq",
-        description: "Vet at home in Delhi NCR",
+        description: "Vet at home in Gurgaon",
         prefill: {
           name: bookingState.lead.name.trim(),
           contact: bookingState.lead.phone.trim(),
@@ -326,7 +326,7 @@ export default function VetNearMePaymentPage() {
 
       <div className="pay-box">
         <div className="pay-line">
-          <span>Home vet visit</span>
+          <span>Home vet visit in Gurgaon</span>
           <span>₹{formatCurrency(BOOKING_PRICING.originalPrice)}</span>
         </div>
         <div className="pay-line discount">
@@ -352,8 +352,8 @@ export default function VetNearMePaymentPage() {
       </div>
 
       <div className="refund-note">
-        Secure booking with 100% refund if we cannot confirm a vet in your area
-        after payment.
+        Secure booking with 100% refund if we cannot confirm a vet in your
+        Gurgaon area after payment.
       </div>
 
       {paymentMessage.text ? (

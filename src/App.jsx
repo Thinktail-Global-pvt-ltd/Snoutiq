@@ -1,13 +1,15 @@
 import React, { lazy, Suspense, useEffect, useRef } from "react";
 import {
   BrowserRouter as Router,
+  Navigate,
   Route,
   Routes,
   useLocation,
 } from "react-router-dom";
 
 const HOME_PATH = "/";
-const VET_NEAR_ME_BASE_PATH = "/vet-near-me-delhi-ncr";
+const VET_NEAR_ME_BASE_PATH = "/vet-at-home-gurgaon";
+const VET_NEAR_ME_LEGACY_BASE_PATH = "/vet-near-me-delhi-ncr";
 const NON_HOME_PRELOAD_EVENTS = ["pointerdown", "keydown", "touchstart"];
 let homePagePromise;
 let mainLayoutPromise;
@@ -73,6 +75,11 @@ const loadVetNearMeSuccessPage = () =>
   (vetNearMeSuccessPagePromise ??=
     import("./newflow/vetNearMeFlow/VetNearMeSuccessPage"));
 
+const normalizeVetNearMePath = (pathname = "") =>
+  pathname.startsWith(VET_NEAR_ME_LEGACY_BASE_PATH)
+    ? pathname.replace(VET_NEAR_ME_LEGACY_BASE_PATH, VET_NEAR_ME_BASE_PATH)
+    : pathname;
+
 const getVetNearMePageLoader = (pathname = "") => {
   if (pathname.startsWith(`${VET_NEAR_ME_BASE_PATH}/pet-details`)) {
     return loadVetNearMePetDetailsPage;
@@ -104,9 +111,12 @@ if (typeof window !== "undefined") {
     void loadHomePage();
   }
 
-  if (currentPath.startsWith(VET_NEAR_ME_BASE_PATH)) {
+  if (
+    currentPath.startsWith(VET_NEAR_ME_BASE_PATH) ||
+    currentPath.startsWith(VET_NEAR_ME_LEGACY_BASE_PATH)
+  ) {
     void loadVetNearMeBookingLayout();
-    void getVetNearMePageLoader(currentPath)();
+    void getVetNearMePageLoader(normalizeVetNearMePath(currentPath))();
   }
 
   const preloadAppRoutes = () => {
@@ -123,7 +133,10 @@ if (typeof window !== "undefined") {
         passive: true,
       });
     });
-  } else if (!currentPath.startsWith(VET_NEAR_ME_BASE_PATH)) {
+  } else if (
+    !currentPath.startsWith(VET_NEAR_ME_BASE_PATH) &&
+    !currentPath.startsWith(VET_NEAR_ME_LEGACY_BASE_PATH)
+  ) {
     void loadMainLayout();
     preloadAppRoutes();
   }
@@ -145,6 +158,32 @@ function App() {
 
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
+          <Route
+            path={VET_NEAR_ME_LEGACY_BASE_PATH}
+            element={<Navigate replace to={VET_NEAR_ME_BASE_PATH} />}
+          />
+          <Route
+            path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/pet-details`}
+            element={
+              <Navigate
+                replace
+                to={`${VET_NEAR_ME_BASE_PATH}/pet-details`}
+              />
+            }
+          />
+          <Route
+            path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/payment`}
+            element={
+              <Navigate replace to={`${VET_NEAR_ME_BASE_PATH}/payment`} />
+            }
+          />
+          <Route
+            path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/success`}
+            element={
+              <Navigate replace to={`${VET_NEAR_ME_BASE_PATH}/success`} />
+            }
+          />
+
           <Route
             path={`${VET_NEAR_ME_BASE_PATH}`}
             element={<VetNearMeBookingLayout />}

@@ -33,6 +33,143 @@ const STEP_NUMBER_BY_PATH = {
   [BOOKING_FLOW_ROUTES.success]: 4,
 };
 
+const BOOKING_CANONICAL_URL = "https://snoutiq.com/vet-at-home-gurgaon";
+const BOOKING_OG_IMAGE_URL = "https://snoutiq.com/og-vet-at-home.jpg";
+const BOOKING_SUPPORT_PHONE_DISPLAY = "+91 8588007466";
+const BOOKING_SUPPORT_PHONE_LINK = "tel:+918588007466";
+const BOOKING_SUPPORT_PHONE_SCHEMA = "+918588007466";
+const BOOKING_SUPPORT_EMAIL = "support@snoutiq.com";
+const BOOKING_LEAD_TITLE =
+  "Vet at Home in Gurgaon - Verified Vet Near You | Snoutiq";
+const BOOKING_LEAD_DESCRIPTION =
+  'Searched for a vet near me in Gurgaon? Snoutiq sends verified, experienced veterinarians to your home in DLF Phases, Sohna Road, Golf Course Ext. Road, South City and more. \u20B9999 flat. Same-day visits.';
+const BOOKING_OG_TITLE = "Vet at Home in Gurgaon | Snoutiq";
+const BOOKING_OG_DESCRIPTION =
+  "Verified vet at your door in DLF Phases, Sohna Road, Golf Course Ext. Road, South City, Gurgaon. \u20B9999. Same-day. 100% refund if vet not confirmed.";
+const BOOKING_TWITTER_TITLE = "Vet at Home Gurgaon | Snoutiq";
+const BOOKING_TWITTER_DESCRIPTION =
+  "Verified vet to your door in DLF Phases, Sohna Road, Golf Course Ext. Road, South City Gurgaon. \u20B9999. Same-day.";
+const BOOKING_LOCAL_BUSINESS_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  name: "Snoutiq - Vet at Home Gurgaon",
+  description:
+    "Verified veterinarians for home visits across Gurgaon. DLF Phases, Sohna Road, Golf Course Extension Road, South City, Dwarka Expressway.",
+  url: BOOKING_CANONICAL_URL,
+  telephone: BOOKING_SUPPORT_PHONE_SCHEMA,
+  email: BOOKING_SUPPORT_EMAIL,
+  image: BOOKING_OG_IMAGE_URL,
+  priceRange: "\u20B9999",
+  currenciesAccepted: "INR",
+  paymentAccepted: "UPI, Credit Card, Debit Card, Net Banking",
+  areaServed: [
+    "DLF Phase 1, Gurgaon",
+    "DLF Phase 2, Gurgaon",
+    "DLF Phase 3, Gurgaon",
+    "DLF Phase 4, Gurgaon",
+    "DLF Phase 5, Gurgaon",
+    "Sohna Road, Gurgaon",
+    "Golf Course Extension Road, Gurgaon",
+    "South City, Gurgaon",
+    "Dwarka Expressway, Gurgaon",
+    "Nirvana Country, Gurgaon",
+    "Sector 56, Gurgaon",
+    "Sector 67, Gurgaon",
+  ].map((name) => ({
+    "@type": "Place",
+    name,
+  })),
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Gurgaon",
+    addressRegion: "Haryana",
+    addressCountry: "IN",
+  },
+  hasOfferCatalog: {
+    "@type": "OfferCatalog",
+    name: "Vet at Home Services Gurgaon",
+    itemListElement: [
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Home Vet Visit Gurgaon",
+          description:
+            "Full veterinary examination at your home in Gurgaon by a verified BVSc vet.",
+        },
+        price: "999",
+        priceCurrency: "INR",
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Dog Vaccination at Home Gurgaon",
+          description:
+            "Dog vaccination at home in Gurgaon by a verified veterinarian.",
+        },
+        price: "999",
+        priceCurrency: "INR",
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Cat Vaccination at Home Gurgaon",
+          description:
+            "Cat vaccination at home in Gurgaon by a verified veterinarian.",
+        },
+        price: "999",
+        priceCurrency: "INR",
+      },
+    ],
+  },
+  aggregateRating: {
+    "@type": "AggregateRating",
+    ratingValue: "4.9",
+    reviewCount: "63",
+    bestRating: "5",
+  },
+};
+const BOOKING_FAQ_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "Is a home vet visit as thorough as going to a clinic in Gurgaon?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "For most situations yes. Vaccinations, health checks, deworming, fever and illness assessment, wound care can all be handled at home by a qualified vet. For X-rays, surgery or hospitalisation, you need a clinic - and our vet will tell you clearly if that is the case.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How quickly can I get a vet near me in Gurgaon?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Across DLF Phases, Sohna Road, Golf Course Extension Road and South City, same-day visits are regularly arranged. Our target is vet at your door within 60 minutes of booking confirmation.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "What does the Rs.999 vet at home fee in Gurgaon include?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "The fee covers the vet home visit, full examination, basic treatment, up to Rs.200 of essential medicines, a written report and your pet record saved on Snoutiq. Any additional medicines are discussed before administering.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Do you have vets near me in Gurgaon for cats?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes - experienced vets for dogs and cats across all covered Gurgaon societies including DLF Phases, Sohna Road, Golf Course Extension Road, South City and Dwarka Expressway.",
+      },
+    },
+  ],
+};
+
 function StepIndicator({ currentStep }) {
   if (currentStep === 4) return null;
 
@@ -150,10 +287,33 @@ const upsertBookingCanonical = (href) => {
   canonical.setAttribute("href", href);
 };
 
+const upsertBookingJsonLdScript = (id, payload) => {
+  if (typeof document === "undefined") return;
+
+  const selector = `script[data-booking-schema="${id}"]`;
+  const existingScript = document.querySelector(selector);
+
+  if (!payload) {
+    if (existingScript) {
+      existingScript.remove();
+    }
+    return;
+  }
+
+  const script = existingScript || document.createElement("script");
+  script.type = "application/ld+json";
+  script.setAttribute("data-booking-schema", id);
+  script.textContent = JSON.stringify(payload);
+
+  if (!existingScript) {
+    document.head.appendChild(script);
+  }
+};
+
 function VetNearMeBookingPage() {
   const location = useLocation();
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
-  const [selectedArea, setSelectedArea] = useState("Gurgaon");
+  const [selectedArea, setSelectedArea] = useState(COVERAGE_AREAS[0] || "");
   const [showStickyCta, setShowStickyCta] = useState(false);
   const [showDeferredSections, setShowDeferredSections] = useState(false);
   const [featuredVets, setFeaturedVets] = useState(FEATURED_VETS);
@@ -180,17 +340,56 @@ function VetNearMeBookingPage() {
     currentStep === 2 || currentStep === 3 || isSuccessStep;
 
   useEffect(() => {
-    const pageTitle = currentStep === 4
-      ? "Booking Confirmed | Vet at Home - Snoutiq"
-      : "Vet Near Me in Delhi NCR | Vet at Home - Snoutiq";
+    const pageTitle =
+      currentStep === 4
+        ? "Booking Confirmed | Vet at Home Gurgaon | Snoutiq"
+        : currentStep === 3
+          ? "Pay Securely | Vet at Home Gurgaon | Snoutiq"
+          : currentStep === 2
+            ? "Your Pet Details | Vet at Home Gurgaon | Snoutiq"
+            : BOOKING_LEAD_TITLE;
+    const pageDescription =
+      currentStep === 4
+        ? "Booking confirmed for your Gurgaon home vet visit with Snoutiq."
+        : BOOKING_LEAD_DESCRIPTION;
 
     document.title = pageTitle;
+    upsertBookingMetaTag("name", "description", pageDescription);
+    upsertBookingCanonical(BOOKING_CANONICAL_URL);
+    upsertBookingMetaTag("name", "robots", "index, follow");
+
+    upsertBookingMetaTag("property", "og:type", "website");
+    upsertBookingMetaTag("property", "og:url", BOOKING_CANONICAL_URL);
+    upsertBookingMetaTag("property", "og:title", BOOKING_OG_TITLE);
+    upsertBookingMetaTag(
+      "property",
+      "og:description",
+      BOOKING_OG_DESCRIPTION
+    );
+    upsertBookingMetaTag("property", "og:image", BOOKING_OG_IMAGE_URL);
+
+    upsertBookingMetaTag("name", "twitter:card", "summary_large_image");
+    upsertBookingMetaTag("name", "twitter:title", BOOKING_TWITTER_TITLE);
     upsertBookingMetaTag(
       "name",
-      "description",
-      "Searched for a vet near me in Delhi NCR? Snoutiq sends verified, experienced veterinarians to your home in Gurgaon, Delhi, Noida and Faridabad. Same-day visits. Rs.999."
+      "twitter:description",
+      BOOKING_TWITTER_DESCRIPTION
     );
-    upsertBookingCanonical(`https://snoutiq.com${location.pathname}`);
+    upsertBookingMetaTag("name", "twitter:image", BOOKING_OG_IMAGE_URL);
+
+    upsertBookingMetaTag("name", "geo.region", "IN-HR");
+    upsertBookingMetaTag("name", "geo.placename", "Gurgaon, Haryana");
+    upsertBookingMetaTag("name", "geo.position", "28.4595;77.0266");
+    upsertBookingMetaTag("name", "ICBM", "28.4595, 77.0266");
+
+    upsertBookingJsonLdScript(
+      "local-business",
+      currentStep === 1 ? BOOKING_LOCAL_BUSINESS_SCHEMA : null
+    );
+    upsertBookingJsonLdScript(
+      "faq-page",
+      currentStep === 1 ? BOOKING_FAQ_SCHEMA : null
+    );
   }, [currentStep, location.pathname]);
 
   useEffect(() => {
@@ -358,21 +557,6 @@ function VetNearMeBookingPage() {
 
   return (
     <>
-      {false ? (
-        <>
-          <title>
-          {currentStep === 4
-            ? "Booking Confirmed | Vet at Home — Snoutiq"
-            : "Vet Near Me in Delhi NCR | Vet at Home — Snoutiq"}
-        </title>
-        <meta
-          name="description"
-          content='Searched for a vet near me in Delhi NCR? Snoutiq sends verified, experienced veterinarians to your home in Gurgaon, Delhi, Noida and Faridabad. Same-day visits. ₹999.'
-        />
-          <link rel="canonical" href={`https://snoutiq.com${location.pathname}`} />
-        </>
-      ) : null}
-
       {isStandaloneStep ? (
         <main
           className={`vet-near-me-page standalone-page${
@@ -394,8 +578,9 @@ function VetNearMeBookingPage() {
       ) : (
       <main className="vet-near-me-page">
         <div className="bridge-bar">
-          Searched for <b>"vet near me"</b>? A verified vet comes to your home
-          anywhere in Delhi NCR — Gurgaon · Delhi · Noida · Faridabad
+          Searched for <b>"vet near me in Gurgaon"</b>? A verified vet comes
+          to your society - DLF Phases, Sohna Road, Golf Course Ext., South
+          City, Dwarka Expressway
         </div>
 
         <nav>
@@ -425,24 +610,25 @@ function VetNearMeBookingPage() {
                 marginTop: 1,
               }}
             >
-              💡
+              {"\uD83D\uDCA1"}
             </div>
             <p>
-              <b>Looked up "vet near me"?</b> Instead of travelling to a crowded
-              clinic with a stressed pet, a qualified vet comes to your home —
-              anywhere in Delhi NCR.
+              <b>Looked up "vet near me in Gurgaon"?</b> Skip the drive to a
+              crowded clinic. A verified, experienced vet comes directly to
+              your society - DLF Phases, Sohna Road, Golf Course Ext. Road,
+              South City and more.
             </p>
           </div>
 
           <h1 className="hl">
-            The vet nearest to you
+            Gurgaon&apos;s most trusted
             <br />
-            <em>is at your door.</em>
+            <em>vet at your door.</em>
           </h1>
           <p className="sub">
-            Verified, experienced veterinarians for home visits across Gurgaon,
-            Delhi, Noida and Faridabad. Your pet stays calm. You don't leave
-            home.
+            Experienced, verified veterinarians visiting homes across DLF
+            Phases, Sohna Road, Golf Course Ext. Road, South City and Dwarka
+            Expressway. Your pet stays calm. You never leave your society.
           </p>
 
           <div className="price-block">
@@ -451,8 +637,8 @@ function VetNearMeBookingPage() {
             <div className="price-save">20% off</div>
           </div>
           <p className="price-note">
-            Per home visit · Includes up to ₹200 of essential medicines ·
-            Additional medicines only with your approval
+            Per home visit to your society in Gurgaon - Includes up to ₹200 of
+            essential medicines - No surprise charges
           </p>
 
           <div className="form-card" id="main-form">
@@ -495,12 +681,12 @@ function VetNearMeBookingPage() {
 
         <section className="network">
           <div className="eyebrow">Backed by real clinics</div>
-          <h2>Backed by 20+ partner clinics across Delhi NCR</h2>
+          <h2>Backed by partner clinics across Gurgaon</h2>
           <p>
-            Snoutiq home-visit vets are attached to trusted neighbourhood clinics
-            across Gurgaon, Delhi, Noida and Faridabad. When a case needs lab
-            tests, X-rays or hospitalisation, they route you to the right
-            facility — no dead ends.
+            Snoutiq home-visit vets are attached to trusted clinics across
+            Gurgaon. When a case needs lab tests, X-rays or hospitalisation,
+            they route you to the nearest suitable facility - no dead ends, no
+            panic.
           </p>
           <div className="network-badges">
             {NETWORK_BADGES.map((badge) => (
@@ -528,7 +714,7 @@ function VetNearMeBookingPage() {
           <div className="checks">
             {STANDARD_CHECKS.map((check) => (
               <div className="chk" key={check.title}>
-                <div className="chk-mark">✓</div>
+                <div className="chk-mark">{"\u2713"}</div>
                 <p>
                   <strong>{check.title}</strong>
                   {check.body}
@@ -563,7 +749,8 @@ function VetNearMeBookingPage() {
                     ))}
                   </div>
                   <div className="vet-stat">
-                    <b>{vet.performanceStats.petsTreated}</b> pets treated ·{" "}
+                    <b>{vet.performanceStats.petsTreated}</b> pets treated{" "}
+                    {"\u00B7"}{" "}
                     <b>{vet.performanceStats.repeatCalls}</b> repeat calls
                   </div>
                 </div>
@@ -579,13 +766,13 @@ function VetNearMeBookingPage() {
               <div>
                 <div className="adv-name">Dr. Shashank Goyal</div>
                 <div className="adv-role">
-                  Senior Veterinarian · Blue Coat Vet, Gurgaon
+                  Senior Veterinarian {"\u00B7"} Blue Coat Vet, Gurgaon
                 </div>
               </div>
             </div>
             <div className="adv-quote">
               "Our home-visit protocol is built to match good clinic standards
-              — from how history is taken to how the visit is documented. Pet
+              - from how history is taken to how the visit is documented. Pet
               parents get clarity, not confusion."
             </div>
           </div>
@@ -630,7 +817,7 @@ function VetNearMeBookingPage() {
         <section className="how">
           <div className="eyebrow">Simple process</div>
           <h2 className="sec-h" style={{ marginBottom: 6 }}>
-            From your query to vet at door —
+            From your query to vet at door -
             <br />
             <em>within 60 minutes</em>
           </h2>
@@ -662,10 +849,10 @@ function VetNearMeBookingPage() {
         <section className="areas">
           <div className="eyebrow">Coverage</div>
           <h2 className="sec-h" style={{ marginBottom: 4, fontSize: 26 }}>
-            Vets near you across Delhi NCR
+            Covering Gurgaon&apos;s <em>gated societies</em>
           </h2>
           <p style={{ fontSize: 14, color: "var(--ink2)", marginBottom: 0 }}>
-            Tap your area to check availability
+            Tap your society cluster to confirm we cover it
           </p>
           <div className="area-chips">
             {COVERAGE_AREAS.map((area) => (
@@ -682,14 +869,14 @@ function VetNearMeBookingPage() {
         </section>
 
         <section className="reviews">
-          <div className="eyebrow">Pet parents in Delhi NCR</div>
+          <div className="eyebrow">Pet parents in Gurgaon</div>
           <h2 className="sec-h" style={{ marginBottom: 20 }}>
             What they said after the visit
           </h2>
 
           {REVIEWS.map((review) => (
             <div className="rev" key={review.name}>
-              <div className="stars">★★★★★</div>
+              <div className="stars">{"\u2605\u2605\u2605\u2605\u2605"}</div>
               <div className="rev-q">{review.quote}</div>
               <div className="rev-body">{review.body}</div>
               <div className="rev-meta">
@@ -735,8 +922,8 @@ function VetNearMeBookingPage() {
             height="22"
           />
           <p>
-            Vet near you, at home — across Delhi NCR. A ThinkTail Global Pvt.
-            Ltd. product.
+            Vet at home across Gurgaon&apos;s gated societies. A ThinkTail Global
+            Pvt. Ltd. product.
           </p>
         </footer>
           </>
@@ -744,8 +931,8 @@ function VetNearMeBookingPage() {
 
         <div className={`sticky${showStickyCta ? " visible" : ""}`}>
           <div className="sticky-left">
-            <p>Vet near you · Home visit · Delhi NCR</p>
-            <small>₹999 · 100% refund if vet not confirmed</small>
+            <p>Vet near you - Gurgaon societies</p>
+            <small>₹999 - DLF - Sohna Rd - Golf Course Ext. - South City</small>
           </div>
           <button type="button" className="sticky-btn" onClick={scrollToForm}>
             Book now

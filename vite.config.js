@@ -56,17 +56,33 @@ export default defineConfig({
 
           const homePreloads = collectChunkPreloads(["MainLayout", "HomePage"]);
           const vetNearMePreloadsByPath = {
+            "/vet-at-home-gurgaon": collectChunkPreloads([
+              "VetNearMeBookingLayout",
+              "VetNearMeLeadPage",
+            ]),
             "/vet-near-me-delhi-ncr": collectChunkPreloads([
               "VetNearMeBookingLayout",
               "VetNearMeLeadPage",
+            ]),
+            "/vet-at-home-gurgaon/pet-details": collectChunkPreloads([
+              "VetNearMeBookingLayout",
+              "VetNearMePetDetailsPage",
             ]),
             "/vet-near-me-delhi-ncr/pet-details": collectChunkPreloads([
               "VetNearMeBookingLayout",
               "VetNearMePetDetailsPage",
             ]),
+            "/vet-at-home-gurgaon/payment": collectChunkPreloads([
+              "VetNearMeBookingLayout",
+              "VetNearMePaymentPage",
+            ]),
             "/vet-near-me-delhi-ncr/payment": collectChunkPreloads([
               "VetNearMeBookingLayout",
               "VetNearMePaymentPage",
+            ]),
+            "/vet-at-home-gurgaon/success": collectChunkPreloads([
+              "VetNearMeBookingLayout",
+              "VetNearMeSuccessPage",
             ]),
             "/vet-near-me-delhi-ncr/success": collectChunkPreloads([
               "VetNearMeBookingLayout",
