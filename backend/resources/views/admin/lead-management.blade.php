@@ -1,6 +1,7 @@
 @extends('layouts.admin-panel')
 
 @section('page-title', 'Lead Management')
+@section('hide-sidebar', 'true')
 
 @push('styles')
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
@@ -32,6 +33,16 @@
 
     .admin-main {
         background: var(--crm-bg);
+    }
+
+    .admin-shell--no-sidebar .admin-main {
+        max-width: none;
+        margin: 0;
+    }
+
+    .admin-shell--no-sidebar .admin-header {
+        border-radius: 0;
+        margin-bottom: 0;
     }
 
     .admin-header {
