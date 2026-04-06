@@ -30,19 +30,45 @@
         --crm-radius-sm: 6px;
     }
 
+    .admin-main {
+        background: var(--crm-bg);
+    }
+
+    .admin-header {
+        background: rgba(24, 28, 39, 0.95);
+        border-bottom: 1px solid var(--crm-border);
+    }
+
+    .admin-header .page-title h1 {
+        color: var(--crm-ink);
+    }
+
+    .admin-header .header-meta {
+        color: var(--crm-ink-2);
+    }
+
+    .admin-header .header-meta .badge {
+        background: var(--crm-surface-2) !important;
+        color: var(--crm-ink);
+        border: 1px solid var(--crm-border);
+    }
+
     .admin-content {
-        padding: 1rem;
+        padding: 0;
+        background: var(--crm-bg);
     }
 
     .crm-shell-wrap {
         font-family: 'DM Sans', sans-serif;
         color: var(--crm-ink);
         background: radial-gradient(circle at top right, rgba(79, 124, 248, 0.18), transparent 45%), var(--crm-bg);
-        border: 1px solid #0b0d14;
-        border-radius: 16px;
+        border: 0;
+        border-radius: 0;
         overflow: hidden;
-        min-height: calc(100vh - 10.5rem);
-        box-shadow: 0 18px 42px rgba(7, 10, 18, 0.45);
+        min-height: calc(100vh - 74px);
+        box-shadow: none;
+        display: flex;
+        flex-direction: column;
     }
 
     .crm-topbar {
@@ -173,7 +199,8 @@
     .crm-app {
         display: grid;
         grid-template-columns: 252px 1fr;
-        min-height: calc(100vh - 18.6rem);
+        min-height: 0;
+        flex: 1;
     }
 
     .crm-sidebar {
@@ -923,6 +950,13 @@
         color: var(--crm-ink-2);
     }
 
+    .crm-pg-pages {
+        display: flex;
+        align-items: center;
+        gap: 0.34rem;
+        flex-wrap: wrap;
+    }
+
     .crm-pg-btn {
         border: 1px solid var(--crm-border-2);
         color: var(--crm-ink-2);
@@ -942,6 +976,39 @@
     .crm-pg-btn[aria-disabled='true'] {
         opacity: 0.45;
         pointer-events: none;
+    }
+
+    .crm-pg-num {
+        min-width: 30px;
+        height: 30px;
+        border: 1px solid var(--crm-border-2);
+        color: var(--crm-ink-2);
+        text-decoration: none;
+        border-radius: var(--crm-radius-sm);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.69rem;
+        background: rgba(30, 36, 53, 0.75);
+        padding: 0 0.42rem;
+    }
+
+    .crm-pg-num:hover {
+        color: var(--crm-ink);
+        border-color: var(--crm-blue);
+    }
+
+    .crm-pg-num.active {
+        border-color: var(--crm-blue);
+        background: var(--crm-blue-bg);
+        color: var(--crm-blue);
+        pointer-events: none;
+    }
+
+    .crm-pg-ellipsis {
+        font-size: 0.72rem;
+        color: var(--crm-ink-3);
+        padding: 0 0.1rem;
     }
 
     .crm-modal-overlay {
@@ -1099,11 +1166,11 @@
 
     @media (max-width: 991.98px) {
         .admin-content {
-            padding: 0.68rem;
+            padding: 0;
         }
 
         .crm-shell-wrap {
-            min-height: auto;
+            min-height: calc(100vh - 64px);
         }
 
         .crm-app {
@@ -1480,6 +1547,32 @@
         'per_page' => $perPage ?? 50,
         'page' => $currentPageNumber,
     ];
+
+    $paginationWindow = [];
+    if ($filteredTargetUsers instanceof \Illuminate\Pagination\LengthAwarePaginator && $filteredTargetUsers->total() > 0) {
+        $currentPage = (int) $filteredTargetUsers->currentPage();
+        $lastPage = (int) $filteredTargetUsers->lastPage();
+        $windowStart = max(1, $currentPage - 2);
+        $windowEnd = min($lastPage, $currentPage + 2);
+
+        if ($windowStart > 1) {
+            $paginationWindow[] = 1;
+            if ($windowStart > 2) {
+                $paginationWindow[] = 'ellipsis-left';
+            }
+        }
+
+        for ($pageNumber = $windowStart; $pageNumber <= $windowEnd; $pageNumber++) {
+            $paginationWindow[] = $pageNumber;
+        }
+
+        if ($windowEnd < $lastPage) {
+            if ($windowEnd < ($lastPage - 1)) {
+                $paginationWindow[] = 'ellipsis-right';
+            }
+            $paginationWindow[] = $lastPage;
+        }
+    }
 @endphp
 
 @if(session('status'))
@@ -1660,7 +1753,7 @@
                 of {{ number_format((int) $filteredTargetUsers->total()) }} users
                 • Page {{ (int) $filteredTargetUsers->currentPage() }} / {{ (int) $filteredTargetUsers->lastPage() }}
             </div>
-            <div class="d-flex gap-2">
+            <div class="crm-pg-pages">
                 <a
                     href="{{ $filteredTargetUsers->onFirstPage() ? '#' : $filteredTargetUsers->previousPageUrl() }}"
                     class="crm-pg-btn {{ $filteredTargetUsers->onFirstPage() ? 'disabled' : '' }}"
@@ -1668,6 +1761,22 @@
                 >
                     Previous
                 </a>
+
+                @foreach($paginationWindow as $pageItem)
+                    @if(is_string($pageItem) && str_starts_with($pageItem, 'ellipsis'))
+                        <span class="crm-pg-ellipsis">…</span>
+                    @elseif(is_numeric($pageItem))
+                        @php $pageNumber = (int) $pageItem; @endphp
+                        <a
+                            href="{{ $filteredTargetUsers->url($pageNumber) }}"
+                            class="crm-pg-num {{ $pageNumber === (int) $filteredTargetUsers->currentPage() ? 'active' : '' }}"
+                            @if($pageNumber === (int) $filteredTargetUsers->currentPage()) aria-current="page" @endif
+                        >
+                            {{ $pageNumber }}
+                        </a>
+                    @endif
+                @endforeach
+
                 <a
                     href="{{ $filteredTargetUsers->hasMorePages() ? $filteredTargetUsers->nextPageUrl() : '#' }}"
                     class="crm-pg-btn {{ $filteredTargetUsers->hasMorePages() ? '' : 'disabled' }}"
