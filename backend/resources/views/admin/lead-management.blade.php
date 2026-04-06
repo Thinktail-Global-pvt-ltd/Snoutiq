@@ -31,31 +31,41 @@
         --crm-radius-sm: 6px;
     }
 
+    body {
+        background: var(--crm-bg) !important;
+    }
+
+    .admin-shell,
+    .admin-shell--no-sidebar {
+        background: var(--crm-bg) !important;
+    }
+
     .admin-main {
-        background: var(--crm-bg);
+        background: var(--crm-bg) !important;
     }
 
     .admin-shell--no-sidebar .admin-main {
-        max-width: none;
-        margin: 0;
+        max-width: none !important;
+        margin: 0 !important;
+        width: 100% !important;
     }
 
     .admin-shell--no-sidebar .admin-header {
-        border-radius: 0;
-        margin-bottom: 0;
+        border-radius: 0 !important;
+        margin-bottom: 0 !important;
     }
 
     .admin-header {
-        background: rgba(24, 28, 39, 0.95);
-        border-bottom: 1px solid var(--crm-border);
+        background: rgba(24, 28, 39, 0.95) !important;
+        border-bottom: 1px solid var(--crm-border) !important;
     }
 
     .admin-header .page-title h1 {
-        color: var(--crm-ink);
+        color: var(--crm-ink) !important;
     }
 
     .admin-header .header-meta {
-        color: var(--crm-ink-2);
+        color: var(--crm-ink-2) !important;
     }
 
     .admin-header .header-meta .badge {
@@ -65,8 +75,8 @@
     }
 
     .admin-content {
-        padding: 0;
-        background: var(--crm-bg);
+        padding: 0 !important;
+        background: var(--crm-bg) !important;
     }
 
     .crm-shell-wrap {
