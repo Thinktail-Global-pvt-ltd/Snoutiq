@@ -371,6 +371,7 @@ class SnoutiqSymptomController extends Controller
             'question' => $promptText,
             'answer' => $assistantMessage,
         ];
+        $compatBody['diagnosis_summary'] = (string) ($rawBody['response']['diagnosis_summary'] ?? '');
         $compatBody['decision'] = $routing;
         $compatBody['emergency_status'] = in_array($routing, ['emergency', 'in_clinic'], true)
             ? strtoupper($routing)
@@ -385,6 +386,7 @@ class SnoutiqSymptomController extends Controller
             'possible_causes' => $rawBody['triage_detail']['possible_causes'] ?? [],
             'red_flags_present' => $rawBody['triage_detail']['red_flags_found'] ?? [],
             'india_context_note' => $rawBody['triage_detail']['india_context'] ?? '',
+            'diagnosis_summary' => (string) ($rawBody['response']['diagnosis_summary'] ?? ''),
         ];
         $compatBody['conversation_html'] = sprintf(
             '<div class="chat-bubble user">%s</div><div class="chat-bubble ai">%s</div>',
@@ -731,6 +733,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "If there is recent conversation history, continue from it instead of restarting.\n\n" .
             "Return ONLY this JSON:\n" .
             '{"message":"Main response 2-4 sentences plain language",' .
+            '"diagnosis_summary":"One short sentence with preliminary likely causes, never a confirmed diagnosis",' .
             '"do_now":"One immediate action",' .
             '"time_sensitivity":"e.g. Go now / Within 2-4 hours / If not better in 24 hours",' .
             '"what_to_watch":["sign1","sign2","sign3"]}';
@@ -845,6 +848,12 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $message = $this->buildDynamicFallbackMessage($pet, $routing, $ownerMessage, $triage);
         }
 
+        $diagnosisSummary = $this->cleanAssistantText((string) ($payload['diagnosis_summary'] ?? ''));
+        if ($diagnosisSummary === '') {
+            $diagnosisSummary = $this->buildDiagnosisSummary($triage, $ownerMessage);
+        }
+        $message = $this->appendDiagnosisToMessage($message, $diagnosisSummary);
+
         $doNow = $this->cleanAssistantText((string) ($payload['do_now'] ?? ''));
         if ($doNow === '') {
             $doNow = $this->defaultDoNow($pet, $routing);
@@ -868,6 +877,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
 
         return [
             'message' => $message,
+            'diagnosis_summary' => $diagnosisSummary,
             'do_now' => $doNow,
             'time_sensitivity' => $timeSensitivity,
             'what_to_watch' => array_slice(array_values(array_unique($whatToWatch)), 0, 4),
@@ -1035,6 +1045,94 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         };
 
         return array_slice(array_values(array_unique(array_merge($items, $defaults))), 0, 4);
+    }
+
+    private function buildDiagnosisSummary(array $triage, string $ownerMessage = ''): string
+    {
+        $causes = array_values(array_filter(array_map(
+            fn ($cause) => $this->cleanAssistantText((string) $cause),
+            array_slice($triage['possible_causes'] ?? [], 0, 3)
+        )));
+
+        if (!$causes) {
+            $causes = $this->inferPossibleCausesFromMessage($ownerMessage);
+        }
+
+        if (!$causes) {
+            return '';
+        }
+
+        return 'Possible causes include ' . $this->humanJoin($causes) . '.';
+    }
+
+    private function appendDiagnosisToMessage(string $message, string $diagnosisSummary): string
+    {
+        $message = trim($message);
+        $diagnosisSummary = trim($diagnosisSummary);
+
+        if ($diagnosisSummary === '') {
+            return $message;
+        }
+
+        if (preg_match('/\b(possible causes?|likely causes?|preliminary diagnosis|diagnosis summary)\b/i', $message)) {
+            return $message;
+        }
+
+        if ($message !== '' && !preg_match('/[.!?]$/', $message)) {
+            $message .= '.';
+        }
+
+        return trim($message . ' ' . $diagnosisSummary);
+    }
+
+    private function inferPossibleCausesFromMessage(string $ownerMessage): array
+    {
+        $text = mb_strtolower($this->cleanAssistantText($ownerMessage));
+        if ($text === '') {
+            return [];
+        }
+
+        $rules = [
+            [['vomit', 'vomiting', 'throwing up'], ['stomach upset', 'dietary indiscretion', 'a gastrointestinal infection']],
+            [['diarrhea', 'diarrhoea', 'loose motion', 'loose stool'], ['stomach upset', 'diet change', 'a gastrointestinal infection']],
+            [['itch', 'itching', 'scratching', 'skin', 'rash'], ['an allergy flare', 'a skin infection', 'fleas or ticks']],
+            [['limp', 'limping', 'paw pain', 'leg pain'], ['a soft tissue injury', 'a paw injury', 'joint pain']],
+            [['cough', 'coughing', 'sneeze', 'sneezing', 'runny nose'], ['respiratory irritation', 'an infection', 'an allergy']],
+            [['not eating', 'no appetite', 'loss of appetite', 'lethargic', 'lethargy'], ['fever', 'stomach upset', 'pain or dehydration']],
+            [['urine', 'urinating', 'pee', 'straining to pee'], ['a urinary infection', 'stones', 'a blockage']],
+        ];
+
+        foreach ($rules as [$keywords, $causes]) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($text, $keyword)) {
+                    return $causes;
+                }
+            }
+        }
+
+        return [];
+    }
+
+    private function humanJoin(array $items): string
+    {
+        $items = array_values(array_filter(array_map(
+            fn ($item) => trim((string) $item),
+            $items
+        )));
+
+        $count = count($items);
+        if ($count === 0) {
+            return '';
+        }
+        if ($count === 1) {
+            return $items[0];
+        }
+        if ($count === 2) {
+            return $items[0] . ' or ' . $items[1];
+        }
+
+        $last = array_pop($items);
+        return implode(', ', $items) . ', or ' . $last;
     }
 
     private function summarizeOwnerConcern(string $ownerMessage): string
