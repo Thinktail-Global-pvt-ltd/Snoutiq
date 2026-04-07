@@ -68,6 +68,8 @@ class SnoutiqSymptomController extends Controller
     private const DEEPLINK_CLINIC    = 'snoutiq://find-clinic';
     private const DEEPLINK_MONITOR   = 'snoutiq://monitor-guide';
     private const DEEPLINK_GOVT      = 'snoutiq://govt-hospitals';
+    private const DEEPLINK_VET_HOME  = 'snoutiq://vet-at-home';
+    private const DEEPLINK_CLINIC_BOOKING = 'snoutiq://clinic-booking';
 
     // ── Session / cost controls ───────────────────────────────────────────────
     private const SESSION_TTL_MINUTES  = 1440;   // 24h
@@ -213,19 +215,27 @@ class SnoutiqSymptomController extends Controller
             $this->saveToDb($data, $sessionId, $message, $response['message'], $routing, 'emergency');
             $this->saveWebChatCampaign($data, $sessionId, $turn, $message, $response, $state, $routing, 'critical', $score);
 
-            return response()->json([
-                'success'         => true,
-                'session_id'      => $sessionId,
-                'routing'         => $routing,
-                'severity'        => 'critical',
-                'turn'            => $turn,
-                'score'           => $score,
-                'response'        => $response,
-                'buttons'         => $this->buttons($routing),
-                'triage_detail'   => $triage,
-                'vet_summary'     => $this->vetSummary($state, $score, $routing),
-                'red_flag_bypass' => true,
-            ]);
+            $triageDetail = [
+                'possible_causes' => $triage['possible_causes'] ?? [],
+                'red_flags_found' => $triage['red_flags_present'] ?? [],
+                'india_context' => $triage['india_context_note'] ?? '',
+                'safe_to_wait_hours' => $triage['safe_to_wait_hours'] ?? 0,
+                'image_observation' => $triage['image_observation'] ?? '',
+            ];
+
+            return response()->json(
+                $this->buildApiPayload(
+                    $sessionId,
+                    $routing,
+                    'critical',
+                    $turn,
+                    $score,
+                    $response,
+                    $triageDetail,
+                    $state,
+                    true
+                )
+            );
         }
 
         // ── LAYER 2: Evidence scoring (keyword heuristics, fast, no API call) ─
@@ -259,25 +269,27 @@ class SnoutiqSymptomController extends Controller
         $this->saveToDb($data, $sessionId, $message, $response['message'] ?? '', $routing, $severity);
         $this->saveWebChatCampaign($data, $sessionId, $turn, $message, $response, $state, $routing, $severity, $score);
 
-        return response()->json([
-            'success'         => true,
-            'session_id'      => $sessionId,
-            'routing'         => $routing,
-            'severity'        => $severity,
-            'turn'            => $turn,
-            'score'           => $score,
-            'response'        => $response,
-            'buttons'         => $this->buttons($routing),
-            'triage_detail'   => [
-                'possible_causes'   => $triageJson['possible_causes']   ?? [],
-                'red_flags_found'   => $triageJson['red_flags_present'] ?? [],
-                'india_context'     => $triageJson['india_context_note'] ?? '',
-                'safe_to_wait_hours'=> $triageJson['safe_to_wait_hours'] ?? 0,
-                'image_observation' => $triageJson['image_observation']  ?? '',
-            ],
-            'vet_summary'     => $this->vetSummary($state, $score, $routing),
-            'red_flag_bypass' => false,
-        ]);
+        $triageDetail = [
+            'possible_causes' => $triageJson['possible_causes'] ?? [],
+            'red_flags_found' => $triageJson['red_flags_present'] ?? [],
+            'india_context' => $triageJson['india_context_note'] ?? '',
+            'safe_to_wait_hours' => $triageJson['safe_to_wait_hours'] ?? 0,
+            'image_observation' => $triageJson['image_observation'] ?? '',
+        ];
+
+        return response()->json(
+            $this->buildApiPayload(
+                $sessionId,
+                $routing,
+                $severity,
+                $turn,
+                $score,
+                $response,
+                $triageDetail,
+                $state,
+                false
+            )
+        );
     }
 
     /**
@@ -1262,31 +1274,288 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
     // BUTTON CONFIG — frontend reads this to show CTA buttons
     // =========================================================================
 
+    private function buildApiPayload(
+        string $sessionId,
+        string $routing,
+        string $severity,
+        int $turn,
+        int $score,
+        array $response,
+        array $triageDetail,
+        array $state,
+        bool $redFlagBypass
+    ): array {
+        $pet = $state['pet'] ?? [];
+        $ui = $this->buildUiPayload($routing, $score, $pet, $response);
+        $view = (string) ($ui['view'] ?? $routing);
+
+        return [
+            'success' => true,
+            'session_id' => $sessionId,
+            'routing' => $routing,
+            'severity' => $severity,
+            'turn' => $turn,
+            'score' => $score,
+            'health_score' => $ui['health_score']['value'] ?? null,
+            'response' => $response,
+            'buttons' => $this->buttons($view),
+            'ui' => $ui,
+            'triage_detail' => $triageDetail,
+            'vet_summary' => $this->vetSummary($state, $score, $routing),
+            'red_flag_bypass' => $redFlagBypass,
+        ];
+    }
+
+    private function buildUiPayload(string $routing, int $score, array $pet, array $response): array
+    {
+        $healthScore = $this->healthScorePercent($routing, $score);
+        $view = $this->uiViewFromHealthScore($healthScore, $routing);
+        $healthMeta = $this->healthScoreMeta($healthScore);
+        $petName = trim((string) ($pet['name'] ?? ''));
+        $shareTitle = $petName !== '' ? 'Share ' . $this->possessive($petName) . ' score' : 'Share this score';
+
+        return [
+            'view' => $view,
+            'theme' => $this->uiTheme($view),
+            'banner' => $this->uiBanner($view, $pet, $response),
+            'health_score' => [
+                'value' => $healthScore,
+                'label' => $healthMeta['label'],
+                'subtitle' => $healthMeta['subtitle'],
+                'color' => $healthMeta['color'],
+                'share' => [
+                    'title' => $shareTitle,
+                    'helper' => 'Help other pet parents find Snoutiq',
+                    'whatsapp_text' => $this->shareWhatsappText($petName, $healthScore, $healthMeta['label']),
+                ],
+            ],
+            'service_cards' => $this->serviceCards($view),
+        ];
+    }
+
+    private function healthScorePercent(string $routing, int $score): int
+    {
+        $score = max(0, min(10, $score));
+
+        switch ($routing) {
+            case 'emergency':
+                return max(10, min(30, (int) round(32 - ($score * 1.2))));
+            case 'in_clinic':
+                return max(36, min(55, (int) round(63 - ($score * 2.8))));
+            case 'monitor':
+                return max(76, min(92, (int) round(96 - ($score * 5.0))));
+            case 'video_consult':
+            default:
+                return max(56, min(75, (int) round(83 - ($score * 3.3))));
+        }
+    }
+
+    private function uiViewFromHealthScore(int $healthScore, string $routing): string
+    {
+        if ($routing === 'emergency' || $healthScore <= 30) {
+            return 'emergency';
+        }
+        if ($healthScore <= 55) {
+            return 'in_clinic';
+        }
+        if ($healthScore <= 75) {
+            return 'video_consult';
+        }
+
+        return 'monitor';
+    }
+
+    private function healthScoreMeta(int $healthScore): array
+    {
+        if ($healthScore <= 30) {
+            return [
+                'label' => 'Critical Risk',
+                'subtitle' => 'Needs emergency care now',
+                'color' => '#C62828',
+            ];
+        }
+        if ($healthScore <= 55) {
+            return [
+                'label' => 'High Risk',
+                'subtitle' => 'Needs vet attention today',
+                'color' => '#e53935',
+            ];
+        }
+        if ($healthScore <= 75) {
+            return [
+                'label' => 'Medium Risk',
+                'subtitle' => 'Needs professional check today',
+                'color' => '#F57C00',
+            ];
+        }
+
+        return [
+            'label' => 'Low Risk',
+            'subtitle' => 'Monitor closely at home',
+            'color' => '#2E7D32',
+        ];
+    }
+
+    private function uiTheme(string $view): string
+    {
+        return match ($view) {
+            'emergency' => 'emergency',
+            'in_clinic' => 'clinic',
+            'monitor' => 'monitor',
+            default => 'video',
+        };
+    }
+
+    private function uiBanner(string $view, array $pet, array $response): array
+    {
+        $petName = trim((string) ($pet['name'] ?? 'Your pet'));
+
+        return match ($view) {
+            'emergency' => [
+                'eyebrow' => 'Assessment complete — urgent action needed',
+                'title' => 'Go to Emergency Vet Now',
+                'subtitle' => sprintf('%s needs immediate care — this can be fatal within hours', $petName),
+                'time_badge' => $response['time_sensitivity'] ?? 'Go now — every minute matters',
+            ],
+            'in_clinic' => [
+                'eyebrow' => 'Assessment complete — routing decision',
+                'title' => 'Visit a Vet Clinic Today',
+                'subtitle' => 'A physical examination is needed today',
+                'time_badge' => $response['time_sensitivity'] ?? 'Book the earliest appointment today',
+            ],
+            'monitor' => [
+                'eyebrow' => 'Assessment complete — home monitoring guidance',
+                'title' => 'Monitor at Home for Now',
+                'subtitle' => 'Symptoms look manageable right now — follow these steps closely',
+                'time_badge' => $response['time_sensitivity'] ?? 'If no improvement in 48 hours, book a consult',
+            ],
+            default => [
+                'eyebrow' => 'Assessment complete — routing decision',
+                'title' => 'See a Vet Today via Video',
+                'subtitle' => 'Symptoms need professional assessment today',
+                'time_badge' => $response['time_sensitivity'] ?? 'Book a consult within the next 2-3 hours',
+            ],
+        };
+    }
+
+    private function serviceCards(string $view): array
+    {
+        $video = [
+            'badge' => 'Most popular',
+            'badge_variant' => '',
+            'title' => 'Video Consultation',
+            'price' => '₹499',
+            'orig_price' => '₹599',
+            'guarantee' => "Connect in 15 mins or it's free",
+            'bullets' => ['Experienced vets only', 'Connect in 15 mins', 'Money-back guarantee'],
+            'theme' => 'video',
+            'featured' => true,
+            'cta' => [
+                'label' => '📱 Book Video Consult Now',
+                'deeplink' => self::DEEPLINK_VIDEO,
+            ],
+        ];
+
+        $vetAtHome = [
+            'badge' => 'Selected cities',
+            'badge_variant' => 'vah',
+            'title' => 'Vet at Home',
+            'price' => '₹999',
+            'orig_price' => null,
+            'guarantee' => 'Vet at your door in 60 mins or money back',
+            'bullets' => ['Qualified vet visits you at home', 'In 60 mins or full money back', 'No travel stress for your pet'],
+            'theme' => 'vah',
+            'featured' => false,
+            'cta' => [
+                'label' => '🏠 Book Vet at Home',
+                'deeplink' => self::DEEPLINK_VET_HOME,
+            ],
+        ];
+
+        $clinicBooking = [
+            'badge' => 'Confirmed slot',
+            'badge_variant' => 'cb',
+            'title' => 'Confirmed Clinic Booking',
+            'price' => '₹350',
+            'orig_price' => null,
+            'guarantee' => 'Guaranteed appointment, skip the wait',
+            'bullets' => ['No queue - appointment confirmed instantly', 'Nearest available vet'],
+            'theme' => 'cb',
+            'featured' => false,
+            'cta' => [
+                'label' => '🗺 Book Clinic Appointment',
+                'deeplink' => self::DEEPLINK_CLINIC_BOOKING,
+            ],
+        ];
+
+        return match ($view) {
+            'emergency' => [$vetAtHome, $clinicBooking],
+            'in_clinic' => [$vetAtHome, $clinicBooking],
+            'monitor' => [[
+                'badge' => 'If symptoms worsen',
+                'badge_variant' => '',
+                'title' => $video['title'],
+                'price' => $video['price'],
+                'orig_price' => $video['orig_price'],
+                'guarantee' => $video['guarantee'],
+                'bullets' => $video['bullets'],
+                'theme' => $video['theme'],
+                'featured' => true,
+                'cta' => [
+                    'label' => '📱 Book Video Consult',
+                    'deeplink' => self::DEEPLINK_VIDEO,
+                ],
+            ]],
+            default => [$video, $vetAtHome],
+        };
+    }
+
+    private function shareWhatsappText(string $petName, int $healthScore, string $label): string
+    {
+        $subject = $petName !== '' ? "my pet {$petName}" : 'my pet';
+        $askUrl = rtrim((string) config('app.url', 'https://snoutiq.com'), '/') . '/ask';
+
+        return "🐾 I just checked {$subject} on Snoutiq AI.\n\n" .
+            "Pet Health Score: *{$healthScore}/100* ({$label})\n\n" .
+            "Snoutiq AI gave me specific advice in seconds - it's free for all pet parents in India.\n\n" .
+            "Check your pet here 👇\n{$askUrl}";
+    }
+
+    private function possessive(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 'this';
+        }
+
+        return preg_match('/s$/i', $value) ? "{$value}'" : "{$value}'s";
+    }
+
     private function buttons(string $routing): array
     {
         $map = [
             'emergency' => [
-                'primary'   => ['label' => 'Find Emergency Vet Now', 'type' => 'emergency',
+                'primary'   => ['label' => 'Find Emergency Vet Near Me', 'type' => 'emergency',
                                 'deeplink' => self::DEEPLINK_EMERGENCY, 'color' => '#ef4444', 'icon' => 'alert-triangle'],
-                'secondary' => ['label' => 'Govt. Vet Hospital',     'type' => 'govt',
+                'secondary' => ['label' => 'Govt. Vet Hospital (Free/Low Cost)', 'type' => 'govt',
                                 'deeplink' => self::DEEPLINK_GOVT,      'color' => '#f97316', 'icon' => 'building'],
             ],
             'video_consult' => [
-                'primary'   => ['label' => 'Start Video Consult',    'type' => 'video_consult',
+                'primary'   => ['label' => 'Book Video Consult - ₹499', 'type' => 'video_consult',
                                 'deeplink' => self::DEEPLINK_VIDEO,     'color' => '#3b82f6', 'icon' => 'video'],
-                'secondary' => ['label' => 'Find Nearby Vet',        'type' => 'clinic',
+                'secondary' => ['label' => 'Find Clinic Instead',    'type' => 'clinic',
                                 'deeplink' => self::DEEPLINK_CLINIC,    'color' => '#8b5cf6', 'icon' => 'map-pin'],
             ],
             'in_clinic' => [
-                'primary'   => ['label' => 'Find Nearby Vet',        'type' => 'clinic',
-                                'deeplink' => self::DEEPLINK_CLINIC,    'color' => '#8b5cf6', 'icon' => 'map-pin'],
-                'secondary' => ['label' => 'Video Consult First',    'type' => 'video_consult',
-                                'deeplink' => self::DEEPLINK_VIDEO,     'color' => '#3b82f6', 'icon' => 'video'],
+                'primary'   => ['label' => 'Book Vet at Home - ₹999', 'type' => 'vet_at_home',
+                                'deeplink' => self::DEEPLINK_VET_HOME,  'color' => '#8b5cf6', 'icon' => 'home'],
+                'secondary' => ['label' => 'Find Nearest Clinic',     'type' => 'clinic',
+                                'deeplink' => self::DEEPLINK_CLINIC,    'color' => '#3b82f6', 'icon' => 'map-pin'],
             ],
             'monitor' => [
-                'primary'   => ['label' => 'Monitor at Home',        'type' => 'info',
+                'primary'   => ['label' => 'Save Monitoring Guide',   'type' => 'info',
                                 'deeplink' => self::DEEPLINK_MONITOR,   'color' => '#10b981', 'icon' => 'eye'],
-                'secondary' => ['label' => 'Video Consult if Worried','type' => 'video_consult',
+                'secondary' => ['label' => 'Video Consult if Worried - ₹499', 'type' => 'video_consult',
                                 'deeplink' => self::DEEPLINK_VIDEO,      'color' => '#3b82f6', 'icon' => 'video'],
             ],
         ];

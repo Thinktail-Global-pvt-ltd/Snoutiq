@@ -696,6 +696,101 @@ function getRoutingTheme(routing) {
   })[routing] || 'video';
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getHealthScorePercent(payload) {
+  const explicit = Number(
+    payload?.ui?.health_score?.value ??
+    payload?.ui?.health_score ??
+    payload?.health_score
+  );
+  if (Number.isFinite(explicit)) {
+    return clamp(Math.round(explicit), 0, 100);
+  }
+
+  const rawScore = Number(payload?.score);
+  const routing = payload?.routing || 'video_consult';
+  if (!Number.isFinite(rawScore)) {
+    return ({ emergency: 22, in_clinic: 47, video_consult: 63, monitor: 82 })[routing] || 63;
+  }
+
+  switch (routing) {
+    case 'emergency':
+      return clamp(Math.round(32 - (rawScore * 1.2)), 10, 30);
+    case 'in_clinic':
+      return clamp(Math.round(63 - (rawScore * 2.8)), 36, 55);
+    case 'monitor':
+      return clamp(Math.round(96 - (rawScore * 5.0)), 76, 92);
+    case 'video_consult':
+    default:
+      return clamp(Math.round(83 - (rawScore * 3.3)), 56, 75);
+  }
+}
+
+function getRiskBand(scorePercent) {
+  if (scorePercent <= 30) {
+    return {
+      routing: 'emergency',
+      label: 'Critical Risk',
+      subtitle: 'Needs emergency care now',
+      color: '#C62828',
+    };
+  }
+  if (scorePercent <= 55) {
+    return {
+      routing: 'in_clinic',
+      label: 'High Risk',
+      subtitle: 'Needs vet attention today',
+      color: 'var(--red-lt)',
+    };
+  }
+  if (scorePercent <= 75) {
+    return {
+      routing: 'video_consult',
+      label: 'Medium Risk',
+      subtitle: 'Needs professional check today',
+      color: 'var(--orange)',
+    };
+  }
+  return {
+    routing: 'monitor',
+    label: 'Low Risk',
+    subtitle: 'Monitor closely at home',
+    color: 'var(--green)',
+  };
+}
+
+function getPetNameForUi(payload) {
+  const explicit = (payload?.pet_name || payload?.pet?.name || '').trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const summary = String(payload?.vet_summary || '');
+  const match = summary.match(/PATIENT:\s*([^|]+)/i);
+  return match?.[1]?.trim() || '';
+}
+
+function toPossessive(name) {
+  if (!name) return 'this';
+  return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
+
+function renderHealthGauge(scorePercent, color) {
+  const circumference = 201.1;
+  const dashOffset = (circumference * (100 - scorePercent) / 100).toFixed(1);
+
+  return `
+    <svg viewBox="0 0 80 80" aria-hidden="true">
+      <circle cx="40" cy="40" r="32" fill="none" stroke="#f1f5f9" stroke-width="8"></circle>
+      <circle cx="40" cy="40" r="32" fill="none" stroke="${escapeHtml(color)}" stroke-width="8" stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="round" transform="rotate(-90 40 40)"></circle>
+      <text x="40" y="44" text-anchor="middle" font-size="14" font-weight="900" fill="${escapeHtml(color)}" font-family="Fraunces,serif">${escapeHtml(scorePercent)}</text>
+    </svg>
+  `;
+}
+
 function getRoutingTitle(routing) {
   return ({
     emergency: 'Go to Emergency Vet Now',
@@ -719,7 +814,40 @@ function getRoutingLabel(routing, revised) {
 
 function renderActionButton(button, themeClass) {
   if (!button || !button.label) return '';
-  return `<button class="${button.type === 'video_consult' || themeClass === 'emergency' || themeClass === 'clinic' || themeClass === 'monitor' ? 'btn-p ' + themeClass : 'btn-s'}" data-link="${escapeHtml(button.deeplink || '')}" onclick="openCta(this.dataset.link)">${escapeHtml(button.label)}</button>`;
+  return `<button class="btn-p ${themeClass}" data-link="${escapeHtml(button.deeplink || '')}" onclick="openCta(this.dataset.link)">${escapeHtml(button.label)}</button>`;
+}
+
+function renderServiceCards(cards = []) {
+  if (!Array.isArray(cards) || !cards.length) return '';
+
+  return `
+    <div class="svc-wrap">
+      ${cards.map((card) => {
+        const badge = card.badge
+          ? `<div class="svc-header"><div class="svc-badge${card.badge_variant ? ' ' + escapeHtml(card.badge_variant) : ''}">${escapeHtml(card.badge)}</div></div>`
+          : '<div class="svc-header"><div></div></div>';
+        const price = card.price ? `<div class="svc-price-row"><div class="svc-price ${escapeHtml(card.theme || 'video')}">${escapeHtml(card.price)}</div>${card.orig_price ? `<div class="svc-orig">${escapeHtml(card.orig_price)}</div>` : ''}</div>` : '';
+        const guarantee = card.guarantee ? `<div class="svc-guarantee">${escapeHtml(card.guarantee)}</div>` : '';
+        const bullets = Array.isArray(card.bullets) && card.bullets.length
+          ? `<div class="svc-trust">${card.bullets.map((bullet) => `<div class="svc-ti">${escapeHtml(bullet)}</div>`).join('')}</div>`
+          : '';
+        const cta = card.cta?.label
+          ? `<button class="svc-cta ${escapeHtml(card.theme || 'video')}" data-link="${escapeHtml(card.cta?.deeplink || '')}" onclick="openCta(this.dataset.link)">${escapeHtml(card.cta.label)}</button>`
+          : '';
+
+        return `
+          <div class="svc-card${card.featured ? ' featured' : ''}">
+            ${badge}
+            <div class="svc-title">${escapeHtml(card.title || '')}</div>
+            ${price}
+            ${guarantee}
+            ${bullets}
+            ${cta}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
 function renderList(items = [], type = 'watch') {
@@ -739,8 +867,19 @@ function renderList(items = [], type = 'watch') {
 
 function renderResultCard(payload, options = {}) {
   const revised = Boolean(options.revised);
-  const routing = payload.routing || 'video_consult';
-  const theme = getRoutingTheme(routing);
+  const ui = payload.ui || {};
+  const healthUi = ui.health_score || {};
+  const banner = ui.banner || {};
+  const healthScore = getHealthScorePercent(payload);
+  const computedBand = getRiskBand(healthScore);
+  const visualRouting = ui.view || computedBand.routing;
+  const riskBand = {
+    routing: visualRouting,
+    label: healthUi.label || computedBand.label,
+    subtitle: healthUi.subtitle || computedBand.subtitle,
+    color: healthUi.color || computedBand.color,
+  };
+  const theme = ui.theme || getRoutingTheme(visualRouting);
   const response = payload.response || {};
   const detail = payload.triage_detail || {};
   const buttons = payload.buttons || {};
@@ -750,20 +889,44 @@ function renderResultCard(payload, options = {}) {
     ? `<button class="btn-s" data-link="${escapeHtml(buttons.secondary.deeplink || '')}" onclick="openCta(this.dataset.link)">${escapeHtml(buttons.secondary.label || 'Learn More')}</button>`
     : '';
   const turnMeta = payload.turn ? `Turn ${payload.turn}` : 'Live response';
-  const scoreMeta = typeof payload.score === 'number' ? ` · Score ${payload.score}/10` : '';
   const severityMeta = payload.severity ? ` · ${escapeHtml(payload.severity)}` : '';
+  const petName = getPetNameForUi(payload);
+  const shareMeta = healthUi.share || {};
+  const shareTitle = shareMeta.title || (petName ? `Share ${toPossessive(petName)} score` : 'Share this score');
+  const shareHelper = shareMeta.helper || 'Help other pet parents find Snoutiq';
+  const shareRouting = JSON.stringify(visualRouting);
+  const sharePetName = JSON.stringify(petName);
+  const serviceCards = renderServiceCards(ui.service_cards || []);
 
   return `
     <div class="rcard" data-kind="assistant-card">
       <div class="ub ${theme}">
-        <div class="ub-lbl">${escapeHtml(getRoutingLabel(routing, revised))}</div>
-        <div class="ub-title">${escapeHtml(getRoutingTitle(routing))}</div>
-        <div class="ub-sub">${escapeHtml(subtitle)}</div>
-        <div class="tbadge">🕐 ${escapeHtml(response.time_sensitivity || 'Review this guidance now')}</div>
+        <div class="ub-lbl">${escapeHtml(banner.eyebrow || getRoutingLabel(visualRouting, revised))}</div>
+        <div class="ub-title">${escapeHtml(banner.title || getRoutingTitle(visualRouting))}</div>
+        <div class="ub-sub">${escapeHtml(banner.subtitle || subtitle)}</div>
+        <div class="tbadge">🕐 ${escapeHtml(banner.time_badge || response.time_sensitivity || 'Review this guidance now')}</div>
       </div>
+      <div class="hs-wrap">
+        <div class="hs-top">
+          <div class="hs-left">
+            <div class="hs-eyebrow">Pet Health Score</div>
+            <div class="hs-score-row"><div class="hs-num" style="color:${escapeHtml(riskBand.color)}">${escapeHtml(healthScore)}</div><div class="hs-denom">/100</div></div>
+            <div class="hs-label" style="color:${escapeHtml(riskBand.color)}">${escapeHtml(riskBand.label)}</div>
+            <div class="hs-sub">${escapeHtml(riskBand.subtitle)}</div>
+          </div>
+          <div class="hs-gauge">${renderHealthGauge(healthScore, riskBand.color)}</div>
+        </div>
+        <div class="hs-share">
+          <div class="share-label"><strong>${escapeHtml(shareTitle)}</strong>${escapeHtml(shareHelper)}</div>
+          <button class="wa-btn" onclick='shareWA(${shareRouting}, ${sharePetName}, ${healthScore})'><svg class="wa-icon" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Share on WhatsApp</button>
+          <button class="copy-link" onclick="copyLink(event)">Copy link</button>
+        </div>
+      </div>
+      ${(primary || secondary) ? `<div class="ctas">${primary}${secondary}</div>` : ''}
+      ${serviceCards}
       <div class="cbdy">
         ${revised ? '<div class="rbadge">✓ Assessment updated</div>' : ''}
-        <div class="mini-meta">${turnMeta}${scoreMeta}${severityMeta}</div>
+        <div class="mini-meta">${turnMeta}${severityMeta}</div>
         <div class="ablock">
           <div class="aico">🩺</div>
           <div class="atxt">
@@ -775,7 +938,6 @@ function renderResultCard(payload, options = {}) {
         ${detail.india_context ? `<div class="india"><span>🇮🇳</span><span>${escapeHtml(detail.india_context)}</span></div>` : ''}
         ${renderList(response.what_to_watch || [], 'watch')}
         ${renderList(detail.possible_causes || [], 'causes')}
-        ${(primary || secondary) ? `<div class="ctas">${primary}${secondary}</div>` : ''}
       </div>
       <div class="disc"><div class="disc-i">🤖</div><div><div class="disc-t">Snoutiq AI — triage only</div><p>AI-generated guidance. Not a diagnosis. Always follow a licensed vet's advice.</p></div></div>
     </div>
@@ -893,11 +1055,12 @@ async function answerFQ(btn, id, answerText) {
 }
 
 function shareWA(routing, petName, score) {
-  const labels = { emergency: 'Critical Risk', video: 'Medium Risk', clinic: 'High Risk', monitor: 'Low Risk' };
-  const label = labels[routing] || 'Medium Risk';
+  const scorePercent = clamp(Number(score) || 0, 0, 100);
+  const label = getRiskBand(scorePercent).label;
+  const subject = petName ? `my pet ${petName}` : 'my pet';
   const text = encodeURIComponent(
-    `🐾 I just checked my pet ${petName} on Snoutiq AI.\n\n` +
-    `Pet Health Score: *${score}/100* (${label})\n\n` +
+    `🐾 I just checked ${subject} on Snoutiq AI.\n\n` +
+    `Pet Health Score: *${scorePercent}/100* (${label})\n\n` +
     'Snoutiq AI gave me specific advice in seconds — it\'s free for all pet parents in India.\n\n' +
     `Check your pet here 👇\n${ASK_URL}`
   );
