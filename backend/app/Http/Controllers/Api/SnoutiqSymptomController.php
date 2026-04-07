@@ -187,9 +187,9 @@ class SnoutiqSymptomController extends Controller
         }
 
         // ── Session state ─────────────────────────────────────────────────────
-        $sessionId = $this->resolveSessionId($request, $data);
+        $sessionId = $this->resolveSessionId($data);
         $cacheKey = "snoutiq_symptom:{$sessionId}";
-        $state    = Cache::get($cacheKey, $this->defaultState());
+        $state    = $this->loadConversationState($sessionId) ?? $this->defaultState();
 
         // ── Soft reset on greeting ────────────────────────────────────────────
         if ($this->isGreeting($message) && !empty($state['history'])) {
@@ -211,6 +211,7 @@ class SnoutiqSymptomController extends Controller
             $this->appendHistory($state, $message, $response['message'], $routing, $score);
             Cache::put($cacheKey, $state, now()->addMinutes(self::SESSION_TTL_MINUTES));
             $this->saveToDb($data, $sessionId, $message, $response['message'], $routing, 'emergency');
+            $this->saveWebChatCampaign($data, $sessionId, $turn, $message, $response, $state, $routing, 'critical', $score);
 
             return response()->json([
                 'success'         => true,
@@ -256,6 +257,7 @@ class SnoutiqSymptomController extends Controller
         // ── Save to DB ────────────────────────────────────────────────────────
         $severity = $triageJson['severity'] ?? 'mild';
         $this->saveToDb($data, $sessionId, $message, $response['message'] ?? '', $routing, $severity);
+        $this->saveWebChatCampaign($data, $sessionId, $turn, $message, $response, $state, $routing, $severity, $score);
 
         return response()->json([
             'success'         => true,
@@ -293,7 +295,7 @@ class SnoutiqSymptomController extends Controller
             'message'    => 'required|string|max:600',
         ]);
 
-        $sessionId = $this->resolveExistingSessionId($request, $data['session_id'] ?? null);
+        $sessionId = $this->resolveExistingSessionId($data['session_id'] ?? null);
         if (!$sessionId) {
             return response()->json([
                 'success' => false,
@@ -417,7 +419,7 @@ class SnoutiqSymptomController extends Controller
             'answer'     => 'required|string|max:200',
         ]);
 
-        $sessionId = $this->resolveExistingSessionId($request, $data['session_id'] ?? null);
+        $sessionId = $this->resolveExistingSessionId($data['session_id'] ?? null);
         if (!$sessionId) {
             return response()->json([
                 'success' => false,
@@ -455,7 +457,7 @@ class SnoutiqSymptomController extends Controller
      */
     public function session(Request $request, string $session_id): \Illuminate\Http\JsonResponse
     {
-        $state = Cache::get("snoutiq_symptom:{$session_id}");
+        $state = $this->loadConversationState($session_id);
         if (!$state) {
             return response()->json(['success' => false, 'message' => 'Session not found'], 404);
         }
@@ -469,6 +471,7 @@ class SnoutiqSymptomController extends Controller
     public function resetSession(Request $request, string $session_id): \Illuminate\Http\JsonResponse
     {
         Cache::forget("snoutiq_symptom:{$session_id}");
+        DB::table('web_chat_campaign')->where('session_id', $session_id)->delete();
 
         return response()->json([
             'success' => true,
@@ -487,8 +490,10 @@ class SnoutiqSymptomController extends Controller
 
         // If pet_id is 0 (followup without pet_id), try to get from cached session
         if ($petId === 0 && !empty($data['session_id'])) {
-            $state = Cache::get("snoutiq_symptom:{$data['session_id']}", []);
-            return $state['pet'] ?? $this->defaultPet($data);
+            $state = $this->loadConversationState($data['session_id']);
+            return is_array($state) && !empty($state['pet'])
+                ? $state['pet']
+                : $this->defaultPet($data);
         }
 
         if ($petId > 0) {
@@ -537,19 +542,11 @@ class SnoutiqSymptomController extends Controller
         ];
     }
 
-    private function resolveSessionId(Request $request, array $data): string
+    private function resolveSessionId(array $data): string
     {
         $sessionId = trim((string) ($data['session_id'] ?? ''));
         if ($sessionId !== '') {
-            $this->storeSessionIdOnRequest($request, $sessionId);
             return $sessionId;
-        }
-
-        if ($request->hasSession()) {
-            $existing = trim((string) $request->session()->get('snoutiq_symptom.session_id', ''));
-            if ($existing !== '') {
-                return $existing;
-            }
         }
 
         $userId = isset($data['user_id']) ? (int) $data['user_id'] : 0;
@@ -559,43 +556,44 @@ class SnoutiqSymptomController extends Controller
                 ->first();
 
             if ($latest?->chat_room_token) {
-                $sessionId = (string) $latest->chat_room_token;
-                $this->storeSessionIdOnRequest($request, $sessionId);
-                return $sessionId;
+                return (string) $latest->chat_room_token;
             }
         }
 
-        $sessionId = 'room_' . Str::uuid()->toString();
-        $this->storeSessionIdOnRequest($request, $sessionId);
-
-        return $sessionId;
+        return 'room_' . Str::uuid()->toString();
     }
 
-    private function resolveExistingSessionId(Request $request, ?string $sessionId): ?string
+    private function resolveExistingSessionId(?string $sessionId): ?string
     {
         $sessionId = trim((string) ($sessionId ?? ''));
-        if ($sessionId !== '') {
-            $this->storeSessionIdOnRequest($request, $sessionId);
-            return $sessionId;
-        }
-
-        if ($request->hasSession()) {
-            $existing = trim((string) $request->session()->get('snoutiq_symptom.session_id', ''));
-            if ($existing !== '') {
-                return $existing;
-            }
-        }
-
-        return null;
+        return $sessionId !== '' ? $sessionId : null;
     }
 
-    private function storeSessionIdOnRequest(Request $request, string $sessionId): void
+    private function loadConversationState(string $sessionId): ?array
     {
-        if (!$request->hasSession()) {
-            return;
+        $cacheKey = "snoutiq_symptom:{$sessionId}";
+        $state = Cache::get($cacheKey);
+        if (is_array($state) && !empty($state)) {
+            return $state;
         }
 
-        $request->session()->put('snoutiq_symptom.session_id', $sessionId);
+        $row = DB::table('web_chat_campaign')
+            ->where('session_id', $sessionId)
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        $state = json_decode((string) ($row->state_payload_json ?? ''), true);
+        if (!is_array($state) || empty($state)) {
+            return null;
+        }
+
+        Cache::put($cacheKey, $state, now()->addMinutes(self::SESSION_TTL_MINUTES));
+
+        return $state;
     }
 
     private function calcAge(?string $dob): array
@@ -1415,6 +1413,48 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $room->save();
         } catch (\Exception $e) {
             Log::error('SnoutiqSymptomController DB save failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    private function saveWebChatCampaign(
+        array $data,
+        string $sessionId,
+        int $turn,
+        string $question,
+        array $response,
+        array $state,
+        string $routing,
+        string $severity,
+        int $score
+    ): void {
+        try {
+            $pet = $state['pet'] ?? [];
+
+            DB::table('web_chat_campaign')->insert([
+                'session_id' => $sessionId,
+                'user_id' => isset($data['user_id']) ? (int) $data['user_id'] : null,
+                'pet_id' => isset($data['pet_id']) ? (int) $data['pet_id'] : null,
+                'turn' => max(1, $turn),
+                'routing' => $routing,
+                'severity' => $severity,
+                'score' => max(0, min(255, $score)),
+                'pet_name' => $pet['name'] ?? ($data['pet_name'] ?? null),
+                'species' => $pet['species'] ?? ($data['species'] ?? null),
+                'breed' => $pet['breed'] ?? ($data['breed'] ?? null),
+                'location' => $pet['location'] ?? ($data['location'] ?? null),
+                'user_message' => mb_substr($question, 0, 65535),
+                'assistant_message' => mb_substr((string) ($response['message'] ?? ''), 0, 65535),
+                'request_payload_json' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                'response_payload_json' => json_encode($response, JSON_UNESCAPED_UNICODE),
+                'state_payload_json' => json_encode($state, JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('SnoutiqSymptomController web_chat_campaign insert failed', [
+                'error' => $e->getMessage(),
+                'session_id' => $sessionId,
+            ]);
         }
     }
 }
