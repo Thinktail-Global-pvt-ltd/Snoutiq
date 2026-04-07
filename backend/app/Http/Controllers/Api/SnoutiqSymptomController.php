@@ -252,7 +252,7 @@ class SnoutiqSymptomController extends Controller
         }
 
         // ── LAYER 4: Gemini — Response writer (warm, plain language) ──────────
-        $response = $this->callGeminiResponse($pet, $message, $routing, $triageJson);
+        $response = $this->callGeminiResponse($pet, $message, $routing, $triageJson, $state['history'] ?? []);
 
         // ── Update state ──────────────────────────────────────────────────────
         $this->appendHistory($state, $message, $response['message'] ?? '', $routing, $score);
@@ -361,9 +361,16 @@ class SnoutiqSymptomController extends Controller
         $score = (int) ($rawBody['score'] ?? 0);
         $session = (string) ($rawBody['session_id'] ?? $sessionId ?? '');
 
+        $assistantMessage = (string) ($rawBody['response']['message'] ?? '');
+
         $compatBody = $rawBody;
         $compatBody['context_token'] = $session;
         $compatBody['chat_room_token'] = $session;
+        $compatBody['message'] = $assistantMessage;
+        $compatBody['chat'] = [
+            'question' => $promptText,
+            'answer' => $assistantMessage,
+        ];
         $compatBody['decision'] = $routing;
         $compatBody['emergency_status'] = in_array($routing, ['emergency', 'in_clinic'], true)
             ? strtoupper($routing)
@@ -382,7 +389,7 @@ class SnoutiqSymptomController extends Controller
         $compatBody['conversation_html'] = sprintf(
             '<div class="chat-bubble user">%s</div><div class="chat-bubble ai">%s</div>',
             e($promptText),
-            e((string) ($rawBody['response']['message'] ?? ''))
+            e($assistantMessage)
         );
 
         return response()->json($compatBody, $response->getStatusCode());
@@ -691,7 +698,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
     // LAYER 4 — GEMINI RESPONSE WRITER (warm, plain language for pet parent)
     // =========================================================================
 
-    private function callGeminiResponse(array $pet, string $message, string $routing, array $triage): array
+    private function callGeminiResponse(array $pet, string $message, string $routing, array $triage, array $history = []): array
     {
         $routingInstructions = [
             'emergency'    => 'This pet needs emergency care NOW. Be calm but very direct — go to nearest vet or government hospital immediately. Give ONE thing they can do right now while going (keep warm, do not feed). Do not say it will be okay. Be honest but not terrifying.',
@@ -701,18 +708,27 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         ];
 
         $causes = implode(', ', array_slice($triage['possible_causes'] ?? [], 0, 3));
+        $redFlags = implode(', ', array_slice($triage['red_flags_present'] ?? [], 0, 3));
+        $historyStr = $this->formatHistoryForPrompt($history);
+        $imageObservation = trim((string) ($triage['image_observation'] ?? ''));
 
         $prompt =
             "You are Snoutiq, a caring pet health assistant. " .
             "You speak to worried pet parents in warm, simple language. " .
             "You never diagnose. You never say you are an AI. " .
-            "You always give one specific next action. No medical jargon.\n\n" .
+            "You always give one specific next action. No medical jargon. " .
+            "Make the response feel tailored to this exact conversation, not like a reusable template.\n\n" .
             "Pet: {$pet['name']} ({$pet['species']}, {$pet['breed']}, {$pet['age']})\n" .
+            ($historyStr ? "Recent conversation:\n{$historyStr}\n" : '') .
             "Message from owner: " . mb_substr($message, 0, 300) . "\n" .
             "Routing decision: {$routing}\n" .
             ($causes ? "Possible causes (do NOT state as diagnosis): {$causes}\n" : '') .
+            ($redFlags ? "Red flags already seen: {$redFlags}\n" : '') .
+            ($imageObservation !== '' ? "Image observation: {$imageObservation}\n" : '') .
             "India context: " . ($triage['india_context_note'] ?? '') . "\n\n" .
             "Instruction: " . ($routingInstructions[$routing] ?? $routingInstructions['video_consult']) . "\n\n" .
+            "The `message` field must sound natural and should reference what the owner is seeing right now. " .
+            "If there is recent conversation history, continue from it instead of restarting.\n\n" .
             "Return ONLY this JSON:\n" .
             '{"message":"Main response 2-4 sentences plain language",' .
             '"do_now":"One immediate action",' .
@@ -722,18 +738,16 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $raw     = $this->geminiCall($prompt, self::RESPONSE_MAX_TOKENS);
         $decoded = $this->decodeJson($raw);
 
-        if (!is_array($decoded)) {
-            $fallbackAction = $routing === 'emergency'
-                ? 'go to a vet immediately'
-                : 'book a Snoutiq video consult';
-            return [
-                'message'          => "We recommend you {$fallbackAction} for {$pet['name']}.",
-                'do_now'           => $routing === 'emergency' ? 'Go to nearest vet now' : 'Book a video consult',
-                'time_sensitivity' => $routing === 'emergency' ? 'Go now' : 'Within a few hours',
-                'what_to_watch'    => ['Monitor breathing', 'Check if eating/drinking', 'Watch energy levels'],
-            ];
+        if (is_array($decoded)) {
+            return $this->normalizeGeminiResponsePayload($decoded, $pet, $routing, $message, $triage);
         }
-        return $decoded;
+
+        $recovered = $this->recoverStructuredResponse($raw);
+        if (is_array($recovered)) {
+            return $this->normalizeGeminiResponsePayload($recovered, $pet, $routing, $message, $triage);
+        }
+
+        return $this->normalizeGeminiResponsePayload([], $pet, $routing, $message, $triage, $raw);
     }
 
     // =========================================================================
@@ -813,6 +827,226 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $json    = substr($text, $start, $end - $start + 1);
         $decoded = json_decode($json, true);
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private function normalizeGeminiResponsePayload(
+        array $payload,
+        array $pet,
+        string $routing,
+        string $ownerMessage,
+        array $triage,
+        string $rawText = ''
+    ): array {
+        $message = $this->cleanAssistantText((string) ($payload['message'] ?? ''));
+        if ($message === '' && $rawText !== '') {
+            $message = $this->extractNarrativeFromRawResponse($rawText);
+        }
+        if ($message === '') {
+            $message = $this->buildDynamicFallbackMessage($pet, $routing, $ownerMessage, $triage);
+        }
+
+        $doNow = $this->cleanAssistantText((string) ($payload['do_now'] ?? ''));
+        if ($doNow === '') {
+            $doNow = $this->defaultDoNow($pet, $routing);
+        }
+
+        $timeSensitivity = $this->cleanAssistantText((string) ($payload['time_sensitivity'] ?? ''));
+        if ($timeSensitivity === '') {
+            $timeSensitivity = $this->defaultTimeSensitivity($routing, $triage);
+        }
+
+        $whatToWatch = [];
+        if (isset($payload['what_to_watch']) && is_array($payload['what_to_watch'])) {
+            $whatToWatch = array_values(array_filter(array_map(
+                fn ($item) => $this->cleanAssistantText((string) $item),
+                $payload['what_to_watch']
+            )));
+        }
+        if (!$whatToWatch) {
+            $whatToWatch = $this->defaultWhatToWatch($routing, $triage);
+        }
+
+        return [
+            'message' => $message,
+            'do_now' => $doNow,
+            'time_sensitivity' => $timeSensitivity,
+            'what_to_watch' => array_slice(array_values(array_unique($whatToWatch)), 0, 4),
+        ];
+    }
+
+    private function recoverStructuredResponse(string $raw): ?array
+    {
+        $message = $this->extractJsonStringField($raw, 'message');
+        $doNow = $this->extractJsonStringField($raw, 'do_now');
+        $timeSensitivity = $this->extractJsonStringField($raw, 'time_sensitivity');
+        $whatToWatch = $this->extractJsonStringArrayField($raw, 'what_to_watch');
+
+        $payload = array_filter([
+            'message' => $message,
+            'do_now' => $doNow,
+            'time_sensitivity' => $timeSensitivity,
+            'what_to_watch' => $whatToWatch,
+        ], function ($value) {
+            if (is_array($value)) {
+                return !empty($value);
+            }
+            return $value !== null && $value !== '';
+        });
+
+        return $payload ?: null;
+    }
+
+    private function extractJsonStringField(string $raw, string $field): ?string
+    {
+        if (!preg_match('/"' . preg_quote($field, '/') . '"\s*:\s*"((?:\\\\.|[^"\\\\])*)"/s', $raw, $matches)) {
+            return null;
+        }
+
+        $decoded = json_decode('"' . $matches[1] . '"', true);
+        if (is_string($decoded)) {
+            return $decoded;
+        }
+
+        return stripcslashes($matches[1]);
+    }
+
+    private function extractJsonStringArrayField(string $raw, string $field): array
+    {
+        if (!preg_match('/"' . preg_quote($field, '/') . '"\s*:\s*\[(.*?)\]/s', $raw, $matches)) {
+            return [];
+        }
+
+        preg_match_all('/"((?:\\\\.|[^"\\\\])*)"/s', $matches[1], $itemMatches);
+        $items = [];
+        foreach ($itemMatches[1] ?? [] as $item) {
+            $decoded = json_decode('"' . $item . '"', true);
+            $items[] = is_string($decoded) ? $decoded : stripcslashes($item);
+        }
+
+        return array_values(array_filter($items, fn ($item) => trim((string) $item) !== ''));
+    }
+
+    private function extractNarrativeFromRawResponse(string $raw): string
+    {
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $raw);
+        $text = preg_replace('/\s*```$/m', '', $text);
+        $text = preg_replace('/^\s*[{[].*[}\]]\s*$/s', '', $text);
+        $text = strip_tags((string) $text);
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $text = preg_replace('/^\s*(message|do_now|time_sensitivity)\s*:\s*/mi', '', $text);
+        $lines = array_values(array_filter(array_map(
+            fn ($line) => trim(preg_replace('/^[\-\*\x{2022}]+\s*/u', '', $line)),
+            explode("\n", $text)
+        )));
+
+        if (!$lines) {
+            return '';
+        }
+
+        return $this->cleanAssistantText(implode(' ', array_slice($lines, 0, 3)));
+    }
+
+    private function cleanAssistantText(string $text): string
+    {
+        $text = strip_tags($text);
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $text = preg_replace('/[`*_#>]/', '', $text);
+        $text = preg_replace('/\s+/', ' ', $text);
+        return trim((string) $text, " \t\n\r\0\x0B\"'");
+    }
+
+    private function buildDynamicFallbackMessage(array $pet, string $routing, string $ownerMessage, array $triage): string
+    {
+        $petName = trim((string) ($pet['name'] ?? 'your pet')) ?: 'your pet';
+        $issue = $this->summarizeOwnerConcern($ownerMessage);
+        $causes = array_values(array_filter(array_map(
+            fn ($cause) => $this->cleanAssistantText((string) $cause),
+            array_slice($triage['possible_causes'] ?? [], 0, 2)
+        )));
+        $issueLine = $issue !== '' ? "Based on your note about {$issue}, " : '';
+        $causeLine = $causes ? ' This could be related to ' . implode(' or ', $causes) . '.' : '';
+
+        $message = match ($routing) {
+            'emergency' => "{$petName} needs urgent hands-on veterinary care right now. {$issueLine}{$causeLine} Please go to the nearest vet clinic or emergency animal hospital immediately.",
+            'in_clinic' => "{$issueLine}{$petName} needs an in-person veterinary exam rather than home monitoring alone.{$causeLine} Please arrange the earliest clinic visit today.",
+            'monitor' => "{$issueLine}{$petName}'s situation sounds manageable to monitor for the moment if they stay otherwise stable.{$causeLine} Keep a close eye on symptoms and upgrade to a consult if anything worsens.",
+            default => "{$issueLine}A live vet review would be the best next step for {$petName}.{$causeLine} A video consult can help you decide quickly whether home care is enough or a clinic visit is needed.",
+        };
+
+        return preg_replace('/\s+/', ' ', trim($message));
+    }
+
+    private function defaultDoNow(array $pet, string $routing): string
+    {
+        $petName = trim((string) ($pet['name'] ?? 'your pet')) ?: 'your pet';
+
+        return match ($routing) {
+            'emergency' => "Leave now for the nearest vet or emergency hospital with {$petName} kept calm and still.",
+            'in_clinic' => "Call the nearest clinic and book the earliest same-day appointment for {$petName}.",
+            'monitor' => "Offer rest, water if tolerated, and note any change in appetite, energy, vomiting, stool, or breathing.",
+            default => "Start a Snoutiq video consult so a vet can review {$petName}'s symptoms in real time.",
+        };
+    }
+
+    private function defaultTimeSensitivity(string $routing, array $triage): string
+    {
+        $safeToWait = isset($triage['safe_to_wait_hours']) ? (int) $triage['safe_to_wait_hours'] : 0;
+
+        return match ($routing) {
+            'emergency' => 'Go now',
+            'in_clinic' => $safeToWait > 0 ? "Within {$safeToWait} hours" : 'Same day',
+            'monitor' => $safeToWait > 0 ? "If not improving within {$safeToWait} hours" : 'If not improving within 24 hours',
+            default => $safeToWait > 0 ? "Within {$safeToWait} hours" : 'Within the next few hours',
+        };
+    }
+
+    private function defaultWhatToWatch(string $routing, array $triage): array
+    {
+        $items = [];
+
+        foreach (array_slice($triage['red_flags_present'] ?? [], 0, 2) as $flag) {
+            $flagText = $this->cleanAssistantText((string) $flag);
+            if ($flagText !== '') {
+                $items[] = 'Any sign of ' . $flagText;
+            }
+        }
+
+        $defaults = match ($routing) {
+            'emergency' => [
+                'Breathing becoming fast, noisy, or laboured',
+                'Collapse, weakness, or reduced responsiveness',
+                'Repeated vomiting, seizures, or sudden worsening',
+            ],
+            'in_clinic' => [
+                'Pain, swelling, or limping getting worse',
+                'Eating or drinking much less than usual',
+                'Vomiting, diarrhoea, or low energy continuing',
+            ],
+            'monitor' => [
+                'Low energy or appetite getting worse',
+                'New vomiting, diarrhoea, or trouble urinating',
+                'Any new pain, swelling, or breathing changes',
+            ],
+            default => [
+                'Low energy, appetite loss, or dehydration',
+                'Symptoms spreading, worsening, or becoming more frequent',
+                'Any breathing difficulty or sudden distress',
+            ],
+        };
+
+        return array_slice(array_values(array_unique(array_merge($items, $defaults))), 0, 4);
+    }
+
+    private function summarizeOwnerConcern(string $ownerMessage): string
+    {
+        $text = $this->cleanAssistantText($ownerMessage);
+        if ($text === '') {
+            return '';
+        }
+
+        $text = mb_strtolower($text);
+        $text = mb_substr($text, 0, 90);
+        return rtrim($text, " .,;:!?");
     }
 
     // =========================================================================
