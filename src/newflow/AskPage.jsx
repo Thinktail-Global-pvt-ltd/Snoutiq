@@ -696,10 +696,6 @@ function AssessmentCard({
                     Copy summary
                   </button>
                 </div>
-                <details className="ask-summary-details">
-                  <summary>Show vet summary</summary>
-                  <pre>{assessment.vet_summary}</pre>
-                </details>
               </section>
             ) : null}
           </div>
