@@ -443,6 +443,8 @@ Route::get('/snoutiq/symptom-checker-web', function () {
     return view('snoutiq.symptom-checker-web');
 })->name('snoutiq.symptom-checker-web');
 
+Route::view('/ask', 'snoutiq.ask')->name('snoutiq.ask');
+
 // Protected application routes (requires session user)
 Route::middleware([EnsureSessionUser::class])->group(function(){
     Route::get('/profile', function () {
