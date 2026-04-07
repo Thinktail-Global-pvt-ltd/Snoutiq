@@ -1518,7 +1518,7 @@ Route::post('/excell-export/import', function (Request $request) {
     ], 201);
 })->name('excell_export.import');
 
-Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
+Route::match(['post', 'put', 'patch'], '/doctor/profile', function (Request $request) {
     $doctorId = $request->query('doctor_id');
     if (!$doctorId) {
         return response()->json(['message' => 'doctor_id is required'], 422);
@@ -1529,17 +1529,14 @@ Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
         return response()->json(['message' => 'Doctor not found'], 404);
     }
 
-    $doctorImageRule = $request->hasFile('doctor_image')
-        ? 'sometimes|file|image|max:5120'
-        : 'sometimes|nullable|string|max:500';
-
     $validated = $request->validate([
         'doctor_name' => 'sometimes|required|string|max:255',
         'doctor_email' => 'sometimes|nullable|email|max:255',
         'doctor_mobile' => 'sometimes|nullable|string|max:25',
         'doctor_license' => 'sometimes|nullable|string|max:150',
         'staff_role' => 'sometimes|nullable|string|max:100',
-        'doctor_image' => $doctorImageRule,
+        'doctor_image' => 'sometimes|nullable|string|max:500',
+        'doctor_image_file' => 'sometimes|nullable|file|image|max:5120',
         'doctor_image_base64' => 'sometimes|nullable|string',
         'doctor_document' => 'sometimes|nullable|string|max:500',
         'toggle_availability' => 'sometimes|boolean',
@@ -1570,7 +1567,24 @@ Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
         return [$binary, $mime];
     };
 
-    if ($request->hasFile('doctor_image')) {
+    if ($request->hasFile('doctor_image_file')) {
+        if (!Schema::hasColumn('doctors', 'doctor_image_blob') || !Schema::hasColumn('doctors', 'doctor_image_mime')) {
+            return response()->json([
+                'message' => 'doctor_image blob columns are missing. Please run migrations.',
+            ], 500);
+        }
+
+        $file = $request->file('doctor_image_file');
+        if (!$file || !$file->isValid()) {
+            return response()->json([
+                'message' => $file?->getErrorMessage() ?: 'Invalid image upload.',
+            ], 422);
+        }
+
+        $doctorImageBlob = $file->get();
+        $doctorImageMime = $file->getMimeType() ?: ($file->getClientMimeType() ?: 'image/jpeg');
+        $validated['doctor_image'] = null;
+    } elseif ($request->hasFile('doctor_image')) {
         if (!Schema::hasColumn('doctors', 'doctor_image_blob') || !Schema::hasColumn('doctors', 'doctor_image_mime')) {
             return response()->json([
                 'message' => 'doctor_image blob columns are missing. Please run migrations.',
@@ -1617,7 +1631,7 @@ Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
         $validated['doctor_image'] = null;
     }
 
-    unset($validated['doctor_image_base64']);
+    unset($validated['doctor_image_base64'], $validated['doctor_image_file']);
 
     $doctor->fill($validated);
     if ($doctorImageBlob !== null && $doctorImageMime !== null) {
