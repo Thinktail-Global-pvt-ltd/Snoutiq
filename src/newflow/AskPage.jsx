@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import { apiBaseUrl, apiPost } from "../lib/api";
+import logo from "../assets/images/logo.webp";
 import "./AskPage.css";
 
 const ASK_TITLE = "Snoutiq - Is My Pet Okay? Free AI Pet Health Check";
@@ -956,7 +957,15 @@ export default function AskPage() {
 
       <div className="ask-nav">
         <div className="ask-logo">
-          SN<b>🐾</b>UTIQ
+          <img
+            src={logo}
+            alt="SnoutIQ"
+            className="ask-logo-image"
+            width={130}
+            height={24}
+            loading="eager"
+            decoding="async"
+          />
         </div>
         <div className="ask-nav-actions">
           <div className="ask-badge">{navBadgeText}</div>
