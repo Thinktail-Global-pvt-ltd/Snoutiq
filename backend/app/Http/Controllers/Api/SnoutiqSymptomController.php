@@ -1297,6 +1297,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'turn' => $turn,
             'score' => $score,
             'health_score' => $ui['health_score']['value'] ?? null,
+            'score_band' => $ui['score_band'] ?? null,
             'response' => $response,
             'buttons' => $this->buttons($view),
             'ui' => $ui,
@@ -1311,12 +1312,14 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $healthScore = $this->healthScorePercent($routing, $score);
         $view = $this->uiViewFromHealthScore($healthScore, $routing);
         $healthMeta = $this->healthScoreMeta($healthScore);
+        $scoreBand = $this->scoreBandMeta($view);
         $petName = trim((string) ($pet['name'] ?? ''));
         $shareTitle = $petName !== '' ? 'Share ' . $this->possessive($petName) . ' score' : 'Share this score';
 
         return [
             'view' => $view,
             'theme' => $this->uiTheme($view),
+            'score_band' => $scoreBand,
             'banner' => $this->uiBanner($view, $pet, $response),
             'health_score' => [
                 'value' => $healthScore,
@@ -1394,6 +1397,36 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'subtitle' => 'Monitor closely at home',
             'color' => '#2E7D32',
         ];
+    }
+
+    private function scoreBandMeta(string $view): array
+    {
+        return match ($view) {
+            'emergency' => [
+                'min' => 0,
+                'max' => 30,
+                'range' => '0-30',
+                'view' => 'emergency',
+            ],
+            'in_clinic' => [
+                'min' => 31,
+                'max' => 55,
+                'range' => '31-55',
+                'view' => 'in_clinic',
+            ],
+            'monitor' => [
+                'min' => 76,
+                'max' => 100,
+                'range' => '76-100',
+                'view' => 'monitor',
+            ],
+            default => [
+                'min' => 56,
+                'max' => 75,
+                'range' => '56-75',
+                'view' => 'video_consult',
+            ],
+        };
     }
 
     private function uiTheme(string $view): string
