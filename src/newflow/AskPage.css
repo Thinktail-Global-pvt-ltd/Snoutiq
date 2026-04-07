@@ -63,8 +63,12 @@
   letter-spacing: -0.02em;
 }
 
-.ask-logo b {
-  color: var(--ask-orange);
+.ask-logo-image {
+  display: block;
+  width: auto;
+  max-width: 110px;
+  height: 20px;
+  object-fit: contain;
 }
 
 .ask-nav-actions {
