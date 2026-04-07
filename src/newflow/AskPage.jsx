@@ -76,10 +76,20 @@ const SPECIES_OPTIONS = [
 ];
 
 const CTA_ROUTE_MAP = {
-  video_consult: "/online-vet-consultation",
-  clinic: "/find-vets-near-you",
-  vet_at_home: "/vet-at-home-gurgaon",
-  emergency: "/find-vets-near-you",
+  video_consult: "/20+vetsonline?start=details",
+  clinic: "/vet-at-home-gurgaon/pet-details",
+  vet_at_home: "/vet-at-home-gurgaon/pet-details",
+  emergency: "/vet-at-home-gurgaon/pet-details",
+  govt: "/vet-at-home-gurgaon/pet-details",
+};
+
+const DEEPLINK_ROUTE_MAP = {
+  "snoutiq://video-consult": "/20+vetsonline?start=details",
+  "snoutiq://vet-at-home": "/vet-at-home-gurgaon/pet-details",
+  "snoutiq://clinic-booking": "/vet-at-home-gurgaon/pet-details",
+  "snoutiq://find-clinic": "/vet-at-home-gurgaon/pet-details",
+  "snoutiq://emergency": "/vet-at-home-gurgaon/pet-details",
+  "snoutiq://govt-hospitals": "/vet-at-home-gurgaon/pet-details",
 };
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
@@ -170,6 +180,22 @@ const getThemeClass = (theme = "video") => `ask-theme-${theme}`;
 
 const buildGoogleSearchUrl = (query) =>
   `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+
+const navigateToAskTarget = (navigate, target) => {
+  const route = String(target || "").trim();
+  if (!route) return;
+
+  if (route.includes("start=details")) {
+    window.location.assign(route);
+    return;
+  }
+
+  const [pathname, query = ""] = route.split("?");
+  navigate({
+    pathname: pathname || "/",
+    search: query ? `?${query}` : "",
+  });
+};
 
 const buildAssessmentShareText = (assessment) =>
   assessment?.ui?.health_score?.share?.whatsapp_text ||
@@ -866,18 +892,15 @@ export default function AskPage() {
       return;
     }
 
-    if (type === "govt") {
-      window.open(
-        buildGoogleSearchUrl("government veterinary hospital near me"),
-        "_blank",
-        "noopener,noreferrer"
-      );
+    const route = CTA_ROUTE_MAP[type];
+    if (route) {
+      navigateToAskTarget(navigate, route);
       return;
     }
 
-    const route = CTA_ROUTE_MAP[type];
-    if (route) {
-      navigate(route);
+    const deeplinkRoute = DEEPLINK_ROUTE_MAP[deeplink];
+    if (deeplinkRoute) {
+      navigateToAskTarget(navigate, deeplinkRoute);
       return;
     }
 
@@ -972,7 +995,9 @@ export default function AskPage() {
           <button
             type="button"
             className="ask-nav-button"
-            onClick={() => navigate("/online-vet-consultation")}
+            onClick={() =>
+              navigateToAskTarget(navigate, "/20+vetsonline?start=details")
+            }
           >
             Consult ₹499
           </button>
@@ -984,7 +1009,7 @@ export default function AskPage() {
           <div className="ask-chat-header">
             <div className="ask-avatar">🐾</div>
             <div className="ask-chat-meta">
-              <h2>Snoutiq Vet AI</h2>
+              <h2>Snoutiq AI</h2>
               <p>
                 <span className="ask-live-dot" />
                 AI triage · Vet-reviewed · Free
