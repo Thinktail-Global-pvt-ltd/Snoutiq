@@ -284,11 +284,13 @@ Route::get('/doctor/profile', function (Request $request) {
         }
     }
 
+    $doctorData = $doctor->toArray();
+    $doctorData['doctor_image_blob_url'] = empty($doctor->doctor_image_blob)
+        ? null
+        : route('api.doctors.blob-image', ['doctor' => $doctor->id]);
+
     return response()->json([
-        'data' => array_merge(
-            $doctor->toArray(),
-            ['clinic' => $clinic]
-        ),
+        'data' => array_merge($doctorData, ['clinic' => $clinic]),
     ]);
 });
 
@@ -1527,20 +1529,101 @@ Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
         return response()->json(['message' => 'Doctor not found'], 404);
     }
 
+    $doctorImageRule = $request->hasFile('doctor_image')
+        ? 'sometimes|file|image|max:5120'
+        : 'sometimes|nullable|string|max:500';
+
     $validated = $request->validate([
         'doctor_name' => 'sometimes|required|string|max:255',
         'doctor_email' => 'sometimes|nullable|email|max:255',
         'doctor_mobile' => 'sometimes|nullable|string|max:25',
         'doctor_license' => 'sometimes|nullable|string|max:150',
         'staff_role' => 'sometimes|nullable|string|max:100',
-        'doctor_image' => 'sometimes|nullable|string|max:500',
+        'doctor_image' => $doctorImageRule,
+        'doctor_image_base64' => 'sometimes|nullable|string',
         'doctor_document' => 'sometimes|nullable|string|max:500',
         'toggle_availability' => 'sometimes|boolean',
         'doctors_price' => 'sometimes|nullable|numeric|min:0|max:1000000',
         'vet_registeration_id' => 'sometimes|nullable|integer|exists:vet_registerations_temp,id',
     ]);
 
+    $doctorImageBlob = null;
+    $doctorImageMime = null;
+
+    $extractBlobFromDataUri = static function (?string $value): array {
+        if (!$value || !str_starts_with($value, 'data:image')) {
+            return [null, null];
+        }
+
+        if (!preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s', $value, $matches)) {
+            return [null, null];
+        }
+
+        $mime = strtolower(trim($matches[1]));
+        $rawBase64 = str_replace(' ', '+', $matches[2]);
+        $binary = base64_decode($rawBase64, true);
+
+        if ($binary === false) {
+            return [null, null];
+        }
+
+        return [$binary, $mime];
+    };
+
+    if ($request->hasFile('doctor_image')) {
+        if (!Schema::hasColumn('doctors', 'doctor_image_blob') || !Schema::hasColumn('doctors', 'doctor_image_mime')) {
+            return response()->json([
+                'message' => 'doctor_image blob columns are missing. Please run migrations.',
+            ], 500);
+        }
+
+        $file = $request->file('doctor_image');
+        if (!$file || !$file->isValid()) {
+            return response()->json([
+                'message' => $file?->getErrorMessage() ?: 'Invalid image upload.',
+            ], 422);
+        }
+
+        $doctorImageBlob = $file->get();
+        $doctorImageMime = $file->getMimeType() ?: ($file->getClientMimeType() ?: 'image/jpeg');
+        $validated['doctor_image'] = null;
+    } elseif (!empty($validated['doctor_image_base64'])) {
+        if (!Schema::hasColumn('doctors', 'doctor_image_blob') || !Schema::hasColumn('doctors', 'doctor_image_mime')) {
+            return response()->json([
+                'message' => 'doctor_image blob columns are missing. Please run migrations.',
+            ], 500);
+        }
+
+        [$doctorImageBlob, $doctorImageMime] = $extractBlobFromDataUri((string) $validated['doctor_image_base64']);
+        if (!$doctorImageBlob || !$doctorImageMime) {
+            return response()->json([
+                'message' => 'Invalid doctor_image_base64 data URI.',
+            ], 422);
+        }
+        $validated['doctor_image'] = null;
+    } elseif (!empty($validated['doctor_image']) && str_starts_with((string) $validated['doctor_image'], 'data:image')) {
+        if (!Schema::hasColumn('doctors', 'doctor_image_blob') || !Schema::hasColumn('doctors', 'doctor_image_mime')) {
+            return response()->json([
+                'message' => 'doctor_image blob columns are missing. Please run migrations.',
+            ], 500);
+        }
+
+        [$doctorImageBlob, $doctorImageMime] = $extractBlobFromDataUri((string) $validated['doctor_image']);
+        if (!$doctorImageBlob || !$doctorImageMime) {
+            return response()->json([
+                'message' => 'Invalid doctor_image data URI.',
+            ], 422);
+        }
+        $validated['doctor_image'] = null;
+    }
+
+    unset($validated['doctor_image_base64']);
+
     $doctor->fill($validated);
+    if ($doctorImageBlob !== null && $doctorImageMime !== null) {
+        $doctor->doctor_image_blob = $doctorImageBlob;
+        $doctor->doctor_image_mime = $doctorImageMime;
+    }
     $doctor->save();
 
     return response()->json([
@@ -1552,6 +1635,9 @@ Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
             'doctor_mobile' => $doctor->doctor_mobile,
             'doctor_license' => $doctor->doctor_license,
             'doctor_image' => $doctor->doctor_image,
+            'doctor_image_blob_url' => empty($doctor->doctor_image_blob)
+                ? null
+                : route('api.doctors.blob-image', ['doctor' => $doctor->id]),
             'doctor_document' => $doctor->doctor_document,
             'toggle_availability' => $doctor->toggle_availability,
             'doctors_price' => $doctor->doctors_price,
