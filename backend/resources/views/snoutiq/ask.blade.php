@@ -37,7 +37,7 @@ body{font-family:'DM Sans',sans-serif;background:#EEF2F7;color:var(--ink);displa
 .chdr-info p{font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:4px}
 .ldot{width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 2s ease infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.dbar{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;flex-shrink:0;background:var(--surface)}
+.dbar{display:none;gap:6px;padding:9px 12px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;flex-shrink:0;background:var(--surface)}
 .dbar::-webkit-scrollbar{display:none}
 .dtab{padding:5px 11px;border-radius:50px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid transparent;white-space:nowrap;transition:all .15s;font-family:'DM Sans',sans-serif;letter-spacing:.01em}
 .dtab.i{background:#f3f4f6;color:var(--muted);border-color:#d1d5db}.dtab.i.on{background:var(--ink);color:#fff}
@@ -193,6 +193,12 @@ body{font-family:'DM Sans',sans-serif;background:#EEF2F7;color:var(--ink);displa
 .sendbtn{width:42px;height:42px;background:var(--blue);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s,background .15s}
 .sendbtn:hover{background:var(--blue-mid);transform:scale(1.05)}
 .sendbtn svg{width:17px;height:17px;fill:#fff}
+.live-thread{display:flex;flex-direction:column;gap:14px}
+.live-empty{border:1.5px dashed var(--border);border-radius:var(--r);padding:18px 16px;color:var(--muted);font-size:13.5px;line-height:1.5;background:var(--surface);text-align:center}
+.loading-row{display:flex;justify-content:flex-start}
+.loading-row .tbub{background:var(--white)}
+.errbox{background:#fff5f5;border:1px solid #fecaca;color:#991b1b;border-radius:var(--r-sm);padding:12px 14px;font-size:13px;line-height:1.45}
+.mini-meta{font-size:11px;color:var(--muted);margin-bottom:8px}
 @media(max-width:480px){.ub-title{font-size:19px}.idle-h{font-size:23px}.qgrid{grid-template-columns:1fr 1fr}.cbdy{padding:13px}.cbody{padding:13px 11px}}
 </style>
 </head>
@@ -201,8 +207,8 @@ body{font-family:'DM Sans',sans-serif;background:#EEF2F7;color:var(--ink);displa
 <nav class="nav">
   <div class="logo">SN<b>🐾</b>UTIQ</div>
   <div class="nav-r">
-    <div class="checks-badge" id="chk-badge">2 free checks left</div>
-    <button class="nav-cta" onclick="switchDemo('v')">Consult ₹499</button>
+    <div class="checks-badge" id="chk-badge">New session</div>
+    <button class="nav-cta" onclick="openDefaultVideoConsult()">Consult ₹499</button>
   </div>
 </nav>
 <div class="page">
@@ -249,6 +255,11 @@ body{font-family:'DM Sans',sans-serif;background:#EEF2F7;color:var(--ink);displa
         <button class="sbtn" onclick="setSp(this,'cat')">🐈 Cat</button>
         <button class="sbtn" onclick="setSp(this,'rabbit')">🐇 Rabbit</button>
         <button class="sbtn" onclick="setSp(this,'bird')">🐦 Bird</button>
+      </div>
+    </div>
+    <div class="screen" id="s-live">
+      <div id="liveThread" class="live-thread">
+        <div class="live-empty" id="liveEmpty">Describe symptoms to start a live assessment. The page will keep using the returned session ID for follow-up context.</div>
       </div>
     </div>
     <div class="screen" id="s-e">
@@ -569,27 +580,25 @@ body{font-family:'DM Sans',sans-serif;background:#EEF2F7;color:var(--ink);displa
 </div>
 <script>
 const ASK_URL = @json(url('/ask'));
+const API_BASE = @json(url('/api'));
+const SESSION_STORAGE_KEY = 'snoutiq_symptom_session_id';
 let species = 'dog';
+let currentSessionId = sessionStorage.getItem(SESSION_STORAGE_KEY) || '';
+let isSending = false;
 
-function sw(name, el) {
+function showScreen(name) {
   document.querySelectorAll('.screen').forEach((screen) => screen.classList.remove('on'));
-  document.querySelectorAll('.dtab').forEach((tab) => tab.classList.remove('on'));
-  document.getElementById('s-' + name).classList.add('on');
-  if (el) {
-    el.classList.add('on');
+  const screen = document.getElementById('s-' + name);
+  if (screen) {
+    screen.classList.add('on');
   }
-  document.getElementById('cbody').scrollTop = 0;
-}
-
-function switchDemo(name) {
-  const map = { v: 'v', video: 'v', emergency: 'e', clinic: 'c', monitor: 'm' };
-  sw(map[name] || name);
 }
 
 function setSp(btn, sp) {
   document.querySelectorAll('.sbtn').forEach((button) => button.classList.remove('on'));
   btn.classList.add('on');
   species = sp;
+  sessionStorage.setItem('snoutiq_symptom_species', species);
 }
 
 function qsend(txt) {
@@ -597,24 +606,250 @@ function qsend(txt) {
   send();
 }
 
-function send() {
+function speciesLabel(sp) {
+  return { dog: 'Dog', cat: 'Cat', rabbit: 'Rabbit', bird: 'Bird' }[sp] || 'Pet';
+}
+
+function speciesEmoji(sp) {
+  return { dog: '🐕', cat: '🐈', rabbit: '🐇', bird: '🐦' }[sp] || '🐾';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatTime(date = new Date()) {
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function updateBadge(turn = null) {
+  const badge = document.getElementById('chk-badge');
+  if (!badge) return;
+  if (!currentSessionId) {
+    badge.textContent = 'New session';
+    return;
+  }
+  const shortId = currentSessionId.replace(/^room_/, '').slice(0, 8);
+  badge.textContent = turn ? `Turn ${turn} · ${shortId}` : `Session ${shortId}`;
+}
+
+function openDefaultVideoConsult() {
+  openCta('snoutiq://video-consult');
+}
+
+function openCta(link) {
+  if (!link) return;
+  if (/^https?:\/\//i.test(link)) {
+    window.open(link, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  window.location.href = link;
+}
+
+function ensureLiveThreadVisible() {
+  showScreen('live');
+  const empty = document.getElementById('liveEmpty');
+  if (empty) {
+    empty.remove();
+  }
+}
+
+function appendHtml(html) {
+  ensureLiveThreadVisible();
+  const thread = document.getElementById('liveThread');
+  thread.insertAdjacentHTML('beforeend', html);
+  document.getElementById('cbody').scrollTop = document.getElementById('cbody').scrollHeight;
+}
+
+function renderUserBlock(message) {
+  const pill = `${speciesEmoji(species)} ${speciesLabel(species)} · Live AI session`;
+  return `
+    <div style="display:flex;justify-content:flex-end"><div class="ppill">${escapeHtml(pill)}</div></div>
+    <div class="mrow" data-kind="user-message">
+      <div>
+        <div class="mbub">${escapeHtml(message)}</div>
+        <div class="mtime">${escapeHtml(formatTime())}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderLoadingBlock(id) {
+  return `
+    <div class="loading-row" id="${escapeHtml(id)}">
+      <div class="tbub"><div class="td"></div><div class="td"></div><div class="td"></div></div>
+    </div>
+  `;
+}
+
+function getRoutingTheme(routing) {
+  return ({
+    emergency: 'emergency',
+    video_consult: 'video',
+    in_clinic: 'clinic',
+    monitor: 'monitor',
+  })[routing] || 'video';
+}
+
+function getRoutingTitle(routing) {
+  return ({
+    emergency: 'Go to Emergency Vet Now',
+    video_consult: 'See a Vet Today via Video',
+    in_clinic: 'Visit a Vet Clinic Today',
+    monitor: 'Monitor at Home for Now',
+  })[routing] || 'See a Vet Today';
+}
+
+function getRoutingLabel(routing, revised) {
+  if (revised) {
+    return 'Assessment updated using your latest answer';
+  }
+  return ({
+    emergency: 'Assessment complete — urgent action needed',
+    video_consult: 'Assessment complete — routing decision',
+    in_clinic: 'Assessment complete — routing decision',
+    monitor: 'Assessment complete — home monitoring guidance',
+  })[routing] || 'Assessment complete';
+}
+
+function renderActionButton(button, themeClass) {
+  if (!button || !button.label) return '';
+  return `<button class="${button.type === 'video_consult' || themeClass === 'emergency' || themeClass === 'clinic' || themeClass === 'monitor' ? 'btn-p ' + themeClass : 'btn-s'}" data-link="${escapeHtml(button.deeplink || '')}" onclick="openCta(this.dataset.link)">${escapeHtml(button.label)}</button>`;
+}
+
+function renderList(items = [], type = 'watch') {
+  if (!Array.isArray(items) || !items.length) return '';
+  if (type === 'causes') {
+    return `<div><div class="slbl">Most likely causes</div><div class="cpills">${items.map((item) => `<span class="cpill">${escapeHtml(item)}</span>`).join('')}</div></div>`;
+  }
+  return `
+    <div>
+      <div class="slbl">Watch for</div>
+      <div class="wlist">
+        ${items.map((item) => `<div class="wi"><span class="wiico">•</span><p>${escapeHtml(item)}</p></div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderResultCard(payload, options = {}) {
+  const revised = Boolean(options.revised);
+  const routing = payload.routing || 'video_consult';
+  const theme = getRoutingTheme(routing);
+  const response = payload.response || {};
+  const detail = payload.triage_detail || {};
+  const buttons = payload.buttons || {};
+  const subtitle = response.diagnosis_summary || response.message || 'Live assessment generated for the current symptoms.';
+  const primary = renderActionButton(buttons.primary, theme);
+  const secondary = buttons.secondary
+    ? `<button class="btn-s" data-link="${escapeHtml(buttons.secondary.deeplink || '')}" onclick="openCta(this.dataset.link)">${escapeHtml(buttons.secondary.label || 'Learn More')}</button>`
+    : '';
+  const turnMeta = payload.turn ? `Turn ${payload.turn}` : 'Live response';
+  const scoreMeta = typeof payload.score === 'number' ? ` · Score ${payload.score}/10` : '';
+  const severityMeta = payload.severity ? ` · ${escapeHtml(payload.severity)}` : '';
+
+  return `
+    <div class="rcard" data-kind="assistant-card">
+      <div class="ub ${theme}">
+        <div class="ub-lbl">${escapeHtml(getRoutingLabel(routing, revised))}</div>
+        <div class="ub-title">${escapeHtml(getRoutingTitle(routing))}</div>
+        <div class="ub-sub">${escapeHtml(subtitle)}</div>
+        <div class="tbadge">🕐 ${escapeHtml(response.time_sensitivity || 'Review this guidance now')}</div>
+      </div>
+      <div class="cbdy">
+        ${revised ? '<div class="rbadge">✓ Assessment updated</div>' : ''}
+        <div class="mini-meta">${turnMeta}${scoreMeta}${severityMeta}</div>
+        <div class="ablock">
+          <div class="aico">🩺</div>
+          <div class="atxt">
+            <div class="slbl">What we think is happening</div>
+            <p>${escapeHtml(response.message || 'No assessment text was returned.')}</p>
+          </div>
+        </div>
+        ${response.do_now ? `<div class="donow"><div class="dnicon">⚡</div><div><div class="slbl">Do this right now</div><p>${escapeHtml(response.do_now)}</p></div></div>` : ''}
+        ${detail.india_context ? `<div class="india"><span>🇮🇳</span><span>${escapeHtml(detail.india_context)}</span></div>` : ''}
+        ${renderList(response.what_to_watch || [], 'watch')}
+        ${renderList(detail.possible_causes || [], 'causes')}
+        ${(primary || secondary) ? `<div class="ctas">${primary}${secondary}</div>` : ''}
+      </div>
+      <div class="disc"><div class="disc-i">🤖</div><div><div class="disc-t">Snoutiq AI — triage only</div><p>AI-generated guidance. Not a diagnosis. Always follow a licensed vet's advice.</p></div></div>
+    </div>
+  `;
+}
+
+function replaceLoadingWithError(id, message) {
+  const loading = document.getElementById(id);
+  if (!loading) return;
+  loading.outerHTML = `<div class="errbox">${escapeHtml(message)}</div>`;
+}
+
+function replaceLoadingWithCard(id, payload, options = {}) {
+  const loading = document.getElementById(id);
+  if (!loading) return;
+  loading.outerHTML = renderResultCard(payload, options);
+}
+
+async function postJson(url, payload) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const raw = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(raw);
+  } catch (_) {}
+  return { ok: res.ok, status: res.status, json, raw };
+}
+
+async function send() {
+  if (isSending) return;
   const el = document.getElementById('inp');
   const msg = el.value.trim();
   if (!msg) return;
 
+  isSending = true;
+  appendHtml(renderUserBlock(msg));
+  const loadingId = `loading-${Date.now()}`;
+  appendHtml(renderLoadingBlock(loadingId));
+
   el.value = '';
   el.style.height = 'auto';
 
-  const t = msg.toLowerCase();
-  let target = 'v';
-  if (/collaps|bleed|seizure|poison|not breath|limp body|bloat|gdv/.test(t)) target = 'e';
-  else if (/limp|swell|swollen|fracture|lame|bone|joint|can.t walk/.test(t)) target = 'c';
-  else if (/sneez|mild|slight|occasional|once|a bit/.test(t)) target = 'm';
+  try {
+    const endpoint = currentSessionId ? `${API_BASE}/symptom-followup` : `${API_BASE}/symptom-check`;
+    const payload = currentSessionId
+      ? { session_id: currentSessionId, message: msg }
+      : { message: msg, species };
 
-  sw(target);
+    const result = await postJson(endpoint, payload);
+    if (!result.ok || !result.json) {
+      replaceLoadingWithError(loadingId, 'Unable to get a live assessment right now. Please try again.');
+      return;
+    }
+
+    currentSessionId = result.json.session_id || currentSessionId;
+    if (currentSessionId) {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, currentSessionId);
+    }
+
+    updateBadge(result.json.turn ?? null);
+    replaceLoadingWithCard(loadingId, result.json);
+  } catch (_) {
+    replaceLoadingWithError(loadingId, 'Network error while fetching the assessment.');
+  } finally {
+    isSending = false;
+  }
 }
 
-function answerFQ(btn, id) {
+async function answerFQ(btn, id, answerText) {
+  if (!currentSessionId || isSending) return;
   const opts = btn.closest('.fopts');
   opts.querySelectorAll('.fopt').forEach((button) => {
     button.classList.remove('sel');
@@ -625,14 +860,36 @@ function answerFQ(btn, id) {
   const upd = document.getElementById('fu-' + id);
   upd.classList.add('show');
 
-  setTimeout(() => {
+  try {
+    isSending = true;
+    const question = btn.closest('.fcard')?.querySelector('.fq')?.textContent?.trim() || '';
+    const result = await postJson(`${API_BASE}/symptom-answer`, {
+      session_id: currentSessionId,
+      question,
+      answer: answerText || btn.textContent.trim(),
+    });
+
     upd.classList.remove('show');
-    document.getElementById('fq-' + id).style.opacity = '.55';
-    const rev = document.getElementById('rev-' + id);
-    if (rev) {
-      rev.style.display = 'block';
+    if (!result.ok || !result.json) {
+      return;
     }
-  }, 2200);
+
+    currentSessionId = result.json.session_id || currentSessionId;
+    if (currentSessionId) {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, currentSessionId);
+    }
+
+    updateBadge(result.json.turn ?? null);
+    const lastCard = document.querySelector('#liveThread [data-kind="assistant-card"]:last-of-type');
+    if (lastCard) {
+      lastCard.outerHTML = renderResultCard(result.json, { revised: true });
+      ensureLiveThreadVisible();
+    }
+  } catch (_) {
+    upd.classList.remove('show');
+  } finally {
+    isSending = false;
+  }
 }
 
 function shareWA(routing, petName, score) {
@@ -663,6 +920,18 @@ function resize(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 100) + 'px';
 }
+
+const storedSpecies = sessionStorage.getItem('snoutiq_symptom_species');
+if (storedSpecies) {
+  species = storedSpecies;
+  const match = Array.from(document.querySelectorAll('.sbtn')).find((button) => button.textContent.toLowerCase().includes(storedSpecies));
+  if (match) {
+    document.querySelectorAll('.sbtn').forEach((button) => button.classList.remove('on'));
+    match.classList.add('on');
+  }
+}
+
+updateBadge();
 
 document.getElementById('inp').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {

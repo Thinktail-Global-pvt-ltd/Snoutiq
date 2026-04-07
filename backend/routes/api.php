@@ -1919,6 +1919,7 @@ Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']);
 Route::post('/chat/send', [SnoutiqSymptomController::class, 'chatSend']);
 Route::post('/symptom-check', [SnoutiqSymptomController::class, 'check']);
 Route::post('/symptom-followup', [SnoutiqSymptomController::class, 'followup']);
+Route::post('/symptom-answer', [SnoutiqSymptomController::class, 'answer']);
 Route::get('/symptom-session/{session_id}', [SnoutiqSymptomController::class, 'session']);
 Route::post('/symptom-session/{session_id}/reset', [SnoutiqSymptomController::class, 'resetSession']);
 Route::post('/chat/dog-disease', [GeminiChatController::class, 'dogDisease']);
