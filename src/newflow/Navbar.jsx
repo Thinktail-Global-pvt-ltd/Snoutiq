@@ -53,7 +53,7 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
     <nav className="sticky top-0 z-50 w-full border-b border-brand/20 bg-white/80 backdrop-blur-md">
       <div className="bg-brand px-4 py-2 text-center text-sm font-bold text-slate-900">
         <Link
-          to="/symptoms"
+          to="/ask"
           className="flex items-center justify-center gap-2 hover:underline"
         >
           <span>🚀 New: AI Symptom Checker for Pet Parents - Try it now!</span>

@@ -82,7 +82,7 @@ export default function NewCounsult() {
                 </p>
 
                 <Link
-                  to="/symptoms"
+                  to="/ask"
                   className="inline-flex items-center gap-2 bg-brand text-slate-900 font-bold px-6 py-3 rounded-xl hover:bg-brand-hover transition-colors"
                 >
                   Try AI Symptom Checker <ArrowRight className="w-5 h-5" />

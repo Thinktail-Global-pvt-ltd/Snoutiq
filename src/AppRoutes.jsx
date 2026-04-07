@@ -145,7 +145,7 @@ export default function AppRoutes() {
 
         <Route path="/investor-relations" element={<InvesterPage/>}/>
 
-        <Route path="/symptoms" element={<SymptomsHub />} />
+        <Route path="/ask" element={<SymptomsHub />} />
         <Route
           path="/puppy-vaccination-delhi"
           element={<PuppyVaccinationDelhi />}

@@ -83,7 +83,7 @@ export function NewFooter() {
           <div>
             <h3 className="mb-4 font-semibold text-slate-900">Resources</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/symptoms" className="hover:text-brand transition-colors">Symptom Checker</Link></li>
+              <li><Link to="/ask" className="hover:text-brand transition-colors">Symptom Checker</Link></li>
               <li><Link to="/vet-insights" className="hover:text-brand transition-colors">Vet Insights</Link></li>
               <li><Link to="/blog" className="hover:text-brand transition-colors">Blog</Link></li>
               <li><Link to="/vet-insights/interview-dr-sharma-emergency-care" className="hover:text-brand transition-colors">Emergency Care Guide</Link></li>

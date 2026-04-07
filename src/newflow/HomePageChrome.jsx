@@ -471,7 +471,7 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
     <nav className="sticky top-0 z-50 w-full border-b border-brand/20 bg-white/80 backdrop-blur-md">
       <div className="bg-brand px-4 py-2 text-center text-sm font-bold text-slate-900">
         <Link
-          to="/symptoms"
+          to="/ask"
           className="flex items-center justify-center gap-2 hover:underline"
         >
           <span>New: AI Symptom Checker for Pet Parents - Try it now!</span>
@@ -691,7 +691,7 @@ export function Footer() {
             <h3 className="mb-4 font-semibold text-slate-900">Resources</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/symptoms" className="transition-colors hover:text-brand">
+                <Link to="/ask" className="transition-colors hover:text-brand">
                   Symptom Checker
                 </Link>
               </li>
