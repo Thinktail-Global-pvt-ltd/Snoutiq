@@ -99,6 +99,20 @@ const SymptomsHub = lazy(() => import("./newflow/SymptomsHub"));
 const PuppyVaccinationDelhi = lazy(() =>
   import("./newflow/PuppyVaccinationDelhi")
 );
+const VideoCallPetDetails = lazy(() =>
+  import("./newflow/askBooking/VideoCallPetDetails")
+);
+const VideoCallPayment = lazy(() =>
+  import("./newflow/askBooking/VideoCallPayment").then((module) => ({
+    default: module.VideoCallPayment,
+  }))
+);
+const VetNearMePetDetailsPage = lazy(() =>
+  import("./newflow/askBooking/VetNearPetDetails")
+);
+const VetNearMePaymentPage = lazy(() =>
+  import("./newflow/askBooking/VetNearPayment")
+);
 const KittenVaccinationDelhi = lazy(() =>
   import("./newflow/KittenVaccinationDelhi")
 );
@@ -117,6 +131,12 @@ export default function AppRoutes() {
   return (
     <HelmetProvider>
       <Routes>
+        <Route path="/video-call-pet-details" element={<VideoCallPetDetails />} />
+        <Route path="/video-call-payment" element={<VideoCallPayment />} />
+       <Route path="/vet-near-me-pet-details" element={<VetNearMePetDetailsPage />} />
+        <Route path="/vet-near-me-payment" element={<VetNearMePaymentPage />} />
+
+
         <Route path="/about" element={<NewAbout />} />
         <Route path="/parents" element={<NewCounsult />} />
         <Route path="/clinics" element={<NewClinics />} />

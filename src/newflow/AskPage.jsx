@@ -86,20 +86,20 @@ const SPECIES_OPTIONS = [
 ];
 
 const CTA_ROUTE_MAP = {
-  video_consult: "/20+vetsonline?start=details",
-  clinic: "/vet-at-home-gurgaon/pet-details",
-  vet_at_home: "/vet-at-home-gurgaon/pet-details",
-  emergency: "/vet-at-home-gurgaon/pet-details",
-  govt: "/vet-at-home-gurgaon/pet-details",
+  video_consult: "/video-call-pet-details",
+  clinic: "/vet-near-me-pet-details",
+  vet_at_home: "/vet-near-me-pet-details",
+  emergency: "/vet-near-me-pet-details",
+  govt: "/vet-near-me-pet-details",
 };
 
 const DEEPLINK_ROUTE_MAP = {
-  "snoutiq://video-consult": "/20+vetsonline?start=details",
-  "snoutiq://vet-at-home": "/vet-at-home-gurgaon/pet-details",
-  "snoutiq://clinic-booking": "/vet-at-home-gurgaon/pet-details",
-  "snoutiq://find-clinic": "/vet-at-home-gurgaon/pet-details",
-  "snoutiq://emergency": "/vet-at-home-gurgaon/pet-details",
-  "snoutiq://govt-hospitals": "/vet-at-home-gurgaon/pet-details",
+  "snoutiq://video-consult": "/video-call-pet-details",
+  "snoutiq://vet-at-home": "/vet-near-me-pet-details",
+  "snoutiq://clinic-booking": "/vet-near-me-pet-details",
+  "snoutiq://find-clinic": "/vet-near-me-pet-details",
+  "snoutiq://emergency": "/vet-near-me-pet-details",
+  "snoutiq://govt-hospitals": "/vet-near-me-pet-details",
 };
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
