@@ -595,22 +595,6 @@ function IdleScreen({ species, onSpeciesSelect, onQuickStart }) {
         ))}
       </div>
 
-      <div className="ask-section-label">My pet is a</div>
-      <div className="ask-species-row">
-        {SPECIES_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={`ask-species-button${
-              species === option.value ? " is-active" : ""
-            }`}
-            onClick={() => onSpeciesSelect(option.value)}
-          >
-            <span>{option.emoji}</span>
-            <span>{option.label}</span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1621,26 +1605,40 @@ export default function AskPage() {
     }
   };
 
-  const handleSend = async ({ message, nextSpecies } = {}) => {
-    const messageText = String(message ?? inputValue).trim();
-    const speciesValue = String(nextSpecies || species || "dog").trim() || "dog";
+ const handleSend = async ({ message, nextSpecies } = {}) => {
+  const messageText = String(message ?? inputValue).trim();
+  const speciesValue = String(nextSpecies || species || "dog").trim() || "dog";
 
-    if (!messageText || loading) return;
+  if (!messageText || loading) return;
 
-    if (!sessionId) {
-      setSpecies(speciesValue);
-      setInputValue(messageText);
-      setPendingInitialRequest({
-        message: messageText,
-        species: speciesValue,
+  if (!sessionId) {
+    const storedProfile = sanitizeAskProfile(readStoredProfile());
+    const profileErrors = validateAskProfile(storedProfile);
+
+    setSpecies(speciesValue);
+
+    if (Object.keys(profileErrors).length === 0) {
+      setAskProfile(storedProfile);
+      await sendAssessmentRequest({
+        messageText,
+        speciesValue,
+        profileValue: storedProfile,
       });
-      setIntakeErrors({});
-      setIntakeOpen(true);
       return;
     }
 
-    await sendAssessmentRequest({ messageText, speciesValue });
-  };
+    setInputValue(messageText);
+    setPendingInitialRequest({
+      message: messageText,
+      species: speciesValue,
+    });
+    setIntakeErrors({});
+    setIntakeOpen(true);
+    return;
+  }
+
+  await sendAssessmentRequest({ messageText, speciesValue });
+};
 
   const handleQuickStart = (item) => {
     setSpecies(item.species);
