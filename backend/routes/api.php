@@ -1542,10 +1542,61 @@ Route::match(['post', 'put', 'patch'], '/doctor/profile', function (Request $req
         'toggle_availability' => 'sometimes|boolean',
         'doctors_price' => 'sometimes|nullable|numeric|min:0|max:1000000',
         'vet_registeration_id' => 'sometimes|nullable|integer|exists:vet_registerations_temp,id',
+        'clinic_name' => 'sometimes|nullable|string|max:255',
+        'clinic_email' => 'sometimes|nullable|email|max:255',
+        'clinic_mobile' => 'sometimes|nullable|string|max:25',
+        'clinic_city' => 'sometimes|nullable|string|max:120',
+        'clinic_address' => 'sometimes|nullable|string|max:500',
+        'clinic_pincode' => 'sometimes|nullable|string|max:20',
+        'clinic_profile' => 'sometimes|nullable|string|max:255',
+        'hospital_profile' => 'sometimes|nullable|string|max:255',
+        'clinic_license_no' => 'sometimes|nullable|string|max:120',
+        'clinic_chat_price' => 'sometimes|nullable|numeric|min:0|max:1000000',
+        'clinic_bio' => 'sometimes|nullable|string|max:2000',
+        'vet_name' => 'sometimes|nullable|string|max:255',
+        'vet_email' => 'sometimes|nullable|email|max:255',
+        'vet_mobile' => 'sometimes|nullable|string|max:25',
+        'vet_city' => 'sometimes|nullable|string|max:120',
+        'vet_address' => 'sometimes|nullable|string|max:500',
+        'vet_pincode' => 'sometimes|nullable|string|max:20',
+        'address' => 'sometimes|nullable|string|max:500',
+        'city' => 'sometimes|nullable|string|max:120',
+        'pincode' => 'sometimes|nullable|string|max:20',
     ]);
 
     $doctorImageBlob = null;
     $doctorImageMime = null;
+    $normalizeString = static function ($value): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    };
+    $formatClinic = static function (?VetRegisterationTemp $clinicRow): ?array {
+        if (!$clinicRow) {
+            return null;
+        }
+
+        return [
+            'id' => $clinicRow->id,
+            'name' => $clinicRow->name ?? null,
+            'slug' => $clinicRow->slug ?? null,
+            'email' => $clinicRow->email ?? null,
+            'mobile' => $clinicRow->mobile ?? null,
+            'address' => $clinicRow->address ?? null,
+            'city' => $clinicRow->city ?? null,
+            'pincode' => $clinicRow->pincode ?? null,
+            'image' => $clinicRow->image ?? null,
+            'clinic_profile' => $clinicRow->clinic_profile ?? null,
+            'hospital_profile' => $clinicRow->hospital_profile ?? null,
+            'license_no' => $clinicRow->license_no ?? null,
+            'chat_price' => $clinicRow->chat_price ?? null,
+            'bio' => $clinicRow->bio ?? null,
+        ];
+    };
 
     $extractBlobFromDataUri = static function (?string $value): array {
         if (!$value || !str_starts_with($value, 'data:image')) {
@@ -1633,12 +1684,90 @@ Route::match(['post', 'put', 'patch'], '/doctor/profile', function (Request $req
 
     unset($validated['doctor_image_base64'], $validated['doctor_image_file']);
 
-    $doctor->fill($validated);
-    if ($doctorImageBlob !== null && $doctorImageMime !== null) {
-        $doctor->doctor_image_blob = $doctorImageBlob;
-        $doctor->doctor_image_mime = $doctorImageMime;
+    $doctorUpdateKeys = [
+        'doctor_name',
+        'doctor_email',
+        'doctor_mobile',
+        'doctor_license',
+        'staff_role',
+        'doctor_image',
+        'doctor_document',
+        'toggle_availability',
+        'doctors_price',
+        'vet_registeration_id',
+    ];
+    $doctorUpdates = array_intersect_key($validated, array_flip($doctorUpdateKeys));
+
+    $clinicFieldAliases = [
+        'name' => ['clinic_name', 'vet_name'],
+        'email' => ['clinic_email', 'vet_email'],
+        'mobile' => ['clinic_mobile', 'vet_mobile'],
+        'city' => ['clinic_city', 'vet_city', 'city'],
+        'address' => ['clinic_address', 'vet_address', 'address'],
+        'pincode' => ['clinic_pincode', 'vet_pincode', 'pincode'],
+        'clinic_profile' => ['clinic_profile'],
+        'hospital_profile' => ['hospital_profile'],
+        'license_no' => ['clinic_license_no'],
+        'chat_price' => ['clinic_chat_price'],
+        'bio' => ['clinic_bio'],
+    ];
+    $clinicUpdates = [];
+
+    foreach ($clinicFieldAliases as $target => $sources) {
+        foreach ($sources as $source) {
+            if (!array_key_exists($source, $validated)) {
+                continue;
+            }
+
+            $value = $validated[$source];
+            $clinicUpdates[$target] = $target === 'chat_price'
+                ? ($value === null ? null : (float) $value)
+                : $normalizeString($value);
+            break;
+        }
     }
-    $doctor->save();
+
+    $clinic = null;
+    if (!empty($clinicUpdates)) {
+        $clinicId = $doctorUpdates['vet_registeration_id'] ?? $doctor->vet_registeration_id;
+        if (!$clinicId) {
+            return response()->json([
+                'message' => 'vet_registeration_id is required to update clinic fields.',
+            ], 422);
+        }
+
+        $clinic = VetRegisterationTemp::find($clinicId);
+        if (!$clinic) {
+            return response()->json([
+                'message' => 'Related clinic not found.',
+            ], 404);
+        }
+    } elseif (!empty($doctorUpdates['vet_registeration_id'])) {
+        $clinic = VetRegisterationTemp::find($doctorUpdates['vet_registeration_id']);
+    } elseif (!empty($doctor->vet_registeration_id)) {
+        $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+    }
+
+    DB::transaction(function () use ($doctor, $doctorUpdates, $doctorImageBlob, $doctorImageMime, $clinic, $clinicUpdates) {
+        $doctor->fill($doctorUpdates);
+        if ($doctorImageBlob !== null && $doctorImageMime !== null) {
+            $doctor->doctor_image_blob = $doctorImageBlob;
+            $doctor->doctor_image_mime = $doctorImageMime;
+        }
+        $doctor->save();
+
+        if ($clinic && !empty($clinicUpdates)) {
+            $clinic->fill($clinicUpdates);
+            $clinic->save();
+        }
+    });
+
+    $doctor->refresh();
+    if ($doctor->vet_registeration_id) {
+        $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+    } else {
+        $clinic = null;
+    }
 
     return response()->json([
         'message' => 'Doctor profile updated successfully.',
@@ -1657,6 +1786,7 @@ Route::match(['post', 'put', 'patch'], '/doctor/profile', function (Request $req
             'doctors_price' => $doctor->doctors_price,
             'vet_registeration_id' => $doctor->vet_registeration_id,
             'staff_role' => $doctor->staff_role,
+            'clinic' => $formatClinic($clinic),
         ],
     ]);
 });
