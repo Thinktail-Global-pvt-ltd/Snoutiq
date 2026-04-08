@@ -854,12 +854,16 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "Instruction: " . ($routingInstructions[$routing] ?? $routingInstructions['video_consult']) . "\n\n" .
             "The `message` field must sound natural and should reference what the owner is seeing right now. " .
             "If there is recent conversation history, continue from it instead of restarting.\n\n" .
+            "If routing is video_consult or in_clinic, include ONE focused follow-up question that would meaningfully change the advice. " .
+            "Give 2-3 short answer choices. If routing is emergency, set follow_up_question to null.\n\n" .
             "Return ONLY this JSON:\n" .
             '{"message":"Main response 2-4 sentences plain language",' .
+            '"what_we_think_is_happening":"2-4 sentence explanation for the section titled What we think is happening",' .
             '"diagnosis_summary":"One short sentence with preliminary likely causes, never a confirmed diagnosis",' .
             '"do_now":"One immediate action",' .
             '"time_sensitivity":"e.g. Go now / Within 2-4 hours / If not better in 24 hours",' .
-            '"what_to_watch":["sign1","sign2","sign3"]}';
+            '"what_to_watch":["sign1","sign2","sign3"],' .
+            '"follow_up_question":{"label":"One question to narrow this down","question":"One focused question","options":["Option 1","Option 2","Option 3"]}}';
 
         $raw     = $this->geminiCall($prompt, self::RESPONSE_MAX_TOKENS);
         $decoded = $this->decodeJson($raw);
@@ -967,8 +971,16 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         if ($message === '' && $rawText !== '') {
             $message = $this->extractNarrativeFromRawResponse($rawText);
         }
+
+        $whatWeThink = $this->cleanAssistantText((string) ($payload['what_we_think_is_happening'] ?? ''));
+        if ($whatWeThink === '') {
+            $whatWeThink = $message;
+        }
+        if ($whatWeThink === '') {
+            $whatWeThink = $this->buildDynamicFallbackMessage($pet, $routing, $ownerMessage, $triage);
+        }
         if ($message === '') {
-            $message = $this->buildDynamicFallbackMessage($pet, $routing, $ownerMessage, $triage);
+            $message = $whatWeThink;
         }
 
         $diagnosisSummary = $this->cleanAssistantText((string) ($payload['diagnosis_summary'] ?? ''));
@@ -976,6 +988,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $diagnosisSummary = $this->buildDiagnosisSummary($triage, $ownerMessage);
         }
         $message = $this->appendDiagnosisToMessage($message, $diagnosisSummary);
+        $whatWeThink = $this->appendDiagnosisToMessage($whatWeThink, $diagnosisSummary);
 
         $doNow = $this->cleanAssistantText((string) ($payload['do_now'] ?? ''));
         if ($doNow === '') {
@@ -998,24 +1011,36 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $whatToWatch = $this->defaultWhatToWatch($routing, $triage);
         }
 
+        $followUpQuestion = $this->normalizeFollowUpQuestion(
+            $payload['follow_up_question'] ?? null,
+            $routing,
+            $pet,
+            $ownerMessage,
+            $triage
+        );
+
         return [
             'message' => $message,
+            'what_we_think_is_happening' => $whatWeThink,
             'diagnosis_summary' => $diagnosisSummary,
             'do_now' => $doNow,
             'time_sensitivity' => $timeSensitivity,
             'what_to_watch' => array_slice(array_values(array_unique($whatToWatch)), 0, 4),
+            'follow_up_question' => $followUpQuestion,
         ];
     }
 
     private function recoverStructuredResponse(string $raw): ?array
     {
         $message = $this->extractJsonStringField($raw, 'message');
+        $whatWeThink = $this->extractJsonStringField($raw, 'what_we_think_is_happening');
         $doNow = $this->extractJsonStringField($raw, 'do_now');
         $timeSensitivity = $this->extractJsonStringField($raw, 'time_sensitivity');
         $whatToWatch = $this->extractJsonStringArrayField($raw, 'what_to_watch');
 
         $payload = array_filter([
             'message' => $message,
+            'what_we_think_is_happening' => $whatWeThink,
             'do_now' => $doNow,
             'time_sensitivity' => $timeSensitivity,
             'what_to_watch' => $whatToWatch,
@@ -1077,6 +1102,129 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         }
 
         return $this->cleanAssistantText(implode(' ', array_slice($lines, 0, 3)));
+    }
+
+    private function normalizeFollowUpQuestion(
+        mixed $value,
+        string $routing,
+        array $pet,
+        string $ownerMessage,
+        array $triage
+    ): ?array {
+        if (!$this->shouldAskFollowUpQuestion($routing)) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            $label = $this->cleanAssistantText((string) ($value['label'] ?? 'One question to narrow this down'));
+            $question = $this->cleanAssistantText((string) ($value['question'] ?? ''));
+            $options = array_values(array_filter(array_map(
+                fn ($item) => $this->cleanAssistantText((string) $item),
+                is_array($value['options'] ?? null) ? $value['options'] : []
+            )));
+
+            $options = array_slice(array_values(array_unique($options)), 0, 3);
+
+            if ($question !== '' && count($options) >= 2) {
+                return [
+                    'label' => $label !== '' ? $label : 'One question to narrow this down',
+                    'question' => $question,
+                    'options' => $options,
+                ];
+            }
+        }
+
+        return $this->defaultFollowUpQuestion($pet, $routing, $ownerMessage, $triage);
+    }
+
+    private function shouldAskFollowUpQuestion(string $routing): bool
+    {
+        return in_array($routing, ['video_consult', 'in_clinic'], true);
+    }
+
+    private function defaultFollowUpQuestion(array $pet, string $routing, string $ownerMessage, array $triage): ?array
+    {
+        if (!$this->shouldAskFollowUpQuestion($routing)) {
+            return null;
+        }
+
+        $text = mb_strtolower($this->cleanAssistantText($ownerMessage));
+
+        $question = [
+            'label' => 'One question to narrow this down',
+            'question' => 'Did this start suddenly in the last 24 hours, or has it been building over a few days?',
+            'options' => [
+                'Started suddenly in the last 24 hours',
+                'Has been building over 2-3 days',
+                "I'm not sure",
+            ],
+        ];
+
+        if (preg_match('/\b(vomit|vomiting|throwing up|diarrh|not eating|no appetite|letharg|fever)\b/', $text)) {
+            $question['question'] = sprintf(
+                'Has %s been outdoors recently, or could %s have eaten anything unusual in the past 3 days?',
+                $pet['name'] ?? 'your pet',
+                (($pet['sex'] ?? '') === 'female') ? 'she' : 'he'
+            );
+            $question['options'] = [
+                'Yes — outdoors / may have eaten something unusual',
+                'No — stayed home, nothing unusual',
+                "I'm not sure",
+            ];
+        } elseif (preg_match('/\b(limp|limping|swollen|swelling|paw|leg|joint|yelp|pain)\b/', $text)) {
+            $question['question'] = sprintf(
+                'Did the problem start suddenly after activity or a fall, or did it come on gradually over several days for %s?',
+                $pet['name'] ?? 'your pet'
+            );
+            $question['options'] = [
+                'Suddenly — after activity or a fall',
+                'Gradually — no specific incident',
+                "I'm not sure",
+            ];
+        } elseif (preg_match('/\b(cough|coughing|sneez|runny nose|nasal|eye discharge|breath)\b/', $text)) {
+            $question['question'] = sprintf(
+                'Is %s having only mild upper-respiratory signs, or are there also breathing changes or visible discharge?',
+                $pet['name'] ?? 'your pet'
+            );
+            $question['options'] = [
+                'Only mild sneezing / cough',
+                'There is discharge or breathing change too',
+                "I'm not sure",
+            ];
+        } elseif (preg_match('/\b(itch|itching|scratch|scratching|rash|skin|ear|ears)\b/', $text)) {
+            $question['question'] = sprintf(
+                'Did this flare start after any new food, shampoo, grooming, or flea/tick exposure for %s?',
+                $pet['name'] ?? 'your pet'
+            );
+            $question['options'] = [
+                'Yes — new product / possible flea-tick exposure',
+                'No — nothing new that I know of',
+                "I'm not sure",
+            ];
+        } elseif (preg_match('/\b(urine|urinating|pee|straining)\b/', $text)) {
+            $question['question'] = sprintf(
+                'Has %s passed normal urine recently, or is there straining / very little urine coming out?',
+                $pet['name'] ?? 'your pet'
+            );
+            $question['options'] = [
+                'Normal urine has passed',
+                'Straining or very little / no urine',
+                "I'm not sure",
+            ];
+        } elseif (!empty($triage['red_flags_present'])) {
+            $question['question'] = sprintf(
+                'Since this started, has %s stayed about the same, or is %s clearly getting worse?',
+                $pet['name'] ?? 'your pet',
+                (($pet['sex'] ?? '') === 'female') ? 'she' : 'he'
+            );
+            $question['options'] = [
+                'About the same',
+                'Clearly getting worse',
+                "I'm not sure",
+            ];
+        }
+
+        return $question;
     }
 
     private function cleanAssistantText(string $text): string
@@ -1299,6 +1447,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'health_score' => $ui['health_score']['value'] ?? null,
             'score_band' => $ui['score_band'] ?? null,
             'response' => $response,
+            'follow_up_question' => $response['follow_up_question'] ?? null,
             'buttons' => $this->buttons($view),
             'ui' => $ui,
             'triage_detail' => $triageDetail,

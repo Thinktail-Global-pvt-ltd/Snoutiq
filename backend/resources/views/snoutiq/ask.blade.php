@@ -865,6 +865,32 @@ function renderList(items = [], type = 'watch') {
   `;
 }
 
+function renderFollowUpCard(followUp, domId) {
+  if (!followUp || typeof followUp !== 'object') return '';
+  const question = String(followUp.question || '').trim();
+  const options = Array.isArray(followUp.options)
+    ? followUp.options.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
+    : [];
+
+  if (!question || options.length < 2) return '';
+
+  const label = String(followUp.label || 'One question to narrow this down').trim();
+
+  return `
+    <div class="fcard" id="fq-${escapeHtml(domId)}">
+      <div class="slbl">🔍 ${escapeHtml(label)}</div>
+      <div class="fq">${escapeHtml(question)}</div>
+      <div class="fopts">
+        ${options.map((option) => `<button class="fopt" data-answer="${escapeHtml(option)}" onclick="answerFQ(this,'${escapeHtml(domId)}')">${escapeHtml(option)}</button>`).join('')}
+      </div>
+      <div class="fupd" id="fu-${escapeHtml(domId)}">
+        <div class="tbub"><div class="td"></div><div class="td"></div><div class="td"></div></div>
+        <span>Updating assessment with your answer…</span>
+      </div>
+    </div>
+  `;
+}
+
 function renderResultCard(payload, options = {}) {
   const revised = Boolean(options.revised);
   const ui = payload.ui || {};
@@ -884,6 +910,9 @@ function renderResultCard(payload, options = {}) {
   const detail = payload.triage_detail || {};
   const buttons = payload.buttons || {};
   const subtitle = response.diagnosis_summary || response.message || 'Live assessment generated for the current symptoms.';
+  const whatWeThink = response.what_we_think_is_happening || response.message || 'No assessment text was returned.';
+  const followUp = payload.follow_up_question || response.follow_up_question || null;
+  const followUpDomId = String(`${payload.session_id || 'session'}-${payload.turn || 'live'}`).replace(/[^a-zA-Z0-9_-]/g, '');
   const primary = renderActionButton(buttons.primary, theme);
   const secondary = buttons.secondary
     ? `<button class="btn-s" data-link="${escapeHtml(buttons.secondary.deeplink || '')}" onclick="openCta(this.dataset.link)">${escapeHtml(buttons.secondary.label || 'Learn More')}</button>`
@@ -931,13 +960,14 @@ function renderResultCard(payload, options = {}) {
           <div class="aico">🩺</div>
           <div class="atxt">
             <div class="slbl">What we think is happening</div>
-            <p>${escapeHtml(response.message || 'No assessment text was returned.')}</p>
+            <p>${escapeHtml(whatWeThink)}</p>
           </div>
         </div>
         ${response.do_now ? `<div class="donow"><div class="dnicon">⚡</div><div><div class="slbl">Do this right now</div><p>${escapeHtml(response.do_now)}</p></div></div>` : ''}
         ${detail.india_context ? `<div class="india"><span>🇮🇳</span><span>${escapeHtml(detail.india_context)}</span></div>` : ''}
         ${renderList(response.what_to_watch || [], 'watch')}
         ${renderList(detail.possible_causes || [], 'causes')}
+        ${renderFollowUpCard(followUp, followUpDomId)}
       </div>
       <div class="disc"><div class="disc-i">🤖</div><div><div class="disc-t">Snoutiq AI — triage only</div><p>AI-generated guidance. Not a diagnosis. Always follow a licensed vet's advice.</p></div></div>
     </div>
@@ -1025,10 +1055,11 @@ async function answerFQ(btn, id, answerText) {
   try {
     isSending = true;
     const question = btn.closest('.fcard')?.querySelector('.fq')?.textContent?.trim() || '';
+    const answerValue = btn.dataset.answer || answerText || btn.textContent.trim();
     const result = await postJson(`${API_BASE}/symptom-answer`, {
       session_id: currentSessionId,
       question,
-      answer: answerText || btn.textContent.trim(),
+      answer: answerValue,
     });
 
     upd.classList.remove('show');
