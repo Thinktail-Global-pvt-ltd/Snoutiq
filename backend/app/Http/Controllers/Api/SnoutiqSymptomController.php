@@ -248,6 +248,13 @@ class SnoutiqSymptomController extends Controller
         $imageMime = $data['image_mime']   ?? 'image/jpeg';
 
         $triageJson = $this->callGeminiTriage($pet, $message, $state['history'], $imageB64, $imageMime, $score);
+        $triageJson['possible_causes'] = $this->normalizePossibleCauses($triageJson['possible_causes'] ?? [], $message, $pet);
+        $triageJson['india_context_note'] = $this->normalizeIndiaContextNote(
+            $triageJson['india_context_note'] ?? '',
+            $pet,
+            $message,
+            $triageJson['routing'] ?? ''
+        );
 
         // Gemini routing can upgrade but not downgrade the heuristic decision
         $routing = $this->mergeRouting($baseRouting, $triageJson['routing'] ?? $baseRouting);
@@ -683,8 +690,14 @@ class SnoutiqSymptomController extends Controller
 
     private function emergencyResponse(string $petName, ?string $flag): array
     {
+        $whatWeThink = "{$petName} has red-flag symptoms that can become life-threatening very quickly.";
+        if ($flag) {
+            $whatWeThink .= ' The biggest concern right now is ' . trim((string) $flag) . '.';
+        }
+
         return [
             'message'          => "{$petName} needs emergency veterinary care right now. Do not wait — this situation can become life-threatening very quickly. Go to the nearest vet clinic or government veterinary hospital immediately.",
+            'what_we_think_is_happening' => $whatWeThink,
             'do_now'           => 'Go to the nearest vet or emergency animal hospital NOW. Call ahead if possible.',
             'time_sensitivity' => 'Go now — every minute matters',
             'what_to_watch'    => [
@@ -692,6 +705,7 @@ class SnoutiqSymptomController extends Controller
                 'Do not give food, water, or any medications',
                 'Note any changes in breathing or consciousness',
             ],
+            'be_ready_to_tell_vet' => 'Tell the vet exactly when this started and whether there has been collapse, breathing change, bloating, repeated vomiting, or seizure activity on the way.',
         ];
     }
 
@@ -797,6 +811,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "CURRENT MESSAGE: " . mb_substr($message, 0, self::MAX_INPUT_CHARS) . "\n" .
             "EVIDENCE SCORE SO FAR: {$score}/10\n\n" .
             "TASK: Assess this pet's situation and output routing decision.\n\n" .
+            "Use the pet location if provided. If no location is available, assume India. " .
+            "Possible causes should be short, practical, and prioritized for common Indian veterinary presentations when reasonable. " .
+            "india_context_note must be a single useful India- or location-aware line, not a disclaimer.\n\n" .
             "Routing options:\n" .
             "- emergency: life-threatening right now\n" .
             "- video_consult: vet can assess via video, no immediate danger\n" .
@@ -854,6 +871,8 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "Instruction: " . ($routingInstructions[$routing] ?? $routingInstructions['video_consult']) . "\n\n" .
             "The `message` field must sound natural and should reference what the owner is seeing right now. " .
             "If there is recent conversation history, continue from it instead of restarting.\n\n" .
+            "Make `what_to_watch` a list of 3-4 specific triggers that would make the owner upgrade to clinic care or emergency care. " .
+            "Make `be_ready_to_tell_vet` one concise sentence containing the most useful thing to tell the vet next.\n\n" .
             "If routing is video_consult or in_clinic, include ONE focused follow-up question that would meaningfully change the advice. " .
             "Give 2-3 short answer choices. If routing is emergency, set follow_up_question to null.\n\n" .
             "Return ONLY this JSON:\n" .
@@ -863,6 +882,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             '"do_now":"One immediate action",' .
             '"time_sensitivity":"e.g. Go now / Within 2-4 hours / If not better in 24 hours",' .
             '"what_to_watch":["sign1","sign2","sign3"],' .
+            '"be_ready_to_tell_vet":"One concise sentence for the section titled Be ready to tell the vet",' .
             '"follow_up_question":{"label":"One question to narrow this down","question":"One focused question","options":["Option 1","Option 2","Option 3"]}}';
 
         $raw     = $this->geminiCall($prompt, self::RESPONSE_MAX_TOKENS);
@@ -985,7 +1005,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
 
         $diagnosisSummary = $this->cleanAssistantText((string) ($payload['diagnosis_summary'] ?? ''));
         if ($diagnosisSummary === '') {
-            $diagnosisSummary = $this->buildDiagnosisSummary($triage, $ownerMessage);
+            $diagnosisSummary = $this->buildDiagnosisSummary($triage, $ownerMessage, $pet);
         }
         $message = $this->appendDiagnosisToMessage($message, $diagnosisSummary);
         $whatWeThink = $this->appendDiagnosisToMessage($whatWeThink, $diagnosisSummary);
@@ -1000,15 +1020,21 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $timeSensitivity = $this->defaultTimeSensitivity($routing, $triage);
         }
 
-        $whatToWatch = [];
-        if (isset($payload['what_to_watch']) && is_array($payload['what_to_watch'])) {
-            $whatToWatch = array_values(array_filter(array_map(
-                fn ($item) => $this->cleanAssistantText((string) $item),
-                $payload['what_to_watch']
-            )));
-        }
-        if (!$whatToWatch) {
-            $whatToWatch = $this->defaultWhatToWatch($routing, $triage);
+        $whatToWatch = $this->normalizeWhatToWatch(
+            is_array($payload['what_to_watch'] ?? null) ? $payload['what_to_watch'] : [],
+            $routing,
+            $pet,
+            $ownerMessage,
+            $triage
+        );
+
+        $beReadyToTellVet = $this->cleanAssistantText((string) (
+            $payload['be_ready_to_tell_vet']
+            ?? $payload['vet_question']
+            ?? ''
+        ));
+        if ($beReadyToTellVet === '') {
+            $beReadyToTellVet = $this->defaultBeReadyToTellVet($pet, $routing, $ownerMessage, $triage);
         }
 
         $followUpQuestion = $this->normalizeFollowUpQuestion(
@@ -1025,7 +1051,8 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'diagnosis_summary' => $diagnosisSummary,
             'do_now' => $doNow,
             'time_sensitivity' => $timeSensitivity,
-            'what_to_watch' => array_slice(array_values(array_unique($whatToWatch)), 0, 4),
+            'what_to_watch' => $whatToWatch,
+            'be_ready_to_tell_vet' => $beReadyToTellVet,
             'follow_up_question' => $followUpQuestion,
         ];
     }
@@ -1037,6 +1064,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $doNow = $this->extractJsonStringField($raw, 'do_now');
         $timeSensitivity = $this->extractJsonStringField($raw, 'time_sensitivity');
         $whatToWatch = $this->extractJsonStringArrayField($raw, 'what_to_watch');
+        $beReadyToTellVet = $this->extractJsonStringField($raw, 'be_ready_to_tell_vet');
 
         $payload = array_filter([
             'message' => $message,
@@ -1044,6 +1072,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'do_now' => $doNow,
             'time_sensitivity' => $timeSensitivity,
             'what_to_watch' => $whatToWatch,
+            'be_ready_to_tell_vet' => $beReadyToTellVet,
         ], function ($value) {
             if (is_array($value)) {
                 return !empty($value);
@@ -1257,6 +1286,34 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         return preg_replace('/\s+/', ' ', trim($message));
     }
 
+    private function normalizePossibleCauses(mixed $value, string $ownerMessage, array $pet = []): array
+    {
+        $causes = [];
+
+        if (is_array($value)) {
+            $causes = array_values(array_filter(array_map(
+                fn ($cause) => $this->cleanAssistantText((string) $cause),
+                $value
+            )));
+        }
+
+        if (count($causes) < 3) {
+            $causes = array_merge($causes, $this->inferPossibleCausesFromMessage($ownerMessage, $pet));
+        }
+
+        return array_slice(array_values(array_unique($causes)), 0, 4);
+    }
+
+    private function normalizeIndiaContextNote(mixed $value, array $pet, string $ownerMessage, string $routing = ''): string
+    {
+        $note = $this->cleanAssistantText((string) $value);
+        if ($note !== '') {
+            return $note;
+        }
+
+        return $this->defaultIndiaContextNote($pet, $ownerMessage, $routing);
+    }
+
     private function defaultDoNow(array $pet, string $routing): string
     {
         $petName = trim((string) ($pet['name'] ?? 'your pet')) ?: 'your pet';
@@ -1281,8 +1338,22 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         };
     }
 
-    private function defaultWhatToWatch(string $routing, array $triage): array
+    private function normalizeWhatToWatch(array $items, string $routing, array $pet, string $ownerMessage, array $triage): array
     {
+        $clean = array_values(array_filter(array_map(
+            fn ($item) => $this->cleanAssistantText((string) $item),
+            $items
+        )));
+
+        $defaults = $this->defaultWhatToWatch($routing, $triage, $pet, $ownerMessage);
+        return array_slice(array_values(array_unique(array_merge($clean, $defaults))), 0, 4);
+    }
+
+    private function defaultWhatToWatch(string $routing, array $triage, array $pet = [], string $ownerMessage = ''): array
+    {
+        $petName = trim((string) ($pet['name'] ?? 'your pet')) ?: 'your pet';
+        $pronoun = $this->subjectPronoun($pet);
+        $text = mb_strtolower($this->cleanAssistantText($ownerMessage));
         $items = [];
 
         foreach (array_slice($triage['red_flags_present'] ?? [], 0, 2) as $flag) {
@@ -1290,6 +1361,44 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             if ($flagText !== '') {
                 $items[] = 'Any sign of ' . $flagText;
             }
+        }
+
+        $symptomSpecific = [];
+        if (preg_match('/\b(vomit|vomiting|throwing up|diarrh|not eating|no appetite|letharg|fever)\b/', $text)) {
+            $symptomSpecific = [
+                "If {$petName} vomits more than twice in the next 6 hours, upgrade to a same-day clinic visit.",
+                "If gums turn pale, white, or yellow at any point, {$petName} should be seen the same day.",
+                "If {$pronoun} has not urinated in 12+ hours, mention it urgently because dehydration or organ stress may be developing.",
+                "Any of the above with rapid or laboured breathing means skip video and go to emergency care immediately.",
+            ];
+        } elseif (preg_match('/\b(limp|limping|swollen|swelling|paw|leg|joint|yelp|pain)\b/', $text)) {
+            $symptomSpecific = [
+                "If swelling spreads quickly or the leg becomes hot and very painful, arrange an urgent same-day clinic visit.",
+                "If {$petName} stops bearing weight on the leg, do not wait for home monitoring.",
+                "If {$pronoun} becomes lethargic or stops eating along with the pain, tell the clinic the situation has escalated.",
+                "Any of the above with crying in pain or breathing change means emergency care is safer.",
+            ];
+        } elseif (preg_match('/\b(cough|coughing|sneez|runny nose|nasal|eye discharge|breath)\b/', $text)) {
+            $symptomSpecific = [
+                "If breathing becomes fast, open-mouth, noisy, or laboured, go straight to a clinic or emergency vet.",
+                "If yellow or green discharge appears from the nose or eyes, book a same-day consult.",
+                "If appetite drops or energy falls noticeably, the situation is no longer a simple monitor-at-home case.",
+                "Any blue, grey, or very pale gums should be treated as an emergency.",
+            ];
+        } elseif (preg_match('/\b(itch|itching|scratch|scratching|rash|skin|ear|ears)\b/', $text)) {
+            $symptomSpecific = [
+                "If the rash spreads quickly, the skin starts oozing, or there is facial swelling, book a same-day vet visit.",
+                "If {$petName} keeps scratching nonstop or cries when touched, clinic care is more appropriate than monitoring.",
+                "If vomiting, low energy, or breathing change appears along with the skin flare, seek urgent care.",
+                "Any swelling around the face or difficulty breathing is an emergency.",
+            ];
+        } elseif (preg_match('/\b(urine|urinating|pee|straining)\b/', $text)) {
+            $symptomSpecific = [
+                "If {$petName} is straining but only passing drops, this can become urgent quickly.",
+                "If no urine is passed for several hours despite repeated attempts, go to a clinic immediately.",
+                "If there is blood in the urine or obvious pain, same-day veterinary care is needed.",
+                "Any straining with vomiting, collapse, or severe distress is an emergency.",
+            ];
         }
 
         $defaults = match ($routing) {
@@ -1315,10 +1424,86 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             ],
         };
 
-        return array_slice(array_values(array_unique(array_merge($items, $defaults))), 0, 4);
+        return array_slice(array_values(array_unique(array_merge($symptomSpecific, $items, $defaults))), 0, 4);
     }
 
-    private function buildDiagnosisSummary(array $triage, string $ownerMessage = ''): string
+    private function defaultBeReadyToTellVet(array $pet, string $routing, string $ownerMessage, array $triage): string
+    {
+        $petName = trim((string) ($pet['name'] ?? 'your pet')) ?: 'your pet';
+        $text = mb_strtolower($this->cleanAssistantText($ownerMessage));
+
+        if (preg_match('/\b(vomit|vomiting|throwing up|diarrh|not eating|no appetite|letharg|fever)\b/', $text)) {
+            return "Be ready to tell the vet when {$petName} last ate a completely normal meal, and whether stool, urine, and vomiting have looked normal in the last 24 hours.";
+        }
+        if (preg_match('/\b(limp|limping|swollen|swelling|paw|leg|joint|yelp|pain)\b/', $text)) {
+            return "Be ready to tell the vet when the limping started, whether {$petName} can bear any weight, and whether there was a fall, rough play, or paw injury first.";
+        }
+        if (preg_match('/\b(cough|coughing|sneez|runny nose|nasal|eye discharge|breath)\b/', $text)) {
+            return "Be ready to tell the vet whether there is any eye or nasal discharge, how breathing looks at rest, and whether {$petName} has been around other pets recently.";
+        }
+        if (preg_match('/\b(itch|itching|scratch|scratching|rash|skin|ear|ears)\b/', $text)) {
+            return "Be ready to tell the vet when the itching started, whether fleas are visible, and if there was any new food, shampoo, medicine, or grooming before the flare.";
+        }
+        if (preg_match('/\b(urine|urinating|pee|straining)\b/', $text)) {
+            return "Be ready to tell the vet when {$petName} last passed a normal amount of urine and whether there has been straining, blood, or obvious pain.";
+        }
+        if ($routing === 'emergency') {
+            return "Be ready to tell the vet exactly when this started and whether there has been collapse, vomiting, breathing change, seizure activity, or sudden worsening.";
+        }
+
+        return "Be ready to tell the vet when this started, what changed first, and whether appetite, urination, stool, and energy have otherwise been normal.";
+    }
+
+    private function defaultIndiaContextNote(array $pet, string $ownerMessage, string $routing = ''): string
+    {
+        $text = mb_strtolower($this->cleanAssistantText($ownerMessage));
+        $location = trim((string) ($pet['location'] ?? 'India'));
+        $locationLower = mb_strtolower($location);
+
+        $region = 'India';
+        if (preg_match('/\b(delhi|gurgaon|gurugram|noida|ghaziabad|faridabad|ncr)\b/', $locationLower)) {
+            $region = 'Delhi NCR';
+        } elseif (preg_match('/\bmumbai\b/', $locationLower)) {
+            $region = 'Mumbai';
+        } elseif (preg_match('/\bbengaluru|bangalore\b/', $locationLower)) {
+            $region = 'Bengaluru';
+        } elseif (preg_match('/\bpune\b/', $locationLower)) {
+            $region = 'Pune';
+        } elseif ($location !== '') {
+            $region = $location;
+        }
+
+        $isSpecificRegion = $region !== 'India';
+        $prefix = $isSpecificRegion ? "In {$region}" : 'Across India';
+
+        if (preg_match('/\b(not eating|no appetite|loss of appetite|letharg|fever)\b/', $text) && (($pet['species'] ?? '') === 'dog')) {
+            return $isSpecificRegion
+                ? "Tick fever (Ehrlichia canis) is year-round in {$region} and frequently causes sudden appetite loss with lethargy — often missed because fever can be intermittent. Worth ruling out early."
+                : 'Tick fever (Ehrlichia canis) is common year-round across India and can cause sudden appetite loss with lethargy, sometimes with only intermittent fever early on.';
+        }
+        if (preg_match('/\b(vomit|vomiting|throwing up|diarrh)\b/', $text)) {
+            return "{$prefix}, sudden vomiting or diarrhea is often linked to dietary indiscretion, food contamination, or a gastrointestinal infection, so hydration can worsen faster than owners expect.";
+        }
+        if (preg_match('/\b(cough|coughing|sneez|runny nose|nasal|eye discharge|breath)\b/', $text)) {
+            return "{$prefix}, seasonal respiratory infections and dust exposure are common reasons mild sneezing or coughing can flare, especially in flat-faced pets.";
+        }
+        if (preg_match('/\b(itch|itching|scratch|scratching|rash|skin|ear|ears)\b/', $text)) {
+            return "{$prefix}, flea and tick exposure plus ringworm are common reasons itching, patchy hair loss, and skin irritation need treatment rather than simple home care.";
+        }
+        if (preg_match('/\b(urine|urinating|pee|straining)\b/', $text)) {
+            return "{$prefix}, dehydration and urinary crystal disease are common problems, and straining with little urine can become urgent quickly.";
+        }
+        if (preg_match('/\b(limp|limping|swollen|swelling|paw|leg|joint|yelp|pain)\b/', $text)) {
+            return "{$prefix}, paw injuries, soft-tissue strains, and tick-borne fever can all present with limping or reluctance to walk, so worsening pain is worth checking early.";
+        }
+        if ($routing === 'emergency') {
+            return "{$prefix}, government veterinary hospitals and teaching hospitals can be useful low-cost options if private emergency care is far away.";
+        }
+
+        return "{$prefix}, tick-borne disease, dehydration, and gastrointestinal infections are common reasons pets worsen faster than owners expect, so close monitoring matters.";
+    }
+
+    private function buildDiagnosisSummary(array $triage, string $ownerMessage = '', array $pet = []): string
     {
         $causes = array_values(array_filter(array_map(
             fn ($cause) => $this->cleanAssistantText((string) $cause),
@@ -1326,7 +1511,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         )));
 
         if (!$causes) {
-            $causes = $this->inferPossibleCausesFromMessage($ownerMessage);
+            $causes = $this->inferPossibleCausesFromMessage($ownerMessage, $pet);
         }
 
         if (!$causes) {
@@ -1356,11 +1541,16 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         return trim($message . ' ' . $diagnosisSummary);
     }
 
-    private function inferPossibleCausesFromMessage(string $ownerMessage): array
+    private function inferPossibleCausesFromMessage(string $ownerMessage, array $pet = []): array
     {
         $text = mb_strtolower($this->cleanAssistantText($ownerMessage));
+        $species = strtolower((string) ($pet['species'] ?? ''));
         if ($text === '') {
             return [];
+        }
+
+        if (preg_match('/\b(not eating|no appetite|loss of appetite|letharg|lethargic)\b/', $text) && $species === 'dog') {
+            return ['tick fever (Ehrlichia)', 'gastroenteritis', 'dietary indiscretion', 'early infection / fever'];
         }
 
         $rules = [
@@ -1368,9 +1558,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             [['diarrhea', 'diarrhoea', 'loose motion', 'loose stool'], ['stomach upset', 'diet change', 'a gastrointestinal infection']],
             [['itch', 'itching', 'scratching', 'skin', 'rash'], ['an allergy flare', 'a skin infection', 'fleas or ticks']],
             [['limp', 'limping', 'paw pain', 'leg pain'], ['a soft tissue injury', 'a paw injury', 'joint pain']],
-            [['cough', 'coughing', 'sneeze', 'sneezing', 'runny nose'], ['respiratory irritation', 'an infection', 'an allergy']],
+            [['cough', 'coughing', 'sneeze', 'sneezing', 'runny nose'], $species === 'cat' ? ['an upper respiratory infection', 'viral irritation', 'an allergy flare'] : ['respiratory irritation', 'an infection', 'an allergy']],
             [['not eating', 'no appetite', 'loss of appetite', 'lethargic', 'lethargy'], ['fever', 'stomach upset', 'pain or dehydration']],
-            [['urine', 'urinating', 'pee', 'straining to pee'], ['a urinary infection', 'stones', 'a blockage']],
+            [['urine', 'urinating', 'pee', 'straining to pee'], $species === 'cat' ? ['a urinary blockage', 'a urinary infection', 'bladder inflammation'] : ['a urinary infection', 'stones', 'a blockage']],
         ];
 
         foreach ($rules as [$keywords, $causes]) {
@@ -1418,6 +1608,11 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         return rtrim($text, " .,;:!?");
     }
 
+    private function subjectPronoun(array $pet): string
+    {
+        return (($pet['sex'] ?? '') === 'female') ? 'she' : 'he';
+    }
+
     // =========================================================================
     // BUTTON CONFIG — frontend reads this to show CTA buttons
     // =========================================================================
@@ -1448,6 +1643,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'score_band' => $ui['score_band'] ?? null,
             'response' => $response,
             'follow_up_question' => $response['follow_up_question'] ?? null,
+            'be_ready_to_tell_vet' => $response['be_ready_to_tell_vet'] ?? null,
             'buttons' => $this->buttons($view),
             'ui' => $ui,
             'triage_detail' => $triageDetail,

@@ -850,16 +850,53 @@ function renderServiceCards(cards = []) {
   `;
 }
 
-function renderList(items = [], type = 'watch') {
+function renderCauseList(items = []) {
   if (!Array.isArray(items) || !items.length) return '';
-  if (type === 'causes') {
-    return `<div><div class="slbl">Most likely causes</div><div class="cpills">${items.map((item) => `<span class="cpill">${escapeHtml(item)}</span>`).join('')}</div></div>`;
+  return `<div><div class="slbl">Most likely causes</div><div class="cpills">${items.map((item) => `<span class="cpill">${escapeHtml(item)}</span>`).join('')}</div></div>`;
+}
+
+function getWatchTone(item) {
+  const text = String(item || '').toLowerCase();
+  if (/(emergency|immediately|go straight|go to emergency|open-mouth|laboured breathing|rapid breathing|collapse|blue|grey|very pale gums)/.test(text)) {
+    return 'danger';
   }
+  if (/(same-day|same day|urgent|book a same-day|clinic immediately|should be seen|do not wait|go to a clinic)/.test(text)) {
+    return 'warning';
+  }
+  return 'neutral';
+}
+
+function watchIcon(tone) {
+  if (tone === 'danger') return '🔴';
+  if (tone === 'warning') return '🟡';
+  return '⚪';
+}
+
+function renderWatchList(items = []) {
+  if (!Array.isArray(items) || !items.length) return '';
   return `
     <div>
-      <div class="slbl">Watch for</div>
+      <div class="slbl">Watch for — go to clinic if you see these</div>
       <div class="wlist">
-        ${items.map((item) => `<div class="wi"><span class="wiico">•</span><p>${escapeHtml(item)}</p></div>`).join('')}
+        ${items.map((item) => {
+          const tone = getWatchTone(item);
+          const cls = tone === 'neutral' ? '' : tone;
+          return `<div class="wi ${cls}"><span class="wiico">${watchIcon(tone)}</span><p>${escapeHtml(item)}</p></div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderVetPrep(text = '') {
+  const clean = String(text || '').trim();
+  if (!clean) return '';
+  return `
+    <div class="vetq">
+      <div class="vetqico">💬</div>
+      <div>
+        <div class="slbl">Be ready to tell the vet</div>
+        <p>${escapeHtml(clean)}</p>
       </div>
     </div>
   `;
@@ -911,6 +948,7 @@ function renderResultCard(payload, options = {}) {
   const buttons = payload.buttons || {};
   const subtitle = response.diagnosis_summary || response.message || 'Live assessment generated for the current symptoms.';
   const whatWeThink = response.what_we_think_is_happening || response.message || 'No assessment text was returned.';
+  const beReadyToTellVet = response.be_ready_to_tell_vet || payload.be_ready_to_tell_vet || '';
   const followUp = payload.follow_up_question || response.follow_up_question || null;
   const followUpDomId = String(`${payload.session_id || 'session'}-${payload.turn || 'live'}`).replace(/[^a-zA-Z0-9_-]/g, '');
   const primary = renderActionButton(buttons.primary, theme);
@@ -965,8 +1003,9 @@ function renderResultCard(payload, options = {}) {
         </div>
         ${response.do_now ? `<div class="donow"><div class="dnicon">⚡</div><div><div class="slbl">Do this right now</div><p>${escapeHtml(response.do_now)}</p></div></div>` : ''}
         ${detail.india_context ? `<div class="india"><span>🇮🇳</span><span>${escapeHtml(detail.india_context)}</span></div>` : ''}
-        ${renderList(response.what_to_watch || [], 'watch')}
-        ${renderList(detail.possible_causes || [], 'causes')}
+        ${renderWatchList(response.what_to_watch || [])}
+        ${renderCauseList(detail.possible_causes || [])}
+        ${renderVetPrep(beReadyToTellVet)}
         ${renderFollowUpCard(followUp, followUpDomId)}
       </div>
       <div class="disc"><div class="disc-i">🤖</div><div><div class="disc-t">Snoutiq AI — triage only</div><p>AI-generated guidance. Not a diagnosis. Always follow a licensed vet's advice.</p></div></div>
