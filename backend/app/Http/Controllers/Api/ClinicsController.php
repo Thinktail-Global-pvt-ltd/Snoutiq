@@ -292,6 +292,15 @@ class ClinicsController extends Controller
 
             if ($userColumn) {
                 $petColumns = ['id', DB::raw("{$userColumn} as user_id"), 'name', 'breed'];
+                if (Schema::hasColumn('pets', 'pet_doc1')) {
+                    $petColumns[] = 'pet_doc1';
+                }
+                if (Schema::hasColumn('pets', 'pet_doc2')) {
+                    $petColumns[] = 'pet_doc2';
+                }
+                if (Schema::hasColumn('pets', 'pic_link')) {
+                    $petColumns[] = 'pic_link';
+                }
                 if (Schema::hasColumn('pets', 'type')) {
                     $petColumns[] = 'type';
                 }
@@ -347,7 +356,21 @@ class ClinicsController extends Controller
                     ->orderBy('name')
                     ->get();
 
-                $petRows = $petRows->map(function ($pet) {
+                $petBlobUrlById = collect();
+                if ($this->petDoc2BlobColumnsReady() && $petRows->isNotEmpty()) {
+                    $petIdsWithBlob = DB::table('pets')
+                        ->whereIn('id', $petRows->pluck('id')->all())
+                        ->whereNotNull('pet_doc2_blob')
+                        ->where('pet_doc2_blob', '!=', '')
+                        ->pluck('id')
+                        ->map(fn ($petId) => (int) $petId);
+
+                    $petBlobUrlById = $petIdsWithBlob->mapWithKeys(
+                        fn (int $petId) => [$petId => route('api.pets.pet-doc2-blob', ['pet' => $petId], true)]
+                    );
+                }
+
+                $petRows = $petRows->map(function ($pet) use ($petBlobUrlById) {
                     $payload = $this->decodeJsonToArray($pet->dog_disease_payload ?? null);
                     $pet->vaccination = is_array($payload) ? ($payload['vaccination'] ?? null) : null;
                     $pet->vaccination_details = $pet->vaccination;
@@ -357,6 +380,11 @@ class ClinicsController extends Controller
                         $isNeutered = $pet->is_nuetered ?? null;
                     }
                     $pet->is_neutered = $isNeutered;
+                    $pet->pet_doc2_blob_url = $petBlobUrlById->get((int) $pet->id);
+                    $pet->pet_image_url = $pet->pet_doc2_blob_url
+                        ?: $this->absolutePetDocumentUrl($pet->pet_doc1 ?? null)
+                        ?: $this->absolutePetDocumentUrl($pet->pet_doc2 ?? null)
+                        ?: $this->absolutePetDocumentUrl($pet->pic_link ?? null);
 
                     return $pet;
                 });
@@ -367,6 +395,9 @@ class ClinicsController extends Controller
 
         $patients = $patients->map(function ($patient) use ($petMap, $transactionMap) {
             $patient->pets = ($petMap[$patient->id] ?? collect())->values();
+            $primaryPet = $patient->pets->first();
+            $patient->pet_doc2_blob_url = data_get($primaryPet, 'pet_doc2_blob_url');
+            $patient->pet_image_url = data_get($primaryPet, 'pet_image_url');
             $patient->transactions = ($transactionMap[$patient->id] ?? collect())->values();
             return $patient;
         });
@@ -394,6 +425,38 @@ class ClinicsController extends Controller
 
         $decoded = json_decode($value, true);
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private function petDoc2BlobColumnsReady(): bool
+    {
+        return Schema::hasTable('pets')
+            && Schema::hasColumn('pets', 'pet_doc2_blob')
+            && Schema::hasColumn('pets', 'pet_doc2_mime');
+    }
+
+    private function absolutePetDocumentUrl(?string $path): ?string
+    {
+        if ($path === null) {
+            return null;
+        }
+
+        $path = trim($path);
+        if ($path === '') {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        $path = ltrim($path, '/');
+        $base = rtrim(url('/'), '/');
+
+        if (str_starts_with($path, 'backend/') && str_ends_with($base, '/backend')) {
+            $path = substr($path, strlen('backend/'));
+        }
+
+        return $base.'/'.$path;
     }
 
     // POST /api/clinics/{id}/doctors
