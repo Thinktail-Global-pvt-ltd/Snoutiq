@@ -855,6 +855,23 @@ function renderCauseList(items = []) {
   return `<div><div class="slbl">Most likely causes</div><div class="cpills">${items.map((item) => `<span class="cpill">${escapeHtml(item)}</span>`).join('')}</div></div>`;
 }
 
+function renderWaitingList(items = []) {
+  if (!Array.isArray(items) || !items.length) return '';
+  return `
+    <div>
+      <div class="slbl">Safe to do while waiting</div>
+      <div class="hclist">
+        ${items.map((item, index) => `
+          <div class="hci">
+            <div class="hcn">${index + 1}</div>
+            <span>${escapeHtml(item)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function getWatchTone(item) {
   const text = String(item || '').toLowerCase();
   if (/(emergency|immediately|go straight|go to emergency|open-mouth|laboured breathing|rapid breathing|collapse|blue|grey|very pale gums)/.test(text)) {
@@ -1006,6 +1023,9 @@ function renderResultCard(payload, options = {}) {
   const subtitle = response.diagnosis_summary || response.message || 'Live assessment generated for the current symptoms.';
   const whatWeThink = response.what_we_think_is_happening || response.message || 'No assessment text was returned.';
   const beReadyToTellVet = response.be_ready_to_tell_vet || payload.be_ready_to_tell_vet || '';
+  const safeToDoWhileWaiting = Array.isArray(response.safe_to_do_while_waiting)
+    ? response.safe_to_do_while_waiting
+    : (Array.isArray(payload.safe_to_do_while_waiting) ? payload.safe_to_do_while_waiting : []);
   const revisedContext = options.revisedContext || payload.revised_context || null;
   const followUpHistory = Array.isArray(payload.follow_up_history) ? payload.follow_up_history : [];
   const followUp = payload.follow_up_question || response.follow_up_question || null;
@@ -1062,6 +1082,7 @@ function renderResultCard(payload, options = {}) {
         </div>
         ${response.do_now ? `<div class="donow"><div class="dnicon">⚡</div><div><div class="slbl">Do this right now</div><p>${escapeHtml(response.do_now)}</p></div></div>` : ''}
         ${detail.india_context ? `<div class="india"><span>🇮🇳</span><span>${escapeHtml(detail.india_context)}</span></div>` : ''}
+        ${renderWaitingList(safeToDoWhileWaiting)}
         ${renderWatchList(response.what_to_watch || [])}
         ${renderCauseList(detail.possible_causes || [])}
         ${renderVetPrep(beReadyToTellVet)}

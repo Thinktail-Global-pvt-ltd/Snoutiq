@@ -58,6 +58,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class SnoutiqSymptomController extends Controller
@@ -131,6 +132,7 @@ class SnoutiqSymptomController extends Controller
      *     "message": "Main message to pet parent (plain text, no markdown)",
      *     "do_now": "One immediate action they can take",
      *     "time_sensitivity": "Go now / Within 2 hours / If no better in 24h",
+     *     "safe_to_do_while_waiting": ["step1", "step2", "step3"],
      *     "what_to_watch": ["sign1", "sign2", "sign3"]
      *   },
      *   "buttons": {
@@ -167,8 +169,13 @@ class SnoutiqSymptomController extends Controller
             'user_id'      => 'nullable|integer',
             'pet_id'       => 'nullable|integer',
             'message'      => 'required|string|max:600',
-            'pet_name'     => 'nullable|string|max:50',
+            'phone'        => 'nullable|string|max:30',
+            'owner_name'   => 'nullable|string|max:120',
+            'pet_owner_name' => 'nullable|string|max:120',
+            'user_name'    => 'nullable|string|max:120',
+            'pet_name'     => 'nullable|string|max:120',
             'species'      => 'nullable|string|max:20',
+            'type'         => 'nullable|string|max:20',
             'breed'        => 'nullable|string|max:80',
             'dob'          => 'nullable|date_format:Y-m-d',
             'sex'          => 'nullable|string|max:10',
@@ -177,7 +184,36 @@ class SnoutiqSymptomController extends Controller
             'session_id'   => 'nullable|string|max:100',
             'image_base64' => 'nullable|string',
             'image_mime'   => 'nullable|string|max:20',
+            'user'         => 'nullable|array',
+            'user.phone'   => 'nullable|string|max:30',
+            'user.name'    => 'nullable|string|max:120',
+            'users'        => 'nullable|array',
+            'users.phone'  => 'nullable|string|max:30',
+            'users.name'   => 'nullable|string|max:120',
+            'pet'          => 'nullable|array',
+            'pet.pet_name' => 'nullable|string|max:120',
+            'pet.name'     => 'nullable|string|max:120',
+            'pet.breed'    => 'nullable|string|max:80',
+            'pet.dob'      => 'nullable|date_format:Y-m-d',
+            'pet.type'     => 'nullable|string|max:20',
+            'pet.species'  => 'nullable|string|max:20',
+            'pets'         => 'nullable|array',
+            'pets.pet_name'=> 'nullable|string|max:120',
+            'pets.name'    => 'nullable|string|max:120',
+            'pets.breed'   => 'nullable|string|max:80',
+            'pets.dob'     => 'nullable|date_format:Y-m-d',
+            'pets.type'    => 'nullable|string|max:20',
+            'pets.species' => 'nullable|string|max:20',
         ]);
+
+        $data = $this->normalizeSymptomEntryPayload($data);
+        $resolvedEntities = $this->persistSymptomEntryUserAndPet($data);
+        if (!empty($resolvedEntities['user_id'])) {
+            $data['user_id'] = $resolvedEntities['user_id'];
+        }
+        if (!empty($resolvedEntities['pet_id'])) {
+            $data['pet_id'] = $resolvedEntities['pet_id'];
+        }
 
         // ── Trim input to cost limit ──────────────────────────────────────────
         $message = mb_substr(trim($data['message']), 0, self::MAX_INPUT_CHARS);
@@ -199,6 +235,10 @@ class SnoutiqSymptomController extends Controller
         }
 
         $state['pet'] = $pet;
+        $state['user_id'] = $data['user_id'] ?? ($state['user_id'] ?? null);
+        $state['pet_id'] = $data['pet_id'] ?? ($state['pet_id'] ?? null);
+        $data['user_id'] = $state['user_id'] ?? null;
+        $data['pet_id'] = $state['pet_id'] ?? null;
         $turn         = count($state['history']) + 1;
 
         // ── LAYER 1: Hardcoded red flag check — NO AI NEEDED ─────────────────
@@ -410,6 +450,7 @@ class SnoutiqSymptomController extends Controller
         $compatBody['context_token'] = $session;
         $compatBody['chat_room_token'] = $session;
         $compatBody['message'] = $assistantMessage;
+        $compatBody['safe_to_do_while_waiting'] = $rawBody['response']['safe_to_do_while_waiting'] ?? [];
         $compatBody['chat'] = [
             'question' => $promptText,
             'answer' => $assistantMessage,
@@ -429,6 +470,7 @@ class SnoutiqSymptomController extends Controller
             'possible_causes' => $rawBody['triage_detail']['possible_causes'] ?? [],
             'red_flags_present' => $rawBody['triage_detail']['red_flags_found'] ?? [],
             'india_context_note' => $rawBody['triage_detail']['india_context'] ?? '',
+            'safe_to_do_while_waiting' => $rawBody['response']['safe_to_do_while_waiting'] ?? [],
             'diagnosis_summary' => (string) ($rawBody['response']['diagnosis_summary'] ?? ''),
         ];
         $compatBody['conversation_html'] = sprintf(
@@ -547,9 +589,25 @@ class SnoutiqSymptomController extends Controller
         }
 
         if ($petId > 0) {
+            $petSelect = array_values(array_filter([
+                'id',
+                'user_id',
+                'name',
+                'breed',
+                'pet_age',
+                Schema::hasColumn('pets', 'pet_gender') ? 'pet_gender' : null,
+                Schema::hasColumn('pets', 'species') ? 'species' : null,
+                Schema::hasColumn('pets', 'dob') ? 'dob' : null,
+                Schema::hasColumn('pets', 'neutered') ? 'neutered' : null,
+                Schema::hasColumn('pets', 'location') ? 'location' : null,
+                Schema::hasColumn('pets', 'type') ? 'type' : null,
+                Schema::hasColumn('pets', 'pet_type') ? 'pet_type' : null,
+                Schema::hasColumn('pets', 'pet_dob') ? 'pet_dob' : null,
+                Schema::hasColumn('pets', 'gender') ? 'gender' : null,
+            ]));
+
             $row = DB::table('pets')
-                ->select('id','user_id','name','breed','pet_age','pet_gender',
-                         'species','dob','neutered','location')
+                ->select($petSelect)
                 ->where('id', $petId)->first();
 
             if (!$row) return ['error' => 'Pet not found'];
@@ -558,17 +616,17 @@ class SnoutiqSymptomController extends Controller
             }
 
             // Calculate age from dob if available
-            $dob = $data['dob'] ?? $row->dob ?? null;
+            $dob = $data['dob'] ?? ($row->dob ?? $row->pet_dob ?? null);
             [$ageVal, $ageUnit] = $this->calcAge($dob);
             $ageStr = $ageVal ? "{$ageVal} {$ageUnit}" : ($row->pet_age ?? 'unknown age');
 
             return [
                 'name'     => $data['pet_name'] ?? $row->name   ?? 'Your pet',
-                'species'  => strtolower($data['species']  ?? $row->species    ?? 'dog'),
+                'species'  => strtolower($data['species']  ?? $row->species ?? $row->pet_type ?? $row->type ?? 'dog'),
                 'breed'    => $data['breed']    ?? $row->breed   ?? 'Mixed breed',
                 'age'      => $ageStr,
                 'dob'      => $dob,
-                'sex'      => strtolower($data['sex'] ?? $row->pet_gender ?? 'unknown'),
+                'sex'      => strtolower($data['sex'] ?? $row->pet_gender ?? $row->gender ?? 'unknown'),
                 'neutered' => strtolower($data['neutered'] ?? $row->neutered ?? 'unknown'),
                 'location' => $data['location'] ?? $row->location ?? 'India',
             ];
@@ -582,7 +640,7 @@ class SnoutiqSymptomController extends Controller
         [$ageVal, $ageUnit] = $this->calcAge($data['dob'] ?? null);
         return [
             'name'     => $data['pet_name'] ?? 'Your pet',
-            'species'  => strtolower($data['species'] ?? 'dog'),
+            'species'  => strtolower($data['species'] ?? $data['type'] ?? 'dog'),
             'breed'    => $data['breed']    ?? 'Mixed breed',
             'age'      => $ageVal ? "{$ageVal} {$ageUnit}" : 'unknown age',
             'dob'      => $data['dob'] ?? null,
@@ -644,6 +702,329 @@ class SnoutiqSymptomController extends Controller
         Cache::put($cacheKey, $state, now()->addMinutes(self::SESSION_TTL_MINUTES));
 
         return $state;
+    }
+
+    private function normalizeSymptomEntryPayload(array $data): array
+    {
+        $data['phone'] = $this->cleanOptionalString($this->firstFilled($data, [
+            'phone', 'user.phone', 'users.phone',
+        ]));
+        $data['owner_name'] = $this->cleanOptionalString($this->firstFilled($data, [
+            'owner_name', 'pet_owner_name', 'user_name', 'user.name', 'users.name',
+        ]));
+        $data['pet_name'] = $this->cleanOptionalString($this->firstFilled($data, [
+            'pet_name', 'pet.pet_name', 'pets.pet_name', 'pet.name', 'pets.name',
+        ])) ?? ($data['pet_name'] ?? null);
+        $data['breed'] = $this->cleanOptionalString($this->firstFilled($data, [
+            'breed', 'pet.breed', 'pets.breed',
+        ])) ?? ($data['breed'] ?? null);
+        $data['dob'] = $this->cleanOptionalString($this->firstFilled($data, [
+            'dob', 'pet.dob', 'pets.dob',
+        ])) ?? ($data['dob'] ?? null);
+        $data['type'] = $this->cleanOptionalString($this->firstFilled($data, [
+            'type', 'pet.type', 'pets.type',
+        ])) ?? ($data['type'] ?? null);
+        $data['species'] = $this->cleanOptionalString($this->firstFilled($data, [
+            'species', 'pet.species', 'pets.species', 'type', 'pet.type', 'pets.type',
+        ])) ?? ($data['species'] ?? null);
+
+        return $data;
+    }
+
+    private function persistSymptomEntryUserAndPet(array $data): array
+    {
+        $resolvedPhone = $this->normalizePhoneNumber($data['phone'] ?? null);
+        $rawPhone = trim((string) ($data['phone'] ?? ''));
+        $resolvedUserId = isset($data['user_id']) ? (int) $data['user_id'] : null;
+        $resolvedPetId = isset($data['pet_id']) ? (int) $data['pet_id'] : null;
+        $ownerName = trim((string) ($data['owner_name'] ?? ''));
+        $petName = trim((string) ($data['pet_name'] ?? ''));
+        $breed = trim((string) ($data['breed'] ?? ''));
+        $dob = trim((string) ($data['dob'] ?? ''));
+        $species = strtolower(trim((string) ($data['species'] ?? $data['type'] ?? '')));
+        $hasOwnerOrPetContext = $ownerName !== ''
+            || $petName !== ''
+            || $breed !== ''
+            || $dob !== ''
+            || $species !== ''
+            || !empty($data['sex'])
+            || !empty($data['neutered'])
+            || !empty($data['location']);
+        $hasPetContext = $petName !== ''
+            || $breed !== ''
+            || $dob !== ''
+            || $species !== ''
+            || !empty($data['sex'])
+            || !empty($data['neutered'])
+            || !empty($data['location'])
+            || ($resolvedPetId !== null && $resolvedPetId > 0);
+
+        if (!Schema::hasTable('users') || !Schema::hasTable('pets')) {
+            return [
+                'user_id' => $resolvedUserId,
+                'pet_id' => $resolvedPetId,
+            ];
+        }
+
+        try {
+            $userRow = null;
+
+            if ($resolvedPhone !== null && Schema::hasColumn('users', 'phone')) {
+                $userRow = DB::table('users')
+                    ->where('phone', $resolvedPhone)
+                    ->when($rawPhone !== '' && $rawPhone !== $resolvedPhone, function ($q) use ($rawPhone) {
+                        $q->orWhere('phone', $rawPhone);
+                    })
+                    ->orderByDesc('id')
+                    ->first();
+            }
+
+            if (!$userRow && $resolvedUserId !== null && $resolvedUserId > 0) {
+                $userRow = DB::table('users')->where('id', $resolvedUserId)->first();
+            }
+
+            if ($userRow) {
+                $resolvedUserId = (int) $userRow->id;
+                $userUpdate = [];
+
+                if (Schema::hasColumn('users', 'name') && $ownerName !== '') {
+                    $userUpdate['name'] = $ownerName;
+                }
+                if (Schema::hasColumn('users', 'phone') && $resolvedPhone !== null) {
+                    $phoneTakenByOther = DB::table('users')
+                        ->where('phone', $resolvedPhone)
+                        ->where('id', '!=', $resolvedUserId)
+                        ->exists();
+                    if (!$phoneTakenByOther) {
+                        $userUpdate['phone'] = $resolvedPhone;
+                    }
+                }
+                if (Schema::hasColumn('users', 'pet_name') && $petName !== '') {
+                    $userUpdate['pet_name'] = $petName;
+                }
+                if (Schema::hasColumn('users', 'breed') && $breed !== '') {
+                    $userUpdate['breed'] = $breed;
+                }
+                if (Schema::hasColumn('users', 'updated_at')) {
+                    $userUpdate['updated_at'] = now();
+                }
+
+                if ($userUpdate) {
+                    DB::table('users')->where('id', $resolvedUserId)->update($userUpdate);
+                }
+            }
+
+            if (!$userRow && ($resolvedPhone !== null || $hasOwnerOrPetContext)) {
+                $userPayload = [];
+                $userSeed = $resolvedPhone
+                    ?? Str::slug($ownerName !== '' ? $ownerName : ($petName !== '' ? $petName : Str::random(8)));
+
+                if (Schema::hasColumn('users', 'name')) {
+                    $userPayload['name'] = $ownerName !== ''
+                        ? $ownerName
+                        : ($petName !== '' ? ($petName . '\'s parent') : 'Symptom Check User');
+                }
+                if (Schema::hasColumn('users', 'phone') && $resolvedPhone !== null) {
+                    $userPayload['phone'] = $resolvedPhone;
+                }
+                if (Schema::hasColumn('users', 'email')) {
+                    $userPayload['email'] = $this->uniqueSymptomEntryEmail($userSeed);
+                }
+                if (Schema::hasColumn('users', 'password')) {
+                    $userPayload['password'] = bcrypt(Str::random(32));
+                }
+                if (Schema::hasColumn('users', 'role')) {
+                    $userPayload['role'] = 'pet_owner';
+                }
+                if (Schema::hasColumn('users', 'phone_verified_at') && $resolvedPhone !== null) {
+                    $userPayload['phone_verified_at'] = now();
+                }
+                if (Schema::hasColumn('users', 'pet_name') && $petName !== '') {
+                    $userPayload['pet_name'] = $petName;
+                }
+                if (Schema::hasColumn('users', 'breed') && $breed !== '') {
+                    $userPayload['breed'] = $breed;
+                }
+                if (Schema::hasColumn('users', 'created_at')) {
+                    $userPayload['created_at'] = now();
+                }
+                if (Schema::hasColumn('users', 'updated_at')) {
+                    $userPayload['updated_at'] = now();
+                }
+
+                if ($userPayload) {
+                    $newUserId = (int) DB::table('users')->insertGetId($userPayload);
+                    if ($newUserId > 0) {
+                        $resolvedUserId = $newUserId;
+                        $userRow = DB::table('users')->where('id', $newUserId)->first();
+                    }
+                }
+            }
+
+            if ($userRow) {
+                $resolvedUserId = (int) $userRow->id;
+            }
+
+            if ($resolvedUserId !== null && $resolvedUserId > 0 && $hasPetContext) {
+                $petUserColumn = Schema::hasColumn('pets', 'user_id')
+                    ? 'user_id'
+                    : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+                if ($petUserColumn !== null) {
+                    $petQuery = DB::table('pets')->where($petUserColumn, $resolvedUserId);
+
+                    if ($resolvedPetId !== null && $resolvedPetId > 0) {
+                        $petQuery->where('id', $resolvedPetId);
+                    } elseif ($petName !== '') {
+                        $petQuery->whereRaw('LOWER(TRIM(name)) = ?', [strtolower($petName)]);
+                    }
+
+                    $petRow = $petQuery->orderByDesc('id')->first();
+                    $petInsertName = $petName !== ''
+                        ? $petName
+                        : trim((string) (($userRow->pet_name ?? null) ?: 'Pet'));
+                    $petPayload = [];
+
+                    if (Schema::hasColumn('pets', 'name') && ($petName !== '' || !$petRow)) {
+                        $petPayload['name'] = $petName !== '' ? $petName : $petInsertName;
+                    }
+                    if (Schema::hasColumn('pets', 'breed') && $breed !== '') {
+                        $petPayload['breed'] = $breed;
+                    }
+                    if ($species !== '') {
+                        if (Schema::hasColumn('pets', 'species')) {
+                            $petPayload['species'] = $species;
+                        }
+                        if (Schema::hasColumn('pets', 'pet_type')) {
+                            $petPayload['pet_type'] = $species;
+                        }
+                        if (Schema::hasColumn('pets', 'type')) {
+                            $petPayload['type'] = $species;
+                        }
+                    }
+                    if ($dob !== '') {
+                        if (Schema::hasColumn('pets', 'dob')) {
+                            $petPayload['dob'] = $dob;
+                        }
+                        if (Schema::hasColumn('pets', 'pet_dob')) {
+                            $petPayload['pet_dob'] = $dob;
+                        }
+                        [$ageVal, $ageUnit] = $this->calcAge($dob);
+                        if (Schema::hasColumn('pets', 'pet_age') && is_numeric($ageVal)) {
+                            $petPayload['pet_age'] = str_contains((string) $ageUnit, 'year') ? (int) $ageVal : 0;
+                        }
+                    }
+                    if (Schema::hasColumn('pets', 'pet_gender') && !empty($data['sex'])) {
+                        $petPayload['pet_gender'] = strtolower((string) $data['sex']);
+                    }
+                    if (Schema::hasColumn('pets', 'gender') && !empty($data['sex'])) {
+                        $petPayload['gender'] = strtolower((string) $data['sex']);
+                    }
+                    if (Schema::hasColumn('pets', 'location') && !empty($data['location'])) {
+                        $petPayload['location'] = (string) $data['location'];
+                    }
+                    if (Schema::hasColumn('pets', 'neutered') && !empty($data['neutered'])) {
+                        $petPayload['neutered'] = strtolower((string) $data['neutered']);
+                    }
+                    if (Schema::hasColumn('pets', 'updated_at')) {
+                        $petPayload['updated_at'] = now();
+                    }
+
+                    if ($petRow) {
+                        if ($petPayload) {
+                            DB::table('pets')->where('id', $petRow->id)->update($petPayload);
+                        }
+                        $resolvedPetId = (int) $petRow->id;
+                    } else {
+                        $insertPayload = array_merge([$petUserColumn => $resolvedUserId], $petPayload);
+                        if (Schema::hasColumn('pets', 'created_at')) {
+                            $insertPayload['created_at'] = now();
+                        }
+                        if (Schema::hasColumn('pets', 'updated_at')) {
+                            $insertPayload['updated_at'] = now();
+                        }
+                        if ($insertPayload) {
+                            $resolvedPetId = (int) DB::table('pets')->insertGetId($insertPayload);
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('symptom_check.user_pet_persistence_failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [
+            'user_id' => $resolvedUserId,
+            'pet_id' => $resolvedPetId,
+        ];
+    }
+
+    private function firstFilled(array $data, array $paths): mixed
+    {
+        foreach ($paths as $path) {
+            $value = data_get($data, $path);
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+            if ($value !== null && $value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function cleanOptionalString(mixed $value): ?string
+    {
+        if (!is_scalar($value)) {
+            return null;
+        }
+
+        $clean = trim((string) $value);
+        return $clean === '' ? null : $clean;
+    }
+
+    private function normalizePhoneNumber(mixed $phone): ?string
+    {
+        if (!is_scalar($phone)) {
+            return null;
+        }
+
+        $raw = trim((string) $phone);
+        if ($raw === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $raw);
+        if (!$digits) {
+            return null;
+        }
+
+        if (str_starts_with($digits, '91') && strlen($digits) >= 12) {
+            return substr($digits, 0, 12);
+        }
+
+        if (strlen($digits) === 10) {
+            return '91' . $digits;
+        }
+
+        return $digits;
+    }
+
+    private function uniqueSymptomEntryEmail(string $seed): string
+    {
+        $emailLocal = preg_replace('/[^a-z0-9]/i', '', $seed) ?: (string) now()->timestamp;
+        $emailCandidate = "symptom_{$emailLocal}@snoutiq.local";
+        $suffix = 1;
+
+        while (DB::table('users')->where('email', $emailCandidate)->exists()) {
+            $emailCandidate = "symptom_{$emailLocal}_{$suffix}@snoutiq.local";
+            $suffix++;
+        }
+
+        return $emailCandidate;
     }
 
     private function calcAge(?string $dob): array
@@ -731,6 +1112,11 @@ class SnoutiqSymptomController extends Controller
             'what_we_think_is_happening' => $whatWeThink,
             'do_now'           => 'Go to the nearest vet or emergency animal hospital NOW. Call ahead if possible.',
             'time_sensitivity' => 'Go now — every minute matters',
+            'safe_to_do_while_waiting' => [
+                "Keep {$petName} calm, quiet, and as still as possible while leaving for the vet.",
+                'Do not give food, treats, or any human medicine unless a vet has specifically told you to.',
+                'If a toxin, medicine, or unusual food may be involved, take the packet or a photo of it with you.',
+            ],
             'what_to_watch'    => [
                 'Keep ' . $petName . ' calm and still while travelling',
                 'Do not give food, water, or any medications',
@@ -913,6 +1299,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "Instruction: " . ($routingInstructions[$routing] ?? $routingInstructions['video_consult']) . "\n\n" .
             "The `message` field must sound natural and should reference what the owner is seeing right now. " .
             "If there is recent conversation history, continue from it instead of restarting.\n\n" .
+            "Make `safe_to_do_while_waiting` a list of 3-4 very safe, low-risk steps the owner can do while waiting. " .
+            "These must be practical, species-aware, and should never include medication doses, home remedies, or anything risky. " .
+            "It is fine to include a warning like do not give human medication.\n" .
             "Make `what_to_watch` a list of 3-4 specific triggers that would make the owner upgrade to clinic care or emergency care. " .
             "Make `be_ready_to_tell_vet` one concise sentence containing the most useful thing to tell the vet next.\n\n" .
             "If routing is video_consult or in_clinic, include ONE focused follow-up question that would meaningfully change the advice. " .
@@ -923,6 +1312,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             '"diagnosis_summary":"One short sentence with preliminary likely causes, never a confirmed diagnosis",' .
             '"do_now":"One immediate action",' .
             '"time_sensitivity":"e.g. Go now / Within 2-4 hours / If not better in 24 hours",' .
+            '"safe_to_do_while_waiting":["step1","step2","step3"],' .
             '"what_to_watch":["sign1","sign2","sign3"],' .
             '"be_ready_to_tell_vet":"One concise sentence for the section titled Be ready to tell the vet",' .
             '"follow_up_question":{"label":"One question to narrow this down","question":"One focused question","options":["Option 1","Option 2","Option 3"]}}';
@@ -1062,6 +1452,14 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $timeSensitivity = $this->defaultTimeSensitivity($routing, $triage);
         }
 
+        $safeToDoWhileWaiting = $this->normalizeSafeToDoWhileWaiting(
+            is_array($payload['safe_to_do_while_waiting'] ?? null) ? $payload['safe_to_do_while_waiting'] : [],
+            $routing,
+            $pet,
+            $ownerMessage,
+            $triage
+        );
+
         $whatToWatch = $this->normalizeWhatToWatch(
             is_array($payload['what_to_watch'] ?? null) ? $payload['what_to_watch'] : [],
             $routing,
@@ -1093,6 +1491,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'diagnosis_summary' => $diagnosisSummary,
             'do_now' => $doNow,
             'time_sensitivity' => $timeSensitivity,
+            'safe_to_do_while_waiting' => $safeToDoWhileWaiting,
             'what_to_watch' => $whatToWatch,
             'be_ready_to_tell_vet' => $beReadyToTellVet,
             'follow_up_question' => $followUpQuestion,
@@ -1105,6 +1504,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $whatWeThink = $this->extractJsonStringField($raw, 'what_we_think_is_happening');
         $doNow = $this->extractJsonStringField($raw, 'do_now');
         $timeSensitivity = $this->extractJsonStringField($raw, 'time_sensitivity');
+        $safeToDoWhileWaiting = $this->extractJsonStringArrayField($raw, 'safe_to_do_while_waiting');
         $whatToWatch = $this->extractJsonStringArrayField($raw, 'what_to_watch');
         $beReadyToTellVet = $this->extractJsonStringField($raw, 'be_ready_to_tell_vet');
 
@@ -1113,6 +1513,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'what_we_think_is_happening' => $whatWeThink,
             'do_now' => $doNow,
             'time_sensitivity' => $timeSensitivity,
+            'safe_to_do_while_waiting' => $safeToDoWhileWaiting,
             'what_to_watch' => $whatToWatch,
             'be_ready_to_tell_vet' => $beReadyToTellVet,
         ], function ($value) {
@@ -1378,6 +1779,112 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'monitor' => $safeToWait > 0 ? "If not improving within {$safeToWait} hours" : 'If not improving within 24 hours',
             default => $safeToWait > 0 ? "Within {$safeToWait} hours" : 'Within the next few hours',
         };
+    }
+
+    private function normalizeSafeToDoWhileWaiting(array $items, string $routing, array $pet, string $ownerMessage, array $triage): array
+    {
+        $clean = [];
+        foreach ($items as $item) {
+            $text = $this->cleanAssistantText((string) $item);
+            if ($text === '' || !$this->isSafeWaitingAdvice($text)) {
+                continue;
+            }
+            $clean[] = $text;
+        }
+
+        $defaults = $this->defaultSafeToDoWhileWaiting($routing, $pet, $ownerMessage, $triage);
+        return array_slice(array_values(array_unique(array_merge($clean, $defaults))), 0, 4);
+    }
+
+    private function isSafeWaitingAdvice(string $text): bool
+    {
+        $lower = mb_strtolower($text);
+
+        if (preg_match('/\b(force[\s-]?feed|induce vomiting|home remedy|turmeric|essential oil|coconut oil|alcohol|dose|dosage|tablet|capsule|syrup|ml|mg)\b/', $lower)) {
+            return false;
+        }
+
+        if (
+            preg_match('/\b(paracetamol|crocin|dolo|ibuprofen|aspirin|diclofenac|antibiotic|steroid|painkiller)\b/', $lower)
+            && !preg_match('/\b(do not|don\'t|avoid|never|toxic|no human medication)\b/', $lower)
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function defaultSafeToDoWhileWaiting(string $routing, array $pet, string $ownerMessage, array $triage): array
+    {
+        $petName = trim((string) ($pet['name'] ?? 'your pet')) ?: 'your pet';
+        $pronoun = $this->subjectPronoun($pet);
+        $species = mb_strtolower((string) ($pet['species'] ?? 'pet'));
+        $text = mb_strtolower($this->cleanAssistantText($ownerMessage));
+
+        if ($routing === 'emergency') {
+            return [
+                "Keep {$petName} calm, quiet, and as still as possible during travel.",
+                'Do not give food, treats, or any human medicine unless a vet has specifically told you to.',
+                'If poisoning or a foreign item is possible, take the packet, wrapper, or a photo with you.',
+            ];
+        }
+
+        if (preg_match('/\b(vomit|vomiting|throwing up|diarrh|not eating|no appetite|letharg|fever)\b/', $text)) {
+            return [
+                "Offer small sips of water every 20-30 minutes if {$petName} can keep it down; do not force-feed.",
+                "Note the last time {$petName} passed urine, stool, or vomited and what it looked like.",
+                'Do not give paracetamol, ibuprofen, antibiotics, or any human medicine without veterinary advice.',
+            ];
+        }
+
+        if (preg_match('/\b(limp|limping|swollen|swelling|paw|leg|joint|yelp|pain)\b/', $text)) {
+            return [
+                "Restrict running, stairs, jumping, and rough play until {$petName} is examined.",
+                "Check the paw pads and nails gently for a thorn, cut, or lodged object, but stop if {$pronoun} is painful.",
+                'Do not massage the area or give human painkillers while waiting.',
+            ];
+        }
+
+        if (preg_match('/\b(cough|coughing|sneez|runny nose|nasal|eye discharge|breath)\b/', $text)) {
+            $speciesSpecific = $species === 'cat'
+                ? "Warm {$petName}'s food slightly so smell encourages eating if the nose feels blocked."
+                : "Keep {$petName} rested in a cool, well-ventilated room and avoid exercise until breathing is reassessed.";
+
+            return [
+                'Keep the room calm, cool, and well ventilated; avoid smoke, dust, incense, or strong sprays nearby.',
+                'Gently wipe visible eye or nose discharge with clean lukewarm water if needed.',
+                $speciesSpecific,
+                'Do not give cough syrups, steam directly to the face, or any human cold medicine.',
+            ];
+        }
+
+        if (preg_match('/\b(itch|itching|scratch|scratching|rash|skin|ear|ears)\b/', $text)) {
+            return [
+                "Use a cone or gentle distraction if needed so {$petName} does not keep chewing or scratching the same area.",
+                'Keep the skin dry and note any new shampoo, treats, medicines, or flea exposure from the last few days.',
+                'Do not apply human creams, antiseptics, or pain-relief gels unless a vet has advised it.',
+            ];
+        }
+
+        if (preg_match('/\b(urine|urinating|pee|straining)\b/', $text)) {
+            return [
+                "Keep water available and give {$petName} easy access to the usual toilet spot or litter tray.",
+                "Note the last normal urination, whether only drops are coming out, and whether there is any blood.",
+                'Do not squeeze the belly or give human pain medicine while waiting.',
+            ];
+        }
+
+        $hours = isset($triage['safe_to_wait_hours']) ? max(0, (int) $triage['safe_to_wait_hours']) : 0;
+        $timeNote = $hours > 0
+            ? "If {$petName} is not clearly improving within {$hours} hours, upgrade to a vet consult."
+            : "If {$petName} is getting worse, upgrade to a vet consult rather than waiting.";
+
+        return [
+            "Keep {$petName} rested and offer water normally unless drinking seems to worsen symptoms.",
+            'Take a short video or photo of the symptom if it comes and goes, so the vet can see the exact pattern.',
+            'Avoid human medication or home remedies unless a vet has specifically recommended them.',
+            $timeNote,
+        ];
     }
 
     private function normalizeWhatToWatch(array $items, string $routing, array $pet, string $ownerMessage, array $triage): array
@@ -1677,6 +2184,8 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         return [
             'success' => true,
             'session_id' => $sessionId,
+            'user_id' => $state['user_id'] ?? null,
+            'pet_id' => $state['pet_id'] ?? null,
             'routing' => $routing,
             'severity' => $severity,
             'turn' => $turn,
@@ -1684,6 +2193,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'health_score' => $ui['health_score']['value'] ?? null,
             'score_band' => $ui['score_band'] ?? null,
             'response' => $response,
+            'safe_to_do_while_waiting' => $response['safe_to_do_while_waiting'] ?? [],
             'follow_up_question' => $response['follow_up_question'] ?? null,
             'follow_up_history' => array_values($state['follow_up_history'] ?? []),
             'be_ready_to_tell_vet' => $response['be_ready_to_tell_vet'] ?? null,
