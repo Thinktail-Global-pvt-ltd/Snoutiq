@@ -321,6 +321,8 @@ class ReceptionistBookingController extends Controller
             ->whereNotNull('in_clinic_appointment_id')
             ->groupBy('in_clinic_appointment_id');
 
+        $hasAppointmentPetIdColumn = Schema::hasColumn('appointments', 'pet_id');
+
         $query = DB::table('appointments as a')
             ->leftJoin('doctors as d', 'a.doctor_id', '=', 'd.id')
             ->leftJoinSub($latestPrescriptionByAppointment, 'lp', function ($join) {
@@ -335,6 +337,7 @@ class ReceptionistBookingController extends Controller
                 'a.name as patient_name',
                 'a.mobile as patient_phone',
                 'a.pet_name',
+                DB::raw($hasAppointmentPetIdColumn ? 'a.pet_id as appointment_pet_id' : 'NULL as appointment_pet_id'),
                 'a.appointment_date',
                 'a.appointment_time',
                 'a.status',
@@ -363,6 +366,11 @@ class ReceptionistBookingController extends Controller
         });
 
         $userBlobUrlById = collect();
+        $petBlobUrlById = collect();
+        $petDetailsById = collect();
+        $petByUserAndName = collect();
+        $latestPetByUserId = collect();
+
         if ($this->userPetDoc2BlobColumnsReady()) {
             $patientIds = $rows->pluck('patient_id')
                 ->filter(fn ($patientId) => is_numeric($patientId) && (int) $patientId > 0)
@@ -384,10 +392,95 @@ class ReceptionistBookingController extends Controller
             }
         }
 
-        $rows = $rows->map(function ($row) use ($userBlobUrlById) {
+        if (Schema::hasTable('pets')) {
+            $directPetIds = $rows->pluck('appointment_pet_id')
+                ->filter(fn ($petId) => is_numeric($petId) && (int) $petId > 0)
+                ->map(fn ($petId) => (int) $petId)
+                ->unique()
+                ->values();
+
+            $patientIds = $rows->pluck('patient_id')
+                ->filter(fn ($patientId) => is_numeric($patientId) && (int) $patientId > 0)
+                ->map(fn ($patientId) => (int) $patientId)
+                ->unique()
+                ->values();
+
+            if ($directPetIds->isNotEmpty() || $patientIds->isNotEmpty()) {
+                $petColumns = ['id', 'user_id', 'name'];
+                foreach (['pet_doc1', 'pet_doc2', 'pic_link'] as $column) {
+                    if (Schema::hasColumn('pets', $column)) {
+                        $petColumns[] = $column;
+                    }
+                }
+
+                $petQuery = DB::table('pets')
+                    ->select($petColumns)
+                    ->orderByDesc('id');
+
+                $petQuery->where(function ($builder) use ($directPetIds, $patientIds) {
+                    if ($directPetIds->isNotEmpty()) {
+                        $builder->whereIn('id', $directPetIds->all());
+                    }
+                    if ($patientIds->isNotEmpty()) {
+                        $method = $directPetIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                        $builder->{$method}('user_id', $patientIds->all());
+                    }
+                });
+
+                $petRecords = $petQuery->get();
+
+                $petDetailsById = $petRecords->keyBy(fn ($pet) => (int) $pet->id);
+                $petByUserAndName = $petRecords->groupBy(function ($pet) {
+                    $name = Str::lower(trim((string) ($pet->name ?? '')));
+                    return ((int) ($pet->user_id ?? 0)).'|'.$name;
+                });
+                $latestPetByUserId = $petRecords
+                    ->groupBy(fn ($pet) => (int) ($pet->user_id ?? 0))
+                    ->map(fn ($pets) => $pets->first());
+
+                if ($this->petDoc2BlobColumnsReady()) {
+                    $petIdsWithBlob = DB::table('pets')
+                        ->whereIn('id', $petRecords->pluck('id')->all())
+                        ->whereNotNull('pet_doc2_blob')
+                        ->where('pet_doc2_blob', '!=', '')
+                        ->pluck('id')
+                        ->map(fn ($petId) => (int) $petId);
+
+                    $petBlobUrlById = $petIdsWithBlob->mapWithKeys(
+                        fn (int $petId) => [$petId => route('api.pets.pet-doc2-blob', ['pet' => $petId], true)]
+                    );
+                }
+            }
+        }
+
+        $rows = $rows->map(function ($row) use ($userBlobUrlById, $petDetailsById, $petByUserAndName, $latestPetByUserId, $petBlobUrlById) {
             $patientId = is_numeric($row->patient_id ?? null) ? (int) $row->patient_id : null;
+            $appointmentPetId = is_numeric($row->appointment_pet_id ?? null) ? (int) $row->appointment_pet_id : null;
+
+            $pet = $appointmentPetId ? $petDetailsById->get($appointmentPetId) : null;
+            if (!$pet && $patientId) {
+                $petNameKey = Str::lower(trim((string) ($row->pet_name ?? '')));
+                if ($petNameKey !== '') {
+                    $pet = $petByUserAndName->get($patientId.'|'.$petNameKey)?->first();
+                }
+                if (!$pet) {
+                    $pet = $latestPetByUserId->get($patientId);
+                }
+            }
+
+            $resolvedPetId = $pet ? (int) $pet->id : $appointmentPetId;
+            $petBlobUrl = $resolvedPetId ? $petBlobUrlById->get($resolvedPetId) : null;
+            $petImageUrl = $petBlobUrl
+                ?: $this->absolutePetDocumentUrl($pet->pet_doc1 ?? null)
+                ?: $this->absolutePetDocumentUrl($pet->pet_doc2 ?? null)
+                ?: $this->absolutePetDocumentUrl($pet->pic_link ?? null);
+
             $row->user_pet_doc2_blob_url = $patientId ? $userBlobUrlById->get($patientId) : null;
             $row->user_image_url = $row->user_pet_doc2_blob_url;
+            $row->pet_id = $resolvedPetId ?: null;
+            $row->pet_doc2_blob_url = $petBlobUrl;
+            $row->pet_image_url = $petImageUrl;
+            unset($row->appointment_pet_id);
             return $row;
         });
 
@@ -712,6 +805,31 @@ class ReceptionistBookingController extends Controller
         return Schema::hasTable('users')
             && Schema::hasColumn('users', 'pet_doc2_blob')
             && Schema::hasColumn('users', 'pet_doc2_mime');
+    }
+
+    private function absolutePetDocumentUrl(?string $path): ?string
+    {
+        if ($path === null) {
+            return null;
+        }
+
+        $path = trim($path);
+        if ($path === '') {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        $path = ltrim($path, '/');
+        $base = rtrim(url('/'), '/');
+
+        if (str_starts_with($path, 'backend/') && str_ends_with($base, '/backend')) {
+            $path = substr($path, strlen('backend/'));
+        }
+
+        return $base.'/'.$path;
     }
 
     public function storeBooking(Request $request)

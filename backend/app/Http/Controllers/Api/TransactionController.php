@@ -19,12 +19,17 @@ class TransactionController extends Controller
     {
         $data = $request->validate([
             'doctor_id' => 'required|integer',
+            'date' => 'nullable|date',
             'limit' => 'nullable|integer|min:1|max:200',
         ]);
 
         $limit = (int) ($data['limit'] ?? 50);
+        $date = (string) ($data['date'] ?? now()->toDateString());
         $petColumns = ['id', 'name'];
         if (Schema::hasTable('pets')) {
+            if (Schema::hasColumn('pets', 'pet_doc1')) {
+                $petColumns[] = 'pet_doc1';
+            }
             if (Schema::hasColumn('pets', 'pet_doc2')) {
                 $petColumns[] = 'pet_doc2';
             }
@@ -33,6 +38,9 @@ class TransactionController extends Controller
             }
             if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
                 $petColumns[] = 'pet_doc2_mime';
+            }
+            if (Schema::hasColumn('pets', 'pic_link')) {
+                $petColumns[] = 'pic_link';
             }
             if (Schema::hasColumn('pets', 'breed')) {
                 $petColumns[] = 'breed';
@@ -60,7 +68,7 @@ class TransactionController extends Controller
             ->select('transactions.*')
             ->whereIn('transactions.type', ['video_consult', 'video_call', 'video call', 'appointment', 'appointments'])
             ->where('transactions.doctor_id', $data['doctor_id'])
-            ->whereDate('transactions.created_at', now()->toDateString())
+            ->whereDate('transactions.created_at', $date)
             ->where(function ($query) {
                 $query->whereNull('transactions.status')
                     ->orWhere('transactions.status', '!=', 'pending');
@@ -137,7 +145,10 @@ class TransactionController extends Controller
             }
 
             $petBlobUrl = $pet ? $this->petDoc2BlobUrl($pet) : null;
+            $petDoc1Url = $pet ? $this->absolutePetDoc2Url($pet->pet_doc1 ?? null) : null;
             $petDoc2Url = $pet ? $this->absolutePetDoc2Url($pet->pet_doc2 ?? null) : null;
+            $petPicLinkUrl = $pet ? $this->absolutePetDoc2Url($pet->pic_link ?? null) : null;
+            $petImageUrl = $petBlobUrl ?: $petDoc1Url ?: $petDoc2Url ?: $petPicLinkUrl;
             $requiresPrescription = $this->transactionRequiresPrescription((string) ($tx->type ?? ''));
             $hasPrescription = $requiresPrescription
                 ? $this->hasMatchingPrescriptionForTransaction($tx, $prescriptionChannelSet)
@@ -167,6 +178,8 @@ class TransactionController extends Controller
                 'user_name' => $user->name ?? null,
                 'doctor_name' => $tx->doctor->doctor_name ?? null,
                 'device_tokens' => $deviceTokens,
+                'pet_doc2_blob_url' => $petBlobUrl,
+                'pet_image_url' => $petImageUrl,
                 'pet' => $pet ? [
                     'id' => $pet->id,
                     'name' => $pet->name,
@@ -177,7 +190,7 @@ class TransactionController extends Controller
                     'pet_doc2' => $pet->pet_doc2 ?? null,
                     'pet_doc2_blob_url' => $petBlobUrl,
                     'pet_doc2_url' => $petDoc2Url,
-                    'pet_image_url' => $petBlobUrl ?: $petDoc2Url,
+                    'pet_image_url' => $petImageUrl,
                 ] : null,
                 'call' => $this->formatJoinedCall($tx),
                 'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
