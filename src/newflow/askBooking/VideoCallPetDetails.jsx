@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Coffee,
-  CreditCard,
   Dog,
   FileText,
   Heart,
@@ -29,7 +28,6 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { FaWhatsapp } from "react-icons/fa";
 
 const FLOW_STORAGE_KEY = "snoutiq-video-call-copied-flow";
 const PAYMENT_ROUTE = "/video-call-payment";
@@ -67,14 +65,6 @@ const YES_NO_OPTIONS = [
   { label: "Yes", value: "1" },
   { label: "No", value: "0" },
 ];
-
-const startCase = (value) =>
-  String(value || "")
-    .trim()
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 
 const fieldBase =
   "w-full rounded-2xl border border-[#d6e3ff] bg-[#fbfdff] p-3 text-[#0f172a] placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-[#4f6bff]/12 focus:border-[#4f6bff] hover:border-[#bfd0ff] disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed md:p-3.5 md:text-[15px]";
@@ -332,7 +322,7 @@ const buildDraftDetails = (source) => ({
   hasPhoto: false,
 });
 
-const buildMaskedPrefillFields = (source) => {
+const buildHiddenPrefillFields = (source) => {
   const prepared = buildInitialDetails(source);
   return {
     ownerName: Boolean(prepared.ownerName),
@@ -439,9 +429,9 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const [hasChangesSinceSubmit, setHasChangesSinceSubmit] = useState(
     initialHasChangesSinceSubmit
   );
-  const [maskedPrefillFields, setMaskedPrefillFields] = useState(() =>
-     routePrefill && !storedPetDetails && !storedDraft
-      ? buildMaskedPrefillFields(routePrefill)
+  const [hiddenPrefillFields, setHiddenPrefillFields] = useState(() =>
+    routePrefill && !storedPetDetails && !storedDraft
+      ? buildHiddenPrefillFields(routePrefill)
       : {}
   );
   const breedDropdownRef = useRef(null);
@@ -453,10 +443,10 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const hasExistingSubmission = Boolean(
     existingPaymentMeta?.user_id && existingPaymentMeta?.pet_id && storedPetDetails
   );
-  const isPrefillMasked = (field) => Boolean(maskedPrefillFields[field]);
-  const getVisibleFieldValue = (field, value) => (isPrefillMasked(field) ? "" : value);
-  const revealPrefillField = (field) => {
-    setMaskedPrefillFields((current) =>
+  const isPrefilled = (field) => Boolean(hiddenPrefillFields[field]);
+  const shouldShowField = (field) => !isPrefilled(field);
+  const revealField = (field) => {
+    setHiddenPrefillFields((current) =>
       current[field] ? { ...current, [field]: false } : current
     );
   };
@@ -464,7 +454,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const updateField = (field, value) => {
     setHasChangesSinceSubmit(true);
     setSubmitError("");
-    revealPrefillField(field);
+    revealField(field);
     setDetails((current) => ({ ...current, [field]: value }));
   };
 
@@ -610,18 +600,13 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   }, [breedOptions, breedSearch]);
 
   const selectedBreedLabel = useMemo(() => {
-    if (isPrefillMasked("breed")) return "";
     if (!details.breed) return "";
     return breedOptions.find((option) => option.value === details.breed)?.label || "";
-  }, [breedOptions, details.breed, maskedPrefillFields.breed]);
+  }, [breedOptions, details.breed]);
 
-  const visiblePetType = getVisibleFieldValue("type", details.type);
-  const showBreed = visiblePetType === "dog" || visiblePetType === "cat";
-  const isExotic = visiblePetType === "exotic";
-  const approxAge = useMemo(
-    () => (isPrefillMasked("petDob") ? "" : calcAgeFromDob(details.petDob)),
-    [details.petDob, maskedPrefillFields.petDob]
-  );
+  const showBreed = details.type === "dog" || details.type === "cat";
+  const isExotic = details.type === "exotic";
+  const approxAge = useMemo(() => calcAgeFromDob(details.petDob), [details.petDob]);
   const uploadKind = useMemo(() => {
     if (!uploadFile?.type) return "file";
     if (uploadFile.type.startsWith("image/")) return "image";
@@ -634,27 +619,38 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   }, [uploadKind]);
   const canReuseExistingSubmission = hasExistingSubmission && !hasChangesSinceSubmit;
   const phoneDigits = details.ownerMobile.replace(/\D/g, "");
-  const visibleProblemTextLength = isPrefillMasked("problemText")
-    ? 0
-    : details.problemText.trim().length;
-  const petTypeLabel = details.type
-    ? details.type === "exotic"
-      ? startCase(details.exoticType || "Other")
-      : startCase(details.type)
-    : "Not selected";
-  const ownerReady = Boolean(
-    details.ownerName.trim() && phoneDigits.length === 10 && details.city.trim()
-  );
-  const petReady = Boolean(details.name.trim() && details.type && details.petDob);
-  const concernReady = Boolean(
-    details.problemText.trim().length > 10 &&
-      details.lastDaysEnergy &&
-      details.lastDaysAppetite &&
-      details.mood
-  );
-  const uploadReady = Boolean(
-    canReuseExistingSubmission || (details.hasPhoto && uploadFile)
-  );
+  const visibleProblemTextLength = details.problemText.trim().length;
+  const showOwnerNameField = shouldShowField("ownerName");
+  const showOwnerMobileField = shouldShowField("ownerMobile");
+  const showCityField = shouldShowField("city");
+  const showOwnerSection =
+    showOwnerNameField || showOwnerMobileField || showCityField;
+  const showPetNameField = shouldShowField("name");
+  const showGenderField = shouldShowField("gender");
+  const showTypeField = shouldShowField("type");
+  const showBreedField = showBreed && shouldShowField("breed");
+  const showExoticTypeField = isExotic && shouldShowField("exoticType");
+  const showPetDobField = shouldShowField("petDob");
+  const showWeightField = shouldShowField("weightKg");
+  const showPetSection =
+    showPetNameField ||
+    showGenderField ||
+    showTypeField ||
+    showBreedField ||
+    showExoticTypeField ||
+    showPetDobField ||
+    showWeightField;
+  const showProblemTextField = shouldShowField("problemText");
+  const showEnergyField = shouldShowField("lastDaysEnergy");
+  const showAppetiteField = shouldShowField("lastDaysAppetite");
+  const showMoodField = shouldShowField("mood");
+  const showConcernSection =
+    showProblemTextField || showEnergyField || showAppetiteField || showMoodField;
+  const showIsNeuteredField = shouldShowField("isNeutered");
+  const showVaccinatedField = shouldShowField("vaccinatedYesNo");
+  const showDewormingField = shouldShowField("dewormingYesNo");
+  const showMedicalSection =
+    showIsNeuteredField || showVaccinatedField || showDewormingField;
   const isValid =
     details.ownerName.trim() &&
     phoneDigits.length === 10 &&
@@ -950,394 +946,453 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
 
 
               <div className="mt-6 space-y-6">
-                <section className={cardBase}>
-                  <div className={cardHeaderBase}>
-                    <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
-                      <User size={20} className="text-[#3998de]" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-base">Owner details</h3>
-                      <p className="text-xs text-gray-500">Used only for booking updates</p>
-                    </div>
-                  </div>
-
-                  <div className={cardBodyBase}>
-                    <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-900">
-                      <Shield size={14} className="mt-0.5 text-blue-600" />
-                      <p>Your details are used only for this copied consultation flow.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Pet Owner Name <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={getVisibleFieldValue("ownerName", details.ownerName)}
-                            onChange={(event) => updateField("ownerName", event.target.value)}
-                            placeholder="Enter your full name"
-                            className={`${fieldBase} pl-12 md:pl-12`}
-                          />
-                        </div>
+                {showOwnerSection ? (
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
+                        <User size={20} className="text-[#3998de]" />
                       </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Mobile Number <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <input
-                            type="tel"
-                            value={getVisibleFieldValue("ownerMobile", details.ownerMobile)}
-                            onChange={(event) => updateField("ownerMobile", normalizePhoneInput(event.target.value))}
-                            placeholder="10-digit mobile number"
-                            className={`${fieldBase} pl-12 md:pl-12`}
-                            inputMode="numeric"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          City <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={getVisibleFieldValue("city", details.city)}
-                            onChange={(event) => updateField("city", event.target.value)}
-                            placeholder="Enter city (e.g. Gurugram)"
-                            className={`${fieldBase} pl-12 md:pl-12`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                <section className={cardBase}>
-                  <div className={cardHeaderBase}>
-                    <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
-                      <PawPrint size={20} className="text-[#3998de]" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-base">Pet details</h3>
-                      <p className="text-xs text-gray-500">Basic details for the request</p>
-                    </div>
-                  </div>
-
-                  <div className={cardBodyBase}>
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Pet's Name <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <PawPrint size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={getVisibleFieldValue("name", details.name)}
-                            onChange={(event) => updateField("name", event.target.value)}
-                            placeholder="Enter your pet's name"
-                            className={`${fieldBase} pl-12 md:pl-12`}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Gender <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <Heart size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <select
-                            value={getVisibleFieldValue("gender", details.gender)}
-                            onChange={(event) => updateField("gender", event.target.value)}
-                            className={`${selectBase} pl-12 md:pl-12`}
-                          >
-                            <option value="">Select gender</option>
-                            {GENDER_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                        </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-base">Owner details</h3>
+                        <p className="text-xs text-gray-500">Used only for booking updates</p>
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Pet Type <span className="text-red-500">*</span>
-                      </label>
-                      <div className="grid grid-cols-3 gap-3 md:gap-4">
-                        {["dog", "cat", "exotic"].map((type) => (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => {
-                              setHasChangesSinceSubmit(true);
-                              setSubmitError("");
-                              revealPrefillField("type");
-                              revealPrefillField("breed");
-                              revealPrefillField("exoticType");
-                              setDetails((current) => ({
-                                ...current,
-                                type,
-                                breed: "",
-                                exoticType: "",
-                              }));
-                            }}
-                            className={[
-                              "p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all duration-200",
-                              "md:p-5 md:flex-row md:justify-center md:gap-3 md:rounded-2xl",
-                              visiblePetType === type
-                                ? "border-[#3998de] bg-[#3998de]/5 text-[#3998de]"
-                                : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100",
-                            ].join(" ")}
-                          >
-                            <div className={visiblePetType === type ? "text-[#3998de]" : "text-gray-500"}>
-                              {getPetTypeIcon(type)}
+                    <div className={cardBodyBase}>
+                      <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+                        <Shield size={14} className="mt-0.5 text-blue-600" />
+                        <p>Your details are used only for this copied consultation flow.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                        {showOwnerNameField ? (
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                              Pet Owner Name <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                              <input
+                                type="text"
+                                value={details.ownerName}
+                                onChange={(event) => updateField("ownerName", event.target.value)}
+                                placeholder="Enter your full name"
+                                className={`${fieldBase} pl-12 md:pl-12`}
+                              />
                             </div>
-                            <span className="capitalize text-sm font-medium md:text-base">{type}</span>
-                          </button>
-                        ))}
+                          </div>
+                        ) : null}
+
+                        {showOwnerMobileField ? (
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                              Mobile Number <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                              <input
+                                type="tel"
+                                value={details.ownerMobile}
+                                onChange={(event) => updateField("ownerMobile", normalizePhoneInput(event.target.value))}
+                                placeholder="10-digit mobile number"
+                                className={`${fieldBase} pl-12 md:pl-12`}
+                                inputMode="numeric"
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {showCityField ? (
+                          <div className="space-y-2 md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                              City <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                              <input
+                                type="text"
+                                value={details.city}
+                                onChange={(event) => updateField("city", event.target.value)}
+                                placeholder="Enter city (e.g. Gurugram)"
+                                className={`${fieldBase} pl-12 md:pl-12`}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+
+                {showPetSection ? (
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
+                        <PawPrint size={20} className="text-[#3998de]" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-base">Pet details</h3>
+                        <p className="text-xs text-gray-500">Basic details for the request</p>
                       </div>
                     </div>
 
-                    {showBreed ? (
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Breed <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative" ref={breedDropdownRef}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              !loadingBreeds && breedOptions.length
-                                ? setBreedDropdownOpen((current) => !current)
-                                : null
-                            }
-                            className={`${selectBase} text-left`}
-                            disabled={loadingBreeds || breedOptions.length === 0}
-                          >
-                            {loadingBreeds
-                              ? `Loading ${visiblePetType || "pet"} breeds...`
-                              : selectedBreedLabel || `Select ${visiblePetType || "pet"} breed`}
-                          </button>
-                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-
-                          {breedDropdownOpen ? (
-                            <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
-                              <div className="p-2 border-b border-gray-100">
+                    <div className={cardBodyBase}>
+                      {showPetNameField || showGenderField ? (
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                          {showPetNameField ? (
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">
+                                Pet's Name <span className="text-red-500">*</span>
+                              </label>
+                              <div className="relative">
+                                <PawPrint size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                                 <input
                                   type="text"
-                                  value={breedSearch}
-                                  onChange={(event) => setBreedSearch(event.target.value)}
-                                  placeholder={`Search ${visiblePetType || "pet"} breeds`}
-                                  className={fieldBase}
-                                  autoFocus
+                                  value={details.name}
+                                  onChange={(event) => updateField("name", event.target.value)}
+                                  placeholder="Enter your pet's name"
+                                  className={`${fieldBase} pl-12 md:pl-12`}
                                 />
                               </div>
-                              <div className="max-h-56 overflow-auto">
-                                {filteredBreedOptions.length ? (
-                                  filteredBreedOptions.map((option) => (
-                                    <button
-                                      key={option.value}
-                                      type="button"
-                                      onClick={() => {
-                                        updateField("breed", option.value);
-                                        setBreedDropdownOpen(false);
-                                        setBreedSearch("");
-                                      }}
-                                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                                        details.breed === option.value
-                                          ? "bg-gray-50 font-semibold text-gray-900"
-                                          : "text-gray-700"
-                                      }`}
-                                    >
+                            </div>
+                          ) : null}
+
+                          {showGenderField ? (
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">
+                                Gender <span className="text-red-500">*</span>
+                              </label>
+                              <div className="relative">
+                                <Heart size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                <select
+                                  value={details.gender}
+                                  onChange={(event) => updateField("gender", event.target.value)}
+                                  className={`${selectBase} pl-12 md:pl-12`}
+                                >
+                                  <option value="">Select gender</option>
+                                  {GENDER_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
                                       {option.label}
-                                    </button>
-                                  ))
-                                ) : (
-                                  <div className="px-4 py-2 text-sm text-gray-500">No breeds found</div>
-                                )}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                               </div>
                             </div>
                           ) : null}
                         </div>
-                        {breedError ? (
-                          <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                            <AlertCircle size={12} />
-                            {breedError}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
+                      ) : null}
 
-                    {isExotic ? (
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Which pet? <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <Rabbit size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={getVisibleFieldValue("exoticType", details.exoticType)}
-                            onChange={(event) => updateField("exoticType", event.target.value)}
-                            placeholder="e.g. Parrot, Rabbit, Turtle"
-                            className={`${fieldBase} pl-12 md:pl-12`}
-                          />
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Pet's Date of Birth <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <input
-                            type="date"
-                            max={todayISO()}
-                            value={getVisibleFieldValue("petDob", details.petDob)}
-                            onChange={(event) => updateField("petDob", event.target.value)}
-                            className={`${fieldBase} pl-12 md:pl-12`}
-                          />
-                        </div>
-                        {approxAge ? <p className="text-xs text-gray-500">Approx age: {approxAge}</p> : null}
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">Weight (kg)</label>
-                        <div className="relative">
-                          <Scale size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={getVisibleFieldValue("weightKg", details.weightKg)}
-                            onChange={(event) => updateField("weightKg", event.target.value)}
-                            placeholder="Optional"
-                            className={`${fieldBase} pl-12 md:pl-12`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                <section className={cardBase}>
-                  <div className={cardHeaderBase}>
-                    <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
-                      <Activity size={20} className="text-[#3998de]" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-base">Current concern</h3>
-                      <p className="text-xs text-gray-500">Share what your pet is experiencing today</p>
-                    </div>
-                  </div>
-
-                  <div className={cardBodyBase}>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Describe the issue <span className="text-red-500">*</span>
-                      </label>
-                      <textarea
-                        value={getVisibleFieldValue("problemText", details.problemText)}
-                        onChange={(event) => updateField("problemText", event.target.value)}
-                        placeholder="Tell us what symptoms you noticed, when they started, and anything important that changed."
-                        className={textareaBase}
-                      />
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500">More detail helps us submit the request correctly.</span>
-                        <span className={visibleProblemTextLength > 10 ? "text-emerald-600" : "text-gray-400"}>
-                          {visibleProblemTextLength}/10+ characters
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">Energy <span className="text-red-500">*</span></label>
-                        <div className="relative">
-                          <Activity size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <select value={getVisibleFieldValue("lastDaysEnergy", details.lastDaysEnergy)} onChange={(event) => updateField("lastDaysEnergy", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
-                            <option value="">Select energy level</option>
-                            {ENERGY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">Appetite <span className="text-red-500">*</span></label>
-                        <div className="relative">
-                          <Coffee size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <select value={getVisibleFieldValue("lastDaysAppetite", details.lastDaysAppetite)} onChange={(event) => updateField("lastDaysAppetite", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
-                            <option value="">Select appetite</option>
-                            {APPETITE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">Mood <span className="text-red-500">*</span></label>
-                        <div className="relative">
-                          <Heart size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <select value={getVisibleFieldValue("mood", details.mood)} onChange={(event) => updateField("mood", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
-                            <option value="">Select mood</option>
-                            {MOOD_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                <section className={cardBase}>
-                  <div className={cardHeaderBase}>
-                    <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
-                      <Shield size={20} className="text-[#3998de]" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-base">Medical history</h3>
-                      <p className="text-xs text-gray-500">Quick health checks before submission</p>
-                    </div>
-                  </div>
-
-                  <div className={cardBodyBase}>
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
-                      {[
-                        ["isNeutered", "Is your pet neutered?"],
-                        ["vaccinatedYesNo", "Vaccinated?"],
-                        ["dewormingYesNo", "Dewormed?"],
-                      ].map(([field, label]) => (
-                        <div className="space-y-2" key={field}>
-                          <label className="block text-sm font-medium text-gray-700">{label} <span className="text-red-500">*</span></label>
-                          <div className="relative">
-                            <select value={getVisibleFieldValue(field, details[field])} onChange={(event) => updateField(field, event.target.value)} className={selectBase}>
-                              <option value="">Select</option>
-                              {YES_NO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                      {showTypeField ? (
+                        <div className="space-y-3">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Pet Type <span className="text-red-500">*</span>
+                          </label>
+                          <div className="grid grid-cols-3 gap-3 md:gap-4">
+                            {["dog", "cat", "exotic"].map((type) => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => {
+                                  setHasChangesSinceSubmit(true);
+                                  setSubmitError("");
+                                  revealField("breed");
+                                  revealField("exoticType");
+                                  setDetails((current) => ({
+                                    ...current,
+                                    type,
+                                    breed: "",
+                                    exoticType: "",
+                                  }));
+                                }}
+                                className={[
+                                  "p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all duration-200",
+                                  "md:p-5 md:flex-row md:justify-center md:gap-3 md:rounded-2xl",
+                                  details.type === type
+                                    ? "border-[#3998de] bg-[#3998de]/5 text-[#3998de]"
+                                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100",
+                                ].join(" ")}
+                              >
+                                <div className={details.type === type ? "text-[#3998de]" : "text-gray-500"}>
+                                  {getPetTypeIcon(type)}
+                                </div>
+                                <span className="capitalize text-sm font-medium md:text-base">{type}</span>
+                              </button>
+                            ))}
                           </div>
                         </div>
-                      ))}
+                      ) : null}
+
+                      {showBreedField ? (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Breed <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative" ref={breedDropdownRef}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                !loadingBreeds && breedOptions.length
+                                  ? setBreedDropdownOpen((current) => !current)
+                                  : null
+                              }
+                              className={`${selectBase} text-left`}
+                              disabled={loadingBreeds || breedOptions.length === 0}
+                            >
+                              {loadingBreeds
+                                ? `Loading ${details.type || "pet"} breeds...`
+                                : selectedBreedLabel || `Select ${details.type || "pet"} breed`}
+                            </button>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+
+                            {breedDropdownOpen ? (
+                              <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
+                                <div className="p-2 border-b border-gray-100">
+                                  <input
+                                    type="text"
+                                    value={breedSearch}
+                                    onChange={(event) => setBreedSearch(event.target.value)}
+                                    placeholder={`Search ${details.type || "pet"} breeds`}
+                                    className={fieldBase}
+                                    autoFocus
+                                  />
+                                </div>
+                                <div className="max-h-56 overflow-auto">
+                                  {filteredBreedOptions.length ? (
+                                    filteredBreedOptions.map((option) => (
+                                      <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => {
+                                          updateField("breed", option.value);
+                                          setBreedDropdownOpen(false);
+                                          setBreedSearch("");
+                                        }}
+                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
+                                          details.breed === option.value
+                                            ? "bg-gray-50 font-semibold text-gray-900"
+                                            : "text-gray-700"
+                                        }`}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="px-4 py-2 text-sm text-gray-500">No breeds found</div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                          {breedError ? (
+                            <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                              <AlertCircle size={12} />
+                              {breedError}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {showExoticTypeField ? (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Which pet? <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <Rabbit size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={details.exoticType}
+                              onChange={(event) => updateField("exoticType", event.target.value)}
+                              placeholder="e.g. Parrot, Rabbit, Turtle"
+                              className={`${fieldBase} pl-12 md:pl-12`}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {showPetDobField || showWeightField ? (
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                          {showPetDobField ? (
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">
+                                Pet's Date of Birth <span className="text-red-500">*</span>
+                              </label>
+                              <div className="relative">
+                                <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                <input
+                                  type="date"
+                                  max={todayISO()}
+                                  value={details.petDob}
+                                  onChange={(event) => updateField("petDob", event.target.value)}
+                                  className={`${fieldBase} pl-12 md:pl-12`}
+                                />
+                              </div>
+                              {approxAge ? <p className="text-xs text-gray-500">Approx age: {approxAge}</p> : null}
+                            </div>
+                          ) : null}
+
+                          {showWeightField ? (
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Weight (kg)</label>
+                              <div className="relative">
+                                <Scale size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  value={details.weightKg}
+                                  onChange={(event) => updateField("weightKg", event.target.value)}
+                                  placeholder="Optional"
+                                  className={`${fieldBase} pl-12 md:pl-12`}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                </section>
+                  </section>
+                ) : null}
+
+                {showConcernSection ? (
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
+                        <Activity size={20} className="text-[#3998de]" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-base">Current concern</h3>
+                        <p className="text-xs text-gray-500">Share what your pet is experiencing today</p>
+                      </div>
+                    </div>
+
+                    <div className={cardBodyBase}>
+                      {showProblemTextField ? (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Describe the issue <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={details.problemText}
+                            onChange={(event) => updateField("problemText", event.target.value)}
+                            placeholder="Tell us what symptoms you noticed, when they started, and anything important that changed."
+                            className={textareaBase}
+                          />
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">More detail helps us submit the request correctly.</span>
+                            <span className={visibleProblemTextLength > 10 ? "text-emerald-600" : "text-gray-400"}>
+                              {visibleProblemTextLength}/10+ characters
+                            </span>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {showEnergyField || showAppetiteField || showMoodField ? (
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
+                          {showEnergyField ? (
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Energy <span className="text-red-500">*</span></label>
+                              <div className="relative">
+                                <Activity size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                <select value={details.lastDaysEnergy} onChange={(event) => updateField("lastDaysEnergy", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
+                                  <option value="">Select energy level</option>
+                                  {ENERGY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {showAppetiteField ? (
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Appetite <span className="text-red-500">*</span></label>
+                              <div className="relative">
+                                <Coffee size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                <select value={details.lastDaysAppetite} onChange={(event) => updateField("lastDaysAppetite", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
+                                  <option value="">Select appetite</option>
+                                  {APPETITE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {showMoodField ? (
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Mood <span className="text-red-500">*</span></label>
+                              <div className="relative">
+                                <Heart size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                <select value={details.mood} onChange={(event) => updateField("mood", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
+                                  <option value="">Select mood</option>
+                                  {MOOD_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </section>
+                ) : null}
+
+                {showMedicalSection ? (
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
+                        <Shield size={20} className="text-[#3998de]" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-base">Medical history</h3>
+                        <p className="text-xs text-gray-500">Quick health checks before submission</p>
+                      </div>
+                    </div>
+
+                    <div className={cardBodyBase}>
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
+                        {showIsNeuteredField ? (
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">Is your pet neutered? <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                              <select value={details.isNeutered} onChange={(event) => updateField("isNeutered", event.target.value)} className={selectBase}>
+                                <option value="">Select</option>
+                                {YES_NO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {showVaccinatedField ? (
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">Vaccinated? <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                              <select value={details.vaccinatedYesNo} onChange={(event) => updateField("vaccinatedYesNo", event.target.value)} className={selectBase}>
+                                <option value="">Select</option>
+                                {YES_NO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {showDewormingField ? (
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">Dewormed? <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                              <select value={details.dewormingYesNo} onChange={(event) => updateField("dewormingYesNo", event.target.value)} className={selectBase}>
+                                <option value="">Select</option>
+                                {YES_NO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
 
                 <section className={cardBase}>
                   <div className={cardHeaderBase}>
@@ -1436,7 +1491,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                               <div>
                                 <p className="text-sm font-semibold text-gray-900 truncate max-w-[200px] md:max-w-xs">{uploadFile.name}</p>
                                 <p className="text-xs text-gray-500 mt-0.5">
-                                  {uploadKind === "image" ? "Image" : uploadKind === "pdf" ? "PDF" : "File"} • {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
+                                  {uploadKind === "image" ? "Image" : uploadKind === "pdf" ? "PDF" : "File"} - {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
                                   {uploadMeta?.compressedSize ? <span className="text-emerald-600 ml-1">{" -> "}{(uploadMeta.compressedSize / 1024 / 1024).toFixed(2)} MB</span> : null}
                                 </p>
                               </div>

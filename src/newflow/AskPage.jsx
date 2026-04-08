@@ -1138,62 +1138,6 @@ function AssessmentCard({
             ) : null}
           </div>
 
-          {serviceCards.length > 0 ? (
-            <div className="ask-service-list">
-              {serviceCards.map((card, index) => (
-                <article
-                  key={`${card?.title || "card"}-${index}`}
-                  className={`ask-service-card${
-                    card?.featured ? " is-featured" : ""
-                  }`}
-                >
-                  <div className="ask-service-header">
-                    {card?.badge ? (
-                      <div
-                        className={`ask-service-badge ask-service-badge-${
-                          card?.badge_variant || "default"
-                        }`}
-                      >
-                        {card.badge}
-                      </div>
-                    ) : (
-                      <span />
-                    )}
-                  </div>
-                  <div className="ask-service-title">{card?.title}</div>
-                  <div className="ask-service-price-row">
-                    <div className={`ask-service-price ask-service-price-${card?.theme || "video"}`}>
-                      {card?.price}
-                    </div>
-                    {card?.orig_price ? (
-                      <div className="ask-service-orig-price">{card.orig_price}</div>
-                    ) : null}
-                  </div>
-                  {card?.guarantee ? (
-                    <div className="ask-service-guarantee">{card.guarantee}</div>
-                  ) : null}
-                  <div className="ask-service-bullets">
-                    {(card?.bullets || []).map((bullet, bulletIndex) => (
-                      <div
-                        key={`${bullet}-${bulletIndex}`}
-                        className="ask-service-bullet"
-                      >
-                        {bullet}
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className={`ask-service-button ask-service-button-${card?.theme || "video"}`}
-                    onClick={() => onAction(card?.cta || {}, assessment)}
-                  >
-                    {card?.cta?.label || "Continue"}
-                  </button>
-                </article>
-              ))}
-            </div>
-          ) : null}
-
           <div className="ask-result-body">
             <section className="ask-body-section">
               <div className="ask-body-label">What we think is happening</div>
@@ -1413,6 +1357,61 @@ function AssessmentCard({
               </p>
             </div>
           </div>
+              {serviceCards.length > 0 ? (
+            <div className="ask-service-list">
+              {serviceCards.map((card, index) => (
+                <article
+                  key={`${card?.title || "card"}-${index}`}
+                  className={`ask-service-card${
+                    card?.featured ? " is-featured" : ""
+                  }`}
+                >
+                  <div className="ask-service-header">
+                    {card?.badge ? (
+                      <div
+                        className={`ask-service-badge ask-service-badge-${
+                          card?.badge_variant || "default"
+                        }`}
+                      >
+                        {card.badge}
+                      </div>
+                    ) : (
+                      <span />
+                    )}
+                  </div>
+                  <div className="ask-service-title">{card?.title}</div>
+                  <div className="ask-service-price-row">
+                    <div className={`ask-service-price ask-service-price-${card?.theme || "video"}`}>
+                      {card?.price}
+                    </div>
+                    {card?.orig_price ? (
+                      <div className="ask-service-orig-price">{card.orig_price}</div>
+                    ) : null}
+                  </div>
+                  {card?.guarantee ? (
+                    <div className="ask-service-guarantee">{card.guarantee}</div>
+                  ) : null}
+                  <div className="ask-service-bullets">
+                    {(card?.bullets || []).map((bullet, bulletIndex) => (
+                      <div
+                        key={`${bullet}-${bulletIndex}`}
+                        className="ask-service-bullet"
+                      >
+                        {bullet}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className={`ask-service-button ask-service-button-${card?.theme || "video"}`}
+                    onClick={() => onAction(card?.cta || {}, assessment)}
+                  >
+                    {card?.cta?.label || "Continue"}
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : null}
         </article>
       </div>
     </div>

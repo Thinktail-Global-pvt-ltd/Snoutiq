@@ -395,49 +395,11 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
             <ArrowLeft size={16} />
             Back
           </button>
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#d7e3ff] bg-[#f6f9ff] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
-            <Lock size={13} />
-            Powered by Razorpay
-          </div>
         </div>
       </div>
 
       <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-8">
-        <div className="overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0f172a_0%,#2457ff_58%,#5b8cff_100%)] p-6 text-white shadow-[0_28px_80px_-36px_rgba(37,99,235,0.75)] md:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/90">
-                <Sparkles size={13} />
-                Step 1 of 2
-              </div>
-              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-                Add pet details before payment
-              </h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-white/78 md:text-[15px]">
-                Fill the consultation form once. We will create your booking session and take you to the secure payment page next.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                ["Owner", ownerReady],
-                ["Pet", petReady],
-                ["Concern", concernReady],
-              ].map(([label, ready]) => (
-                <div
-                  key={label}
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur"
-                >
-                  <div className="flex items-center gap-2 text-xs font-medium text-white/70">
-                    {ready ? <CheckCircle2 size={14} className="text-emerald-300" /> : <BadgeCheck size={14} className="text-white/55" />}
-                    {label}
-                  </div>
-                  <div className="mt-2 text-lg font-semibold">{ready ? "Ready" : "Pending"}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
+  
         <div
           className={`mt-6 rounded-[30px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)] md:p-7
             [&_.step-back]:hidden
@@ -463,56 +425,7 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
             [&_.cta]:mt-7 [&_.cta]:inline-flex [&_.cta]:w-full [&_.cta]:items-center [&_.cta]:justify-center [&_.cta]:rounded-2xl [&_.cta]:bg-[linear-gradient(135deg,#2457ff_0%,#1d4ed8_100%)] [&_.cta]:px-4 [&_.cta]:py-4 [&_.cta]:text-sm [&_.cta]:font-semibold [&_.cta]:text-white [&_.cta]:shadow-[0_18px_35px_-18px_rgba(37,99,235,0.75)] hover:[&_.cta]:translate-y-[-1px] disabled:[&_.cta]:cursor-not-allowed disabled:[&_.cta]:opacity-60
             [&_.cta-note]:mt-3 [&_.cta-note]:text-center [&_.cta-note]:text-xs [&_.cta-note]:text-slate-500`}
         >
-          <div className="mb-6 grid gap-4 rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f9ff_100%)] p-4 md:grid-cols-[1.1fr_0.9fr] md:p-5">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#d7e3ff] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
-                <ShieldCheck size={13} />
-                Auto-saved draft
-              </div>
-              <h2 className="mt-4 !mb-0">Book a vet near you</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-500">
-                Share your details once. We will create the booking and send the full case to the vet before payment.
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-[#0f172a] p-4 text-white">
-              <div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-white/65">
-                <span>Checkout preview</span>
-                <span>{completedCount}/3 done</span>
-              </div>
-              <div className="mt-4 space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-white/70">Owner</span>
-                  <span>{formState.lead.ownerName || "Pending"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/70">Pet</span>
-                  <span>{formState.pet.petName || "Pending"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/70">Type</span>
-                  <span>{summaryPetType}</span>
-                </div>
-              </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,#7dd3fc_0%,#a7f3d0_100%)] transition-all"
-                  style={{ width: `${(completedCount / 3) * 100}%` }}
-                />
-              </div>
-              <div className="mt-5 flex items-end justify-between">
-                <div>
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-white/60">
-                    Pay next
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">Rs {BOOKING_TOTAL_PRICE}</div>
-                </div>
-                <div className="rounded-2xl bg-white/10 p-3 text-white/90">
-                  <CreditCard size={18} />
-                </div>
-              </div>
-            </div>
-          </div>
-
+  
       <div className="sdiv">Your details</div>
       <div className="half">
         <div className="field">
