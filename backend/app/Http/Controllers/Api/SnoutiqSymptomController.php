@@ -464,6 +464,10 @@ class SnoutiqSymptomController extends Controller
 
         if (is_array($payload)) {
             $payload['revised_assessment'] = true;
+            $payload['revised_context'] = [
+                'question' => trim((string) $data['question']),
+                'answer' => trim((string) $data['answer']),
+            ];
             return response()->json($payload, $response->getStatusCode());
         }
 
