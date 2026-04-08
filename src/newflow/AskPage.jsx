@@ -12,6 +12,7 @@ const ASK_DESCRIPTION =
 const ASK_CANONICAL = "https://snoutiq.com/ask";
 const ASK_STORAGE_KEY = "snoutiq-ask-state-v1";
 const ASK_PROFILE_KEY = "snoutiq-ask-profile-v1";
+const ASK_UI_STORAGE_KEY = "snoutiq-ask-ui-v1";
 const ASK_DAILY_USAGE_KEY = "snoutiq-ask-daily-usage-v1";
 const FREE_CHECK_LIMIT = 3;
 const GAUGE_CIRCUMFERENCE = 201.1;
@@ -160,6 +161,71 @@ const writeStoredProfile = (profile) => {
     ASK_PROFILE_KEY,
     JSON.stringify(sanitizeAskProfile(profile))
   );
+};
+
+const readStoredUiState = () => {
+  if (typeof window === "undefined") return null;
+  const raw = safeParse(window.sessionStorage.getItem(ASK_UI_STORAGE_KEY), null);
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    inputValue: typeof raw.inputValue === "string" ? raw.inputValue : "",
+    intakeOpen:
+      Boolean(raw.intakeOpen) &&
+      Boolean(
+        raw.pendingInitialRequest &&
+          typeof raw.pendingInitialRequest.message === "string" &&
+          raw.pendingInitialRequest.message.trim()
+      ),
+    pendingInitialRequest:
+      raw.pendingInitialRequest && typeof raw.pendingInitialRequest === "object"
+        ? {
+            message:
+              typeof raw.pendingInitialRequest.message === "string"
+                ? raw.pendingInitialRequest.message
+                : "",
+            species:
+              typeof raw.pendingInitialRequest.species === "string"
+                ? raw.pendingInitialRequest.species
+                : "",
+          }
+        : null,
+  };
+};
+
+const writeStoredUiState = (state) => {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(
+    ASK_UI_STORAGE_KEY,
+    JSON.stringify({
+      inputValue: typeof state?.inputValue === "string" ? state.inputValue : "",
+      intakeOpen:
+        Boolean(state?.intakeOpen) &&
+        Boolean(
+          state?.pendingInitialRequest &&
+            typeof state.pendingInitialRequest.message === "string" &&
+            state.pendingInitialRequest.message.trim()
+        ),
+      pendingInitialRequest:
+        state?.pendingInitialRequest &&
+        typeof state.pendingInitialRequest === "object"
+          ? {
+              message:
+                typeof state.pendingInitialRequest.message === "string"
+                  ? state.pendingInitialRequest.message
+                  : "",
+              species:
+                typeof state.pendingInitialRequest.species === "string"
+                  ? state.pendingInitialRequest.species
+                  : "",
+            }
+          : null,
+    })
+  );
+};
+
+const clearStoredUiState = () => {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(ASK_UI_STORAGE_KEY);
 };
 
 const readStoredState = () => {
@@ -443,7 +509,7 @@ const resolveImageObservation = (assessment) =>
       ""
   ).trim();
 
-const navigateToAskTarget = (navigate, target) => {
+const navigateToAskTarget = (navigate, target, options = {}) => {
   const route = String(target || "").trim();
   if (!route) return;
 
@@ -453,10 +519,45 @@ const navigateToAskTarget = (navigate, target) => {
   }
 
   const [pathname, query = ""] = route.split("?");
-  navigate({
-    pathname: pathname || "/",
-    search: query ? `?${query}` : "",
-  });
+  navigate(
+    {
+      pathname: pathname || "/",
+      search: query ? `?${query}` : "",
+    },
+    options
+  );
+};
+
+const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
+  const profile = sanitizeAskProfile(askProfile);
+  const lastUserMessage = [...(Array.isArray(entries) ? entries : [])]
+    .reverse()
+    .find(
+      (entry) =>
+        entry?.kind === "user" &&
+        typeof entry?.message === "string" &&
+        entry.message.trim()
+    )?.message;
+  const concern = String(lastUserMessage || inputValue || "").trim();
+
+  return {
+    ownerName: profile.ownerName,
+    ownerMobile: profile.phone,
+    phone: profile.phone,
+    petName: profile.petName,
+    name: profile.petName,
+    breed: profile.breed,
+    dob: profile.dob,
+    petDob: profile.dob,
+    location: profile.location,
+    city: profile.location,
+    area: profile.location,
+    species,
+    type: species,
+    reason: concern,
+    issue: concern,
+    problemText: concern,
+  };
 };
 
 const buildAssessmentShareText = (assessment) =>
@@ -1310,12 +1411,18 @@ export default function AskPage() {
   useEffect(() => {
     const storedState = readStoredState();
     const storedProfile = readStoredProfile();
+    const storedUiState = readStoredUiState();
     if (storedState) {
       setSpecies(storedState.species || "dog");
       setSessionId(storedState.sessionId || "");
       setEntries(storedState.entries || []);
     }
     setAskProfile(storedProfile);
+    if (storedUiState) {
+      setInputValue(storedUiState.inputValue || "");
+      setPendingInitialRequest(storedUiState.pendingInitialRequest || null);
+      setIntakeOpen(Boolean(storedUiState.intakeOpen));
+    }
     setChecksToday(readDailyUsage());
     hydratedRef.current = true;
   }, []);
@@ -1333,6 +1440,11 @@ export default function AskPage() {
     if (!hydratedRef.current) return;
     writeStoredProfile(askProfile);
   }, [askProfile]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    writeStoredUiState({ inputValue, intakeOpen, pendingInitialRequest });
+  }, [inputValue, intakeOpen, pendingInitialRequest]);
 
   useEffect(() => {
     if (!toastMessage) return undefined;
@@ -1754,6 +1866,21 @@ export default function AskPage() {
     window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
   };
 
+  const getAskRouteOptions = (target) => {
+    const route = String(target || "").trim();
+    if (!route.endsWith("-pet-details")) return undefined;
+    return {
+      state: {
+        prefill: buildAskPrefillState({
+          askProfile,
+          species,
+          entries,
+          inputValue,
+        }),
+      },
+    };
+  };
+
   const handleAction = (action, assessment) => {
     const type = String(action?.type || "").trim();
     const deeplink = String(action?.deeplink || "").trim();
@@ -1765,13 +1892,13 @@ export default function AskPage() {
 
     const route = CTA_ROUTE_MAP[type];
     if (route) {
-      navigateToAskTarget(navigate, route);
+      navigateToAskTarget(navigate, route, getAskRouteOptions(route));
       return;
     }
 
     const deeplinkRoute = DEEPLINK_ROUTE_MAP[deeplink];
     if (deeplinkRoute) {
-      navigateToAskTarget(navigate, deeplinkRoute);
+      navigateToAskTarget(navigate, deeplinkRoute, getAskRouteOptions(deeplinkRoute));
       return;
     }
 
@@ -1802,6 +1929,7 @@ export default function AskPage() {
     setErrorMessage("");
     setFollowUpPending(null);
     clearStoredState();
+    clearStoredUiState();
     setToastMessage("Started fresh");
   };
 

@@ -7,16 +7,19 @@ import { apiBaseUrl } from "../../lib/api";
 import {
   Activity,
   AlertCircle,
+  BadgeCheck,
   Calendar,
   Camera,
   Cat,
   CheckCircle2,
   ChevronDown,
   Coffee,
+  CreditCard,
   Dog,
   FileText,
   Heart,
   Image,
+  Lock,
   MapPin,
   PawPrint,
   Phone,
@@ -65,14 +68,23 @@ const YES_NO_OPTIONS = [
   { label: "No", value: "0" },
 ];
 
+const startCase = (value) =>
+  String(value || "")
+    .trim()
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
 const fieldBase =
-  "w-full rounded-xl border border-gray-200 bg-white p-3 text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-2xl md:p-3.5 md:text-[15px]";
+  "w-full rounded-2xl border border-[#d6e3ff] bg-[#fbfdff] p-3 text-[#0f172a] placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-[#4f6bff]/12 focus:border-[#4f6bff] hover:border-[#bfd0ff] disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed md:p-3.5 md:text-[15px]";
 const selectBase = `${fieldBase} appearance-none pr-12`;
 const textareaBase = `${fieldBase} resize-none min-h-[120px]`;
-const cardBase = "rounded-xl border border-gray-200 bg-white overflow-hidden";
+const cardBase =
+  "overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-white/95 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)] backdrop-blur";
 const cardHeaderBase =
-  "flex items-center gap-3 border-b border-gray-100 px-4 py-3.5";
-const cardBodyBase = "px-4 py-4 space-y-3.5";
+  "flex items-center gap-3 border-b border-[#e7efff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-5 py-4";
+const cardBodyBase = "px-5 py-5 space-y-4";
 
 const pickValue = (...values) => {
   for (const value of values) {
@@ -315,6 +327,14 @@ const buildInitialDetails = (source) => {
   };
 };
 
+const buildDraftDetails = (source) => ({
+  ...buildInitialDetails(source),
+  hasPhoto: false,
+});
+
+const areDraftDetailsEqual = (left, right) =>
+  JSON.stringify(buildDraftDetails(left)) === JSON.stringify(buildDraftDetails(right));
+
 const compressImageFile = async (
   file,
   { maxWidth = 1280, maxHeight = 1280, quality = 0.72, outputMime = "image/jpeg" } = {}
@@ -362,12 +382,17 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
     location.state && typeof location.state === "object" ? location.state : {};
   const storedPetDetails = routeState?.petDetails || storedFlow?.petDetails || null;
   const storedPaymentMeta = routeState?.paymentMeta || storedFlow?.paymentMeta || null;
+  const storedDraft = routeState?.draft || storedFlow?.draft || null;
   const prefillSource = {
     ...(storedPetDetails && typeof storedPetDetails === "object" ? storedPetDetails : {}),
+    ...(storedDraft && typeof storedDraft === "object" ? storedDraft : {}),
     ...(routeState?.prefill && typeof routeState.prefill === "object"
       ? routeState.prefill
       : {}),
   };
+  const initialHasChangesSinceSubmit = Boolean(
+    storedDraft && !areDraftDetailsEqual(storedDraft, storedPetDetails)
+  );
 
   const [details, setDetails] = useState(() => buildInitialDetails(prefillSource));
   const [uploadFile, setUploadFile] = useState(null);
@@ -382,7 +407,9 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
   const [breedDropdownOpen, setBreedDropdownOpen] = useState(false);
   const [loadingBreeds, setLoadingBreeds] = useState(false);
   const [breedError, setBreedError] = useState("");
-  const [hasChangesSinceSubmit, setHasChangesSinceSubmit] = useState(false);
+  const [hasChangesSinceSubmit, setHasChangesSinceSubmit] = useState(
+    initialHasChangesSinceSubmit
+  );
   const breedDropdownRef = useRef(null);
 
   const existingPaymentMeta = useMemo(
@@ -398,6 +425,16 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
     setSubmitError("");
     setDetails((current) => ({ ...current, [field]: value }));
   };
+
+  useEffect(() => {
+    const currentStoredFlow = readStoredFlow() || {};
+    writeStoredFlow({
+      ...currentStoredFlow,
+      petDetails: currentStoredFlow.petDetails || storedPetDetails || null,
+      paymentMeta: currentStoredFlow.paymentMeta || storedPaymentMeta || null,
+      draft: buildDraftDetails(details),
+    });
+  }, [details, storedPaymentMeta, storedPetDetails]);
 
   useEffect(() => {
     if (!breedDropdownOpen) return undefined;
@@ -550,6 +587,24 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
   }, [uploadKind]);
   const canReuseExistingSubmission = hasExistingSubmission && !hasChangesSinceSubmit;
   const phoneDigits = details.ownerMobile.replace(/\D/g, "");
+  const petTypeLabel = details.type
+    ? details.type === "exotic"
+      ? startCase(details.exoticType || "Other")
+      : startCase(details.type)
+    : "Not selected";
+  const ownerReady = Boolean(
+    details.ownerName.trim() && phoneDigits.length === 10 && details.city.trim()
+  );
+  const petReady = Boolean(details.name.trim() && details.type && details.petDob);
+  const concernReady = Boolean(
+    details.problemText.trim().length > 10 &&
+      details.lastDaysEnergy &&
+      details.lastDaysAppetite &&
+      details.mood
+  );
+  const uploadReady = Boolean(
+    canReuseExistingSubmission || (details.hasPhoto && uploadFile)
+  );
   const isValid =
     details.ownerName.trim() &&
     phoneDigits.length === 10 &&
@@ -604,7 +659,12 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
       ),
     });
 
-    writeStoredFlow({ petDetails: petPayload, paymentMeta: nextPaymentMeta });
+    setHasChangesSinceSubmit(false);
+    writeStoredFlow({
+      petDetails: petPayload,
+      paymentMeta: nextPaymentMeta,
+      draft: buildDraftDetails(petPayload),
+    });
 
     if (onSubmit) {
       onSubmit(petPayload);
@@ -786,7 +846,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
   };
 
   return (
-    <>
+    <div>
       <Helmet>
         <script>
           {`
@@ -809,34 +869,84 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
         </script>
       </Helmet>
 
-      <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
-        <div className="sticky top-0 z-40 border-b border-gray-200 bg-white">
-          <div className="mx-auto max-w-5xl px-4 py-3 text-center md:px-6">
-            <div className="text-base font-semibold text-gray-900 md:text-lg">
-              Tell us about your pet
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.14),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] flex flex-col">
+        <div className="sticky top-0 z-40 border-b border-[#dbe5ff] bg-white/90 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4f6bff]">
+                Snoutiq Checkout
+              </div>
+              <div className="text-base font-semibold text-slate-900 md:text-lg">
+                Video consultation request
+              </div>
+            </div>
+            <div className="hidden items-center gap-2 rounded-full border border-[#d6e3ff] bg-[#f8fbff] px-3 py-1.5 text-xs font-semibold text-[#2457ff] md:flex">
+              <Lock size={14} />
+              Powered by Razorpay
             </div>
           </div>
         </div>
 
         <div className="w-full">
           <div className="flex-1 px-4 pb-28 pt-4 md:px-6 md:pb-20 md:pt-8">
-            <div className="mx-auto w-full max-w-5xl">
+            <div className="mx-auto w-full max-w-6xl">
               <div className="md:flex md:items-center md:justify-between md:gap-6">
                 <ProgressBar current={2} steps={PET_FLOW_STEPS} />
-                <div className="hidden text-xs font-semibold text-gray-500 bg-white px-4 py-2 rounded-full border border-gray-200 md:block">
-                  Takes less than 2 minutes
+                <div className="hidden items-center gap-2 rounded-full border border-[#d6e3ff] bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm md:flex">
+                  <BadgeCheck size={14} className="text-[#2457ff]" />
+                  Secure checkout in under 2 minutes
                 </div>
               </div>
 
-              <div className="mt-4 rounded-xl bg-gradient-to-r from-[#1d4ed8] to-[#2563eb] px-5 py-4 text-white shadow-sm">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 size={18} className="mt-0.5 text-emerald-300" />
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold">
-                      Submit this form first, then review payment on the next screen
+              <div className="mt-4 overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(135deg,#072a9b_0%,#1457ff_50%,#6ba3ff_100%)] shadow-[0_24px_70px_-42px_rgba(20,87,255,0.8)]">
+                <div className="grid gap-6 px-5 py-6 text-white md:grid-cols-[minmax(0,1fr)_260px] md:px-7 md:py-7">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/90">
+                      <Lock size={12} />
+                      Step 1 of 2
                     </div>
-                    <div className="mt-1 text-xs text-white/80">
-                      We save the consultation request before opening Razorpay.
+                    <h1 className="mt-4 text-2xl font-semibold tracking-tight md:text-[30px]">
+                      Fill pet details, then pay on a secure Razorpay checkout
+                    </h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-white/82 md:text-[15px]">
+                      We save your consultation request first, then open the payment
+                      step. You review the amount only after the form is complete.
+                    </p>
+                    <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-white/88">
+                      <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                        SSL secured
+                      </span>
+                      <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                        UPI / Cards / Net Banking
+                      </span>
+                      <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                        Instant payment step
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[24px] border border-white/15 bg-white/10 p-4 backdrop-blur">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/75">
+                      Checkout flow
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {[
+                        "Submit consultation details",
+                        "Review amount on payment page",
+                        "Pay securely via Razorpay",
+                      ].map((item, index) => (
+                        <div
+                          key={item}
+                          className="flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-2.5"
+                        >
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#1457ff]">
+                            {index + 1}
+                          </div>
+                          <div className="text-sm font-medium text-white/92">
+                            {item}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1275,7 +1385,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                           <>
                             <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-3 md:w-12 md:h-12" />
                             <p className="mb-1 text-sm text-gray-700 font-medium md:text-base">File ready to upload</p>
-                          </>
+      </>
                         ) : (
                           <>
                             <Upload className="w-10 h-10 text-[#3998de] mb-3 md:w-12 md:h-12" />
@@ -1356,26 +1466,26 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                   </div>
                 </section>
 
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                  <div className="text-xs font-semibold text-emerald-700 flex items-center gap-2">
-                    <CheckCircle2 size={14} className="text-emerald-600" />
-                    What happens after you tap Continue
+                <div className="rounded-[28px] border border-[#d7e2ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.28)]">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
+                    <CreditCard size={14} />
+                    What happens next
                   </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] text-gray-600">
-                    <div className="space-y-1"><div className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">1</div><div className="font-semibold text-gray-800">Submit</div><div>We save your request</div></div>
-                    <div className="space-y-1"><div className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">2</div><div className="font-semibold text-gray-800">Pay</div><div>Review amount in Razorpay</div></div>
-                    <div className="space-y-1"><div className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">3</div><div className="font-semibold text-gray-800">Confirm</div><div>Booking updates follow after payment</div></div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[11px] text-slate-600">
+                    <div className="space-y-1 rounded-2xl border border-[#e4ecff] bg-white px-2 py-3"><div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#1457ff] text-xs font-semibold text-white">1</div><div className="font-semibold text-slate-900">Submit</div><div>We save your request</div></div>
+                    <div className="space-y-1 rounded-2xl border border-[#e4ecff] bg-white px-2 py-3"><div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#1457ff] text-xs font-semibold text-white">2</div><div className="font-semibold text-slate-900">Pay</div><div>Amount opens on checkout</div></div>
+                    <div className="space-y-1 rounded-2xl border border-[#e4ecff] bg-white px-2 py-3"><div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#1457ff] text-xs font-semibold text-white">3</div><div className="font-semibold text-slate-900">Confirm</div><div>Booking updates follow</div></div>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
-                  <div className="mb-4 flex items-center justify-center gap-2 text-xs text-gray-500">
+                <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
+                  <div className="mb-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
                     <FaWhatsapp className="text-[#25D366]" />
                     WhatsApp booking updates are sent after payment
                   </div>
 
                   {submitError ? (
-                    <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
+                    <div className="mb-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
                       <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
                       <p className="text-sm">{submitError}</p>
                     </div>
@@ -1385,10 +1495,10 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                     onClick={handleSubmitClick}
                     disabled={!isValid || submitting}
                     title={!isValid ? getSubmitTooltip() : undefined}
-                    className={`w-full text-base font-semibold md:py-4 md:rounded-xl ${
+                    className={`w-full rounded-2xl text-base font-semibold md:py-4 ${
                       !isValid || submitting
-                        ? "opacity-50 cursor-not-allowed bg-gray-300 hover:bg-gray-300"
-                        : "bg-[#3998de] hover:bg-[#3998de]/90 text-white shadow-lg shadow-[#3998de]/30"
+                        ? "cursor-not-allowed bg-slate-300 text-white opacity-50 hover:bg-slate-300"
+                        : "bg-[linear-gradient(135deg,#1457ff_0%,#2563eb_55%,#5b8dff_100%)] text-white shadow-[0_20px_45px_-22px_rgba(20,87,255,0.7)]"
                     }`}
                   >
                     {submitting ? (
@@ -1401,16 +1511,21 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                     )}
                   </Button>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-[11px] text-gray-500">
-                    <div className="flex items-center gap-1"><Shield size={12} className="text-[#3998de]" />SSL secured</div>
-                    <span className="text-gray-300">|</span>
-                    <div>Razorpay</div>
-                    <span className="text-gray-300">|</span>
-                    <div>UPI / Card / Net Banking</div>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] text-slate-500">
+                    <div className="flex items-center gap-1 rounded-full border border-[#e4ecff] bg-[#f8fbff] px-3 py-1">
+                      <Shield size={12} className="text-[#2457ff]" />
+                      SSL secured
+                    </div>
+                    <div className="rounded-full border border-[#e4ecff] bg-[#f8fbff] px-3 py-1">
+                      Razorpay
+                    </div>
+                    <div className="rounded-full border border-[#e4ecff] bg-[#f8fbff] px-3 py-1">
+                      UPI / Card / Net Banking
+                    </div>
                   </div>
 
                   {!isValid ? (
-                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3">
                       <p className="text-xs text-amber-700 flex items-center gap-1.5">
                         <AlertCircle size={14} />
                         {getSubmitTooltip()}
@@ -1419,7 +1534,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                   ) : submitting ? (
                     <p className="text-sm text-gray-500 mt-4 text-center">Uploading your files...</p>
                   ) : (
-                    <p className="text-sm text-gray-500 mt-4 text-center">All fields completed. Ready for payment.</p>
+                    <p className="mt-4 text-center text-sm text-slate-500">All fields completed. Ready for payment.</p>
                   )}
                 </div>
 
@@ -1429,13 +1544,17 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
           </div>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 safe-area-pb max-w-md mx-auto z-20 md:hidden shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 z-20 mx-auto max-w-md border-t border-[#d6e3ff] bg-white/95 p-4 shadow-[0_-18px_45px_-30px_rgba(37,99,235,0.35)] backdrop-blur safe-area-pb md:hidden">
           <div className="space-y-2">
             <Button
               onClick={handleSubmitClick}
               fullWidth
               disabled={!isValid || submitting}
-              className={!isValid || submitting ? "opacity-50 cursor-not-allowed bg-gray-300" : "bg-[#3998de] hover:bg-[#3998de]/90 text-white shadow-lg"}
+              className={
+                !isValid || submitting
+                  ? "cursor-not-allowed bg-slate-300 text-white opacity-50"
+                  : "bg-[linear-gradient(135deg,#1457ff_0%,#2563eb_55%,#5b8dff_100%)] text-white shadow-[0_20px_45px_-22px_rgba(20,87,255,0.7)]"
+              }
             >
               {submitting ? "Submitting..." : "Continue to Payment"}
             </Button>
@@ -1443,6 +1562,6 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

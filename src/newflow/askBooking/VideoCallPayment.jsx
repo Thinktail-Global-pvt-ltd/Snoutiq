@@ -6,8 +6,11 @@ import { apiPost } from "../../lib/api";
 import {
   ShieldCheck,
   ArrowRight,
+  BadgeCheck,
   CheckCircle2,
   ChevronLeft,
+  CreditCard,
+  Lock,
   MessageCircle,
   Video,
 } from "lucide-react";
@@ -301,6 +304,25 @@ export const VideoCallPayment = ({
   const hasPaymentContext = Boolean(
     petDetails && paymentMeta?.user_id && paymentMeta?.pet_id
   );
+  const paymentPetName =
+    pickValue(petDetails?.name, petDetails?.pet_name, petDetails?.petName) ||
+    "Your pet";
+  const paymentPetType =
+    pickValue(
+      petDetails?.type,
+      petDetails?.species,
+      petDetails?.pet_type,
+      petDetails?.petType
+    ) || "Not selected";
+  const paymentLocation =
+    pickValue(petDetails?.city, petDetails?.location, petDetails?.area) ||
+    "Not added";
+  const paymentOwnerName =
+    pickValue(
+      petDetails?.ownerName,
+      petDetails?.owner_name,
+      petDetails?.owner?.name
+    ) || "Pet parent";
 
   const updateStatus = (type, message) => {
     setStatusType(type);
@@ -423,8 +445,8 @@ export const VideoCallPayment = ({
   };
 
   const acknowledgementCardClass = acknowledged
-    ? "border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm"
-    : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/40";
+    ? "border-[#bfd0ff] bg-[linear-gradient(135deg,#f7faff_0%,#eef4ff_100%)] shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]"
+    : "border-[#d6e3ff] bg-white hover:border-[#bfd0ff] hover:bg-[#f8fbff]";
 
   if (!petDetails || !hasPaymentContext) {
     return (
@@ -450,63 +472,139 @@ export const VideoCallPayment = ({
   }
 
   return (
-    <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
-      <div className="sticky top-0 z-40 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3 md:px-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.14),_transparent_28%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] flex flex-col">
+      <div className="sticky top-0 z-40 border-b border-[#dbe5ff] bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6">
           <button
             type="button"
             onClick={handleBack}
-            className="h-8 w-8 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center transition hover:bg-gray-50"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d6e3ff] bg-white text-slate-600 transition hover:bg-[#f8fbff]"
             aria-label="Go back"
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="flex-1 text-center text-base font-semibold text-gray-900 md:text-lg">
-            Secure Payment
+          <div className="min-w-0 flex-1">
+            <div className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4f6bff] md:text-left">
+              Snoutiq Checkout
+            </div>
+            <div className="text-center text-base font-semibold text-slate-900 md:text-left md:text-lg">
+              Secure Razorpay payment
+            </div>
           </div>
-          <div className="h-8 w-8" />
+          <div className="hidden items-center gap-2 rounded-full border border-[#d6e3ff] bg-[#f8fbff] px-3 py-1.5 text-xs font-semibold text-[#2457ff] md:flex">
+            <Lock size={14} />
+            Powered by Razorpay
+          </div>
         </div>
       </div>
 
       <div className="w-full">
-        <div className="flex-1 px-4 pb-44 pt-4 overflow-y-auto md:px-6 md:pb-20 md:pt-8">
-          <div className="mx-auto w-full max-w-5xl">
-            <ProgressBar current={3} steps={PET_FLOW_STEPS} />
+        <div className="flex-1 overflow-y-auto px-4 pb-44 pt-4 md:px-6 md:pb-20 md:pt-8">
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="md:flex md:items-center md:justify-between md:gap-6">
+              <ProgressBar current={3} steps={PET_FLOW_STEPS} />
+              <div className="hidden items-center gap-2 rounded-full border border-[#d6e3ff] bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm md:flex">
+                <BadgeCheck size={14} className="text-[#2457ff]" />
+                Final payment step
+              </div>
+            </div>
 
-            <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="mt-4 overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(135deg,#072a9b_0%,#1457ff_50%,#6ba3ff_100%)] shadow-[0_24px_70px_-42px_rgba(20,87,255,0.8)]">
+              <div className="grid gap-6 px-5 py-6 text-white md:grid-cols-[minmax(0,1fr)_250px] md:px-7 md:py-7">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/90">
+                    <Lock size={12} />
+                    Step 2 of 2
+                  </div>
+                  <h1 className="mt-4 text-2xl font-semibold tracking-tight md:text-[30px]">
+                    Review and pay on a Razorpay-style secure checkout
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-white/82 md:text-[15px]">
+                    Your consultation request is saved. Complete payment to confirm
+                    the booking and receive next updates on WhatsApp.
+                  </p>
+                  <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-white/88">
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                      UPI / Cards / Net Banking
+                    </span>
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                      Instant confirmation
+                    </span>
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                      GST invoice available
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-white/15 bg-white/10 p-4 backdrop-blur">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/75">
+                    Payable now
+                  </div>
+                  {discountAmount > 0 ? (
+                    <div className="mt-2 text-xs text-white/65 line-through">
+                      Rs {formatInr(toInt(totalBeforeDiscount))}
+                    </div>
+                  ) : null}
+                  <div className="mt-1 text-3xl font-semibold text-white">
+                    Rs {formatInr(createOrderAmountInr)}
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm text-white/82">
+                    <div className="flex items-center justify-between">
+                      <span>Pet</span>
+                      <span className="font-medium text-white">{paymentPetName}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Parent</span>
+                      <span className="font-medium text-white">{paymentOwnerName}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Location</span>
+                      <span className="font-medium text-white">{paymentLocation}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_340px]">
               <div className="space-y-6">
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900 md:text-base">
-                      Payment Summary
-                    </h3>
+                <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)] md:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900 md:text-base">
+                        Payment summary
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Same amount that opens on Razorpay
+                      </p>
+                    </div>
                     <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
                       Instant confirmation
                     </span>
                   </div>
 
-                  <div className="mt-4 space-y-3 text-sm text-gray-600">
+                  <div className="mt-5 space-y-3 text-sm text-slate-600">
                     <div className="flex justify-between">
-                      <span>Consultation Charge</span>
+                      <span>Consultation charge</span>
                       <span>Rs {formatInr(consultationAmount)}</span>
                     </div>
 
                     {service > 0 ? (
                       <div className="flex justify-between">
-                        <span>Service Charge</span>
+                        <span>Service charge</span>
                         <span>Rs {formatInr(service)}</span>
                       </div>
                     ) : null}
 
                     {discountAmount > 0 ? (
                       <div className="flex justify-between font-semibold text-emerald-700">
-                        <span>Special Discount</span>
+                        <span>Special discount</span>
                         <span>- Rs {formatInr(discountAmount)}</span>
                       </div>
                     ) : null}
 
                     <div className="flex justify-between">
-                      <span>Taxable Amount</span>
+                      <span>Taxable amount</span>
                       <span>Rs {formatInr(taxableAmount)}</span>
                     </div>
 
@@ -515,15 +613,15 @@ export const VideoCallPayment = ({
                       <span>Rs {formatInr(gstAmount)}</span>
                     </div>
 
-                    <div className="border-t border-gray-100 pt-4 flex justify-between items-end font-semibold text-gray-900">
+                    <div className="flex items-end justify-between border-t border-[#e7efff] pt-4 font-semibold text-slate-900">
                       <span>Total to pay</span>
                       <div className="text-right">
                         {discountAmount > 0 ? (
-                          <div className="text-[11px] font-medium text-gray-400 line-through">
+                          <div className="text-[11px] font-medium text-slate-400 line-through">
                             Rs {formatInr(toInt(totalBeforeDiscount))}
                           </div>
                         ) : null}
-                        <div className="text-lg md:text-base font-bold text-gray-900">
+                        <div className="text-xl font-bold text-slate-900">
                           Rs {formatInr(createOrderAmountInr)}
                         </div>
                       </div>
@@ -531,8 +629,12 @@ export const VideoCallPayment = ({
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <label className="block text-[11px] font-semibold text-gray-600">
+                <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#4f6bff]">
+                    <CreditCard size={14} />
+                    Invoice details
+                  </div>
+                  <label className="mt-4 block text-[11px] font-semibold text-slate-600">
                     GST Number (optional)
                   </label>
                   <input
@@ -540,36 +642,36 @@ export const VideoCallPayment = ({
                     value={gstNumber}
                     onChange={(e) => setGstNumber(e.target.value)}
                     placeholder="07ABCDE1234F1Z5"
-                    className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-2 w-full rounded-2xl border border-[#d6e3ff] bg-[#fbfdff] px-3 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[#2457ff] focus:outline-none focus:ring-4 focus:ring-[#4f6bff]/12"
                   />
-                  <p className="mt-2 text-[11px] text-gray-500">
+                  <p className="mt-2 text-[11px] text-slate-500">
                     Add your GST number if a tax invoice is required.
                   </p>
                 </div>
 
                 <label
-                  className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-gray-600 transition-all ${acknowledgementCardClass}`}
+                  className={`flex cursor-pointer items-start gap-3 rounded-[28px] border p-5 text-slate-600 transition-all ${acknowledgementCardClass}`}
                 >
                   <input
                     type="checkbox"
                     checked={acknowledged}
                     onChange={(e) => setAcknowledged(e.target.checked)}
-                    className="mt-1 h-4 w-4 shrink-0 accent-[#3998de]"
+                    className="mt-1 h-4 w-4 shrink-0 accent-[#2457ff]"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-sm font-semibold text-gray-900">
+                      <div className="text-sm font-semibold text-slate-900">
                         I acknowledge and agree to proceed
                       </div>
-                      <span className="rounded-full border border-blue-200 bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                      <span className="rounded-full border border-[#bfd0ff] bg-white/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#2457ff]">
                         Required
                       </span>
                     </div>
-                    <div className="mt-1.5 text-xs leading-5 text-gray-600">
+                    <div className="mt-1.5 text-xs leading-5 text-slate-600">
                       I understand the limitations and conditions of this
                       consultation.
                     </div>
-                    <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-blue-700">
+                    <div className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-[#2457ff]">
                       <ShieldCheck size={12} />
                       Please confirm before continuing to payment.
                     </div>
@@ -577,7 +679,7 @@ export const VideoCallPayment = ({
                 </label>
 
                 {statusMessage ? (
-                  <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                  <div className="rounded-[24px] border border-[#d6e3ff] bg-white/95 px-4 py-3 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
                     <p className={`text-xs text-center ${statusClassName}`}>
                       {statusMessage}
                     </p>
@@ -585,16 +687,60 @@ export const VideoCallPayment = ({
                 ) : null}
               </div>
 
-              <div className="space-y-6 md:sticky md:top-24">
-                <div className="hidden md:block space-y-3">
+              <div className="space-y-4 md:sticky md:top-28">
+                <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#4f6bff]">
+                    Booking summary
+                  </div>
+                  <div className="mt-4 space-y-3 text-sm text-slate-600">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Pet parent</span>
+                      <span className="text-right font-medium text-slate-900">
+                        {paymentOwnerName}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Pet</span>
+                      <span className="text-right font-medium text-slate-900">
+                        {paymentPetName}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Pet type</span>
+                      <span className="text-right font-medium text-slate-900">
+                        {paymentPetType}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Location</span>
+                      <span className="text-right font-medium text-slate-900">
+                        {paymentLocation}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(135deg,#0b2fa6_0%,#1457ff_55%,#4f8cff_100%)] p-5 text-white shadow-[0_24px_70px_-42px_rgba(20,87,255,0.8)]">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/90">
+                    <Lock size={12} />
+                    Pay securely
+                  </div>
+                  <div className="mt-3 text-2xl font-semibold">
+                    Rs {formatInr(createOrderAmountInr)}
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-white/82">
+                    Razorpay opens UPI, cards and net banking after you confirm
+                    below.
+                  </p>
+
                   <Button
                     onClick={handlePay}
                     disabled={isPaying || !acknowledged}
                     fullWidth
-                    className={`flex items-center justify-between md:rounded-xl md:py-4 md:px-6 text-base font-semibold ${
+                    className={`mt-5 flex items-center justify-between rounded-2xl px-5 py-4 text-base font-semibold ${
                       isPaying || !acknowledged
-                        ? "opacity-50 cursor-not-allowed bg-gray-300"
-                        : "bg-[#1d4ed8] hover:bg-[#1e40af] text-white shadow-lg shadow-blue-200"
+                        ? "cursor-not-allowed bg-white/30 text-white opacity-50"
+                        : "bg-white text-[#1457ff] shadow-[0_20px_40px_-22px_rgba(15,23,42,0.35)] hover:bg-[#f8fbff]"
                     }`}
                   >
                     <span>
@@ -602,18 +748,22 @@ export const VideoCallPayment = ({
                         ? "Processing..."
                         : `Pay Rs ${formatInr(createOrderAmountInr)}`}
                     </span>
-                    <span className="flex items-center gap-2 text-white/80">
+                    <span className="flex items-center gap-2">
                       Proceed <ArrowRight size={18} />
                     </span>
                   </Button>
 
-                  <p className="text-xs text-center text-gray-500 flex items-center justify-center gap-2">
-                    <ShieldCheck size={14} className="text-emerald-600" />
-                    Secure UPI / Card Payment
-                  </p>
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-white/82">
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                      Secure UPI / Card
+                    </span>
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                      Powered by Razorpay
+                    </span>
+                  </div>
 
                   {isOfferApplied ? (
-                    <p className="text-[11px] text-center font-medium text-emerald-700">
+                    <p className="mt-4 text-[11px] font-medium text-emerald-200">
                       Special discount applied: Rs {formatInr(discountAmount)} OFF
                     </p>
                   ) : null}
@@ -624,20 +774,20 @@ export const VideoCallPayment = ({
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#d6e3ff] bg-white/95 backdrop-blur md:hidden">
         <div className="mx-auto w-full max-w-5xl px-4 pb-4 pt-3">
           <div className="mb-3 flex items-end justify-between">
             <div>
-              <p className="text-[11px] font-medium text-gray-500">
+              <p className="text-[11px] font-medium text-slate-500">
                 Total payable
               </p>
               <div className="flex items-center gap-2">
                 {discountAmount > 0 ? (
-                  <span className="text-xs text-gray-400 line-through">
+                  <span className="text-xs text-slate-400 line-through">
                     Rs {formatInr(toInt(totalBeforeDiscount))}
                   </span>
                 ) : null}
-                <span className="text-lg font-bold text-gray-900">
+                <span className="text-lg font-bold text-slate-900">
                   Rs {formatInr(createOrderAmountInr)}
                 </span>
               </div>
@@ -656,8 +806,8 @@ export const VideoCallPayment = ({
             fullWidth
             className={`flex items-center justify-between rounded-2xl py-3.5 text-sm font-semibold ${
               isPaying || !acknowledged
-                ? "cursor-not-allowed bg-gray-300 opacity-50"
-                : "bg-[#1d4ed8] text-white shadow-lg shadow-blue-200 hover:bg-[#1e40af]"
+                ? "cursor-not-allowed bg-slate-300 text-white opacity-50"
+                : "bg-[linear-gradient(135deg,#1457ff_0%,#2563eb_55%,#5b8dff_100%)] text-white shadow-[0_20px_45px_-22px_rgba(20,87,255,0.7)]"
             }`}
           >
             <span>
@@ -665,12 +815,12 @@ export const VideoCallPayment = ({
                 ? "Processing..."
                 : `Pay Rs ${formatInr(createOrderAmountInr)}`}
             </span>
-            <span className="flex items-center gap-2 text-white/80">
+            <span className="flex items-center gap-2 text-white/90">
               Proceed <ArrowRight size={16} />
             </span>
           </Button>
 
-          <p className="mt-2 text-[10px] text-center text-gray-500 flex items-center justify-center gap-1">
+          <p className="mt-2 text-[10px] text-center text-slate-500 flex items-center justify-center gap-1">
             <ShieldCheck size={10} className="text-emerald-600" />
             Secure UPI / Card Payment
           </p>
