@@ -1,6 +1,15 @@
 import React, { useEffect, useId, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
+  BadgeCheck,
+  CheckCircle2,
+  CreditCard,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import {
   fetchBreedOptions,
   submitLeadStep,
   submitPetDetailsStep,
@@ -176,12 +185,19 @@ function clearStandaloneVetNearMeState() {
 
 const isValidPhone = (value) => String(value || "").replace(/\D/g, "").length >= 10;
 
-export default function VetNearPetDetails() {
+export default function VetNearPetDetails({ initialState, onBack, onContinue }) {
   const navigate = useNavigate();
   const location = useLocation();
   const fieldIdPrefix = useId();
+  const storedStandaloneState = readStandaloneVetNearMeState();
   const [formState, setFormState] = useState(() =>
-    hasState(location.state) ? normalizeState(location.state) : readStandaloneVetNearMeState()
+    hasState(storedStandaloneState)
+      ? storedStandaloneState
+      : hasState(initialState)
+        ? normalizeState(initialState)
+        : hasState(location.state)
+          ? normalizeState(location.state)
+          : DEFAULT_STATE
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBreedsLoading, setIsBreedsLoading] = useState(false);
@@ -199,6 +215,15 @@ export default function VetNearPetDetails() {
     formState.pet.breed && !breedOptions.includes(formState.pet.breed)
       ? [formState.pet.breed, ...breedOptions]
       : breedOptions;
+  const ownerReady = Boolean(
+    formState.lead.ownerName.trim() && isValidPhone(formState.lead.phone)
+  );
+  const petReady = Boolean(formState.lead.species && formState.pet.petName.trim());
+  const concernReady = Boolean(formState.pet.issue.trim());
+  const summaryPetType = showOtherPetTypeField
+    ? formState.pet.otherPetType || "Other"
+    : formState.lead.species || "Not selected";
+  const completedCount = [ownerReady, petReady, concernReady].filter(Boolean).length;
 
   useEffect(() => {
     writeStandaloneVetNearMeState(formState);
@@ -335,6 +360,10 @@ export default function VetNearPetDetails() {
 
       setFormState(nextState);
       writeStandaloneVetNearMeState(nextState);
+      if (onContinue) {
+        onContinue(nextState);
+        return;
+      }
       navigate("/vet-near-me-payment", { state: nextState });
     } catch (error) {
       if (/booking session|session is incomplete|step 1/i.test(String(error?.message || ""))) {
@@ -347,29 +376,142 @@ export default function VetNearPetDetails() {
   };
 
   const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
     if (typeof window !== "undefined" && window.history.length > 1) navigate(-1);
   };
 
   return (
-     <div className="vet-near-me-page standalone-page">
-    <div className="standalone-flow">
-      <div className="form-card standalone-form-card">
-        <button type="button" className="step-back" onClick={handleBack}>
-          &larr; Back
-        </button>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_24%),linear-gradient(180deg,#f7faff_0%,#edf4ff_46%,#f5f8ff_100%)] pb-20 text-slate-900">
+      <div className="sticky top-0 z-30 border-b border-white/70 bg-white/88 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-2 rounded-full border border-[#d7e3ff] bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-[#b9cfff] hover:text-[#2457ff]"
+          >
+            <ArrowLeft size={16} />
+            Back
+          </button>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#d7e3ff] bg-[#f6f9ff] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
+            <Lock size={13} />
+            Powered by Razorpay
+          </div>
+        </div>
+      </div>
 
-        <h2 style={{ marginBottom: 4 }}>Book a vet near you</h2>
-        <p
-          style={{
-            fontSize: 13,
-            color: "var(--ink2)",
-            marginBottom: 18,
-            lineHeight: 1.5,
-          }}
+      <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-8">
+        <div className="overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0f172a_0%,#2457ff_58%,#5b8cff_100%)] p-6 text-white shadow-[0_28px_80px_-36px_rgba(37,99,235,0.75)] md:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/90">
+                <Sparkles size={13} />
+                Step 1 of 2
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+                Add pet details before payment
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-white/78 md:text-[15px]">
+                Fill the consultation form once. We will create your booking session and take you to the secure payment page next.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["Owner", ownerReady],
+                ["Pet", petReady],
+                ["Concern", concernReady],
+              ].map(([label, ready]) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur"
+                >
+                  <div className="flex items-center gap-2 text-xs font-medium text-white/70">
+                    {ready ? <CheckCircle2 size={14} className="text-emerald-300" /> : <BadgeCheck size={14} className="text-white/55" />}
+                    {label}
+                  </div>
+                  <div className="mt-2 text-lg font-semibold">{ready ? "Ready" : "Pending"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`mt-6 rounded-[30px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)] md:p-7
+            [&_.step-back]:hidden
+            [&_h2]:text-[28px] [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-slate-950
+            [&_.sdiv]:mb-4 [&_.sdiv]:mt-8 [&_.sdiv]:inline-flex [&_.sdiv]:items-center [&_.sdiv]:gap-2 [&_.sdiv]:rounded-full [&_.sdiv]:border [&_.sdiv]:border-[#d7e3ff] [&_.sdiv]:bg-[#f6f9ff] [&_.sdiv]:px-3 [&_.sdiv]:py-1 [&_.sdiv]:text-[11px] [&_.sdiv]:font-semibold [&_.sdiv]:uppercase [&_.sdiv]:tracking-[0.14em] [&_.sdiv]:text-[#2457ff]
+            [&_.half]:grid [&_.half]:gap-5 md:[&_.half]:grid-cols-2
+            [&_.field]:space-y-2
+            [&_label]:block [&_label]:text-[11px] [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-[0.16em] [&_label]:text-slate-500
+            [&_legend]:mb-2 [&_legend]:block [&_legend]:text-[11px] [&_legend]:font-semibold [&_legend]:uppercase [&_legend]:tracking-[0.16em] [&_legend]:text-slate-500
+            [&_.required-mark]:text-red-500
+            [&_input]:w-full [&_input]:rounded-2xl [&_input]:border [&_input]:border-[#d6e3ff] [&_input]:bg-[#fbfdff] [&_input]:px-4 [&_input]:py-3 [&_input]:text-sm [&_input]:text-slate-900 [&_input]:shadow-[0_1px_2px_rgba(15,23,42,0.03)] [&_input]:outline-none [&_input]:transition
+            [&_select]:w-full [&_select]:appearance-none [&_select]:rounded-2xl [&_select]:border [&_select]:border-[#d6e3ff] [&_select]:bg-[#fbfdff] [&_select]:px-4 [&_select]:py-3 [&_select]:pr-10 [&_select]:text-sm [&_select]:text-slate-900 [&_select]:shadow-[0_1px_2px_rgba(15,23,42,0.03)] [&_select]:outline-none [&_select]:transition
+            [&_textarea]:w-full [&_textarea]:min-h-[120px] [&_textarea]:resize-none [&_textarea]:rounded-2xl [&_textarea]:border [&_textarea]:border-[#d6e3ff] [&_textarea]:bg-[#fbfdff] [&_textarea]:px-4 [&_textarea]:py-3 [&_textarea]:text-sm [&_textarea]:text-slate-900 [&_textarea]:shadow-[0_1px_2px_rgba(15,23,42,0.03)] [&_textarea]:outline-none [&_textarea]:transition
+            [&_input:focus]:border-[#2457ff] [&_input:focus]:ring-4 [&_input:focus]:ring-[#4f6bff]/12
+            [&_select:focus]:border-[#2457ff] [&_select:focus]:ring-4 [&_select:focus]:ring-[#4f6bff]/12
+            [&_textarea:focus]:border-[#2457ff] [&_textarea:focus]:ring-4 [&_textarea:focus]:ring-[#4f6bff]/12
+            [&_.input-error]:border-red-300 [&_.input-error]:ring-4 [&_.input-error]:ring-red-100
+            [&_.field-error]:text-xs [&_.field-error]:font-medium [&_.field-error]:text-red-600
+            [&_.fhint]:text-xs [&_.fhint]:text-slate-500
+            [&_.cbgroup]:grid [&_.cbgroup]:gap-3 md:[&_.cbgroup]:grid-cols-2
+            [&_.cbitem]:flex [&_.cbitem]:cursor-pointer [&_.cbitem]:items-center [&_.cbitem]:gap-3 [&_.cbitem]:rounded-2xl [&_.cbitem]:border [&_.cbitem]:border-[#e2eafc] [&_.cbitem]:bg-white [&_.cbitem]:px-4 [&_.cbitem]:py-3 [&_.cbitem]:text-sm [&_.cbitem]:font-medium [&_.cbitem]:text-slate-700 [&_.cbitem]:transition hover:[&_.cbitem]:border-[#bfd0ff]
+            [&_.cbitem>input]:h-4 [&_.cbitem>input]:w-4 [&_.cbitem>input]:rounded [&_.cbitem>input]:border-slate-300 [&_.cbitem>input]:text-[#2457ff] [&_.cbitem>input]:focus:ring-[#2457ff]
+            [&_.cta]:mt-7 [&_.cta]:inline-flex [&_.cta]:w-full [&_.cta]:items-center [&_.cta]:justify-center [&_.cta]:rounded-2xl [&_.cta]:bg-[linear-gradient(135deg,#2457ff_0%,#1d4ed8_100%)] [&_.cta]:px-4 [&_.cta]:py-4 [&_.cta]:text-sm [&_.cta]:font-semibold [&_.cta]:text-white [&_.cta]:shadow-[0_18px_35px_-18px_rgba(37,99,235,0.75)] hover:[&_.cta]:translate-y-[-1px] disabled:[&_.cta]:cursor-not-allowed disabled:[&_.cta]:opacity-60
+            [&_.cta-note]:mt-3 [&_.cta-note]:text-center [&_.cta-note]:text-xs [&_.cta-note]:text-slate-500`}
         >
-          Share your details once. We will create the booking and send the full
-          case to the vet before payment.
-        </p>
+          <div className="mb-6 grid gap-4 rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f9ff_100%)] p-4 md:grid-cols-[1.1fr_0.9fr] md:p-5">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#d7e3ff] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
+                <ShieldCheck size={13} />
+                Auto-saved draft
+              </div>
+              <h2 className="mt-4 !mb-0">Book a vet near you</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Share your details once. We will create the booking and send the full case to the vet before payment.
+              </p>
+            </div>
+            <div className="rounded-[24px] bg-[#0f172a] p-4 text-white">
+              <div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-white/65">
+                <span>Checkout preview</span>
+                <span>{completedCount}/3 done</span>
+              </div>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/70">Owner</span>
+                  <span>{formState.lead.ownerName || "Pending"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-white/70">Pet</span>
+                  <span>{formState.pet.petName || "Pending"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-white/70">Type</span>
+                  <span>{summaryPetType}</span>
+                </div>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#7dd3fc_0%,#a7f3d0_100%)] transition-all"
+                  style={{ width: `${(completedCount / 3) * 100}%` }}
+                />
+              </div>
+              <div className="mt-5 flex items-end justify-between">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-white/60">
+                    Pay next
+                  </div>
+                  <div className="mt-1 text-2xl font-semibold">Rs {BOOKING_TOTAL_PRICE}</div>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-3 text-white/90">
+                  <CreditCard size={18} />
+                </div>
+              </div>
+            </div>
+          </div>
 
       <div className="sdiv">Your details</div>
       <div className="half">

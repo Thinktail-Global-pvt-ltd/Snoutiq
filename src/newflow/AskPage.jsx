@@ -1,9 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
+import { X } from "lucide-react";
 import { apiBaseUrl, apiPost } from "../lib/api";
 import logo from "../assets/images/logo.webp";
 import avatarLogo from "../assets/images/snoutiq app.png";
+import VetNearPetDetails from "./askBooking/VetNearPetDetails";
+import VetNearPayment from "./askBooking/VetNearPayment";
+import VideoCallPetDetails from "./askBooking/VideoCallPetDetails";
+import { VideoCallPayment } from "./askBooking/VideoCallPayment";
 import "./AskPage.css";
 
 const ASK_TITLE = "Snoutiq - Is My Pet Okay? Free AI Pet Health Check";
@@ -14,6 +19,8 @@ const ASK_STORAGE_KEY = "snoutiq-ask-state-v1";
 const ASK_PROFILE_KEY = "snoutiq-ask-profile-v1";
 const ASK_UI_STORAGE_KEY = "snoutiq-ask-ui-v1";
 const ASK_DAILY_USAGE_KEY = "snoutiq-ask-daily-usage-v1";
+const ASK_VET_NEAR_STANDALONE_KEY = "snoutiq-vet-near-me-standalone";
+const ASK_VIDEO_CALL_STANDALONE_KEY = "snoutiq-video-call-copied-flow";
 const FREE_CHECK_LIMIT = 3;
 const GAUGE_CIRCUMFERENCE = 201.1;
 const DEFAULT_ASK_PROFILE = {
@@ -101,6 +108,13 @@ const DEEPLINK_ROUTE_MAP = {
   "snoutiq://find-clinic": "/vet-near-me-pet-details",
   "snoutiq://emergency": "/vet-near-me-pet-details",
   "snoutiq://govt-hospitals": "/vet-near-me-pet-details",
+};
+
+const ASK_FLOW_MODAL_KIND_MAP = {
+  "/video-call-pet-details": "video-pet-details",
+  "/video-call-payment": "video-payment",
+  "/vet-near-me-pet-details": "vet-pet-details",
+  "/vet-near-me-payment": "vet-payment",
 };
 
 const getTodayKey = () => new Date().toISOString().slice(0, 10);
@@ -248,6 +262,26 @@ const clearStoredState = () => {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(ASK_STORAGE_KEY);
 };
+
+const readStoredFlowSession = (storageKey) => {
+  if (typeof window === "undefined") return null;
+  return safeParse(window.sessionStorage.getItem(storageKey), null);
+};
+
+const isVetNearPaymentReady = (value) =>
+  Boolean(
+    value?.progress?.petDetailsSubmitted &&
+      value?.booking?.bookingId &&
+      value?.booking?.userId &&
+      value?.booking?.petId
+  );
+
+const isVideoCallPaymentReady = (value) =>
+  Boolean(
+    value?.petDetails &&
+      (value?.paymentMeta?.user_id || value?.petDetails?.user_id) &&
+      (value?.paymentMeta?.pet_id || value?.petDetails?.pet_id)
+  );
 
 const getSpeciesMeta = (species) => {
   const normalized = String(species || "")
@@ -1407,6 +1441,7 @@ export default function AskPage() {
   const [breedOptions, setBreedOptions] = useState([]);
   const [breedLoading, setBreedLoading] = useState(false);
   const [breedError, setBreedError] = useState("");
+  const [flowModal, setFlowModal] = useState(null);
 
   useEffect(() => {
     const storedState = readStoredState();
@@ -1458,13 +1493,24 @@ export default function AskPage() {
   }, [entries, loading]);
 
   useEffect(() => {
-    if (typeof document === "undefined" || !intakeOpen) return undefined;
+    if (typeof document === "undefined" || (!intakeOpen && !flowModal)) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [intakeOpen]);
+  }, [flowModal, intakeOpen]);
+
+  useEffect(() => {
+    if (!flowModal) return undefined;
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setFlowModal(null);
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [flowModal]);
 
   useEffect(() => {
     if (!intakeOpen) return undefined;
@@ -1881,6 +1927,48 @@ export default function AskPage() {
     };
   };
 
+  const openAskFlowModal = (target) => {
+    const route = String(target || "").trim();
+    const modalKind = ASK_FLOW_MODAL_KIND_MAP[route];
+    if (!modalKind) return false;
+
+    const prefill = buildAskPrefillState({
+      askProfile,
+      species,
+      entries,
+      inputValue,
+    });
+
+    if (route === "/vet-near-me-pet-details") {
+      const storedVetNearFlow = readStoredFlowSession(ASK_VET_NEAR_STANDALONE_KEY);
+      setFlowModal({
+        kind: isVetNearPaymentReady(storedVetNearFlow)
+          ? "vet-payment"
+          : "vet-pet-details",
+        payload: isVetNearPaymentReady(storedVetNearFlow) ? null : { prefill },
+      });
+      return true;
+    }
+
+    if (route === "/video-call-pet-details") {
+      const storedVideoCallFlow = readStoredFlowSession(
+        ASK_VIDEO_CALL_STANDALONE_KEY
+      );
+      setFlowModal({
+        kind: isVideoCallPaymentReady(storedVideoCallFlow)
+          ? "video-payment"
+          : "video-pet-details",
+        payload: isVideoCallPaymentReady(storedVideoCallFlow)
+          ? null
+          : { prefill },
+      });
+      return true;
+    }
+
+    setFlowModal({ kind: modalKind, payload: null });
+    return true;
+  };
+
   const handleAction = (action, assessment) => {
     const type = String(action?.type || "").trim();
     const deeplink = String(action?.deeplink || "").trim();
@@ -1892,12 +1980,14 @@ export default function AskPage() {
 
     const route = CTA_ROUTE_MAP[type];
     if (route) {
+      if (openAskFlowModal(route)) return;
       navigateToAskTarget(navigate, route, getAskRouteOptions(route));
       return;
     }
 
     const deeplinkRoute = DEEPLINK_ROUTE_MAP[deeplink];
     if (deeplinkRoute) {
+      if (openAskFlowModal(deeplinkRoute)) return;
       navigateToAskTarget(navigate, deeplinkRoute, getAskRouteOptions(deeplinkRoute));
       return;
     }
@@ -1937,6 +2027,56 @@ export default function AskPage() {
     freeChecksLeft > 0
       ? `${freeChecksLeft} free checks left`
       : "Free checks used today";
+
+  let flowModalContent = null;
+  if (flowModal?.kind === "vet-pet-details") {
+    flowModalContent = (
+      <VetNearPetDetails
+        initialState={flowModal.payload}
+        onBack={() => setFlowModal(null)}
+        onContinue={() =>
+          setFlowModal({
+            kind: "vet-payment",
+            payload: null,
+          })
+        }
+      />
+    );
+  } else if (flowModal?.kind === "vet-payment") {
+    flowModalContent = (
+      <VetNearPayment
+        onBack={() =>
+          setFlowModal({
+            kind: "vet-pet-details",
+            payload: null,
+          })
+        }
+      />
+    );
+  } else if (flowModal?.kind === "video-pet-details") {
+    flowModalContent = (
+      <VideoCallPetDetails
+        initialState={flowModal.payload}
+        onSubmit={() =>
+          setFlowModal({
+            kind: "video-payment",
+            payload: null,
+          })
+        }
+      />
+    );
+  } else if (flowModal?.kind === "video-payment") {
+    flowModalContent = (
+      <VideoCallPayment
+        onBack={() =>
+          setFlowModal({
+            kind: "video-pet-details",
+            payload: null,
+          })
+        }
+      />
+    );
+  }
 
   return (
     <div className="ask-root">
@@ -2135,6 +2275,26 @@ export default function AskPage() {
         onSpeciesChange={setSpecies}
         onSubmit={handleIntakeSubmit}
       />
+
+      {flowModalContent ? (
+        <div
+          className="fixed inset-0 z-[120] bg-slate-950/55 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="absolute inset-0 overflow-y-auto overscroll-contain">
+            <button
+              type="button"
+              onClick={() => setFlowModal(null)}
+              className="fixed right-4 top-4 z-[130] inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-slate-950/70 text-white shadow-lg backdrop-blur transition hover:bg-slate-950/85"
+              aria-label="Close checkout"
+            >
+              <X size={18} />
+            </button>
+            {flowModalContent}
+          </div>
+        </div>
+      ) : null}
 
       {toastMessage ? <div className="ask-toast">{toastMessage}</div> : null}
     </div>

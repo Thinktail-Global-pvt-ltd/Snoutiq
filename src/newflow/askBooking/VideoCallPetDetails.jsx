@@ -332,6 +332,29 @@ const buildDraftDetails = (source) => ({
   hasPhoto: false,
 });
 
+const buildMaskedPrefillFields = (source) => {
+  const prepared = buildInitialDetails(source);
+  return {
+    ownerName: Boolean(prepared.ownerName),
+    ownerMobile: Boolean(prepared.ownerMobile),
+    city: Boolean(prepared.city),
+    name: Boolean(prepared.name),
+    type: Boolean(prepared.type),
+    breed: Boolean(prepared.breed),
+    petDob: Boolean(prepared.petDob),
+    gender: Boolean(prepared.gender),
+    problemText: Boolean(prepared.problemText),
+    exoticType: Boolean(prepared.exoticType),
+    lastDaysEnergy: Boolean(prepared.lastDaysEnergy),
+    lastDaysAppetite: Boolean(prepared.lastDaysAppetite),
+    mood: Boolean(prepared.mood),
+    isNeutered: Boolean(prepared.isNeutered),
+    vaccinatedYesNo: Boolean(prepared.vaccinatedYesNo),
+    dewormingYesNo: Boolean(prepared.dewormingYesNo),
+    weightKg: Boolean(prepared.weightKg),
+  };
+};
+
 const areDraftDetailsEqual = (left, right) =>
   JSON.stringify(buildDraftDetails(left)) === JSON.stringify(buildDraftDetails(right));
 
@@ -373,22 +396,28 @@ const getPetTypeIcon = (type) => {
   }
 };
 
-export default function VideoCallPetDetails({ onSubmit, vet }) {
+export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   void vet;
   const location = useLocation();
   const navigate = useNavigate();
   const storedFlow = useMemo(() => readStoredFlow(), []);
   const routeState =
-    location.state && typeof location.state === "object" ? location.state : {};
+    initialState && typeof initialState === "object"
+      ? initialState
+      : location.state && typeof location.state === "object"
+        ? location.state
+        : {};
+  const routePrefill =
+    routeState?.prefill && typeof routeState.prefill === "object"
+      ? routeState.prefill
+      : null;
   const storedPetDetails = routeState?.petDetails || storedFlow?.petDetails || null;
   const storedPaymentMeta = routeState?.paymentMeta || storedFlow?.paymentMeta || null;
   const storedDraft = routeState?.draft || storedFlow?.draft || null;
   const prefillSource = {
+    ...(routePrefill || {}),
     ...(storedPetDetails && typeof storedPetDetails === "object" ? storedPetDetails : {}),
     ...(storedDraft && typeof storedDraft === "object" ? storedDraft : {}),
-    ...(routeState?.prefill && typeof routeState.prefill === "object"
-      ? routeState.prefill
-      : {}),
   };
   const initialHasChangesSinceSubmit = Boolean(
     storedDraft && !areDraftDetailsEqual(storedDraft, storedPetDetails)
@@ -410,6 +439,11 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
   const [hasChangesSinceSubmit, setHasChangesSinceSubmit] = useState(
     initialHasChangesSinceSubmit
   );
+  const [maskedPrefillFields, setMaskedPrefillFields] = useState(() =>
+     routePrefill && !storedPetDetails && !storedDraft
+      ? buildMaskedPrefillFields(routePrefill)
+      : {}
+  );
   const breedDropdownRef = useRef(null);
 
   const existingPaymentMeta = useMemo(
@@ -419,10 +453,18 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
   const hasExistingSubmission = Boolean(
     existingPaymentMeta?.user_id && existingPaymentMeta?.pet_id && storedPetDetails
   );
+  const isPrefillMasked = (field) => Boolean(maskedPrefillFields[field]);
+  const getVisibleFieldValue = (field, value) => (isPrefillMasked(field) ? "" : value);
+  const revealPrefillField = (field) => {
+    setMaskedPrefillFields((current) =>
+      current[field] ? { ...current, [field]: false } : current
+    );
+  };
 
   const updateField = (field, value) => {
     setHasChangesSinceSubmit(true);
     setSubmitError("");
+    revealPrefillField(field);
     setDetails((current) => ({ ...current, [field]: value }));
   };
 
@@ -568,13 +610,18 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
   }, [breedOptions, breedSearch]);
 
   const selectedBreedLabel = useMemo(() => {
+    if (isPrefillMasked("breed")) return "";
     if (!details.breed) return "";
     return breedOptions.find((option) => option.value === details.breed)?.label || "";
-  }, [breedOptions, details.breed]);
+  }, [breedOptions, details.breed, maskedPrefillFields.breed]);
 
-  const showBreed = details.type === "dog" || details.type === "cat";
-  const isExotic = details.type === "exotic";
-  const approxAge = useMemo(() => calcAgeFromDob(details.petDob), [details.petDob]);
+  const visiblePetType = getVisibleFieldValue("type", details.type);
+  const showBreed = visiblePetType === "dog" || visiblePetType === "cat";
+  const isExotic = visiblePetType === "exotic";
+  const approxAge = useMemo(
+    () => (isPrefillMasked("petDob") ? "" : calcAgeFromDob(details.petDob)),
+    [details.petDob, maskedPrefillFields.petDob]
+  );
   const uploadKind = useMemo(() => {
     if (!uploadFile?.type) return "file";
     if (uploadFile.type.startsWith("image/")) return "image";
@@ -587,6 +634,9 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
   }, [uploadKind]);
   const canReuseExistingSubmission = hasExistingSubmission && !hasChangesSinceSubmit;
   const phoneDigits = details.ownerMobile.replace(/\D/g, "");
+  const visibleProblemTextLength = isPrefillMasked("problemText")
+    ? 0
+    : details.problemText.trim().length;
   const petTypeLabel = details.type
     ? details.type === "exotic"
       ? startCase(details.exoticType || "Other")
@@ -898,59 +948,6 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                 </div>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(135deg,#072a9b_0%,#1457ff_50%,#6ba3ff_100%)] shadow-[0_24px_70px_-42px_rgba(20,87,255,0.8)]">
-                <div className="grid gap-6 px-5 py-6 text-white md:grid-cols-[minmax(0,1fr)_260px] md:px-7 md:py-7">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/90">
-                      <Lock size={12} />
-                      Step 1 of 2
-                    </div>
-                    <h1 className="mt-4 text-2xl font-semibold tracking-tight md:text-[30px]">
-                      Fill pet details, then pay on a secure Razorpay checkout
-                    </h1>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-white/82 md:text-[15px]">
-                      We save your consultation request first, then open the payment
-                      step. You review the amount only after the form is complete.
-                    </p>
-                    <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-white/88">
-                      <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-                        SSL secured
-                      </span>
-                      <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-                        UPI / Cards / Net Banking
-                      </span>
-                      <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-                        Instant payment step
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[24px] border border-white/15 bg-white/10 p-4 backdrop-blur">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/75">
-                      Checkout flow
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      {[
-                        "Submit consultation details",
-                        "Review amount on payment page",
-                        "Pay securely via Razorpay",
-                      ].map((item, index) => (
-                        <div
-                          key={item}
-                          className="flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-2.5"
-                        >
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#1457ff]">
-                            {index + 1}
-                          </div>
-                          <div className="text-sm font-medium text-white/92">
-                            {item}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
 
               <div className="mt-6 space-y-6">
                 <section className={cardBase}>
@@ -979,7 +976,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                           <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                           <input
                             type="text"
-                            value={details.ownerName}
+                            value={getVisibleFieldValue("ownerName", details.ownerName)}
                             onChange={(event) => updateField("ownerName", event.target.value)}
                             placeholder="Enter your full name"
                             className={`${fieldBase} pl-12 md:pl-12`}
@@ -995,7 +992,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                           <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                           <input
                             type="tel"
-                            value={details.ownerMobile}
+                            value={getVisibleFieldValue("ownerMobile", details.ownerMobile)}
                             onChange={(event) => updateField("ownerMobile", normalizePhoneInput(event.target.value))}
                             placeholder="10-digit mobile number"
                             className={`${fieldBase} pl-12 md:pl-12`}
@@ -1012,7 +1009,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                           <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                           <input
                             type="text"
-                            value={details.city}
+                            value={getVisibleFieldValue("city", details.city)}
                             onChange={(event) => updateField("city", event.target.value)}
                             placeholder="Enter city (e.g. Gurugram)"
                             className={`${fieldBase} pl-12 md:pl-12`}
@@ -1044,7 +1041,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                           <PawPrint size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                           <input
                             type="text"
-                            value={details.name}
+                            value={getVisibleFieldValue("name", details.name)}
                             onChange={(event) => updateField("name", event.target.value)}
                             placeholder="Enter your pet's name"
                             className={`${fieldBase} pl-12 md:pl-12`}
@@ -1059,7 +1056,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                         <div className="relative">
                           <Heart size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                           <select
-                            value={details.gender}
+                            value={getVisibleFieldValue("gender", details.gender)}
                             onChange={(event) => updateField("gender", event.target.value)}
                             className={`${selectBase} pl-12 md:pl-12`}
                           >
@@ -1087,6 +1084,9 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                             onClick={() => {
                               setHasChangesSinceSubmit(true);
                               setSubmitError("");
+                              revealPrefillField("type");
+                              revealPrefillField("breed");
+                              revealPrefillField("exoticType");
                               setDetails((current) => ({
                                 ...current,
                                 type,
@@ -1097,12 +1097,12 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                             className={[
                               "p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all duration-200",
                               "md:p-5 md:flex-row md:justify-center md:gap-3 md:rounded-2xl",
-                              details.type === type
+                              visiblePetType === type
                                 ? "border-[#3998de] bg-[#3998de]/5 text-[#3998de]"
                                 : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100",
                             ].join(" ")}
                           >
-                            <div className={details.type === type ? "text-[#3998de]" : "text-gray-500"}>
+                            <div className={visiblePetType === type ? "text-[#3998de]" : "text-gray-500"}>
                               {getPetTypeIcon(type)}
                             </div>
                             <span className="capitalize text-sm font-medium md:text-base">{type}</span>
@@ -1127,7 +1127,9 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                             className={`${selectBase} text-left`}
                             disabled={loadingBreeds || breedOptions.length === 0}
                           >
-                            {loadingBreeds ? `Loading ${details.type} breeds...` : selectedBreedLabel || `Select ${details.type} breed`}
+                            {loadingBreeds
+                              ? `Loading ${visiblePetType || "pet"} breeds...`
+                              : selectedBreedLabel || `Select ${visiblePetType || "pet"} breed`}
                           </button>
                           <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
 
@@ -1138,7 +1140,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                                   type="text"
                                   value={breedSearch}
                                   onChange={(event) => setBreedSearch(event.target.value)}
-                                  placeholder={`Search ${details.type} breeds`}
+                                  placeholder={`Search ${visiblePetType || "pet"} breeds`}
                                   className={fieldBase}
                                   autoFocus
                                 />
@@ -1188,7 +1190,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                           <Rabbit size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                           <input
                             type="text"
-                            value={details.exoticType}
+                            value={getVisibleFieldValue("exoticType", details.exoticType)}
                             onChange={(event) => updateField("exoticType", event.target.value)}
                             placeholder="e.g. Parrot, Rabbit, Turtle"
                             className={`${fieldBase} pl-12 md:pl-12`}
@@ -1207,7 +1209,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                           <input
                             type="date"
                             max={todayISO()}
-                            value={details.petDob}
+                            value={getVisibleFieldValue("petDob", details.petDob)}
                             onChange={(event) => updateField("petDob", event.target.value)}
                             className={`${fieldBase} pl-12 md:pl-12`}
                           />
@@ -1223,7 +1225,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                             type="number"
                             min="0"
                             step="0.1"
-                            value={details.weightKg}
+                            value={getVisibleFieldValue("weightKg", details.weightKg)}
                             onChange={(event) => updateField("weightKg", event.target.value)}
                             placeholder="Optional"
                             className={`${fieldBase} pl-12 md:pl-12`}
@@ -1251,15 +1253,15 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                         Describe the issue <span className="text-red-500">*</span>
                       </label>
                       <textarea
-                        value={details.problemText}
+                        value={getVisibleFieldValue("problemText", details.problemText)}
                         onChange={(event) => updateField("problemText", event.target.value)}
                         placeholder="Tell us what symptoms you noticed, when they started, and anything important that changed."
                         className={textareaBase}
                       />
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-500">More detail helps us submit the request correctly.</span>
-                        <span className={details.problemText.trim().length > 10 ? "text-emerald-600" : "text-gray-400"}>
-                          {details.problemText.trim().length}/10+ characters
+                        <span className={visibleProblemTextLength > 10 ? "text-emerald-600" : "text-gray-400"}>
+                          {visibleProblemTextLength}/10+ characters
                         </span>
                       </div>
                     </div>
@@ -1269,7 +1271,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                         <label className="block text-sm font-medium text-gray-700">Energy <span className="text-red-500">*</span></label>
                         <div className="relative">
                           <Activity size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <select value={details.lastDaysEnergy} onChange={(event) => updateField("lastDaysEnergy", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
+                          <select value={getVisibleFieldValue("lastDaysEnergy", details.lastDaysEnergy)} onChange={(event) => updateField("lastDaysEnergy", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
                             <option value="">Select energy level</option>
                             {ENERGY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                           </select>
@@ -1281,7 +1283,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                         <label className="block text-sm font-medium text-gray-700">Appetite <span className="text-red-500">*</span></label>
                         <div className="relative">
                           <Coffee size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <select value={details.lastDaysAppetite} onChange={(event) => updateField("lastDaysAppetite", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
+                          <select value={getVisibleFieldValue("lastDaysAppetite", details.lastDaysAppetite)} onChange={(event) => updateField("lastDaysAppetite", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
                             <option value="">Select appetite</option>
                             {APPETITE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                           </select>
@@ -1293,7 +1295,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                         <label className="block text-sm font-medium text-gray-700">Mood <span className="text-red-500">*</span></label>
                         <div className="relative">
                           <Heart size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                          <select value={details.mood} onChange={(event) => updateField("mood", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
+                          <select value={getVisibleFieldValue("mood", details.mood)} onChange={(event) => updateField("mood", event.target.value)} className={`${selectBase} pl-12 md:pl-12`}>
                             <option value="">Select mood</option>
                             {MOOD_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                           </select>
@@ -1325,7 +1327,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                         <div className="space-y-2" key={field}>
                           <label className="block text-sm font-medium text-gray-700">{label} <span className="text-red-500">*</span></label>
                           <div className="relative">
-                            <select value={details[field]} onChange={(event) => updateField(field, event.target.value)} className={selectBase}>
+                            <select value={getVisibleFieldValue(field, details[field])} onChange={(event) => updateField(field, event.target.value)} className={selectBase}>
                               <option value="">Select</option>
                               {YES_NO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                             </select>
@@ -1466,23 +1468,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                   </div>
                 </section>
 
-                <div className="rounded-[28px] border border-[#d7e2ff] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9ff_100%)] p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.28)]">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
-                    <CreditCard size={14} />
-                    What happens next
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[11px] text-slate-600">
-                    <div className="space-y-1 rounded-2xl border border-[#e4ecff] bg-white px-2 py-3"><div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#1457ff] text-xs font-semibold text-white">1</div><div className="font-semibold text-slate-900">Submit</div><div>We save your request</div></div>
-                    <div className="space-y-1 rounded-2xl border border-[#e4ecff] bg-white px-2 py-3"><div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#1457ff] text-xs font-semibold text-white">2</div><div className="font-semibold text-slate-900">Pay</div><div>Amount opens on checkout</div></div>
-                    <div className="space-y-1 rounded-2xl border border-[#e4ecff] bg-white px-2 py-3"><div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#1457ff] text-xs font-semibold text-white">3</div><div className="font-semibold text-slate-900">Confirm</div><div>Booking updates follow</div></div>
-                  </div>
-                </div>
-
                 <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
-                  <div className="mb-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
-                    <FaWhatsapp className="text-[#25D366]" />
-                    WhatsApp booking updates are sent after payment
-                  </div>
 
                   {submitError ? (
                     <div className="mb-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
@@ -1495,7 +1481,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                     onClick={handleSubmitClick}
                     disabled={!isValid || submitting}
                     title={!isValid ? getSubmitTooltip() : undefined}
-                    className={`w-full rounded-2xl text-base font-semibold md:py-4 ${
+                    className={`hidden w-full rounded-2xl text-base font-semibold md:inline-flex md:py-4 ${
                       !isValid || submitting
                         ? "cursor-not-allowed bg-slate-300 text-white opacity-50 hover:bg-slate-300"
                         : "bg-[linear-gradient(135deg,#1457ff_0%,#2563eb_55%,#5b8dff_100%)] text-white shadow-[0_20px_45px_-22px_rgba(20,87,255,0.7)]"
@@ -1511,7 +1497,7 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                     )}
                   </Button>
 
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] text-slate-500">
+                  <div className="mt-4 hidden flex-wrap items-center justify-center gap-2 text-[11px] text-slate-500 md:flex">
                     <div className="flex items-center gap-1 rounded-full border border-[#e4ecff] bg-[#f8fbff] px-3 py-1">
                       <Shield size={12} className="text-[#2457ff]" />
                       SSL secured
@@ -1525,16 +1511,16 @@ export default function VideoCallPetDetails({ onSubmit, vet }) {
                   </div>
 
                   {!isValid ? (
-                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                    <div className="mt-4 hidden rounded-2xl border border-amber-200 bg-amber-50 p-3 md:block">
                       <p className="text-xs text-amber-700 flex items-center gap-1.5">
                         <AlertCircle size={14} />
                         {getSubmitTooltip()}
                       </p>
                     </div>
                   ) : submitting ? (
-                    <p className="text-sm text-gray-500 mt-4 text-center">Uploading your files...</p>
+                    <p className="mt-4 hidden text-center text-sm text-gray-500 md:block">Uploading your files...</p>
                   ) : (
-                    <p className="mt-4 text-center text-sm text-slate-500">All fields completed. Ready for payment.</p>
+                    <p className="mt-4 hidden text-center text-sm text-slate-500 md:block">All fields completed. Ready for payment.</p>
                   )}
                 </div>
 

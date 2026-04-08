@@ -461,7 +461,7 @@ export const VideoCallPayment = ({
           </p>
           <button
             type="button"
-            onClick={() => navigate(PET_DETAILS_ROUTE, { replace: true })}
+            onClick={handleBack}
             className="mt-5 w-full rounded-2xl bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-extrabold py-3 text-sm shadow-md shadow-blue-200 transition-all"
           >
             Start Consultation

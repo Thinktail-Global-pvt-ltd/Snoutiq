@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
+  BadgeCheck,
+  CreditCard,
+  Lock,
+  PawPrint,
+  Phone,
+  ReceiptText,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import {
   createHomeServiceOrder,
   verifyHomeServicePayment,
 } from "../vetNearMeFlow/bookingFlowApi";
@@ -195,13 +206,15 @@ const hasRequiredContext = (state) => {
   );
 };
 
-export default function VetNearPayment() {
+export default function VetNearPayment({ initialState, onBack }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const routeState = normalizeState(location.state);
+  const routeState = hasRequiredContext(normalizeState(initialState))
+    ? normalizeState(initialState)
+    : normalizeState(location.state);
   const storedState = readStandaloneVetNearMeState();
-  const initialState = hasRequiredContext(routeState) ? routeState : storedState;
-  const [state, setState] = useState(initialState);
+  const resolvedInitialState = hasRequiredContext(routeState) ? routeState : storedState;
+  const [state, setState] = useState(resolvedInitialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGatewayLoading, setIsGatewayLoading] = useState(true);
   const [isGatewayReady, setIsGatewayReady] = useState(false);
@@ -232,6 +245,10 @@ export default function VetNearPayment() {
   useEffect(() => {
     if (!hasRequiredContext(state)) {
       clearStandaloneVetNearMeState();
+      if (onBack) {
+        onBack();
+        return;
+      }
       navigate(PET_DETAILS_ROUTE, { replace: true });
       return;
     }
@@ -242,7 +259,7 @@ export default function VetNearPayment() {
         text: "Payment successful. Your booking is confirmed.",
       });
     }
-  }, [navigate, state]);
+  }, [navigate, onBack, state]);
 
   const petTypeSummary = state.lead.species === "Other" ? state.pet.otherPetType : state.lead.species;
   const petSummary = [state.pet.petName, petTypeSummary, state.pet.breed].filter(Boolean).join(" / ");
@@ -254,6 +271,14 @@ export default function VetNearPayment() {
   const isPaid = state.progress.paymentCompleted || state.booking.paymentStatus === "paid";
 
   const setStatus = (type, text) => setPaymentMessage({ type, text });
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    navigate(PET_DETAILS_ROUTE);
+  };
 
   const handlePayment = async () => {
     if (isSubmitting || isPaid) return;
@@ -372,136 +397,254 @@ export default function VetNearPayment() {
 
   if (!isReady) return null;
 
-return (
-  <div className="vet-near-me-page standalone-page">
-    <div className="standalone-flow">
-      <div className="form-card standalone-form-card">
-        <button
-          type="button"
-          className="step-back"
-          onClick={() => navigate(PET_DETAILS_ROUTE)}
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_24%),linear-gradient(180deg,#f7faff_0%,#edf4ff_46%,#f5f8ff_100%)] pb-20 text-slate-900">
+      <div className="sticky top-0 z-30 border-b border-white/70 bg-white/88 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-2 rounded-full border border-[#d7e3ff] bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-[#b9cfff] hover:text-[#2457ff]"
+          >
+            <ArrowLeft size={16} />
+            Back
+          </button>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#d7e3ff] bg-[#f6f9ff] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
+            <Lock size={13} />
+            Powered by Razorpay
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-8">
+        <div className="overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0f172a_0%,#2457ff_58%,#5b8cff_100%)] p-6 text-white shadow-[0_28px_80px_-36px_rgba(37,99,235,0.75)] md:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/90">
+                <Sparkles size={13} />
+                Step 2 of 2
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+                Secure checkout for your booking
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-white/78 md:text-[15px]">
+                Review your saved booking details and complete payment securely through Razorpay.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                <div className="flex items-center gap-2 text-xs font-medium text-white/70">
+                  <Phone size={14} className="text-emerald-300" />
+                  Contact
+                </div>
+                <div className="mt-2 text-sm font-semibold">{displayValue(state.lead.phone)}</div>
+              </div>
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                <div className="flex items-center gap-2 text-xs font-medium text-white/70">
+                  <PawPrint size={14} className="text-emerald-300" />
+                  Pet
+                </div>
+                <div className="mt-2 text-sm font-semibold">{displayValue(state.pet.petName)}</div>
+              </div>
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                <div className="flex items-center gap-2 text-xs font-medium text-white/70">
+                  <CreditCard size={14} className="text-emerald-300" />
+                  Total
+                </div>
+                <div className="mt-2 text-lg font-semibold">Rs {formatCurrency(BOOKING_TOTAL_PRICE)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="mt-6 rounded-[30px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)] md:p-7
+            [&_.step-back]:hidden
+            [&_h2]:text-[28px] [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-slate-950
+            [&_.summary-card]:mt-6 [&_.summary-card]:rounded-[24px] [&_.summary-card]:border [&_.summary-card]:border-[#d6e3ff] [&_.summary-card]:bg-[linear-gradient(180deg,#fbfdff_0%,#f6f9ff_100%)] [&_.summary-card]:p-4
+            [&_.sum-row]:flex [&_.sum-row]:items-start [&_.sum-row]:justify-between [&_.sum-row]:gap-4 [&_.sum-row]:border-b [&_.sum-row]:border-[#e8efff] [&_.sum-row]:py-3 [&_.sum-row:last-child]:border-b-0 [&_.sum-row:last-child]:pb-0 [&_.sum-row:first-child]:pt-0
+            [&_.sum-label]:text-[11px] [&_.sum-label]:font-semibold [&_.sum-label]:uppercase [&_.sum-label]:tracking-[0.16em] [&_.sum-label]:text-slate-500
+            [&_.sum-val]:max-w-[58%] [&_.sum-val]:text-right [&_.sum-val]:text-sm [&_.sum-val]:font-semibold [&_.sum-val]:text-slate-900
+            [&_.pay-box]:mt-6 [&_.pay-box]:overflow-hidden [&_.pay-box]:rounded-[28px] [&_.pay-box]:border [&_.pay-box]:border-[#c8d9ff] [&_.pay-box]:bg-[#0f172a] [&_.pay-box]:p-5 [&_.pay-box]:text-white
+            [&_.pay-line]:flex [&_.pay-line]:items-center [&_.pay-line]:justify-between [&_.pay-line]:gap-4 [&_.pay-line]:border-b [&_.pay-line]:border-white/10 [&_.pay-line]:py-3 [&_.pay-line]:text-sm [&_.pay-line:last-of-type]:border-b-0
+            [&_.pay-line.discount]:text-emerald-300 [&_.pay-line.discount]:font-semibold
+            [&_.pay-line.total]:mt-1 [&_.pay-line.total]:border-t [&_.pay-line.total]:border-white/15 [&_.pay-line.total]:pt-4 [&_.pay-line.total]:text-base [&_.pay-line.total]:font-semibold
+            [&_.pay-includes]:mt-4 [&_.pay-includes]:rounded-[22px] [&_.pay-includes]:bg-white/10 [&_.pay-includes]:p-4 [&_.pay-includes]:text-sm [&_.pay-includes]:leading-6 [&_.pay-includes]:text-white/72
+            [&_.refund-note]:mt-5 [&_.refund-note]:rounded-[22px] [&_.refund-note]:border [&_.refund-note]:border-emerald-200 [&_.refund-note]:bg-emerald-50 [&_.refund-note]:p-4 [&_.refund-note]:text-sm [&_.refund-note]:leading-6 [&_.refund-note]:text-emerald-800
+            [&_.pay-status]:mt-5 [&_.pay-status]:rounded-[22px] [&_.pay-status]:border [&_.pay-status]:p-4 [&_.pay-status]:text-sm [&_.pay-status]:font-medium
+            [&_.pay-status.info]:border-blue-200 [&_.pay-status.info]:bg-blue-50 [&_.pay-status.info]:text-blue-700
+            [&_.pay-status.success]:border-emerald-200 [&_.pay-status.success]:bg-emerald-50 [&_.pay-status.success]:text-emerald-700
+            [&_.pay-status.error]:border-red-200 [&_.pay-status.error]:bg-red-50 [&_.pay-status.error]:text-red-700
+            [&_.cta]:mt-7 [&_.cta]:inline-flex [&_.cta]:w-full [&_.cta]:items-center [&_.cta]:justify-center [&_.cta]:rounded-2xl [&_.cta]:bg-[linear-gradient(135deg,#2457ff_0%,#1d4ed8_100%)] [&_.cta]:px-4 [&_.cta]:py-4 [&_.cta]:text-sm [&_.cta]:font-semibold [&_.cta]:text-white [&_.cta]:shadow-[0_18px_35px_-18px_rgba(37,99,235,0.75)] hover:[&_.cta]:translate-y-[-1px] disabled:[&_.cta]:cursor-not-allowed disabled:[&_.cta]:opacity-60
+            [&_.cta-note]:mt-3 [&_.cta-note]:text-center [&_.cta-note]:text-xs [&_.cta-note]:text-slate-500"
         >
-          &larr; Back
-        </button>
+          <div className="mb-6 grid gap-4 rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f9ff_100%)] p-4 md:grid-cols-[1.1fr_0.9fr] md:p-5">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#d7e3ff] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
+                <ReceiptText size={13} />
+                Booking summary
+              </div>
+              <h2 className="mt-4 !mb-0">Confirm your booking</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Your pet details are already saved. Review the summary below and open the secure checkout.
+              </p>
+            </div>
+            <div className="rounded-[24px] bg-[#0f172a] p-4 text-white">
+              <div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-white/65">
+                <span>Payment status</span>
+                <span>{isPaid ? "Paid" : "Pending"}</span>
+              </div>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/70">Owner</span>
+                  <span>{displayValue(state.lead.ownerName)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-white/70">Area</span>
+                  <span>{displayValue(state.lead.area, "Not selected")}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-white/70">Reference</span>
+                  <span>{displayValue(state.booking.bookingReference || bookingReferenceFallback)}</span>
+                </div>
+              </div>
+              <div className="mt-5 flex items-end justify-between">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-white/60">
+                    Amount payable
+                  </div>
+                  <div className="mt-1 text-2xl font-semibold">Rs {formatCurrency(BOOKING_TOTAL_PRICE)}</div>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-3 text-white/90">
+                  <ShieldCheck size={18} />
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <h2 style={{ marginBottom: 16 }}>Confirm your booking</h2>
+          <div className="mb-5 flex items-center gap-3 rounded-[22px] border border-[#d7e3ff] bg-[#f6f9ff] px-4 py-3 text-sm text-slate-600">
+            <BadgeCheck size={18} className="shrink-0 text-[#2457ff]" />
+            Secure payment via Razorpay with UPI, cards and net banking.
+          </div>
 
-        <div className="summary-card">
-          <div className="sum-row">
-            <span className="sum-label">Name</span>
-            <span className="sum-val">
-              {displayValue(state.lead.ownerName)}
-            </span>
-          </div>
-          <div className="sum-row">
-            <span className="sum-label">Phone</span>
-            <span className="sum-val">
-              {displayValue(state.lead.phone)}
-            </span>
-          </div>
-          <div className="sum-row">
-            <span className="sum-label">Area</span>
-            <span className="sum-val">
-              {displayValue(state.lead.area, "Not selected")}
-            </span>
-          </div>
-          <div className="sum-row">
-            <span className="sum-label">Pet</span>
-            <span className="sum-val">
-              {displayValue(petSummary, "Not selected")}
-            </span>
-          </div>
-          <div className="sum-row">
-            <span className="sum-label">Reason</span>
-            <span className="sum-val">
-              {displayValue(state.lead.reason, "Not selected")}
-            </span>
-          </div>
-        </div>
+          <h2 style={{ marginBottom: 0 }}>Confirm your booking</h2>
 
-        <div className="pay-box">
-          <div className="pay-line">
-            <span>Home vet visit in Gurgaon</span>
-            <span>Rs {formatCurrency(BOOKING_PRICING.originalPrice)}</span>
-          </div>
-          <div className="pay-line discount">
-            <span>20% off - limited period</span>
-            <span>-Rs {formatCurrency(BOOKING_PRICING.discountAmount)}</span>
-          </div>
-          <div className="pay-line">
-            <span>Amount after discount</span>
-            <span>Rs {formatCurrency(BOOKING_PRICING.currentPrice)}</span>
-          </div>
-          <div className="pay-line">
-            <span>{BOOKING_PRICING.gstRate}% GST</span>
-            <span>+Rs {formatCurrency(BOOKING_GST_AMOUNT)}</span>
-          </div>
-          <div className="pay-line total">
-            <span>Total payable</span>
-            <span>Rs {formatCurrency(BOOKING_TOTAL_PRICE)}</span>
-          </div>
-          <div className="pay-includes">
-            Includes up to Rs 200 of essential medicines / Written visit report /
-            Pet record saved on Snoutiq
-          </div>
-        </div>
-
-        <div className="refund-note">
-          Secure booking with 100% refund if we cannot confirm a vet in your
-          Gurgaon area after payment.
-        </div>
-
-        {paymentMessage.text ? (
-          <div className={`pay-status ${paymentMessage.type || "info"}`}>
-            {paymentMessage.text}
-          </div>
-        ) : null}
-
-        {isPaid ? (
-          <div className="summary-card" style={{ marginTop: 12 }}>
+          <div className="summary-card">
             <div className="sum-row">
-              <span className="sum-label">Payment status</span>
+              <span className="sum-label">Name</span>
               <span className="sum-val">
-                {displayValue(state.booking.paymentStatus, "paid")}
+                {displayValue(state.lead.ownerName)}
               </span>
             </div>
             <div className="sum-row">
-              <span className="sum-label">Payment reference</span>
+              <span className="sum-label">Phone</span>
               <span className="sum-val">
-                {displayValue(state.booking.paymentReference)}
+                {displayValue(state.lead.phone)}
               </span>
             </div>
             <div className="sum-row">
-              <span className="sum-label">Booking reference</span>
+              <span className="sum-label">Area</span>
               <span className="sum-val">
-                {displayValue(
-                  state.booking.bookingReference || bookingReferenceFallback
-                )}
+                {displayValue(state.lead.area, "Not selected")}
+              </span>
+            </div>
+            <div className="sum-row">
+              <span className="sum-label">Pet</span>
+              <span className="sum-val">
+                {displayValue(petSummary, "Not selected")}
+              </span>
+            </div>
+            <div className="sum-row">
+              <span className="sum-label">Reason</span>
+              <span className="sum-val">
+                {displayValue(state.lead.reason, "Not selected")}
               </span>
             </div>
           </div>
-        ) : null}
 
-        <button
-          type="button"
-          className="cta pay-cta"
-          onClick={handlePayment}
-          disabled={isSubmitting || isGatewayLoading || !isReady || isPaid}
-        >
-          {isPaid
-            ? "Payment completed"
-            : isSubmitting
-              ? "Opening payment..."
-              : isGatewayLoading
-                ? "Preparing payment..."
-                : `Pay Rs ${formatCurrency(BOOKING_TOTAL_PRICE)} securely ->`}
-        </button>
+          <div className="pay-box">
+            <div className="pay-line">
+              <span>Home vet visit in Gurgaon</span>
+              <span>Rs {formatCurrency(BOOKING_PRICING.originalPrice)}</span>
+            </div>
+            <div className="pay-line discount">
+              <span>20% off - limited period</span>
+              <span>-Rs {formatCurrency(BOOKING_PRICING.discountAmount)}</span>
+            </div>
+            <div className="pay-line">
+              <span>Amount after discount</span>
+              <span>Rs {formatCurrency(BOOKING_PRICING.currentPrice)}</span>
+            </div>
+            <div className="pay-line">
+              <span>{BOOKING_PRICING.gstRate}% GST</span>
+              <span>+Rs {formatCurrency(BOOKING_GST_AMOUNT)}</span>
+            </div>
+            <div className="pay-line total">
+              <span>Total payable</span>
+              <span>Rs {formatCurrency(BOOKING_TOTAL_PRICE)}</span>
+            </div>
+            <div className="pay-includes">
+              Includes up to Rs 200 of essential medicines / Written visit report /
+              Pet record saved on Snoutiq
+            </div>
+          </div>
 
-        <p className="cta-note">
-          Secure payment via Razorpay / UPI / card / net banking
-        </p>
+          <div className="refund-note">
+            Secure booking with 100% refund if we cannot confirm a vet in your
+            Gurgaon area after payment.
+          </div>
+
+          {paymentMessage.text ? (
+            <div className={`pay-status ${paymentMessage.type || "info"}`}>
+              {paymentMessage.text}
+            </div>
+          ) : null}
+
+          {isPaid ? (
+            <div className="summary-card" style={{ marginTop: 12 }}>
+              <div className="sum-row">
+                <span className="sum-label">Payment status</span>
+                <span className="sum-val">
+                  {displayValue(state.booking.paymentStatus, "paid")}
+                </span>
+              </div>
+              <div className="sum-row">
+                <span className="sum-label">Payment reference</span>
+                <span className="sum-val">
+                  {displayValue(state.booking.paymentReference)}
+                </span>
+              </div>
+              <div className="sum-row">
+                <span className="sum-label">Booking reference</span>
+                <span className="sum-val">
+                  {displayValue(
+                    state.booking.bookingReference || bookingReferenceFallback
+                  )}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            className="cta pay-cta"
+            onClick={handlePayment}
+            disabled={isSubmitting || isGatewayLoading || !isReady || isPaid}
+          >
+            {isPaid
+              ? "Payment completed"
+              : isSubmitting
+                ? "Opening payment..."
+                : isGatewayLoading
+                  ? "Preparing payment..."
+                  : `Pay Rs ${formatCurrency(BOOKING_TOTAL_PRICE)} securely ->`}
+          </button>
+
+          <p className="cta-note">
+            Secure payment via Razorpay / UPI / card / net banking
+          </p>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
