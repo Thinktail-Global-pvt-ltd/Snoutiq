@@ -170,6 +170,12 @@ class SnoutiqSymptomController extends Controller
             'pet_id'       => 'nullable|integer',
             'message'      => 'required|string|max:600',
             'phone'        => 'nullable|string|max:30',
+            'lat'          => 'nullable|numeric|between:-90,90',
+            'latitude'     => 'nullable|numeric|between:-90,90',
+            'long'         => 'nullable|numeric|between:-180,180',
+            'lng'          => 'nullable|numeric|between:-180,180',
+            'lon'          => 'nullable|numeric|between:-180,180',
+            'longitude'    => 'nullable|numeric|between:-180,180',
             'owner_name'   => 'nullable|string|max:120',
             'pet_owner_name' => 'nullable|string|max:120',
             'user_name'    => 'nullable|string|max:120',
@@ -187,9 +193,21 @@ class SnoutiqSymptomController extends Controller
             'user'         => 'nullable|array',
             'user.phone'   => 'nullable|string|max:30',
             'user.name'    => 'nullable|string|max:120',
+            'user.lat'     => 'nullable|numeric|between:-90,90',
+            'user.latitude'=> 'nullable|numeric|between:-90,90',
+            'user.long'    => 'nullable|numeric|between:-180,180',
+            'user.lng'     => 'nullable|numeric|between:-180,180',
+            'user.lon'     => 'nullable|numeric|between:-180,180',
+            'user.longitude' => 'nullable|numeric|between:-180,180',
             'users'        => 'nullable|array',
             'users.phone'  => 'nullable|string|max:30',
             'users.name'   => 'nullable|string|max:120',
+            'users.lat'    => 'nullable|numeric|between:-90,90',
+            'users.latitude'=> 'nullable|numeric|between:-90,90',
+            'users.long'   => 'nullable|numeric|between:-180,180',
+            'users.lng'    => 'nullable|numeric|between:-180,180',
+            'users.lon'    => 'nullable|numeric|between:-180,180',
+            'users.longitude' => 'nullable|numeric|between:-180,180',
             'pet'          => 'nullable|array',
             'pet.pet_name' => 'nullable|string|max:120',
             'pet.name'     => 'nullable|string|max:120',
@@ -709,6 +727,14 @@ class SnoutiqSymptomController extends Controller
         $data['phone'] = $this->cleanOptionalString($this->firstFilled($data, [
             'phone', 'user.phone', 'users.phone',
         ]));
+        $data['latitude'] = $this->normalizeCoordinate($this->firstFilled($data, [
+            'latitude', 'lat', 'user.latitude', 'user.lat', 'users.latitude', 'users.lat',
+        ]), -90, 90);
+        $data['longitude'] = $this->normalizeCoordinate($this->firstFilled($data, [
+            'longitude', 'long', 'lng', 'lon',
+            'user.longitude', 'user.long', 'user.lng', 'user.lon',
+            'users.longitude', 'users.long', 'users.lng', 'users.lon',
+        ]), -180, 180);
         $data['owner_name'] = $this->cleanOptionalString($this->firstFilled($data, [
             'owner_name', 'pet_owner_name', 'user_name', 'user.name', 'users.name',
         ]));
@@ -742,11 +768,15 @@ class SnoutiqSymptomController extends Controller
         $breed = trim((string) ($data['breed'] ?? ''));
         $dob = trim((string) ($data['dob'] ?? ''));
         $species = strtolower(trim((string) ($data['species'] ?? $data['type'] ?? '')));
+        $latitude = $this->normalizeCoordinate($data['latitude'] ?? null, -90, 90);
+        $longitude = $this->normalizeCoordinate($data['longitude'] ?? null, -180, 180);
         $hasOwnerOrPetContext = $ownerName !== ''
             || $petName !== ''
             || $breed !== ''
             || $dob !== ''
             || $species !== ''
+            || $latitude !== null
+            || $longitude !== null
             || !empty($data['sex'])
             || !empty($data['neutered'])
             || !empty($data['location']);
@@ -805,6 +835,12 @@ class SnoutiqSymptomController extends Controller
                 if (Schema::hasColumn('users', 'breed') && $breed !== '') {
                     $userUpdate['breed'] = $breed;
                 }
+                if (Schema::hasColumn('users', 'latitude') && $latitude !== null) {
+                    $userUpdate['latitude'] = $latitude;
+                }
+                if (Schema::hasColumn('users', 'longitude') && $longitude !== null) {
+                    $userUpdate['longitude'] = $longitude;
+                }
                 if (Schema::hasColumn('users', 'updated_at')) {
                     $userUpdate['updated_at'] = now();
                 }
@@ -844,6 +880,12 @@ class SnoutiqSymptomController extends Controller
                 }
                 if (Schema::hasColumn('users', 'breed') && $breed !== '') {
                     $userPayload['breed'] = $breed;
+                }
+                if (Schema::hasColumn('users', 'latitude') && $latitude !== null) {
+                    $userPayload['latitude'] = $latitude;
+                }
+                if (Schema::hasColumn('users', 'longitude') && $longitude !== null) {
+                    $userPayload['longitude'] = $longitude;
                 }
                 if (Schema::hasColumn('users', 'created_at')) {
                     $userPayload['created_at'] = now();
@@ -1011,6 +1053,25 @@ class SnoutiqSymptomController extends Controller
         }
 
         return $digits;
+    }
+
+    private function normalizeCoordinate(mixed $value, float $min, float $max): ?float
+    {
+        if (!is_scalar($value)) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '' || !is_numeric($raw)) {
+            return null;
+        }
+
+        $number = (float) $raw;
+        if ($number < $min || $number > $max) {
+            return null;
+        }
+
+        return round($number, 7);
     }
 
     private function uniqueSymptomEntryEmail(string $seed): string
