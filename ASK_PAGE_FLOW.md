@@ -42,6 +42,7 @@ That means `/ask` uses backend endpoints like:
 
 - `https://snoutiq.com/backend/api/symptom-check`
 - `https://snoutiq.com/backend/api/symptom-followup`
+- `https://snoutiq.com/backend/api/symptom-answer`
 - `https://snoutiq.com/backend/api/symptom-session/{session_id}`
 
 ## Local State Used On `/ask`
@@ -64,6 +65,8 @@ Inside `AskPage.jsx`, the page keeps:
   Copy/reset toast
 - `checksToday`
   Local daily free-check counter
+- `followUpPending`
+  Inline loading/selection state for `symptom-answer`
 
 ## Local Storage Used
 
@@ -118,7 +121,11 @@ This is a recovery path so that a saved session can still rebuild a minimal chat
 
 If user sends the very first message and no `sessionId` exists yet:
 
-- frontend calls `POST /api/symptom-check`
+- frontend opens the intake modal first
+- user enters pet parent + pet details
+- if species is `dog`, frontend loads breeds from `GET /api/dog-breeds/all`
+- if species is `cat`, frontend loads breeds from `GET /api/cat-breeds/with-indian`
+- after modal submit, frontend calls `POST /api/symptom-check`
 
 This can happen from:
 
@@ -140,6 +147,14 @@ If user clicks `Start over`:
 - if `sessionId` exists, it calls `POST /api/symptom-session/{sessionId}/reset`
 - then it clears local UI state even if the backend reset fails
 
+### 6. Follow-up question answer
+
+If backend sends a `follow_up_question` block and user taps one option:
+
+- frontend calls `POST /api/symptom-answer`
+- the current assessment card is updated in place
+- frontend does not append a new chat bubble for that option
+
 ## Exact API Usage
 
 ### 1. `POST /api/symptom-check`
@@ -158,13 +173,33 @@ Request body:
 ```json
 {
   "message": "My dog has been vomiting repeatedly since this morning",
-  "species": "dog"
+  "species": "dog",
+  "type": "dog",
+  "phone": "9876543210",
+  "owner_name": "Rahul",
+  "pet_name": "Bruno",
+  "breed": "Labrador",
+  "dob": "2021-06-01",
+  "location": "Delhi NCR",
+  "user": {
+    "name": "Rahul",
+    "phone": "9876543210"
+  },
+  "pets": {
+    "pet_name": "Bruno",
+    "name": "Bruno",
+    "breed": "Labrador",
+    "dob": "2021-06-01",
+    "type": "dog",
+    "species": "dog"
+  }
 }
 ```
 
 Purpose:
 
 - creates a new symptom-check session
+- persists/links pet parent + pet profile on backend when possible
 - gets the first AI triage assessment
 - returns `session_id`
 
@@ -206,7 +241,41 @@ Frontend behavior after success:
 - appends new assessment card
 - does not increment the first-check counter
 
-### 3. `GET /api/symptom-session/{session_id}`
+### 3. `POST /api/symptom-answer`
+
+Used when:
+
+- backend response contains `follow_up_question`
+- user taps one of the suggested answer options
+
+Frontend call site:
+
+- `handleFollowUpAnswer()` in `src/newflow/AskPage.jsx`
+
+Request body:
+
+```json
+{
+  "session_id": "room_abc123",
+  "question": "Did this start suddenly in the last 24 hours, or has it been building over a few days?",
+  "answer": "Started suddenly in the last 24 hours"
+}
+```
+
+Purpose:
+
+- submits a structured answer to the guided follow-up question
+- backend internally re-runs the symptom assessment for the same session
+- response may include `revised_assessment: true`
+
+Frontend behavior after success:
+
+- keeps same `session_id`
+- replaces the current assessment card payload instead of appending another one
+- stores selected answer locally on that card
+- shows revised-assessment state on the same card
+
+### 4. `GET /api/symptom-session/{session_id}`
 
 Used when:
 
@@ -239,7 +308,7 @@ Frontend behavior after failure:
 - clears `sessionId`
 - clears stored state
 
-### 4. `POST /api/symptom-session/{session_id}/reset`
+### 5. `POST /api/symptom-session/{session_id}/reset`
 
 Used when:
 
@@ -279,6 +348,10 @@ The page does not render the entire backend response blindly. It reads specific 
 - `ui`
 - `buttons`
 - `response`
+- `follow_up_question`
+- `follow_up_history`
+- `be_ready_to_tell_vet`
+- `revised_assessment`
 - `triage_detail`
 - `vet_summary`
 
@@ -311,8 +384,12 @@ The page does not render the entire backend response blindly. It reads specific 
 ### `response` fields used
 
 - `response.message`
+- `response.what_we_think_is_happening`
 - `response.do_now`
+- `response.safe_to_do_while_waiting`
 - `response.what_to_watch`
+- `response.be_ready_to_tell_vet`
+- `response.follow_up_question`
 - `response.diagnosis_summary`
 
 ### `triage_detail` fields used
@@ -322,8 +399,12 @@ The page does not render the entire backend response blindly. It reads specific 
 - `triage_detail.possible_causes`
 - `triage_detail.red_flags_found`
 
-### Other field used
+### Other fields used
 
+- `follow_up_question`
+- `follow_up_history`
+- `be_ready_to_tell_vet`
+- `revised_assessment`
 - `vet_summary`
 
 ## How UI Is Built From Response
@@ -340,9 +421,12 @@ For every successful assessment response:
    - diagnosis/explanation
    - do-now block
    - India-specific note
+   - safe-to-do-while-waiting list
+   - follow-up question card
    - watch-for list
    - likely causes
    - red flags
+   - be-ready-to-tell-vet section
    - vet summary
 
 This means the backend decides most of the assessment content and action hints.
@@ -369,11 +453,24 @@ When user taps one:
 All normal sending goes through `handleSend()`:
 
 - if no `sessionId`:
-  call `POST /api/symptom-check`
+  open intake modal, then call `POST /api/symptom-check`
 - if `sessionId` exists:
   call `POST /api/symptom-followup`
 
 This is the main branching logic of `/ask`.
+
+## Guided Follow-up Answer Logic
+
+Guided answer flow goes through `handleFollowUpAnswer()`:
+
+- if card has `follow_up_question`:
+  call `POST /api/symptom-answer`
+- on success:
+  replace that same assessment entry with the revised payload
+- if backend returns `revised_assessment: true`:
+  frontend shows the revised badge on that card
+
+This keeps the UI stable and avoids duplicate assessment cards for tap-based answers.
 
 ## CTA Navigation From Response
 
@@ -397,6 +494,10 @@ Current mapping in `AskPage.jsx`:
 - `snoutiq://find-clinic` -> `/vet-at-home-gurgaon/pet-details`
 - `snoutiq://emergency` -> `/vet-at-home-gurgaon/pet-details`
 - `snoutiq://govt-hospitals` -> `/vet-at-home-gurgaon/pet-details`
+
+Special case:
+
+- `type: "info"` does not navigate; it copies the assessment summary instead
 
 Also:
 
@@ -463,6 +564,8 @@ For restore failure on `GET /api/symptom-session/{id}`:
 - `sessionId` is the switch between first-check and follow-up API
 - first check increments the local free-check counter
 - follow-up does not
+- guided answer uses `symptom-answer`, not `symptom-followup`
+- guided answer updates the same card in place
 - restore only happens when `sessionId` exists but no entries are available
 - CTA behavior is partly backend-driven and partly frontend-mapped
 - `/ask` currently uses backend payload structure quite heavily, so response contract changes can affect rendering quickly
@@ -471,8 +574,8 @@ For restore failure on `GET /api/symptom-session/{id}`:
 
 | Action | API | Method | Trigger |
 |---|---|---|---|
-| First symptom message | `/api/symptom-check` | `POST` | First send when no `sessionId` exists |
+| First symptom message | `/api/symptom-check` | `POST` | First send when no `sessionId` exists, after intake modal submit |
 | Follow-up symptom message | `/api/symptom-followup` | `POST` | Any later send when `sessionId` exists |
+| Guided follow-up answer | `/api/symptom-answer` | `POST` | User taps an option from `follow_up_question` |
 | Restore missing session history | `/api/symptom-session/{sessionId}` | `GET` | On load when session exists but entries are empty |
 | Reset conversation | `/api/symptom-session/{sessionId}/reset` | `POST` | On `Start over` |
-

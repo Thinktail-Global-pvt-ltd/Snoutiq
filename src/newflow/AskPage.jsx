@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import { apiBaseUrl, apiPost } from "../lib/api";
 import logo from "../assets/images/logo.webp";
+import avatarLogo from "../assets/images/snoutiq app.png";
 import "./AskPage.css";
 
 const ASK_TITLE = "Snoutiq - Is My Pet Okay? Free AI Pet Health Check";
@@ -10,9 +11,18 @@ const ASK_DESCRIPTION =
   "Free AI pet symptom checker for Indian pet parents. Get expert triage guidance in seconds. No signup needed.";
 const ASK_CANONICAL = "https://snoutiq.com/ask";
 const ASK_STORAGE_KEY = "snoutiq-ask-state-v1";
+const ASK_PROFILE_KEY = "snoutiq-ask-profile-v1";
 const ASK_DAILY_USAGE_KEY = "snoutiq-ask-daily-usage-v1";
 const FREE_CHECK_LIMIT = 3;
 const GAUGE_CIRCUMFERENCE = 201.1;
+const DEFAULT_ASK_PROFILE = {
+  ownerName: "",
+  phone: "",
+  petName: "",
+  breed: "",
+  dob: "",
+  location: "Delhi NCR",
+};
 
 const QUICK_SYMPTOMS = [
   {
@@ -126,6 +136,32 @@ const writeDailyUsage = (count) => {
   );
 };
 
+const sanitizeAskProfile = (value) => {
+  const raw = value && typeof value === "object" ? value : {};
+  return {
+    ownerName: String(raw.ownerName || "").trim(),
+    phone: String(raw.phone || "").trim(),
+    petName: String(raw.petName || "").trim(),
+    breed: String(raw.breed || "").trim(),
+    dob: String(raw.dob || "").trim(),
+    location: String(raw.location || DEFAULT_ASK_PROFILE.location).trim(),
+  };
+};
+
+const readStoredProfile = () => {
+  if (typeof window === "undefined") return DEFAULT_ASK_PROFILE;
+  const raw = safeParse(window.localStorage.getItem(ASK_PROFILE_KEY), null);
+  return sanitizeAskProfile(raw);
+};
+
+const writeStoredProfile = (profile) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    ASK_PROFILE_KEY,
+    JSON.stringify(sanitizeAskProfile(profile))
+  );
+};
+
 const readStoredState = () => {
   if (typeof window === "undefined") return null;
   const raw = safeParse(window.localStorage.getItem(ASK_STORAGE_KEY), null);
@@ -181,6 +217,232 @@ const getThemeClass = (theme = "video") => `ask-theme-${theme}`;
 const buildGoogleSearchUrl = (query) =>
   `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 
+const getPhoneDigits = (value) => String(value || "").replace(/\D/g, "");
+
+const formatBreedName = (breedKey, subBreed = null) => {
+  const cap = (input) =>
+    String(input || "")
+      .split(/[-_\s/]+/)
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+
+  const base = cap(breedKey);
+  if (!subBreed) return base;
+  return `${cap(subBreed)} ${base}`;
+};
+
+function SearchableBreedField({
+  value,
+  options,
+  loading,
+  onChange,
+  placeholder,
+}) {
+  const wrapperRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const normalizedValue = String(value || "").trim().toLowerCase();
+  const filteredOptions = (normalizedValue
+    ? options.filter((option) => option.toLowerCase().includes(normalizedValue))
+    : options
+  ).slice(0, 12);
+  const showMenu = open && !loading && filteredOptions.length > 0;
+  const showEmptyState =
+    open && !loading && normalizedValue.length > 0 && filteredOptions.length === 0;
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (wrapperRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="ask-search-select" ref={wrapperRef}>
+      <div className={`ask-search-select-control${open ? " is-open" : ""}`}>
+        <input
+          type="text"
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setOpen(false);
+            }
+
+            if (
+              event.key === "Enter" &&
+              open &&
+              filteredOptions.length === 1 &&
+              filteredOptions[0].toLowerCase() === normalizedValue
+            ) {
+              setOpen(false);
+            }
+          }}
+          placeholder={placeholder}
+          autoComplete="off"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={showMenu || showEmptyState}
+          aria-haspopup="listbox"
+          aria-controls="ask-breed-search-results"
+        />
+        <button
+          type="button"
+          className="ask-search-select-toggle"
+          onClick={() => setOpen((current) => !current)}
+          aria-label={open ? "Hide breed suggestions" : "Show breed suggestions"}
+        >
+          <span className="ask-search-select-caret" aria-hidden="true" />
+        </button>
+      </div>
+
+      {showMenu ? (
+        <div
+          className="ask-search-select-menu"
+          id="ask-breed-search-results"
+          role="listbox"
+        >
+          {filteredOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`ask-search-select-option${
+                option.toLowerCase() === normalizedValue ? " is-selected" : ""
+              }`}
+              role="option"
+              aria-selected={option.toLowerCase() === normalizedValue}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onChange(option);
+                setOpen(false);
+              }}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {showEmptyState ? (
+        <div className="ask-search-select-empty">
+          No breed match found. You can keep typing manually.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+const validateAskProfile = (profile) => {
+  const next = sanitizeAskProfile(profile);
+  const errors = {};
+
+  if (!next.ownerName) {
+    errors.ownerName = "Enter your name";
+  }
+  if (getPhoneDigits(next.phone).length < 10) {
+    errors.phone = "Enter a valid phone number";
+  }
+  if (!next.petName) {
+    errors.petName = "Enter your pet's name";
+  }
+  if (!next.location) {
+    errors.location = "Enter your location";
+  }
+
+  return errors;
+};
+
+const normalizeQuestionKey = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+const getAssessmentResponse = (assessment) =>
+  assessment && typeof assessment === "object" && assessment.response
+    ? assessment.response
+    : {};
+
+const resolveAssessmentMessage = (assessment) => {
+  const response = getAssessmentResponse(assessment);
+  return (
+    response?.what_we_think_is_happening ||
+    response?.message ||
+    assessment?.message ||
+    ""
+  );
+};
+
+const resolveWatchItems = (assessment) => {
+  const response = getAssessmentResponse(assessment);
+  const watchItems = assessment?.what_to_watch ?? response?.what_to_watch;
+  return Array.isArray(watchItems) ? watchItems.filter(Boolean) : [];
+};
+
+const resolveSafeToDoWhileWaiting = (assessment) => {
+  const response = getAssessmentResponse(assessment);
+  const safeItems =
+    response?.safe_to_do_while_waiting ??
+    assessment?.safe_to_do_while_waiting;
+  return Array.isArray(safeItems) ? safeItems.filter(Boolean) : [];
+};
+
+const resolveFollowUpQuestion = (assessment) => {
+  const raw =
+    assessment?.follow_up_question ??
+    getAssessmentResponse(assessment)?.follow_up_question;
+
+  if (!raw || typeof raw !== "object") return null;
+
+  const question = String(raw.question || "").trim();
+  const options = Array.isArray(raw.options)
+    ? raw.options
+        .map((option) => String(option || "").trim())
+        .filter(Boolean)
+    : [];
+
+  if (!question || options.length === 0) return null;
+
+  return {
+    label: String(raw.label || "One question to narrow this down").trim(),
+    question,
+    options,
+  };
+};
+
+const resolveBeReadyToTellVet = (assessment) => {
+  const response = getAssessmentResponse(assessment);
+  return String(
+    assessment?.be_ready_to_tell_vet || response?.be_ready_to_tell_vet || ""
+  ).trim();
+};
+
+const resolveIndiaContext = (assessment) =>
+  String(
+    assessment?.triage_detail?.india_context || assessment?.india_context || ""
+  ).trim();
+
+const resolveImageObservation = (assessment) =>
+  String(
+    assessment?.triage_detail?.image_observation ||
+      assessment?.image_observation ||
+      ""
+  ).trim();
+
 const navigateToAskTarget = (navigate, target) => {
   const route = String(target || "").trim();
   if (!route) return;
@@ -202,12 +464,15 @@ const buildAssessmentShareText = (assessment) =>
   "Check your pet on Snoutiq AI: https://snoutiq.com/ask";
 
 const derivePossibleCauses = (assessment) => {
-  const causes = assessment?.triage_detail?.possible_causes;
+  const causes =
+    assessment?.triage_detail?.possible_causes || assessment?.possible_causes;
   if (Array.isArray(causes) && causes.length > 0) {
     return causes.filter(Boolean);
   }
 
-  const summary = String(assessment?.response?.diagnosis_summary || "").trim();
+  const summary = String(
+    getAssessmentResponse(assessment)?.diagnosis_summary || ""
+  ).trim();
   const match = summary.match(/possible causes include (.+?)\.?$/i);
   if (!match) return [];
 
@@ -221,18 +486,22 @@ const buildAssessmentCopy = (assessment) => {
   const title = assessment?.ui?.banner?.title || "Snoutiq AI assessment";
   const score = assessment?.health_score || assessment?.ui?.health_score?.value;
   const label = assessment?.ui?.health_score?.label || "";
-  const message = assessment?.response?.message || "";
-  const doNow = assessment?.response?.do_now || "";
-  const watch = Array.isArray(assessment?.response?.what_to_watch)
-    ? assessment.response.what_to_watch
-    : [];
+  const message = resolveAssessmentMessage(assessment);
+  const doNow = getAssessmentResponse(assessment)?.do_now || "";
+  const safeToDoWhileWaiting = resolveSafeToDoWhileWaiting(assessment);
+  const watch = resolveWatchItems(assessment);
+  const beReadyToTellVet = resolveBeReadyToTellVet(assessment);
 
   return [
     title,
     score ? `Pet Health Score: ${score}/100${label ? ` (${label})` : ""}` : "",
     message,
     doNow ? `Do now: ${doNow}` : "",
+    safeToDoWhileWaiting.length
+      ? `Safe to do while waiting: ${safeToDoWhileWaiting.join(" | ")}`
+      : "",
     watch.length ? `Watch for: ${watch.join(" | ")}` : "",
+    beReadyToTellVet ? `Be ready to tell the vet: ${beReadyToTellVet}` : "",
     "https://snoutiq.com/ask",
   ]
     .filter(Boolean)
@@ -346,6 +615,215 @@ function IdleScreen({ species, onSpeciesSelect, onQuickStart }) {
   );
 }
 
+function IntakeModal({
+  open,
+  profile,
+  species,
+  pendingMessage,
+  errors,
+  submitting,
+  breedOptions,
+  breedLoading,
+  breedError,
+  onClose,
+  onProfileChange,
+  onSpeciesChange,
+  onSubmit,
+}) {
+  if (!open) return null;
+
+  const speciesMeta = getSpeciesMeta(species);
+  const petLabel = profile?.petName?.trim() || "your pet";
+  const showBreedSuggestions = species === "dog" || species === "cat";
+
+  return (
+    <div className="ask-modal-backdrop" role="presentation">
+      <div
+        className="ask-intake-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ask-intake-title"
+      >
+        <div className="ask-intake-header">
+          <div className="ask-intake-brand">
+            <img
+              src={logo}
+              alt="SnoutIQ"
+              className="ask-intake-logo"
+              width={110}
+              height={20}
+              loading="eager"
+              decoding="async"
+            />
+            <span className="ask-intake-secure">Private • personalized answer</span>
+          </div>
+          <button
+            type="button"
+            className="ask-intake-close"
+            onClick={onClose}
+            aria-label="Close details form"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="ask-intake-summary">
+          <div className="ask-intake-summary-eyebrow">Before we answer</div>
+          <h3 id="ask-intake-title">
+            Tell us about {petLabel} so the first AI answer is more specific
+          </h3>
+          <p>{pendingMessage}</p>
+        </div>
+
+        <form className="ask-intake-body" onSubmit={onSubmit}>
+          <div className="ask-intake-section-label">Pet parent details</div>
+          <div className="ask-intake-grid ask-intake-grid-two">
+            <label className="ask-intake-field">
+              <span>Your name</span>
+              <input
+                type="text"
+                value={profile.ownerName}
+                onChange={(event) =>
+                  onProfileChange("ownerName", event.target.value)
+                }
+                placeholder="Enter your name"
+                autoComplete="name"
+              />
+              {errors.ownerName ? (
+                <small className="ask-intake-error">{errors.ownerName}</small>
+              ) : null}
+            </label>
+
+            <label className="ask-intake-field">
+              <span>Phone number</span>
+              <input
+                type="tel"
+                value={profile.phone}
+                onChange={(event) => onProfileChange("phone", event.target.value)}
+                placeholder="Enter your phone number"
+                autoComplete="tel"
+              />
+              {errors.phone ? (
+                <small className="ask-intake-error">{errors.phone}</small>
+              ) : null}
+            </label>
+          </div>
+
+          <div className="ask-intake-section-label">Pet details</div>
+          <div className="ask-intake-grid ask-intake-grid-two">
+            <label className="ask-intake-field">
+              <span>Pet name</span>
+              <input
+                type="text"
+                value={profile.petName}
+                onChange={(event) => onProfileChange("petName", event.target.value)}
+                placeholder="Enter your pet's name"
+              />
+              {errors.petName ? (
+                <small className="ask-intake-error">{errors.petName}</small>
+              ) : null}
+            </label>
+
+            <label className="ask-intake-field">
+              <span>Pet type</span>
+              <select
+                value={species}
+                onChange={(event) => onSpeciesChange(event.target.value)}
+              >
+                {SPECIES_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="ask-intake-grid ask-intake-grid-two">
+            <label className="ask-intake-field">
+              <span>Breed</span>
+              {showBreedSuggestions ? (
+                <SearchableBreedField
+                  value={profile.breed}
+                  options={breedOptions}
+                  loading={breedLoading}
+                  onChange={(nextValue) => onProfileChange("breed", nextValue)}
+                  placeholder="Search or type breed"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={profile.breed}
+                  onChange={(event) => onProfileChange("breed", event.target.value)}
+                  placeholder="Enter breed"
+                />
+              )}
+              {showBreedSuggestions ? (
+                <small
+                  className={`ask-intake-hint${
+                    breedError ? " is-error" : ""
+                  }`}
+                >
+                  {breedLoading
+                    ? "Loading breeds..."
+                    : breedError ||
+                      "Search breeds or type manually if you do not see a match."}
+                </small>
+              ) : null}
+            </label>
+
+            <label className="ask-intake-field">
+              <span>Date of birth</span>
+              <input
+                type="date"
+                value={profile.dob}
+                onChange={(event) => onProfileChange("dob", event.target.value)}
+              />
+            </label>
+          </div>
+
+          <label className="ask-intake-field">
+            <span>Location</span>
+            <input
+              type="text"
+              value={profile.location}
+              onChange={(event) => onProfileChange("location", event.target.value)}
+              placeholder="Enter your location"
+              autoComplete="address-level2"
+            />
+            {errors.location ? (
+              <small className="ask-intake-error">{errors.location}</small>
+            ) : null}
+          </label>
+
+          <div className="ask-intake-note">
+            <strong>{speciesMeta.label}</strong> profile is used to personalize the
+            first answer, save the session, and make follow-up guidance more useful.
+          </div>
+
+          <div className="ask-intake-actions">
+            <button
+              type="button"
+              className="ask-intake-secondary"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Not now
+            </button>
+            <button
+              type="submit"
+              className="ask-intake-primary"
+              disabled={submitting}
+            >
+              {submitting ? "Checking symptoms..." : "Continue to AI answer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function UserMessage({ entry }) {
   const speciesMeta = getSpeciesMeta(entry?.species);
 
@@ -387,6 +865,8 @@ function AssessmentCard({
   onShare,
   onCopyAssessment,
   onCopyLink,
+  onFollowUpAnswer,
+  followUpPending,
 }) {
   const assessment = entry?.payload || {};
   const ui = assessment?.ui || {};
@@ -396,12 +876,29 @@ function AssessmentCard({
   const serviceCards = Array.isArray(ui?.service_cards) ? ui.service_cards : [];
   const theme = ui?.theme || "video";
   const possibleCauses = derivePossibleCauses(assessment);
-  const watchItems = Array.isArray(assessment?.response?.what_to_watch)
-    ? assessment.response.what_to_watch
-    : [];
+  const watchItems = resolveWatchItems(assessment);
+  const safeToDoWhileWaiting = resolveSafeToDoWhileWaiting(assessment);
   const redFlags = Array.isArray(assessment?.triage_detail?.red_flags_found)
     ? assessment.triage_detail.red_flags_found
     : [];
+  const assessmentMessage = resolveAssessmentMessage(assessment);
+  const indiaContext = resolveIndiaContext(assessment);
+  const imageObservation = resolveImageObservation(assessment);
+  const followUpQuestion = resolveFollowUpQuestion(assessment);
+  const beReadyToTellVet = resolveBeReadyToTellVet(assessment);
+  const answeredFollowUp = entry?.answeredFollowUp || null;
+  const currentQuestionKey = normalizeQuestionKey(followUpQuestion?.question);
+  const answeredQuestionKey = normalizeQuestionKey(answeredFollowUp?.question);
+  const hasAnsweredCurrentQuestion = Boolean(
+    currentQuestionKey &&
+      answeredQuestionKey &&
+      currentQuestionKey === answeredQuestionKey
+  );
+  const selectedFollowUpAnswer = String(
+    followUpPending?.answer ||
+      (hasAnsweredCurrentQuestion ? answeredFollowUp?.answer : "") ||
+      ""
+  ).trim();
 
   return (
     <div className="ask-message-group">
@@ -583,11 +1080,11 @@ function AssessmentCard({
               <div className="ask-body-label">What we think is happening</div>
               <div className="ask-assessment-block">
                 <div className="ask-assessment-icon">🩺</div>
-                <p>{assessment?.response?.message}</p>
+                <p>{assessmentMessage}</p>
               </div>
             </section>
 
-            {assessment?.response?.do_now ? (
+            {getAssessmentResponse(assessment)?.do_now ? (
               <section className="ask-body-section">
                 <div className="ask-do-now">
                   <div className="ask-do-now-icon">⚡</div>
@@ -595,26 +1092,99 @@ function AssessmentCard({
                     <div className="ask-body-label ask-body-label-orange">
                       Do this right now
                     </div>
-                    <p>{assessment.response.do_now}</p>
+                    <p>{getAssessmentResponse(assessment).do_now}</p>
                   </div>
                 </div>
               </section>
             ) : null}
 
-            {assessment?.triage_detail?.india_context ? (
+            {indiaContext ? (
               <section className="ask-body-section">
                 <div className="ask-india-note">
                   <span>🇮🇳</span>
-                  <span>{assessment.triage_detail.india_context}</span>
+                  <span>{indiaContext}</span>
                 </div>
               </section>
             ) : null}
 
-            {assessment?.triage_detail?.image_observation ? (
+            {safeToDoWhileWaiting.length > 0 ? (
+              <section className="ask-body-section">
+                <div className="ask-body-label">Safe to do while waiting</div>
+                <div className="ask-waiting-list">
+                  {safeToDoWhileWaiting.map((item, index) => (
+                    <div
+                      key={`${item}-${index}`}
+                      className="ask-waiting-item"
+                    >
+                      <div className="ask-waiting-index">{index + 1}</div>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {imageObservation ? (
               <section className="ask-body-section">
                 <div className="ask-body-label">Image observation</div>
                 <div className="ask-note-card">
-                  <p>{assessment.triage_detail.image_observation}</p>
+                  <p>{imageObservation}</p>
+                </div>
+              </section>
+            ) : null}
+
+            {followUpQuestion ? (
+              <section className="ask-body-section">
+                <div className="ask-follow-card">
+                  <div className="ask-body-label ask-body-label-purple">
+                    {followUpQuestion.label}
+                  </div>
+                  <div className="ask-follow-question">
+                    {followUpQuestion.question}
+                  </div>
+                  <div className="ask-follow-options">
+                    {followUpQuestion.options.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={`ask-follow-option${
+                          selectedFollowUpAnswer === option ? " is-selected" : ""
+                        }`}
+                        onClick={() =>
+                          onFollowUpAnswer(entry, followUpQuestion, option)
+                        }
+                        disabled={
+                          Boolean(followUpPending) || hasAnsweredCurrentQuestion
+                        }
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+
+                  {followUpPending ? (
+                    <div className="ask-follow-updating">
+                      <div className="ask-typing-bubble">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                      <span>Updating assessment with your answer...</span>
+                    </div>
+                  ) : null}
+
+                  {hasAnsweredCurrentQuestion ? (
+                    <>
+                      {entry?.revisedAssessment || assessment?.revised_assessment ? (
+                        <div className="ask-revised-badge">
+                          Assessment updated based on your answer
+                        </div>
+                      ) : null}
+                      <div className="ask-follow-answer">
+                        Selected answer: <strong>{answeredFollowUp.answer}</strong>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </section>
             ) : null}
@@ -679,6 +1249,19 @@ function AssessmentCard({
               </section>
             ) : null}
 
+            {beReadyToTellVet ? (
+              <section className="ask-body-section">
+                <div className="ask-vet-ready">
+                  <div>
+                    <div className="ask-body-label ask-body-label-blue">
+                      Be ready to tell the vet
+                    </div>
+                    <p>{beReadyToTellVet}</p>
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
             {assessment?.vet_summary ? (
               <section className="ask-body-section">
                 <div className="ask-vet-summary">
@@ -722,6 +1305,7 @@ export default function AskPage() {
   const bodyRef = useRef(null);
   const textareaRef = useRef(null);
   const hydratedRef = useRef(false);
+  const breedCacheRef = useRef({});
   const [species, setSpecies] = useState("dog");
   const [sessionId, setSessionId] = useState("");
   const [entries, setEntries] = useState([]);
@@ -730,14 +1314,24 @@ export default function AskPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [checksToday, setChecksToday] = useState(0);
+  const [followUpPending, setFollowUpPending] = useState(null);
+  const [askProfile, setAskProfile] = useState(DEFAULT_ASK_PROFILE);
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const [intakeErrors, setIntakeErrors] = useState({});
+  const [pendingInitialRequest, setPendingInitialRequest] = useState(null);
+  const [breedOptions, setBreedOptions] = useState([]);
+  const [breedLoading, setBreedLoading] = useState(false);
+  const [breedError, setBreedError] = useState("");
 
   useEffect(() => {
     const storedState = readStoredState();
+    const storedProfile = readStoredProfile();
     if (storedState) {
       setSpecies(storedState.species || "dog");
       setSessionId(storedState.sessionId || "");
       setEntries(storedState.entries || []);
     }
+    setAskProfile(storedProfile);
     setChecksToday(readDailyUsage());
     hydratedRef.current = true;
   }, []);
@@ -752,6 +1346,11 @@ export default function AskPage() {
   }, [checksToday]);
 
   useEffect(() => {
+    if (!hydratedRef.current) return;
+    writeStoredProfile(askProfile);
+  }, [askProfile]);
+
+  useEffect(() => {
     if (!toastMessage) return undefined;
     const timer = window.setTimeout(() => setToastMessage(""), 2200);
     return () => window.clearTimeout(timer);
@@ -761,6 +1360,113 @@ export default function AskPage() {
     if (!bodyRef.current) return;
     bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [entries, loading]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !intakeOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [intakeOpen]);
+
+  useEffect(() => {
+    if (!intakeOpen) return undefined;
+    if (species !== "dog" && species !== "cat") {
+      setBreedOptions([]);
+      setBreedLoading(false);
+      setBreedError("");
+      return undefined;
+    }
+
+    const cached = breedCacheRef.current[species];
+    if (cached) {
+      setBreedOptions(cached.options || []);
+      setBreedError(cached.error || "");
+      setBreedLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    const fetchBreedOptions = async () => {
+      setBreedLoading(true);
+      setBreedError("");
+
+      try {
+        if (species === "dog") {
+          const response = await apiGetJson("/api/dog-breeds/all");
+          const list = [];
+
+          Object.keys(response?.breeds || {}).forEach((breedKey) => {
+            const subBreeds = Array.isArray(response?.breeds?.[breedKey])
+              ? response.breeds[breedKey]
+              : [];
+
+            if (subBreeds.length === 0) {
+              list.push(formatBreedName(breedKey));
+              return;
+            }
+
+            list.push(formatBreedName(breedKey));
+            subBreeds.forEach((subBreed) => {
+              list.push(formatBreedName(breedKey, subBreed));
+            });
+          });
+
+          const options = Array.from(
+            new Set([...list.filter(Boolean), "Mixed Breed", "Other"])
+          ).sort((left, right) => left.localeCompare(right));
+
+          if (!active) return;
+          breedCacheRef.current[species] = { options, error: "" };
+          setBreedOptions(options);
+          setBreedError("");
+          return;
+        }
+
+        const response = await apiGetJson("/api/cat-breeds/with-indian");
+        const options = Array.from(
+          new Set(
+            [
+              ...(Array.isArray(response?.data) ? response.data : []).map(
+                (item) => item?.name || item?.id || ""
+              ),
+              "Mixed / Other",
+            ].filter(Boolean)
+          )
+        ).sort((left, right) => left.localeCompare(right));
+
+        if (!active) return;
+        breedCacheRef.current[species] = { options, error: "" };
+        setBreedOptions(options);
+        setBreedError("");
+      } catch {
+        if (!active) return;
+        const fallback =
+          species === "dog"
+            ? ["Mixed Breed", "Other"]
+            : ["Indian Cat", "Mixed / Other"];
+        const errorText =
+          species === "dog"
+            ? "Could not load dog breeds. You can still type manually."
+            : "Could not load cat breeds. You can still type manually.";
+
+        breedCacheRef.current[species] = { options: fallback, error: errorText };
+        setBreedOptions(fallback);
+        setBreedError(errorText);
+      } finally {
+        if (active) {
+          setBreedLoading(false);
+        }
+      }
+    };
+
+    fetchBreedOptions();
+
+    return () => {
+      active = false;
+    };
+  }, [intakeOpen, species]);
 
   useEffect(() => {
     if (!sessionId || entries.length > 0 || !hydratedRef.current) return;
@@ -807,22 +1513,82 @@ export default function AskPage() {
     species: nextSpecies,
   });
 
-  const pushAssessmentEntry = (payload) => ({
-    id: `assessment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  const pushAssessmentEntry = (payload, overrides = {}) => ({
+    id:
+      overrides.id ||
+      `assessment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     kind: "assessment",
     payload,
-    time: getTimeLabel(),
+    time: overrides.time || getTimeLabel(),
+    answeredFollowUp: overrides.answeredFollowUp || null,
+    revisedAssessment: Boolean(
+      overrides.revisedAssessment ?? payload?.revised_assessment
+    ),
   });
 
-  const handleSend = async ({ message, nextSpecies } = {}) => {
-    const messageText = String(message ?? inputValue).trim();
-    const speciesValue = String(nextSpecies || species || "dog").trim() || "dog";
+  const buildInitialSymptomPayload = ({
+    messageText,
+    speciesValue,
+    profileValue,
+  }) => {
+    const nextProfile = sanitizeAskProfile(profileValue);
+    const user = {};
+    const pets = {};
+    const payload = {
+      message: messageText,
+      species: speciesValue,
+      type: speciesValue,
+      phone: nextProfile.phone || undefined,
+      location: nextProfile.location || undefined,
+      owner_name: nextProfile.ownerName || undefined,
+      pet_name: nextProfile.petName || undefined,
+      breed: nextProfile.breed || undefined,
+      dob: nextProfile.dob || undefined,
+    };
+
+    if (nextProfile.ownerName) {
+      user.name = nextProfile.ownerName;
+    }
+    if (nextProfile.phone) {
+      user.phone = nextProfile.phone;
+    }
+    if (nextProfile.petName) {
+      pets.pet_name = nextProfile.petName;
+      pets.name = nextProfile.petName;
+    }
+    if (nextProfile.breed) {
+      pets.breed = nextProfile.breed;
+    }
+    if (nextProfile.dob) {
+      pets.dob = nextProfile.dob;
+    }
+    if (speciesValue) {
+      pets.type = speciesValue;
+      pets.species = speciesValue;
+    }
+
+    if (Object.keys(user).length > 0) {
+      payload.user = user;
+    }
+    if (Object.keys(pets).length > 0) {
+      payload.pets = pets;
+    }
+
+    return payload;
+  };
+
+  const sendAssessmentRequest = async ({
+    messageText,
+    speciesValue,
+    profileValue = askProfile,
+  }) => {
+    const isFollowup = Boolean(sessionId);
 
     if (!messageText || loading) return;
 
-    const isFollowup = Boolean(sessionId);
     setErrorMessage("");
     setToastMessage("");
+    setFollowUpPending(null);
     setEntries((current) => [...current, pushUserEntry(messageText, speciesValue)]);
     setInputValue("");
     setLoading(true);
@@ -833,10 +1599,14 @@ export default function AskPage() {
             session_id: sessionId,
             message: messageText,
           })
-        : await apiPostJson("/api/symptom-check", {
-            message: messageText,
-            species: speciesValue,
-          });
+        : await apiPostJson(
+            "/api/symptom-check",
+            buildInitialSymptomPayload({
+              messageText,
+              speciesValue,
+              profileValue,
+            })
+          );
 
       setSessionId(payload?.session_id || "");
       setEntries((current) => [...current, pushAssessmentEntry(payload)]);
@@ -851,9 +1621,116 @@ export default function AskPage() {
     }
   };
 
+  const handleSend = async ({ message, nextSpecies } = {}) => {
+    const messageText = String(message ?? inputValue).trim();
+    const speciesValue = String(nextSpecies || species || "dog").trim() || "dog";
+
+    if (!messageText || loading) return;
+
+    if (!sessionId) {
+      setSpecies(speciesValue);
+      setInputValue(messageText);
+      setPendingInitialRequest({
+        message: messageText,
+        species: speciesValue,
+      });
+      setIntakeErrors({});
+      setIntakeOpen(true);
+      return;
+    }
+
+    await sendAssessmentRequest({ messageText, speciesValue });
+  };
+
   const handleQuickStart = (item) => {
     setSpecies(item.species);
     handleSend({ message: item.message, nextSpecies: item.species });
+  };
+
+  const handleIntakeProfileChange = (field, value) => {
+    setAskProfile((current) => ({
+      ...current,
+      [field]: value,
+    }));
+    setIntakeErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const handleCloseIntake = () => {
+    if (loading) return;
+    setIntakeOpen(false);
+    setPendingInitialRequest(null);
+    setIntakeErrors({});
+  };
+
+  const handleIntakeSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!pendingInitialRequest || loading) return;
+
+    const nextErrors = validateAskProfile(askProfile);
+    if (Object.keys(nextErrors).length > 0) {
+      setIntakeErrors(nextErrors);
+      return;
+    }
+
+    const request = pendingInitialRequest;
+    setIntakeErrors({});
+    setIntakeOpen(false);
+    setPendingInitialRequest(null);
+
+    await sendAssessmentRequest({
+      messageText: request.message,
+      speciesValue: species,
+      profileValue: askProfile,
+    });
+  };
+
+  const handleFollowUpAnswer = async (entry, questionConfig, answer) => {
+    const question = String(questionConfig?.question || "").trim();
+    const answerText = String(answer || "").trim();
+
+    if (!entry?.id || !sessionId || !question || !answerText || loading) return;
+
+    setErrorMessage("");
+    setToastMessage("");
+    setFollowUpPending({
+      entryId: entry.id,
+      question,
+      answer: answerText,
+    });
+    setLoading(true);
+
+    try {
+      const payload = await apiPostJson("/api/symptom-answer", {
+        session_id: sessionId,
+        question,
+        answer: answerText,
+      });
+
+      setSessionId(payload?.session_id || sessionId);
+      setEntries((current) =>
+        current.map((currentEntry) =>
+          currentEntry.id === entry.id
+            ? pushAssessmentEntry(payload, {
+                id: currentEntry.id,
+                time: getTimeLabel(),
+                answeredFollowUp: { question, answer: answerText },
+                revisedAssessment: payload?.revised_assessment,
+              })
+            : currentEntry
+        )
+      );
+    } catch (error) {
+      setErrorMessage(extractErrorMessage(error));
+    } finally {
+      setLoading(false);
+      setFollowUpPending(null);
+    }
   };
 
   const handleCopyLink = async () => {
@@ -925,6 +1802,7 @@ export default function AskPage() {
     setSessionId("");
     setInputValue("");
     setErrorMessage("");
+    setFollowUpPending(null);
     clearStoredState();
     setToastMessage("Started fresh");
   };
@@ -974,10 +1852,10 @@ export default function AskPage() {
         🐾 Free AI Pet Health Check · snoutiq.com/ask · No signup needed
       </div>
 
-      <div className="ask-nav">
-        <div className="ask-logo">
-          <img
-            src={logo}
+        <div className="ask-nav">
+          <div className="ask-logo">
+            <img
+              src={logo}
             alt="SnoutIQ"
             className="ask-logo-image"
             width={130}
@@ -1003,7 +1881,17 @@ export default function AskPage() {
       <div className="ask-page-shell">
         <main className="ask-page">
           <div className="ask-chat-header">
-            <div className="ask-avatar">🐾</div>
+            <div className="ask-avatar">
+              <img
+                src={avatarLogo}
+                alt="SnoutIQ"
+                className="ask-avatar-image"
+                width={28}
+                height={28}
+                loading="eager"
+                decoding="async"
+              />
+            </div>
             <div className="ask-chat-meta">
               <h2>Snoutiq AI</h2>
               <p>
@@ -1047,13 +1935,17 @@ export default function AskPage() {
                     onShare={handleShare}
                     onCopyAssessment={handleCopyAssessment}
                     onCopyLink={handleCopyLink}
+                    onFollowUpAnswer={handleFollowUpAnswer}
+                    followUpPending={
+                      followUpPending?.entryId === entry.id ? followUpPending : null
+                    }
                   />
                 );
               }
               return null;
             })}
 
-            {loading ? (
+            {loading && !followUpPending ? (
               <div className="ask-message-group">
                 <div className="ask-message-row">
                   <div className="ask-typing-bubble">
@@ -1091,7 +1983,7 @@ export default function AskPage() {
               type="button"
               className="ask-send-button"
               onClick={() => handleSend()}
-              disabled={loading}
+              disabled={loading || intakeOpen}
               aria-label="Send symptom message"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1101,6 +1993,22 @@ export default function AskPage() {
           </div>
         </main>
       </div>
+
+      <IntakeModal
+        open={intakeOpen}
+        profile={askProfile}
+        species={species}
+        pendingMessage={pendingInitialRequest?.message || inputValue}
+        errors={intakeErrors}
+        submitting={loading}
+        breedOptions={breedOptions}
+        breedLoading={breedLoading}
+        breedError={breedError}
+        onClose={handleCloseIntake}
+        onProfileChange={handleIntakeProfileChange}
+        onSpeciesChange={setSpecies}
+        onSubmit={handleIntakeSubmit}
+      />
 
       {toastMessage ? <div className="ask-toast">{toastMessage}</div> : null}
     </div>
