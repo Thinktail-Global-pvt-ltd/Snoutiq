@@ -16,6 +16,7 @@ class Appointment extends Model
         'name',
         'mobile',
         'pet_name',
+        'appointment_type',
         'appointment_date',
         'appointment_time',
         'status',

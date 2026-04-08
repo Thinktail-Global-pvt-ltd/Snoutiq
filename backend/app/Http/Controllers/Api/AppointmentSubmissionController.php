@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class AppointmentSubmissionController extends Controller
 {
@@ -38,6 +39,7 @@ class AppointmentSubmissionController extends Controller
             'patient_email' => ['nullable', 'email', 'max:191'],
             'pet_name' => ['nullable', 'string', 'max:255'],
             'pet_id' => $petValidation,
+            'appointment_type' => ['sometimes', 'nullable', Rule::in(['neutering', 'deworming'])],
             'date' => ['required', 'date'],
             'time_slot' => ['required', 'string', 'max:50'],
             'amount' => ['nullable', 'integer'],
@@ -47,6 +49,13 @@ class AppointmentSubmissionController extends Controller
             'razorpay_signature' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        if (array_key_exists('appointment_type', $validated) && ! $this->appointmentTypeColumnExists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'appointment_type column missing on appointments table. Please run the migration first.',
+            ], 500);
+        }
 
         $clinic = VetRegisterationTemp::findOrFail($validated['clinic_id']);
         $doctor = Doctor::findOrFail($validated['doctor_id']);
@@ -128,7 +137,7 @@ class AppointmentSubmissionController extends Controller
             );
         }
 
-        $appointment = Appointment::create([
+        $appointmentPayload = [
             'vet_registeration_id' => $clinic->id,
             'doctor_id' => $doctor->id,
             'pet_id' => $validated['pet_id'] ?? null,
@@ -139,7 +148,13 @@ class AppointmentSubmissionController extends Controller
             'appointment_time' => $validated['time_slot'],
             'status' => 'confirmed',
             'notes' => json_encode($notesPayload),
-        ]);
+        ];
+
+        if ($this->appointmentTypeColumnExists()) {
+            $appointmentPayload['appointment_type'] = $validated['appointment_type'] ?? null;
+        }
+
+        $appointment = Appointment::create($appointmentPayload);
 
         return $this->respondWithAppointment($appointment->fresh(), 201);
     }
@@ -197,6 +212,7 @@ class AppointmentSubmissionController extends Controller
             'data' => [
                 'appointment' => [
                     'id' => $appointment->id,
+                    'appointment_type' => $appointment->appointment_type,
                     'date' => $appointment->appointment_date,
                     'time_slot' => $appointment->appointment_time,
                     'status' => $appointment->status,
@@ -242,6 +258,7 @@ class AppointmentSubmissionController extends Controller
             'patient_phone' => ['sometimes', 'nullable', 'string', 'max:20'],
             'pet_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'pet_id' => $petValidation,
+            'appointment_type' => ['sometimes', 'nullable', Rule::in(['neutering', 'deworming'])],
             'date' => ['sometimes', 'required', 'date'],
             'time_slot' => ['sometimes', 'required', 'string', 'max:50'],
             'status' => ['sometimes', 'required', 'string', 'max:24'],
@@ -257,6 +274,13 @@ class AppointmentSubmissionController extends Controller
                 'success' => false,
                 'message' => 'At least one field must be provided to update the appointment.',
             ], 422);
+        }
+
+        if (array_key_exists('appointment_type', $validated) && ! $this->appointmentTypeColumnExists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'appointment_type column missing on appointments table. Please run the migration first.',
+            ], 500);
         }
 
         $clinic = $appointment->clinic;
@@ -290,6 +314,10 @@ class AppointmentSubmissionController extends Controller
 
         if (array_key_exists('pet_id', $validated)) {
             $appointment->pet_id = $validated['pet_id'];
+        }
+
+        if (array_key_exists('appointment_type', $validated)) {
+            $appointment->appointment_type = $validated['appointment_type'];
         }
 
         if (array_key_exists('date', $validated)) {
@@ -581,6 +609,7 @@ class AppointmentSubmissionController extends Controller
                 'email' => $notes['patient_email'] ?? null,
             ],
             'pet_id' => $appointment->pet_id,
+            'appointment_type' => $appointment->appointment_type,
             'date' => $appointment->appointment_date,
             'time_slot' => $appointment->appointment_time,
             'status' => $appointment->status,
@@ -626,6 +655,18 @@ class AppointmentSubmissionController extends Controller
         $payload['notes_decoded'] = !empty($notes) ? $notes : $this->decodeNotes($appointment->notes);
 
         return $payload;
+    }
+
+    private function appointmentTypeColumnExists(): bool
+    {
+        static $hasColumn = null;
+
+        if ($hasColumn === null) {
+            $hasColumn = Schema::hasTable('appointments')
+                && Schema::hasColumn('appointments', 'appointment_type');
+        }
+
+        return $hasColumn;
     }
 
     private function resolvePatientUserId(Appointment $appointment, array $notes = [], array $userLookup = []): ?int
