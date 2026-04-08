@@ -834,9 +834,9 @@ class PrescriptionController extends Controller
                     ?? data_get($primaryPet, 'pet_doc2'),
                 'pet_doc1' => $user->pet_doc1 ?? data_get($primaryPet, 'pet_doc1'),
                 'pet_doc2' => $user->pet_doc2 ?? data_get($primaryPet, 'pet_doc2'),
-                'pet_doc2_blob_url' => $userBlobUrl ?: data_get($primaryPet, 'pet_doc2_blob_url'),
+                'pet_doc2_blob_url' => $userBlobUrl,
                 'pet_image_url' => $userBlobUrl
-                    ?: ($user->pet_doc1 ?? $user->pet_doc2 ?? data_get($primaryPet, 'pet_image_url')),
+                    ?: ($user->pet_doc1 ?? $user->pet_doc2),
                 'pet_name' => $user->pet_name ?? data_get($primaryPet, 'name'),
                 'pet_gender' => $user->pet_gender ?? data_get($primaryPet, 'pet_gender'),
                 'pet_age' => $user->pet_age ?? data_get($primaryPet, 'pet_age'),
