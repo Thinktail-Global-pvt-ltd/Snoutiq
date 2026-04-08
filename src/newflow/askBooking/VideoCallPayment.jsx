@@ -720,7 +720,7 @@ export const VideoCallPayment = ({
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(135deg,#0b2fa6_0%,#1457ff_55%,#4f8cff_100%)] p-5 text-white shadow-[0_24px_70px_-42px_rgba(20,87,255,0.8)]">
+                <div className="hidden overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(135deg,#0b2fa6_0%,#1457ff_55%,#4f8cff_100%)] p-5 text-white shadow-[0_24px_70px_-42px_rgba(20,87,255,0.8)] md:block">
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/90">
                     <Lock size={12} />
                     Pay securely
