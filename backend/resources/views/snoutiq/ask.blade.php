@@ -679,18 +679,6 @@ function renderUserBlock(message) {
   `;
 }
 
-function renderFollowUpAnswerBlock(question, answer) {
-  return `
-    <div style="display:flex;justify-content:flex-end"><div class="ppill">Follow-up answer</div></div>
-    <div class="mrow" data-kind="user-followup-answer">
-      <div>
-        <div class="mbub">${escapeHtml(answer)}</div>
-        <div class="mtime">${escapeHtml(formatTime())}</div>
-      </div>
-    </div>
-  `;
-}
-
 function renderLoadingBlock(id) {
   return `
     <div class="loading-row" id="${escapeHtml(id)}">
@@ -935,6 +923,42 @@ function renderRevisedContext(context = null) {
   `;
 }
 
+function renderFollowUpHistory(items = [], revised = false, revisedContext = null) {
+  const history = Array.isArray(items) ? items : [];
+  const normalized = history
+    .map((item) => ({
+      question: String(item?.question || '').trim(),
+      answer: String(item?.answer || '').trim(),
+    }))
+    .filter((item) => item.question && item.answer);
+
+  if (!normalized.length && revisedContext) {
+    const fallbackQuestion = String(revisedContext.question || '').trim();
+    const fallbackAnswer = String(revisedContext.answer || '').trim();
+    if (fallbackQuestion && fallbackAnswer) {
+      normalized.push({ question: fallbackQuestion, answer: fallbackAnswer });
+    }
+  }
+
+  if (!normalized.length) {
+    return revised ? '<div class="rbadge">✓ Assessment updated based on your answer</div>' : '';
+  }
+
+  return `
+    ${revised ? '<div class="rbadge">✓ Assessment updated based on your answer</div>' : ''}
+    <div class="vetq">
+      <div class="vetqico">↻</div>
+      <div>
+        <div class="slbl">Questions answered so far</div>
+        ${normalized.map((item, index) => `
+          <p${index > 0 ? ' style="margin-top:10px"' : ''}>${escapeHtml(item.question)}</p>
+          <p style="margin-top:6px;font-weight:700;color:var(--ink)">${escapeHtml(item.answer)}</p>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderFollowUpCard(followUp, domId) {
   if (!followUp || typeof followUp !== 'object') return '';
   const question = String(followUp.question || '').trim();
@@ -983,6 +1007,7 @@ function renderResultCard(payload, options = {}) {
   const whatWeThink = response.what_we_think_is_happening || response.message || 'No assessment text was returned.';
   const beReadyToTellVet = response.be_ready_to_tell_vet || payload.be_ready_to_tell_vet || '';
   const revisedContext = options.revisedContext || payload.revised_context || null;
+  const followUpHistory = Array.isArray(payload.follow_up_history) ? payload.follow_up_history : [];
   const followUp = payload.follow_up_question || response.follow_up_question || null;
   const followUpDomId = String(`${payload.session_id || 'session'}-${payload.turn || 'live'}`).replace(/[^a-zA-Z0-9_-]/g, '');
   const primary = renderActionButton(buttons.primary, theme);
@@ -1026,7 +1051,7 @@ function renderResultCard(payload, options = {}) {
       ${(primary || secondary) ? `<div class="ctas">${primary}${secondary}</div>` : ''}
       ${serviceCards}
       <div class="cbdy">
-        ${revised ? renderRevisedContext(revisedContext) : ''}
+        ${renderFollowUpHistory(followUpHistory, revised, revisedContext)}
         <div class="mini-meta">${turnMeta}${severityMeta}</div>
         <div class="ablock">
           <div class="aico">🩺</div>
@@ -1129,9 +1154,6 @@ async function answerFQ(btn, id, answerText) {
     isSending = true;
     const question = btn.closest('.fcard')?.querySelector('.fq')?.textContent?.trim() || '';
     const answerValue = btn.dataset.answer || answerText || btn.textContent.trim();
-    appendHtml(renderFollowUpAnswerBlock(question, answerValue));
-    let loadingId = `loading-followup-${Date.now()}`;
-    appendHtml(renderLoadingBlock(loadingId));
     const result = await postJson(`${API_BASE}/symptom-answer`, {
       session_id: currentSessionId,
       question,
@@ -1140,7 +1162,9 @@ async function answerFQ(btn, id, answerText) {
 
     upd.classList.remove('show');
     if (!result.ok || !result.json) {
-      replaceLoadingWithError(loadingId, 'Unable to update the assessment right now. Please try again.');
+      opts.querySelectorAll('.fopt').forEach((button) => {
+        button.disabled = false;
+      });
       return;
     }
 
@@ -1150,20 +1174,22 @@ async function answerFQ(btn, id, answerText) {
     }
 
     updateBadge(result.json.turn ?? null);
-    replaceLoadingWithCard(loadingId, result.json, {
-      revised: true,
-      revisedContext: {
-        question,
-        answer: answerValue,
-      },
-    });
-    ensureLiveThreadVisible();
+    const lastCard = btn.closest('[data-kind="assistant-card"]') || document.querySelector('#liveThread [data-kind="assistant-card"]:last-of-type');
+    if (lastCard) {
+      lastCard.outerHTML = renderResultCard(result.json, {
+        revised: true,
+        revisedContext: {
+          question,
+          answer: answerValue,
+        },
+      });
+      ensureLiveThreadVisible();
+    }
   } catch (_) {
     upd.classList.remove('show');
-    const loading = document.querySelector('#liveThread [id^="loading-followup-"]:last-of-type');
-    if (loading?.id) {
-      replaceLoadingWithError(loading.id, 'Network error while updating the assessment.');
-    }
+    opts.querySelectorAll('.fopt').forEach((button) => {
+      button.disabled = false;
+    });
   } finally {
     isSending = false;
   }

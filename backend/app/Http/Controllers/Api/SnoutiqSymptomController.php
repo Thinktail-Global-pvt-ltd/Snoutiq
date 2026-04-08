@@ -247,7 +247,15 @@ class SnoutiqSymptomController extends Controller
         $imageB64  = $data['image_base64'] ?? null;
         $imageMime = $data['image_mime']   ?? 'image/jpeg';
 
-        $triageJson = $this->callGeminiTriage($pet, $message, $state['history'], $imageB64, $imageMime, $score);
+        $triageJson = $this->callGeminiTriage(
+            $pet,
+            $message,
+            $state['history'],
+            $state['follow_up_history'] ?? [],
+            $imageB64,
+            $imageMime,
+            $score
+        );
         $triageJson['possible_causes'] = $this->normalizePossibleCauses($triageJson['possible_causes'] ?? [], $message, $pet);
         $triageJson['india_context_note'] = $this->normalizeIndiaContextNote(
             $triageJson['india_context_note'] ?? '',
@@ -265,7 +273,14 @@ class SnoutiqSymptomController extends Controller
         }
 
         // ── LAYER 4: Gemini — Response writer (warm, plain language) ──────────
-        $response = $this->callGeminiResponse($pet, $message, $routing, $triageJson, $state['history'] ?? []);
+        $response = $this->callGeminiResponse(
+            $pet,
+            $message,
+            $routing,
+            $triageJson,
+            $state['history'] ?? [],
+            $state['follow_up_history'] ?? []
+        );
 
         // ── Update state ──────────────────────────────────────────────────────
         $this->appendHistory($state, $message, $response['message'] ?? '', $routing, $score);
@@ -446,6 +461,17 @@ class SnoutiqSymptomController extends Controller
             ], 422);
         }
 
+        $cacheKey = "snoutiq_symptom:{$sessionId}";
+        $state = $this->loadConversationState($sessionId) ?? $this->defaultState();
+        $state['follow_up_history'] = $state['follow_up_history'] ?? [];
+        $state['follow_up_history'][] = [
+            'question' => trim((string) $data['question']),
+            'answer' => trim((string) $data['answer']),
+            'ts' => now()->format('H:i'),
+        ];
+        $state['follow_up_history'] = array_slice($state['follow_up_history'], -6);
+        Cache::put($cacheKey, $state, now()->addMinutes(self::SESSION_TTL_MINUTES));
+
         $message = sprintf(
             'Follow-up answer. You asked: "%s". My answer: %s',
             trim((string) $data['question']),
@@ -468,6 +494,7 @@ class SnoutiqSymptomController extends Controller
                 'question' => trim((string) $data['question']),
                 'answer' => trim((string) $data['answer']),
             ];
+            $payload['follow_up_history'] = $state['follow_up_history'];
             return response()->json($payload, $response->getStatusCode());
         }
 
@@ -802,16 +829,18 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
 ";
 
     private function callGeminiTriage(
-        array $pet, string $message, array $history,
+        array $pet, string $message, array $history, array $followUpHistory,
         ?string $imageB64, string $imageMime, int $score
     ): array {
         $historyStr = $this->formatHistoryForPrompt($history);
+        $followUpHistoryStr = $this->formatFollowUpHistoryForPrompt($followUpHistory);
         $petStr     = $this->petToString($pet);
 
         $prompt =
             self::INDIA_CONTEXT . "\n\n" .
             "PET: {$petStr}\n\n" .
             ($historyStr ? "CONVERSATION SO FAR:\n{$historyStr}\n\n" : '') .
+            ($followUpHistoryStr ? "FOLLOW-UP ANSWERS SO FAR:\n{$followUpHistoryStr}\n\n" : '') .
             "CURRENT MESSAGE: " . mb_substr($message, 0, self::MAX_INPUT_CHARS) . "\n" .
             "EVIDENCE SCORE SO FAR: {$score}/10\n\n" .
             "TASK: Assess this pet's situation and output routing decision.\n\n" .
@@ -844,7 +873,14 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
     // LAYER 4 — GEMINI RESPONSE WRITER (warm, plain language for pet parent)
     // =========================================================================
 
-    private function callGeminiResponse(array $pet, string $message, string $routing, array $triage, array $history = []): array
+    private function callGeminiResponse(
+        array $pet,
+        string $message,
+        string $routing,
+        array $triage,
+        array $history = [],
+        array $followUpHistory = []
+    ): array
     {
         $routingInstructions = [
             'emergency'    => 'This pet needs emergency care NOW. Be calm but very direct — go to nearest vet or government hospital immediately. Give ONE thing they can do right now while going (keep warm, do not feed). Do not say it will be okay. Be honest but not terrifying.',
@@ -856,6 +892,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $causes = implode(', ', array_slice($triage['possible_causes'] ?? [], 0, 3));
         $redFlags = implode(', ', array_slice($triage['red_flags_present'] ?? [], 0, 3));
         $historyStr = $this->formatHistoryForPrompt($history);
+        $followUpHistoryStr = $this->formatFollowUpHistoryForPrompt($followUpHistory);
         $imageObservation = trim((string) ($triage['image_observation'] ?? ''));
 
         $prompt =
@@ -866,6 +903,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "Make the response feel tailored to this exact conversation, not like a reusable template.\n\n" .
             "Pet: {$pet['name']} ({$pet['species']}, {$pet['breed']}, {$pet['age']})\n" .
             ($historyStr ? "Recent conversation:\n{$historyStr}\n" : '') .
+            ($followUpHistoryStr ? "Follow-up answers already collected:\n{$followUpHistoryStr}\n" : '') .
             "Message from owner: " . mb_substr($message, 0, 300) . "\n" .
             "Routing decision: {$routing}\n" .
             ($causes ? "Possible causes (do NOT state as diagnosis): {$causes}\n" : '') .
@@ -1647,6 +1685,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'score_band' => $ui['score_band'] ?? null,
             'response' => $response,
             'follow_up_question' => $response['follow_up_question'] ?? null,
+            'follow_up_history' => array_values($state['follow_up_history'] ?? []),
             'be_ready_to_tell_vet' => $response['be_ready_to_tell_vet'] ?? null,
             'buttons' => $this->buttons($view),
             'ui' => $ui,
@@ -1950,7 +1989,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
 
     private function defaultState(): array
     {
-        return ['history' => [], 'pet' => [], 'score' => 0, 'evidence' => []];
+        return ['history' => [], 'follow_up_history' => [], 'pet' => [], 'score' => 0, 'evidence' => []];
     }
 
     private function softReset(array &$state): void
@@ -1958,6 +1997,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $state['score']    = 0;
         $state['evidence'] = [];
         $state['history']  = [];
+        $state['follow_up_history'] = [];
     }
 
     private function appendHistory(array &$state, string $q, string $a, string $routing, int $score): void
@@ -1982,6 +2022,22 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         foreach ($recent as $turn) {
             $lines[] = 'Owner: ' . ($turn['user']      ?? '');
             $lines[] = 'Snoutiq: ' . ($turn['assistant'] ?? '');
+        }
+        return implode("\n", $lines);
+    }
+
+    private function formatFollowUpHistoryForPrompt(array $followUpHistory): string
+    {
+        $recent = array_slice($followUpHistory, -4);
+        $lines = [];
+        foreach ($recent as $item) {
+            $question = $this->cleanAssistantText((string) ($item['question'] ?? ''));
+            $answer = $this->cleanAssistantText((string) ($item['answer'] ?? ''));
+            if ($question === '' || $answer === '') {
+                continue;
+            }
+            $lines[] = "Q: {$question}";
+            $lines[] = "A: {$answer}";
         }
         return implode("\n", $lines);
     }
