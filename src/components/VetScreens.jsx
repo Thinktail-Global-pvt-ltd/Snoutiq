@@ -3703,7 +3703,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     lastUpdated,
   } = useMemo(() => {
     const totalAmountValue =
-      dashboardData?.total_amount_after_deduction_inr ?? 0;
+      dashboardData?.actual_earnings_inr ??
+      dashboardData?.total_amount_after_deduction_inr ??
+      dashboardData?.total_amount_inr ??
+      0;
     const totalTransactionsValue =
       dashboardData?.total_transactions ?? transactions.length;
     const pendingValue = transactions.filter(
@@ -3925,12 +3928,14 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
                   <p className="text-white/70 text-xs uppercase mb-1">
-                    Total Earnings
+                    Actual Earnings
                   </p>
                   <p className="text-2xl md:text-3xl font-bold">
                     {isLoading ? "..." : formatAmount(totalAmount)}
                   </p>
-                  <p className="text-white/60 text-xs mt-1">All time</p>
+                  <p className="text-white/60 text-xs mt-1">
+                    After 18% GST and Rs.150 per consult
+                  </p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
                   <p className="text-white/70 text-xs uppercase mb-1">
@@ -3991,10 +3996,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       <div className="divide-y divide-gray-100">
                         {latestTransactions.map((item, idx) => {
                           const amountInr =
-                            item?.payment_to_doctor_inr ??
-                            (item?.payment_to_doctor_paise
-                              ? item.payment_to_doctor_paise / 100
-                              : 0);
+                            item?.actual_earnings_inr ??
+                            item?.amount_after_deduction_inr ??
+                            item?.amount_inr ??
+                            0;
                           const petName = resolvePetName(item);
                           const { userId, clinicId } =
                             resolveTransactionIds(item);
@@ -5583,7 +5588,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span>Amount</span>
+                            <span>Current Payment</span>
                             <span className="font-semibold text-stone-900">
                               {formatAmount(
                                 activeTransaction?.payment_to_doctor_inr ??
@@ -5591,6 +5596,41 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                     ? activeTransaction.payment_to_doctor_paise /
                                       100
                                     : 0),
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>GST (18%)</span>
+                            <span className="font-semibold text-stone-900">
+                              {formatAmount(
+                                activeTransaction?.gst_deduction_inr ??
+                                  (activeTransaction?.gst_deduction_paise
+                                    ? activeTransaction.gst_deduction_paise /
+                                      100
+                                    : 0),
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Flat Deduction</span>
+                            <span className="font-semibold text-stone-900">
+                              {formatAmount(
+                                activeTransaction?.flat_deduction_inr ??
+                                  (activeTransaction?.flat_deduction_paise
+                                    ? activeTransaction.flat_deduction_paise /
+                                      100
+                                    : 0),
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Actual Earnings</span>
+                            <span className="font-semibold text-stone-900">
+                              {formatAmount(
+                                activeTransaction?.actual_earnings_inr ??
+                                  activeTransaction?.amount_after_deduction_inr ??
+                                  activeTransaction?.amount_inr ??
+                                  0,
                               )}
                             </span>
                           </div>

@@ -50,6 +50,7 @@ use App\Models\UserObservation;
 use App\Models\Prescription;
 use App\Models\Transaction;
 use App\Models\Otp;
+use App\Support\DoctorEarningsCalculator;
 use App\Support\DeviceTokenOwnerResolver;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 use App\Services\WhatsAppService;
@@ -1027,26 +1028,47 @@ Route::get('/excell-export/transactions', function (Request $request) {
             $q->whereIn('metadata->order_type', $supportedOrderTypes);
         });
 
-    $query = (clone $baseQuery)
-        ->selectRaw('count(*) as total, coalesce(sum(amount_paise),0) as total_paise');
-
-    if (Schema::hasColumn('transactions', 'payment_to_doctor_paise')) {
-        $query->selectRaw('coalesce(sum(payment_to_doctor_paise),0) as total_payment_to_doctor_paise');
-    }
-
-    $row = $query->first();
-
-    $deductionRate = 0.25;
-    $count = (int) ($row->total ?? 0);
-    $grossTotalPaise = (int) ($row->total_paise ?? 0);
-    $totalDoctorPayoutPaise = Schema::hasColumn('transactions', 'payment_to_doctor_paise')
-        ? (int) ($row->total_payment_to_doctor_paise ?? 0)
-        : 0;
-    if ($totalDoctorPayoutPaise === 0 && $grossTotalPaise > 0) {
-        // Backward compatible fallback for rows that may not have payout column populated.
-        $totalDoctorPayoutPaise = (int) max(round($grossTotalPaise * (1 - $deductionRate)), 0);
-    }
     $hasDoctorPayoutColumn = Schema::hasColumn('transactions', 'payment_to_doctor_paise');
+    $resolveCurrentPaymentPaise = static function (Transaction $transaction) use ($hasDoctorPayoutColumn): int {
+        $grossPaise = (int) ($transaction->amount_paise ?? 0);
+
+        if ($hasDoctorPayoutColumn && is_numeric($transaction->payment_to_doctor_paise ?? null)) {
+            return max((int) $transaction->payment_to_doctor_paise, 0);
+        }
+
+        $fromMetadata = data_get($transaction->metadata, 'payout_breakup.payment_to_doctor_paise');
+        if (is_numeric($fromMetadata)) {
+            return max((int) $fromMetadata, 0);
+        }
+
+        // Backward compatible fallback for old transactions where payout columns were not stored.
+        return max((int) round($grossPaise * 0.75), 0);
+    };
+
+    $aggregateTransactions = (clone $baseQuery)->get([
+        'id',
+        'amount_paise',
+        'payment_to_doctor_paise',
+        'metadata',
+    ]);
+
+    $count = $aggregateTransactions->count();
+    $grossTotalPaise = (int) $aggregateTransactions->sum(fn (Transaction $transaction) => (int) ($transaction->amount_paise ?? 0));
+    $totalCurrentPaymentPaise = 0;
+    $totalGstDeductionPaise = 0;
+    $totalFlatDeductionPaise = 0;
+    $totalActualEarningsPaise = 0;
+
+    foreach ($aggregateTransactions as $aggregateTransaction) {
+        $earningsBreakup = DoctorEarningsCalculator::fromCurrentPaymentPaise(
+            $resolveCurrentPaymentPaise($aggregateTransaction)
+        );
+
+        $totalCurrentPaymentPaise += $earningsBreakup['current_payment_paise'];
+        $totalGstDeductionPaise += $earningsBreakup['gst_deduction_paise'];
+        $totalFlatDeductionPaise += $earningsBreakup['flat_deduction_paise'];
+        $totalActualEarningsPaise += $earningsBreakup['actual_earnings_paise'];
+    }
 
     $hasUsersCityColumn = Schema::hasTable('users') && Schema::hasColumn('users', 'city');
     $hasDoctorLicenseColumn = Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'doctor_license');
@@ -1207,9 +1229,10 @@ Route::get('/excell-export/transactions', function (Request $request) {
     }
 
     $transactions = $transactionRows
-        ->map(function (Transaction $t) use ($hasDoctorPayoutColumn, $latestPrescriptionByPetId, $prescriptionCountByPetId, $petBlobUrlById) {
+        ->map(function (Transaction $t) use ($latestPrescriptionByPetId, $prescriptionCountByPetId, $petBlobUrlById, $resolveCurrentPaymentPaise) {
             $grossPaise = (int) ($t->amount_paise ?? 0);
-            $paymentToDoctorPaise = null;
+            $currentPaymentPaise = $resolveCurrentPaymentPaise($t);
+            $earningsBreakup = DoctorEarningsCalculator::fromCurrentPaymentPaise($currentPaymentPaise);
             $petId = is_numeric($t->pet_id) ? (int) $t->pet_id : null;
             $petBlobUrl = $petId ? $petBlobUrlById->get($petId) : null;
             $pet = $t->pet;
@@ -1219,22 +1242,6 @@ Route::get('/excell-export/transactions', function (Request $request) {
             if ($pet) {
                 $pet->setAttribute('pet_doc2_blob_url', $petBlobUrl);
                 $pet->setAttribute('pet_image_url', $petBlobUrl ?: ($pet->pet_doc1 ?? $pet->pet_doc2 ?? null));
-            }
-
-            if ($hasDoctorPayoutColumn && $t->payment_to_doctor_paise !== null) {
-                $paymentToDoctorPaise = (int) $t->payment_to_doctor_paise;
-            }
-
-            if ($paymentToDoctorPaise === null) {
-                $fromMetadata = data_get($t->metadata, 'payout_breakup.payment_to_doctor_paise');
-                if (is_numeric($fromMetadata)) {
-                    $paymentToDoctorPaise = (int) $fromMetadata;
-                }
-            }
-
-            if ($paymentToDoctorPaise === null) {
-                // Backward compatible fallback for old transactions where payout columns were not stored.
-                $paymentToDoctorPaise = (int) max(round($grossPaise * 0.75), 0);
             }
 
             $licenseNumber = $doctor?->doctor_license ?? ($clinic?->license_no ?? null);
@@ -1249,13 +1256,21 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'status' => $t->status,
                 'amount_paise' => $grossPaise,
                 // Keep amount_inr net so existing frontends auto-show post-deduction value.
-                'amount_inr' => $paymentToDoctorPaise / 100,
+                'amount_inr' => $earningsBreakup['actual_earnings_inr'],
                 'gross_amount_inr' => $grossPaise / 100,
-                'amount_after_deduction_paise' => $paymentToDoctorPaise,
-                'amount_after_deduction_inr' => $paymentToDoctorPaise / 100,
-                'net_amount_inr' => $paymentToDoctorPaise / 100,
-                'payment_to_doctor_paise' => $paymentToDoctorPaise,
-                'payment_to_doctor_inr' => $paymentToDoctorPaise / 100,
+                'amount_after_deduction_paise' => $earningsBreakup['actual_earnings_paise'],
+                'amount_after_deduction_inr' => $earningsBreakup['actual_earnings_inr'],
+                'net_amount_inr' => $earningsBreakup['actual_earnings_inr'],
+                'payment_to_doctor_paise' => $earningsBreakup['current_payment_paise'],
+                'payment_to_doctor_inr' => $earningsBreakup['current_payment_inr'],
+                'current_payment_paise' => $earningsBreakup['current_payment_paise'],
+                'current_payment_inr' => $earningsBreakup['current_payment_inr'],
+                'gst_deduction_paise' => $earningsBreakup['gst_deduction_paise'],
+                'gst_deduction_inr' => $earningsBreakup['gst_deduction_inr'],
+                'flat_deduction_paise' => $earningsBreakup['flat_deduction_paise'],
+                'flat_deduction_inr' => $earningsBreakup['flat_deduction_inr'],
+                'actual_earnings_paise' => $earningsBreakup['actual_earnings_paise'],
+                'actual_earnings_inr' => $earningsBreakup['actual_earnings_inr'],
                 'payment_method' => $t->payment_method,
                 'type' => $t->type ?? ($t->metadata['order_type'] ?? null),
                 'metadata' => $t->metadata,
@@ -1287,16 +1302,26 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'clinic_id' => $data['clinic_id'],
         'order_type' => 'excell_export_campaign',
         'order_types' => $supportedOrderTypes,
-        'deduction_rate' => $deductionRate,
+        'deduction_rate' => DoctorEarningsCalculator::GST_RATE,
+        'gst_rate' => DoctorEarningsCalculator::GST_RATE,
+        'flat_deduction_inr_per_transaction' => round(DoctorEarningsCalculator::FLAT_DEDUCTION_PAISE / 100, 2),
         'total_transactions' => $count,
-        'total_amount_paise' => $totalDoctorPayoutPaise,
+        'total_amount_paise' => $totalActualEarningsPaise,
         // Keep total_amount_inr net so existing frontends auto-show post-deduction value.
-        'total_amount_inr' => $totalDoctorPayoutPaise / 100,
+        'total_amount_inr' => round($totalActualEarningsPaise / 100, 2),
         'gross_total_amount_inr' => $grossTotalPaise / 100,
-        'total_amount_after_deduction_paise' => $totalDoctorPayoutPaise,
-        'total_amount_after_deduction_inr' => $totalDoctorPayoutPaise / 100,
-        'total_payment_to_doctor_paise' => $totalDoctorPayoutPaise,
-        'total_payment_to_doctor_inr' => $totalDoctorPayoutPaise / 100,
+        'total_amount_after_deduction_paise' => $totalActualEarningsPaise,
+        'total_amount_after_deduction_inr' => round($totalActualEarningsPaise / 100, 2),
+        'total_payment_to_doctor_paise' => $totalCurrentPaymentPaise,
+        'total_payment_to_doctor_inr' => round($totalCurrentPaymentPaise / 100, 2),
+        'total_current_payment_paise' => $totalCurrentPaymentPaise,
+        'total_current_payment_inr' => round($totalCurrentPaymentPaise / 100, 2),
+        'total_gst_deduction_paise' => $totalGstDeductionPaise,
+        'total_gst_deduction_inr' => round($totalGstDeductionPaise / 100, 2),
+        'total_flat_deduction_paise' => $totalFlatDeductionPaise,
+        'total_flat_deduction_inr' => round($totalFlatDeductionPaise / 100, 2),
+        'actual_earnings_paise' => $totalActualEarningsPaise,
+        'actual_earnings_inr' => round($totalActualEarningsPaise / 100, 2),
         'transactions' => $transactions,
     ]);
 })->name('excell_export.transactions');

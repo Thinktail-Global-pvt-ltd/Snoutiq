@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Prescription;
 use App\Models\Transaction;
+use App\Support\DoctorEarningsCalculator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -72,6 +73,8 @@ class ClinicFinancialsController extends Controller
             $commissionPct = $this->numeric(data_get($txn->metadata, 'commission_pct') ?? data_get($txn->metadata, 'commission_percent'));
             $commission  = round($gross * ($commissionPct / 100), 2);
             $net         = round($gross - $commission, 2);
+            $currentPaymentPaise = $this->resolveCurrentPaymentPaise($txn, $net);
+            $earningsBreakup = DoctorEarningsCalculator::fromCurrentPaymentPaise($currentPaymentPaise);
             $prescriptionSend = $this->hasMatchingPrescriptionForTransaction($txn, $prescriptionChannelSet);
 
             $user   = $txn->user;
@@ -94,6 +97,10 @@ class ClinicFinancialsController extends Controller
                 'commission_pct' => $commissionPct,
                 'commission'     => $commission,
                 'net'            => $net,
+                'current_payment' => $earningsBreakup['current_payment_inr'],
+                'gst_deduction'   => $earningsBreakup['gst_deduction_inr'],
+                'flat_deduction'  => $earningsBreakup['flat_deduction_inr'],
+                'actual_earnings' => $earningsBreakup['actual_earnings_inr'],
                 'status'         => strtolower((string) ($txn->status ?? '')),
                 'status_label'   => strtoupper($txn->status ?? '-'),
                 'payment_mode'   => strtoupper($txn->payment_method ?? $txn->type ?? '-'),
@@ -146,6 +153,10 @@ class ClinicFinancialsController extends Controller
             'telemed'  => round($recent->where('type', 'telemed')->sum('gross'), 2),
             'inclinic' => round($recent->where('type', 'inclinic')->sum('gross'), 2),
             'orders'   => round($recent->where('type', 'order')->sum('gross'), 2),
+            'current_payment' => round($recent->sum('current_payment'), 2),
+            'gst_deduction'   => round($recent->sum('gst_deduction'), 2),
+            'flat_deduction'  => round($recent->sum('flat_deduction'), 2),
+            'actual_earnings' => round($recent->sum('actual_earnings'), 2),
         ];
 
         $lineLabels = [];
@@ -208,6 +219,10 @@ class ClinicFinancialsController extends Controller
                 ),
                 'currency'         => 'INR',
             ],
+            'earnings_rules' => [
+                'gst_rate' => DoctorEarningsCalculator::GST_RATE,
+                'flat_deduction_inr' => round(DoctorEarningsCalculator::FLAT_DEDUCTION_PAISE / 100, 2),
+            ],
             'transactions'  => $filtered,
             'counts'        => [
                 'total'    => $filtered->count(),
@@ -256,6 +271,20 @@ class ClinicFinancialsController extends Controller
         }
 
         return $prescriptionChannelSet->has($channel);
+    }
+
+    protected function resolveCurrentPaymentPaise(Transaction $txn, float $fallbackNetInr): int
+    {
+        if (is_numeric($txn->payment_to_doctor_paise ?? null)) {
+            return max((int) $txn->payment_to_doctor_paise, 0);
+        }
+
+        $fromMetadata = data_get($txn->metadata, 'payout_breakup.payment_to_doctor_paise');
+        if (is_numeric($fromMetadata)) {
+            return max((int) $fromMetadata, 0);
+        }
+
+        return max((int) round($fallbackNetInr * 100), 0);
     }
 
     private function parseDate($value): ?Carbon
