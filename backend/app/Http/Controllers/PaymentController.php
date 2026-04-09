@@ -1368,6 +1368,7 @@ class PaymentController extends Controller
             if ($context['doctor_id']) {
                 $doctorName = Doctor::where('id', $context['doctor_id'])->value('doctor_name');
             }
+            $doctorName = $this->sanitizeDoctorNameForWhatsApp($doctorName);
 
             $clinicName = null;
             $clinicId = $context['clinic_id'] ?? null;
@@ -1396,7 +1397,7 @@ class PaymentController extends Controller
                     'type' => 'body',
                     'parameters' => [
                         ['type' => 'text', 'text' => $user->name ?: 'Pet Parent'],                  // {{1}} PetParentName
-                        ['type' => 'text', 'text' => $doctorName ?: 'Doctor'],                       // {{2}} VetName
+                        ['type' => 'text', 'text' => $doctorName],                                    // {{2}} VetName
                         ['type' => 'text', 'text' => $clinicName ?: 'Clinic'],                       // {{3}} ClinicName
                         ['type' => 'text', 'text' => (string) $amountInInr],                         // {{4}} Amount (numbers only)
                         ['type' => 'text', 'text' => (string) $responseMinutes],                     // {{5}} ResponseTime minutes
@@ -1443,7 +1444,7 @@ class PaymentController extends Controller
             if ($context['doctor_id']) {
                 $doctorName = Doctor::where('id', $context['doctor_id'])->value('doctor_name');
             }
-            $doctorName ??= 'Doctor';
+            $doctorName = $this->sanitizeDoctorNameForWhatsApp($doctorName);
 
             $pet = $context['pet_id'] ? Pet::find($context['pet_id']) : null;
             $petName = $pet?->name ?: 'your pet';
@@ -1614,7 +1615,7 @@ class PaymentController extends Controller
                             $components = [[
                                 'type' => 'body',
                                 'parameters' => [
-                                    ['type' => 'text', 'text' => $doctor->doctor_name ?: 'Doctor'],
+                                    ['type' => 'text', 'text' => $this->sanitizeDoctorNameForWhatsApp($doctor->doctor_name)],
                                     ['type' => 'text', 'text' => $petName],
                                     ['type' => 'text', 'text' => $breed],
                                     ['type' => 'text', 'text' => $parentName],
@@ -1627,7 +1628,7 @@ class PaymentController extends Controller
                         } else {
                             $components = $this->buildVetTemplateComponents(
                                 template: $tpl,
-                                doctorName: $doctor->doctor_name ?: 'Doctor',
+                                doctorName: $this->sanitizeDoctorNameForWhatsApp($doctor->doctor_name),
                                 parentName: $parentName,
                                 petName: $petName,
                                 breed: $breed,
@@ -1769,7 +1770,7 @@ class PaymentController extends Controller
                     try {
                         $components = $this->buildVetTemplateComponents(
                             template: $tpl,
-                            doctorName: $doctor->doctor_name ?: 'Doctor',
+                            doctorName: $this->sanitizeDoctorNameForWhatsApp($doctor->doctor_name),
                             parentName: $parentName,
                             petName: $petName,
                             breed: $breed,
@@ -2708,6 +2709,19 @@ HTML;
             return '91' . $digits;
         }
         return $digits;
+    }
+
+    private function sanitizeDoctorNameForWhatsApp(?string $doctorName): string
+    {
+        $name = trim((string) $doctorName);
+        if ($name === '') {
+            return 'Doctor';
+        }
+
+        $sanitized = preg_replace('/^\s*dr\.?\s+/i', '', $name);
+        $sanitized = trim((string) $sanitized);
+
+        return $sanitized !== '' ? $sanitized : 'Doctor';
     }
 
     private function inferMediaString(array $notes, ?Pet $pet): string

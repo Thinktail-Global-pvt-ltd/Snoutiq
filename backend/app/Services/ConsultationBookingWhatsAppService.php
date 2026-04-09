@@ -71,7 +71,7 @@ class ConsultationBookingWhatsAppService
             if ($context['doctor_id']) {
                 $doctorName = Doctor::where('id', $context['doctor_id'])->value('doctor_name');
             }
-            $doctorName ??= 'Doctor';
+            $doctorName = $this->sanitizeDoctorNameForWhatsApp($doctorName);
 
             $pet = $context['pet_id'] ? Pet::find($context['pet_id']) : null;
             $petName = $pet?->name ?: 'your pet';
@@ -225,7 +225,7 @@ class ConsultationBookingWhatsAppService
                             $components = [[
                                 'type' => 'body',
                                 'parameters' => [
-                                    ['type' => 'text', 'text' => $doctor->doctor_name ?: 'Doctor'],
+                                    ['type' => 'text', 'text' => $this->sanitizeDoctorNameForWhatsApp($doctor->doctor_name)],
                                     ['type' => 'text', 'text' => $petName],
                                     ['type' => 'text', 'text' => $breed],
                                     ['type' => 'text', 'text' => $parentName],
@@ -238,7 +238,7 @@ class ConsultationBookingWhatsAppService
                         } else {
                             $components = $this->buildVetTemplateComponents(
                                 template: $template,
-                                doctorName: $doctor->doctor_name ?: 'Doctor',
+                                doctorName: $this->sanitizeDoctorNameForWhatsApp($doctor->doctor_name),
                                 parentName: $parentName,
                                 petName: $petName,
                                 breed: $breed,
@@ -389,6 +389,19 @@ class ConsultationBookingWhatsAppService
         }
 
         return $digits;
+    }
+
+    private function sanitizeDoctorNameForWhatsApp(?string $doctorName): string
+    {
+        $name = trim((string) $doctorName);
+        if ($name === '') {
+            return 'Doctor';
+        }
+
+        $sanitized = preg_replace('/^\s*dr\.?\s+/i', '', $name);
+        $sanitized = trim((string) $sanitized);
+
+        return $sanitized !== '' ? $sanitized : 'Doctor';
     }
 
     private function isExcelExportCampaignTransaction(Transaction $transaction, array $metadata): bool
