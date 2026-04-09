@@ -2396,6 +2396,21 @@
             + Number((lead.manual_activity || []).length);
     }
 
+    function getLatestTransactionTimestamp(lead) {
+        const relatedTransactionTs = (lead.related_transactions || [])
+            .map((item) => String(item.created_at || ''))
+            .filter(Boolean)
+            .sort()
+            .pop() || '';
+
+        const conversionTs = String(lead.conversion_transaction_at || '');
+
+        return [relatedTransactionTs, conversionTs]
+            .filter(Boolean)
+            .sort()
+            .pop() || '';
+    }
+
     function getLatestTouchTimestamp(lead) {
         const notificationTs = (lead.notifications || [])
             .map((item) => String(item.timestamp || ''))
@@ -2409,7 +2424,9 @@
             .sort()
             .pop() || '';
 
-        return [notificationTs, manualTs, String(lead.created_at || '')]
+        const transactionTs = getLatestTransactionTimestamp(lead);
+
+        return [notificationTs, manualTs, transactionTs, String(lead.created_at || '')]
             .filter(Boolean)
             .sort()
             .pop() || '';
@@ -2485,6 +2502,12 @@
 
             const nextCmp = compareDatesAsc(resolveNextAction(a).date, resolveNextAction(b).date);
             if (nextCmp !== 0) return nextCmp;
+
+            const leftTransactionTs = getLatestTransactionTimestamp(a);
+            const rightTransactionTs = getLatestTransactionTimestamp(b);
+            if (leftTransactionTs !== rightTransactionTs) {
+                return String(rightTransactionTs).localeCompare(String(leftTransactionTs));
+            }
 
             const statusWeight = { overdue: 0, today: 1, upcoming: 2, none: 3 };
             const leftState = resolveNextAction(a).state.key;
