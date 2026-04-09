@@ -514,6 +514,10 @@ const buildGoogleSearchUrl = (query) =>
   `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 
 const getPhoneDigits = (value) => String(value || "").replace(/\D/g, "");
+const formatBackendPhone = (value) => {
+  const digits = getPhoneDigits(value).slice(-10);
+  return digits ? `+91${digits}` : "";
+};
 
 const formatBreedName = (breedKey, subBreed = null) => {
   const cap = (input) =>
@@ -1955,6 +1959,7 @@ export default function AskPage() {
     const latitude = parseCoordinate(nextProfile.lat);
     const longitude = parseCoordinate(nextProfile.long);
     const hasCoordinates = latitude !== null && longitude !== null;
+    const backendPhone = formatBackendPhone(nextProfile.phone);
     const user = {};
     const pets = {};
     const locationValue =
@@ -1964,7 +1969,7 @@ export default function AskPage() {
       message: messageText,
       species: speciesValue,
       type: speciesValue,
-      phone: nextProfile.phone || undefined,
+      phone: backendPhone || undefined,
       location: locationValue,
       owner_name: nextProfile.ownerName || undefined,
       pet_name: nextProfile.petName || undefined,
@@ -1977,8 +1982,8 @@ export default function AskPage() {
     if (nextProfile.ownerName) {
       user.name = nextProfile.ownerName;
     }
-    if (nextProfile.phone) {
-      user.phone = nextProfile.phone;
+    if (backendPhone) {
+      user.phone = backendPhone;
     }
     if (latitude !== null) {
       user.lat = latitude;
