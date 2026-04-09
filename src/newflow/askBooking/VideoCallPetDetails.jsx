@@ -1039,17 +1039,11 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                         <User size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-base">Owner details</h3>
-                        <p className="text-xs text-gray-500">Used only for booking updates</p>
+                        <h3 className="font-semibold text-gray-900 text-base">Personal details</h3>
                       </div>
                     </div>
 
                     <div className={cardBodyBase}>
-                      <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-900">
-                        <Shield size={14} className="mt-0.5 text-blue-600" />
-                        <p>Your details are used only for this copied consultation flow.</p>
-                      </div>
-
                       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
                         {showOwnerNameField ? (
                           <div className="space-y-2">
@@ -1554,20 +1548,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                       </label>
                     </div>
 
-                    <div className="mt-4 space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">Additional document URL (optional)</label>
-                      <div className="relative">
-                        <FileText size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        <input
-                          type="url"
-                          value={details.petDoc2}
-                          onChange={(event) => updateField("petDoc2", event.target.value)}
-                          placeholder="https://example.com/report.png"
-                          className={`${fieldBase} pl-12 md:pl-12`}
-                        />
-                      </div>
-                    </div>
-
                     {uploadFile ? (
                       <div className="mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <div className="flex items-start gap-3">
@@ -1606,10 +1586,11 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                         ) : null}
                       </div>
                     ) : null}
+                    
                   </div>
                 </section>
 
-                <div className="rounded-[24px] border border-[#d6e3ff] bg-white/95 p-4 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
+                <div>
 
                   {submitError ? (
                     <div className="mb-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">

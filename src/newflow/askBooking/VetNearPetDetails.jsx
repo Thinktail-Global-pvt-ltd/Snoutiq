@@ -603,14 +603,6 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
         <div className="mb-6 rounded-[24px] border border-[#dbe7ff] bg-[#f8fbff] p-4 shadow-[0_12px_32px_-24px_rgba(37,99,235,0.35)]">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="space-y-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
-                  Saved details applied
-                </div>
-                <p className="mt-1 text-sm text-slate-600">
-                  {hiddenSavedCount} fields are hidden to keep this form short.
-                </p>
-              </div>
               <div className="grid gap-3 md:grid-cols-3">
                 {hiddenSavedSummaryRows.map((item) => (
                   <div
@@ -837,22 +829,6 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
           {errors.issue ? <div className="field-error">{errors.issue}</div> : null}
         </div>
       ) : null}
-
-      <fieldset className="field">
-        <legend>Symptoms (tick all that apply)</legend>
-        <div className="cbgroup">
-          {SYMPTOM_OPTIONS.map((option) => (
-            <label className="cbitem" key={option.value}>
-              <input
-                type="checkbox"
-                checked={formState.pet.symptoms.includes(option.value)}
-                onChange={() => toggleSymptom(option.value)}
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
 
       {showMedicalHistorySection ? <div className="sdiv">Medical history</div> : null}
       {showVaccinationField || showDewormingField ? (

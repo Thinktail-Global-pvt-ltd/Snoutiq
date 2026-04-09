@@ -23,6 +23,7 @@ const ASK_VET_NEAR_STANDALONE_KEY = "snoutiq-vet-near-me-standalone";
 const ASK_VIDEO_CALL_STANDALONE_KEY = "snoutiq-video-call-copied-flow";
 const FREE_CHECK_LIMIT = 3;
 const GAUGE_CIRCUMFERENCE = 201.1;
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const DEFAULT_ASK_PROFILE = {
   ownerName: "",
   phone: "",
@@ -137,6 +138,59 @@ const safeParse = (value, fallback) => {
   }
 };
 
+const formatBytes = (bytes) => {
+  const value = Number(bytes || 0);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(value / 1024))} KB`;
+};
+
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () =>
+      reject(reader.error || new Error("Unable to read file."));
+    reader.readAsDataURL(file);
+  });
+
+const buildImagePayload = (attachment) => {
+  if (!attachment?.base64) return {};
+  return {
+    image_base64: attachment.base64,
+    image_mime: attachment.mime || "image/jpeg",
+  };
+};
+
+const defaultImageMessage = (isFollowup = false) =>
+  isFollowup
+    ? "Please review this new image and update the assessment."
+    : "Please review this image and tell me what you see.";
+
+const defaultImageVisualMessage = "Image uploaded for review.";
+
+const serializeEntriesForStorage = (entries) =>
+  Array.isArray(entries)
+    ? entries.map((entry) => {
+        if (!entry || typeof entry !== "object") return entry;
+        const nextEntry = { ...entry };
+        delete nextEntry.attachment;
+        return nextEntry;
+      })
+    : [];
+
+const revokeBlobPreviewUrl = (previewUrl) => {
+  const value = String(previewUrl || "").trim();
+  if (!value || !value.startsWith("blob:") || typeof URL === "undefined") return;
+  try {
+    URL.revokeObjectURL(value);
+  } catch {
+    // Ignore stale blob URLs.
+  }
+};
+
 const readDailyUsage = () => {
   if (typeof window === "undefined") return 0;
   const raw = safeParse(window.localStorage.getItem(ASK_DAILY_USAGE_KEY), null);
@@ -214,6 +268,12 @@ const buildGoogleLocationLabel = (result) => {
     .join(", ");
 };
 
+const normalizePhoneInput = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length > 10 ? digits.slice(-10) : digits;
+};
+
 const resolveDetectedLocationLabel = async (latitude, longitude) => {
   if (!GOOGLE_MAPS_API_KEY) return "";
 
@@ -233,7 +293,7 @@ const sanitizeAskProfile = (value) => {
   const raw = value && typeof value === "object" ? value : {};
   return {
     ownerName: String(raw.ownerName || "").trim(),
-    phone: String(raw.phone || "").trim(),
+    phone: normalizePhoneInput(raw.phone),
     petName: String(raw.petName || "").trim(),
     breed: String(raw.breed || "").trim(),
     dob: String(raw.dob || "").trim(),
@@ -671,10 +731,8 @@ const validateAskProfile = (profile, species) => {
   if (!next.dob) {
     errors.dob = "Select date of birth";
   }
-  if (!next.location) {
-    errors.location = "Enter your location";
-  } else if (!hasProfileCoordinates(next)) {
-    errors.location = "Use current location to attach latitude and longitude";
+  if (!next.location || !hasProfileCoordinates(next)) {
+    errors.location = "Tap 'Use current' to attach your location";
   }
 
   return errors;
@@ -1069,6 +1127,8 @@ function IntakeModal({
                 onChange={(event) => onProfileChange("phone", event.target.value)}
                 placeholder="Enter your phone number"
                 autoComplete="tel"
+                inputMode="numeric"
+                maxLength={10}
               />
               {errors.phone ? (
                 <small className="ask-intake-error">{errors.phone}</small>
@@ -1115,11 +1175,18 @@ function IntakeModal({
               <span>Breed</span>
               {showBreedSuggestions ? (
                 <SearchableBreedField
+                  key={`breed-${species || "empty"}`}
                   value={profile.breed}
                   options={breedOptions}
                   loading={breedLoading}
                   onChange={(nextValue) => onProfileChange("breed", nextValue)}
-                  placeholder="Search or type breed"
+                  placeholder={
+                    species === "dog"
+                      ? "Search dog breed"
+                      : species === "cat"
+                        ? "Search cat breed"
+                        : "Enter breed"
+                  }
                 />
               ) : (
                 <input
@@ -1165,9 +1232,10 @@ function IntakeModal({
               <input
                 type="text"
                 value={profile.location}
-                onChange={(event) => onProfileChange("location", event.target.value)}
-                placeholder="Enter your location"
-                autoComplete="address-level2"
+                placeholder="Tap 'Use current' to fetch location"
+                autoComplete="off"
+                readOnly
+                disabled={submitting || locating}
               />
               <button
                 type="button"
@@ -1195,11 +1263,11 @@ function IntakeModal({
               </small>
             ) : coordinatesReady ? (
               <small className="ask-intake-hint is-success">
-                Current device coordinates are attached to this request.
+                Current location selected.
               </small>
             ) : (
               <small className="ask-intake-hint">
-                Use current location to attach latitude and longitude.
+                Tap &quot;Use current&quot; to attach your location.
               </small>
             )}
           </label>
@@ -1234,6 +1302,8 @@ function IntakeModal({
 
 function UserMessage({ entry }) {
   const speciesMeta = getSpeciesMeta(entry?.species);
+  const attachment = entry?.attachment || null;
+  const hasAttachmentPreview = Boolean(String(attachment?.previewUrl || "").trim());
 
   return (
     <div className="ask-message-group">
@@ -1245,6 +1315,42 @@ function UserMessage({ entry }) {
           <div className="ask-message-bubble ask-message-bubble-user">
             {entry?.message}
           </div>
+          {hasAttachmentPreview ? (
+            <div
+              style={{
+                marginTop: 8,
+                display: "inline-flex",
+                flexDirection: "column",
+                gap: 6,
+                alignItems: "flex-end",
+              }}
+            >
+              <img
+                src={attachment.previewUrl}
+                alt={attachment?.name || "Uploaded pet image"}
+                style={{
+                  width: "min(220px, 62vw)",
+                  maxHeight: 220,
+                  borderRadius: 16,
+                  border: "1px solid rgba(255,255,255,0.24)",
+                  objectFit: "cover",
+                  boxShadow: "0 6px 18px rgba(15, 23, 42, 0.18)",
+                  background: "#fff",
+                }}
+              />
+              <div
+                style={{
+                  color: "rgba(17, 24, 39, 0.56)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                {[attachment?.name, formatBytes(attachment?.size)]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
+            </div>
+          ) : null}
           <div className="ask-message-time">{entry?.time}</div>
         </div>
       </div>
@@ -1269,6 +1375,7 @@ function NoteMessage({ entry }) {
 
 function AssessmentCard({
   entry,
+  entryAnchorId,
   onAction,
   onShare,
   onCopyAssessment,
@@ -1309,7 +1416,7 @@ function AssessmentCard({
   ).trim();
 
   return (
-    <div className="ask-message-group">
+    <div className="ask-message-group" id={entryAnchorId}>
       <div className="ask-message-row">
         <article className="ask-result-card">
           <div className={`ask-banner ${getThemeClass(theme)}`}>
@@ -1687,15 +1794,18 @@ function AssessmentCard({
 
 export default function AskPage() {
   const navigate = useNavigate();
-  const bodyRef = useRef(null);
   const textareaRef = useRef(null);
+  const attachmentInputRef = useRef(null);
+  const attachmentUrlsRef = useRef(new Set());
   const hydratedRef = useRef(false);
   const breedCacheRef = useRef({});
   const locationLookupRef = useRef(0);
+  const pendingScrollEntryIdRef = useRef(null);
   const [species, setSpecies] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [entries, setEntries] = useState([]);
   const [inputValue, setInputValue] = useState("");
+  const [pendingAttachment, setPendingAttachment] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -1742,7 +1852,11 @@ export default function AskPage() {
 
   useEffect(() => {
     if (!hydratedRef.current) return;
-    writeStoredState({ species, sessionId, entries });
+    writeStoredState({
+      species,
+      sessionId,
+      entries: serializeEntriesForStorage(entries),
+    });
   }, [entries, sessionId, species]);
 
   useEffect(() => {
@@ -1770,9 +1884,24 @@ export default function AskPage() {
   }, [toastMessage]);
 
   useEffect(() => {
-    if (!bodyRef.current) return;
-    bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [entries, loading]);
+    const entryId = pendingScrollEntryIdRef.current;
+    if (!entryId) return undefined;
+
+    const run = () => {
+      const node = document.getElementById(`ask-entry-${entryId}`);
+      if (!node) return;
+
+      node.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      pendingScrollEntryIdRef.current = null;
+    };
+
+    const frame = window.requestAnimationFrame(run);
+    return () => window.cancelAnimationFrame(frame);
+  }, [entries]);
 
   useEffect(() => {
     if (typeof document === "undefined" || (!intakeOpen && !flowModal)) return undefined;
@@ -1793,6 +1922,16 @@ export default function AskPage() {
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [flowModal]);
+
+  useEffect(
+    () => () => {
+      attachmentUrlsRef.current.forEach((previewUrl) =>
+        revokeBlobPreviewUrl(previewUrl)
+      );
+      attachmentUrlsRef.current.clear();
+    },
+    []
+  );
 
   useEffect(() => {
     if (!intakeOpen) return undefined;
@@ -1929,12 +2068,91 @@ export default function AskPage() {
     resizeTextarea();
   }, [inputValue]);
 
-  const pushUserEntry = (messageText, nextSpecies) => ({
+  const clearPendingAttachment = ({ revokePreview = true } = {}) => {
+    setPendingAttachment((current) => {
+      if (revokePreview && current?.previewUrl) {
+        revokeBlobPreviewUrl(current.previewUrl);
+        attachmentUrlsRef.current.delete(current.previewUrl);
+      }
+      return null;
+    });
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = "";
+    }
+  };
+
+  const revokeAllAttachmentPreviews = () => {
+    attachmentUrlsRef.current.forEach((previewUrl) =>
+      revokeBlobPreviewUrl(previewUrl)
+    );
+    attachmentUrlsRef.current.clear();
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = "";
+    }
+  };
+
+  const handleOpenAttachmentPicker = () => {
+    if (loading || intakeOpen) return;
+    attachmentInputRef.current?.click();
+  };
+
+  const handleAttachmentChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!String(file.type || "").startsWith("image/")) {
+      setToastMessage("Please choose an image file.");
+      return;
+    }
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setToastMessage("Please choose an image under 5 MB.");
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const [, base64 = ""] = dataUrl.split(",", 2);
+      if (!base64) {
+        throw new Error("Empty image payload.");
+      }
+
+      const previewUrl =
+        typeof URL !== "undefined" ? URL.createObjectURL(file) : "";
+      if (previewUrl) {
+        attachmentUrlsRef.current.add(previewUrl);
+      }
+
+      clearPendingAttachment({ revokePreview: true });
+      setPendingAttachment({
+        base64,
+        mime: file.type || "image/jpeg",
+        name: file.name || "Attached image",
+        size: file.size || 0,
+        previewUrl,
+      });
+      setErrorMessage("");
+      setToastMessage("Image attached");
+    } catch {
+      setToastMessage("Unable to read this image. Please try a different file.");
+    }
+  };
+
+  const pushUserEntry = (messageText, nextSpecies, attachment = null) => ({
     id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     kind: "user",
     message: messageText,
     time: getTimeLabel(),
     species: nextSpecies,
+    attachment: attachment
+      ? {
+          name: attachment.name || "Attached image",
+          mime: attachment.mime || "image/jpeg",
+          size: attachment.size || 0,
+          previewUrl: attachment.previewUrl || "",
+        }
+      : null,
   });
 
   const pushAssessmentEntry = (payload, overrides = {}) => ({
@@ -2018,37 +2236,60 @@ export default function AskPage() {
 
   const sendAssessmentRequest = async ({
     messageText,
+    displayText = messageText,
     speciesValue,
     profileValue = askProfile,
+    attachment = pendingAttachment,
   }) => {
     const isFollowup = Boolean(sessionId);
 
-    if (!messageText || loading) return;
+    if ((!messageText && !attachment) || loading) return;
 
     setErrorMessage("");
     setToastMessage("");
     setFollowUpPending(null);
-    setEntries((current) => [...current, pushUserEntry(messageText, speciesValue)]);
+    const entryAttachment = attachment
+      ? {
+          name: attachment.name,
+          mime: attachment.mime,
+          size: attachment.size,
+          previewUrl: attachment.previewUrl,
+        }
+      : null;
+    setEntries((current) => [
+      ...current,
+      pushUserEntry(displayText, speciesValue, entryAttachment),
+    ]);
     setInputValue("");
+    if (attachment) {
+      clearPendingAttachment({ revokePreview: false });
+    }
     setLoading(true);
 
     try {
+      const imagePayload = buildImagePayload(attachment);
       const payload = isFollowup
         ? await apiPostJson("/api/symptom-followup", {
             session_id: sessionId,
             message: messageText,
+            ...imagePayload,
           })
         : await apiPostJson(
             "/api/symptom-check",
-            buildInitialSymptomPayload({
-              messageText,
-              speciesValue,
-              profileValue,
-            })
+            {
+              ...buildInitialSymptomPayload({
+                messageText,
+                speciesValue,
+                profileValue,
+              }),
+              ...imagePayload,
+            }
           );
 
       setSessionId(payload?.session_id || "");
-      setEntries((current) => [...current, pushAssessmentEntry(payload)]);
+      const nextAssessmentEntry = pushAssessmentEntry(payload);
+      pendingScrollEntryIdRef.current = nextAssessmentEntry.id;
+      setEntries((current) => [...current, nextAssessmentEntry]);
 
       if (!isFollowup) {
         setChecksToday((count) => count + 1);
@@ -2061,18 +2302,25 @@ export default function AskPage() {
   };
 
   const handleSend = async ({ message, nextSpecies } = {}) => {
-    const messageText = String(message ?? inputValue).trim();
+    const rawMessageText = String(message ?? inputValue).trim();
     const speciesValue = String(nextSpecies || species || "")
       .trim()
       .toLowerCase();
+    const attachment = pendingAttachment;
+    const hasAttachment = Boolean(attachment?.base64);
+    const isFollowup = Boolean(sessionId);
+    const messageText =
+      rawMessageText || (hasAttachment ? defaultImageMessage(isFollowup) : "");
+    const displayText = rawMessageText || defaultImageVisualMessage;
 
-    if (!messageText || loading) return;
+    if ((!messageText && !hasAttachment) || loading) return;
 
     if (!sessionId) {
       setSpecies(speciesValue);
-      setInputValue(messageText);
+      setInputValue(rawMessageText);
       setPendingInitialRequest({
         message: messageText,
+        displayText,
         species: speciesValue,
       });
       setIntakeErrors({});
@@ -2080,7 +2328,12 @@ export default function AskPage() {
       return;
     }
 
-    await sendAssessmentRequest({ messageText, speciesValue });
+    await sendAssessmentRequest({
+      messageText,
+      displayText,
+      speciesValue,
+      attachment,
+    });
   };
 
   const handleQuickStart = (item) => {
@@ -2092,9 +2345,11 @@ export default function AskPage() {
     if (field === "location") {
       locationLookupRef.current += 1;
     }
+    const nextValue =
+      field === "phone" ? normalizePhoneInput(value) : value;
     setAskProfile((current) => ({
       ...current,
-      [field]: value,
+      [field]: nextValue,
     }));
     setIntakeErrors((current) => {
       if (!current[field]) return current;
@@ -2108,11 +2363,23 @@ export default function AskPage() {
   };
 
   const handleIntakeSpeciesChange = (value) => {
-    setSpecies(value);
+    const nextSpecies = String(value || "").trim().toLowerCase();
+
+    setSpecies(nextSpecies);
+
+    setAskProfile((current) => ({
+      ...current,
+      breed: "",
+    }));
+
+    setBreedOptions([]);
+    setBreedError("");
+    setBreedLoading(false);
+
     setIntakeErrors((current) => {
-      if (!current.species) return current;
       const next = { ...current };
       delete next.species;
+      delete next.breed;
       return next;
     });
   };
@@ -2147,7 +2414,7 @@ export default function AskPage() {
         if (latitude === null || longitude === null) {
           setLocationStatus({
             type: "error",
-            text: "Could not read current location. Please enter it manually.",
+            text: "Could not read current location. Please tap 'Use current' again.",
           });
           setLocating(false);
           return;
@@ -2172,7 +2439,7 @@ export default function AskPage() {
         });
         setLocationStatus({
           type: "success",
-          text: "Current location selected. You can edit it if needed.",
+          text: "Current location selected.",
         });
         setLocating(false);
 
@@ -2199,21 +2466,16 @@ export default function AskPage() {
             });
             setLocationStatus({
               type: "success",
-              text: "Location autofilled from current device.",
+              text: "Current location selected.",
             });
           })
           .catch(() => {});
       },
-      (error) => {
-        const message =
-          error?.code === 1
-            ? "Location permission was blocked. Please allow it and try again."
-            : error?.code === 2
-              ? "Current location is unavailable right now."
-              : error?.code === 3
-                ? "Location request timed out. Please try again."
-                : "Could not fetch current location.";
-        setLocationStatus({ type: "error", text: message });
+      () => {
+        setLocationStatus({
+          type: "error",
+          text: "Could not read current location. Please tap 'Use current' again.",
+        });
         setLocating(false);
       },
       {
@@ -2251,6 +2513,7 @@ export default function AskPage() {
 
     await sendAssessmentRequest({
       messageText: request.message,
+      displayText: request.displayText || request.message,
       speciesValue: species,
       profileValue: askProfile,
     });
@@ -2259,6 +2522,7 @@ export default function AskPage() {
   const handleFollowUpAnswer = async (entry, questionConfig, answer) => {
     const question = String(questionConfig?.question || "").trim();
     const answerText = String(answer || "").trim();
+    const attachment = pendingAttachment;
 
     if (!entry?.id || !sessionId || !question || !answerText || loading) return;
 
@@ -2276,9 +2540,14 @@ export default function AskPage() {
         session_id: sessionId,
         question,
         answer: answerText,
+        ...buildImagePayload(attachment),
       });
 
+      if (attachment) {
+        clearPendingAttachment({ revokePreview: true });
+      }
       setSessionId(payload?.session_id || sessionId);
+      pendingScrollEntryIdRef.current = entry.id;
       setEntries((current) =>
         current.map((currentEntry) =>
           currentEntry.id === entry.id
@@ -2434,6 +2703,8 @@ export default function AskPage() {
     }
 
     setEntries([]);
+    clearPendingAttachment({ revokePreview: true });
+    revokeAllAttachmentPreviews();
     setSessionId("");
     setSpecies("");
     setInputValue("");
@@ -2456,6 +2727,7 @@ export default function AskPage() {
     freeChecksLeft > 0
       ? `${freeChecksLeft} free checks left`
       : "Free checks used today";
+  const canSendMessage = Boolean(String(inputValue || "").trim() || pendingAttachment);
 
   let flowModalContent = null;
   if (flowModal?.kind === "vet-pet-details") {
@@ -2618,7 +2890,7 @@ export default function AskPage() {
             ) : null}
           </div>
 
-          <div className="ask-chat-body" ref={bodyRef}>
+          <div className="ask-chat-body">
             {entries.length === 0 ? (
               <IdleScreen
                 species={species}
@@ -2639,6 +2911,7 @@ export default function AskPage() {
                   <AssessmentCard
                     key={entry.id}
                     entry={entry}
+                    entryAnchorId={`ask-entry-${entry.id}`}
                     onAction={handleAction}
                     onShare={handleShare}
                     onCopyAssessment={handleCopyAssessment}
@@ -2672,32 +2945,153 @@ export default function AskPage() {
             ) : null}
           </div>
 
-          <div className="ask-input-bar">
-            <textarea
-              ref={textareaRef}
-              className="ask-input"
-              rows={1}
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              placeholder="Describe your pet's symptoms..."
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  handleSend();
-                }
+          <div
+            className="ask-input-bar"
+            style={{
+              flexDirection: "column",
+              alignItems: "stretch",
+            }}
+          >
+            {pendingAttachment ? (
+              <div
+                className="ask-note-card"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 10px",
+                }}
+              >
+                <img
+                  src={pendingAttachment.previewUrl}
+                  alt={pendingAttachment?.name || "Pet image ready to send"}
+                  style={{
+                    width: 54,
+                    height: 54,
+                    borderRadius: 12,
+                    objectFit: "cover",
+                    flexShrink: 0,
+                    border: "1px solid rgba(148, 163, 184, 0.22)",
+                    background: "#fff",
+                  }}
+                />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      color: "#111827",
+                      fontSize: 13,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Image ready to send
+                  </div>
+                  <div
+                    style={{
+                      color: "#6b7280",
+                      fontSize: 11.5,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {[pendingAttachment?.name, formatBytes(pendingAttachment?.size)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="ask-reset-button"
+                  style={{
+                    height: 34,
+                    width: 34,
+                    padding: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  onClick={() => clearPendingAttachment({ revokePreview: true })}
+                  disabled={loading}
+                  aria-label="Remove attached image"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : null}
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-end",
+                gap: 8,
               }}
-            />
-            <button
-              type="button"
-              className="ask-send-button"
-              onClick={() => handleSend()}
-              disabled={loading || intakeOpen}
-              aria-label="Send symptom message"
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
-            </button>
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAttachmentChange}
+                style={{ display: "none" }}
+              />
+              <button
+                type="button"
+                className="ask-reset-button"
+                style={{
+                  height: 42,
+                  width: 42,
+                  padding: 0,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderColor: pendingAttachment ? "#93c5fd" : undefined,
+                  background: pendingAttachment ? "#e8f1fb" : undefined,
+                  color: pendingAttachment ? "#1565c0" : undefined,
+                }}
+                onClick={handleOpenAttachmentPicker}
+                disabled={loading || intakeOpen}
+                aria-label="Attach pet image"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+                  <path
+                    d="M16.5 6.5v8.75a4.25 4.25 0 1 1-8.5 0V5.75a2.75 2.75 0 1 1 5.5 0v8.5a1.25 1.25 0 1 1-2.5 0V7.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <textarea
+                ref={textareaRef}
+                className="ask-input"
+                rows={1}
+                value={inputValue}
+                onChange={(event) => setInputValue(event.target.value)}
+                placeholder={
+                  pendingAttachment
+                    ? "Add details, or send this image directly..."
+                    : "Describe your pet's symptoms..."
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    handleSend();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="ask-send-button"
+                onClick={() => handleSend()}
+                disabled={loading || intakeOpen || !canSendMessage}
+                aria-label="Send symptom message"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </main>
       </div>

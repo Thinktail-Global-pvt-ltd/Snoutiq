@@ -328,22 +328,6 @@ export default function VetNearMePetDetailsPage() {
           <div className="field-error">{errors.issue}</div>
         ) : null}
       </div>
-      <fieldset className="field">
-        <legend id={symptomsGroupId}>Symptoms (tick all that apply)</legend>
-        <div className="cbgroup">
-          {SYMPTOM_OPTIONS.map((option) => (
-            <label className="cbitem" key={option.value}>
-              <input
-                type="checkbox"
-                value={option.value}
-                checked={bookingState.pet.symptoms.includes(option.value)}
-                onChange={() => toggleSymptom(option.value)}
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
 
       <div className="sdiv">Medical history</div>
       <div className="half">

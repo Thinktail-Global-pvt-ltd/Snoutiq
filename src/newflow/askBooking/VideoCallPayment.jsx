@@ -18,9 +18,9 @@ const STATIC_DISCOUNT_AMOUNT = 100;
 const GST_RATE = 0.18;
 const SUCCESS_REDIRECT_DELAY = 3000;
 const DESCRIBE_CONSULT_POINTS = Object.freeze([
-  "Share clear symptoms and at least one photo for faster review.",
-  "Online consultation is for guidance. Emergency cases may still need a clinic visit.",
-  "Consultation starts after payment confirmation and doctor assignment.",
+  "Not all issues can be solved via video consultation.",
+  "Clinic visit may be required after the call.",
+  "Information shared is for this consultation session only.",
 ]);
 
 const loadRazorpayScript = () =>
