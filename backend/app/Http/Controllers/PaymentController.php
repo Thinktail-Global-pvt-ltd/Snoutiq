@@ -1280,6 +1280,9 @@ class PaymentController extends Controller
 
     protected function resolveClinicId(Request $request, array $notes, array $context = []): ?int
     {
+        $transactionType = $this->resolveTransactionType($notes);
+        $allowGenericClinicFallback = ! in_array($transactionType, ['home_service', 'excell_export_campaign'], true);
+
         $directId = $context['clinic_id']
             ?? $request->input('clinic_id')
             ?? $request->input('clinicId')
@@ -1305,8 +1308,8 @@ class PaymentController extends Controller
             }
         }
 
-        // Fallbacks only if clinics table exists
-        if (Schema::hasTable('clinics')) {
+        // Only generic/default clinic fallback for flows that still require provider context.
+        if ($allowGenericClinicFallback && Schema::hasTable('clinics')) {
             try {
                 $clinic = DB::table('clinics')->select('id')->first();
                 if ($clinic) {
