@@ -2710,7 +2710,6 @@ export default function AskPage() {
     setInputValue("");
     setErrorMessage("");
     setFollowUpPending(null);
-    setAskProfile(DEFAULT_ASK_PROFILE);
     setPendingInitialRequest(null);
     setIntakeOpen(false);
     setIntakeErrors({});
@@ -2718,7 +2717,6 @@ export default function AskPage() {
     locationLookupRef.current += 1;
     setLocationStatus({ type: "", text: "" });
     clearStoredState();
-    clearStoredProfile();
     clearStoredUiState();
     setToastMessage("Started fresh");
   };

@@ -966,15 +966,11 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4f6bff]">
-                Snoutiq Checkout
+                Snoutiq
               </div>
               <div className="text-base font-semibold text-slate-900 md:text-lg">
                 Video consultation request
               </div>
-            </div>
-            <div className="hidden items-center gap-2 rounded-full border border-[#d6e3ff] bg-[#f8fbff] px-3 py-1.5 text-xs font-semibold text-[#2457ff] md:flex">
-              <Lock size={14} />
-              Powered by Razorpay
             </div>
           </div>
         </div>
@@ -982,15 +978,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
         <div className="w-full">
           <div className="flex-1 px-4 pb-28 pt-4 md:px-6 md:pb-20 md:pt-8">
             <div className="mx-auto w-full max-w-6xl">
-              <div className="md:flex md:items-center md:justify-between md:gap-6">
-                <ProgressBar current={2} steps={PET_FLOW_STEPS} />
-                <div className="hidden items-center gap-2 rounded-full border border-[#d6e3ff] bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm md:flex">
-                  <BadgeCheck size={14} className="text-[#2457ff]" />
-                  Secure checkout in under 2 minutes
-                </div>
-              </div>
-
-
               <div className="mt-6 space-y-6">
                 {hasHiddenSavedDetails ? (
                   <section className={cardBase}>
@@ -999,10 +986,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                         <BadgeCheck size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-base">Saved details applied</h3>
-                        <p className="text-xs text-gray-500">
-                          {hiddenSavedCount} fields are hidden to keep this form short.
-                        </p>
+                        <h3 className="font-semibold text-gray-900 text-base">Personal Details</h3>
                       </div>
                     </div>
                     <div className={cardBodyBase}>
