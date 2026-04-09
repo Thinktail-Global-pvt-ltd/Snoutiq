@@ -674,14 +674,6 @@ class AdminPanelController extends Controller
         $neuteringLeads = collect();
         $runtimeWarnings = [];
         $captureLeadManagementError = static function (string $stage, \Throwable $e) use (&$runtimeWarnings): void {
-            dd([
-                'stage' => $stage,
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => array_slice($e->getTrace(), 0, 20),
-            ]);
-
             $message = sprintf(
                 '[lead-management][%s] %s (%s:%d)',
                 $stage,
@@ -2509,7 +2501,7 @@ class AdminPanelController extends Controller
                 };
             })
             ->filter(fn (array $leadUser): bool => $matchesLeadSearch($leadUser, $searchTerm))
-            ->sort(function (array $left, array $right): int {
+            ->sort(function (array $left, array $right) use ($latestRelatedTransactionTimestamp): int {
                 $leftLatestTransaction = $latestRelatedTransactionTimestamp($left);
                 $rightLatestTransaction = $latestRelatedTransactionTimestamp($right);
                 if ($leftLatestTransaction !== $rightLatestTransaction) {
@@ -2611,13 +2603,14 @@ class AdminPanelController extends Controller
             ],
         ]);
         } catch (\Throwable $e) {
-            dd([
+            Log::error('Lead management failed with unhandled exception', [
                 'stage' => 'lead_management_unhandled',
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => array_slice($e->getTrace(), 0, 20),
             ]);
+
+            throw $e;
         }
     }
 
