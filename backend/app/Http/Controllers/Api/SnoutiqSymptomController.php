@@ -190,6 +190,7 @@ class SnoutiqSymptomController extends Controller
             'session_id'   => 'nullable|string|max:100',
             'image_base64' => 'nullable|string',
             'image_mime'   => 'nullable|string|max:20',
+            'image'        => 'nullable|file|image|max:5120',
             'user'         => 'nullable|array',
             'user.phone'   => 'nullable|string|max:30',
             'user.name'    => 'nullable|string|max:120',
@@ -302,8 +303,7 @@ class SnoutiqSymptomController extends Controller
         $baseRouting = $this->routingFromScore($score, $turn);
 
         // ── LAYER 3: Gemini — Triage call (structured JSON) ───────────────────
-        $imageB64  = $data['image_base64'] ?? null;
-        $imageMime = $data['image_mime']   ?? 'image/jpeg';
+        [$imageB64, $imageMime] = $this->resolveImagePayload($request, $data);
 
         $triageJson = $this->callGeminiTriage(
             $pet,
@@ -389,6 +389,7 @@ class SnoutiqSymptomController extends Controller
             'message'    => 'required|string|max:600',
             'image_base64' => 'nullable|string',
             'image_mime' => 'nullable|string|max:20',
+            'image' => 'nullable|file|image|max:5120',
         ]);
 
         $sessionId = $this->resolveExistingSessionId($data['session_id'] ?? null);
@@ -435,6 +436,7 @@ class SnoutiqSymptomController extends Controller
             'location'       => 'nullable|string|max:100',
             'image_base64'   => 'nullable|string',
             'image_mime'     => 'nullable|string|max:20',
+            'image'          => 'nullable|file|image|max:5120',
         ]);
 
         $sessionId = $payload['session_id']
@@ -457,6 +459,9 @@ class SnoutiqSymptomController extends Controller
             'image_base64' => $payload['image_base64'] ?? null,
             'image_mime' => $payload['image_mime'] ?? null,
         ]);
+        if ($request->hasFile('image')) {
+            $internal->files->set('image', $request->file('image'));
+        }
 
         $response = $this->check($internal);
         $rawBody = json_decode($response->getContent(), true);
@@ -519,6 +524,7 @@ class SnoutiqSymptomController extends Controller
             'answer'     => 'required|string|max:200',
             'image_base64' => 'nullable|string',
             'image_mime' => 'nullable|string|max:20',
+            'image' => 'nullable|file|image|max:5120',
         ]);
 
         $sessionId = $this->resolveExistingSessionId($data['session_id'] ?? null);
@@ -554,6 +560,9 @@ class SnoutiqSymptomController extends Controller
             'image_base64' => $data['image_base64'] ?? null,
             'image_mime' => $data['image_mime'] ?? null,
         ]);
+        if ($request->hasFile('image')) {
+            $internal->files->set('image', $request->file('image'));
+        }
 
         $response = $this->check($internal);
         $payload = json_decode($response->getContent(), true);
@@ -773,6 +782,7 @@ class SnoutiqSymptomController extends Controller
         $rawPhone = trim((string) ($data['phone'] ?? ''));
         $resolvedUserId = isset($data['user_id']) ? (int) $data['user_id'] : null;
         $resolvedPetId = isset($data['pet_id']) ? (int) $data['pet_id'] : null;
+        [$petImageBlob, $petImageMime] = $this->extractPetImageBlobFromPayload($data);
         $ownerName = trim((string) ($data['owner_name'] ?? ''));
         $petName = trim((string) ($data['pet_name'] ?? ''));
         $breed = trim((string) ($data['breed'] ?? ''));
@@ -981,6 +991,12 @@ class SnoutiqSymptomController extends Controller
                     if (Schema::hasColumn('pets', 'updated_at')) {
                         $petPayload['updated_at'] = now();
                     }
+                    if ($petImageBlob !== null && Schema::hasColumn('pets', 'pet_doc2_blob')) {
+                        $petPayload['pet_doc2_blob'] = $petImageBlob;
+                    }
+                    if ($petImageMime !== null && Schema::hasColumn('pets', 'pet_doc2_mime')) {
+                        $petPayload['pet_doc2_mime'] = $petImageMime;
+                    }
 
                     if ($petRow) {
                         if ($petPayload) {
@@ -1011,6 +1027,36 @@ class SnoutiqSymptomController extends Controller
             'user_id' => $resolvedUserId,
             'pet_id' => $resolvedPetId,
         ];
+    }
+
+    private function extractPetImageBlobFromPayload(array $data): array
+    {
+        if (!empty($data['image_base64'])) {
+            $imageB64 = trim((string) $data['image_base64']);
+            if (preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s', $imageB64, $matches)) {
+                $mime = $matches[1];
+                $imageB64 = $matches[2];
+            } else {
+                $mime = trim((string) ($data['image_mime'] ?? 'image/jpeg'));
+            }
+
+            $decoded = base64_decode($imageB64, true);
+            if ($decoded !== false && $decoded !== '') {
+                return [$decoded, $mime !== '' ? $mime : 'image/jpeg'];
+            }
+        }
+
+        if (!empty($data['image']) && is_object($data['image']) && method_exists($data['image'], 'isValid') && $data['image']->isValid()) {
+            $raw = @file_get_contents($data['image']->getRealPath());
+            if ($raw !== false && $raw !== '') {
+                return [
+                    $raw,
+                    method_exists($data['image'], 'getMimeType') ? ($data['image']->getMimeType() ?: 'image/jpeg') : 'image/jpeg',
+                ];
+            }
+        }
+
+        return [null, null];
     }
 
     private function firstFilled(array $data, array $paths): mixed
@@ -1451,6 +1497,35 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         ]);
 
         return $this->curlPost($url, $body);
+    }
+
+    private function resolveImagePayload(Request $request, array $data): array
+    {
+        $imageB64 = trim((string) ($data['image_base64'] ?? ''));
+        $imageMime = trim((string) ($data['image_mime'] ?? 'image/jpeg'));
+
+        if ($imageB64 !== '') {
+            return [$imageB64, $imageMime !== '' ? $imageMime : 'image/jpeg'];
+        }
+
+        if (!$request->hasFile('image')) {
+            return [null, 'image/jpeg'];
+        }
+
+        $file = $request->file('image');
+        if (!$file || !$file->isValid()) {
+            return [null, 'image/jpeg'];
+        }
+
+        $raw = @file_get_contents($file->getRealPath());
+        if ($raw === false || $raw === '') {
+            return [null, 'image/jpeg'];
+        }
+
+        return [
+            base64_encode($raw),
+            $file->getMimeType() ?: 'image/jpeg',
+        ];
     }
 
     private function curlPost(string $url, string $body): string
@@ -2761,6 +2836,17 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $data['image_present'] = true;
             $data['image_bytes_estimate'] = strlen((string) $data['image_base64']);
             $data['image_base64'] = '[omitted base64 image]';
+        }
+
+        if (!empty($data['image']) && is_object($data['image'])) {
+            $data['image_present'] = true;
+            $data['image_upload_name'] = method_exists($data['image'], 'getClientOriginalName')
+                ? $data['image']->getClientOriginalName()
+                : 'uploaded-image';
+            $data['image_upload_mime'] = method_exists($data['image'], 'getMimeType')
+                ? $data['image']->getMimeType()
+                : null;
+            $data['image'] = '[uploaded image omitted]';
         }
 
         return $data;
