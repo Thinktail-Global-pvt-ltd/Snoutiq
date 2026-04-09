@@ -317,6 +317,18 @@ export default function VetNearMePaymentPage() {
           </span>
         </div>
         <div className="sum-row">
+          <span className="sum-label">Visit date</span>
+          <span className="sum-val">
+            {displayValue(bookingState.pet.dateOfVisit, "Not selected")}
+          </span>
+        </div>
+        <div className="sum-row">
+          <span className="sum-label">Visit time</span>
+          <span className="sum-val">
+            {displayValue(bookingState.pet.timeOfVisit, "Not selected")}
+          </span>
+        </div>
+        <div className="sum-row">
           <span className="sum-label">Reason</span>
           <span className="sum-val">
             {displayValue(bookingState.lead.reason, "Not selected")}

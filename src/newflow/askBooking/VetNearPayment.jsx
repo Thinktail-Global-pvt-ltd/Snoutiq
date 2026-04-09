@@ -26,6 +26,8 @@ const DEFAULT_STATE = {
     otherPetType: "",
     dob: "",
     sex: "",
+    dateOfVisit: "",
+    timeOfVisit: "",
     issue: "",
     symptoms: [],
     vaccinationStatus: "",
@@ -78,6 +80,11 @@ const normalizeSpecies = (value, otherPetType = "") => {
   };
 };
 
+const normalizePhoneInput = (value) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 10);
+
 const normalizeState = (input) => {
   const source = input && typeof input === "object" ? input : {};
   const prefill = source.prefill && typeof source.prefill === "object" ? source.prefill : {};
@@ -95,7 +102,7 @@ const normalizeState = (input) => {
   return {
     lead: {
       ownerName: pickText(lead.ownerName, raw.ownerName),
-      phone: pickText(lead.phone, raw.phone, raw.ownerMobile),
+      phone: normalizePhoneInput(pickText(lead.phone, raw.phone, raw.ownerMobile)),
       species: speciesResult.species,
       area: pickText(lead.area, raw.area, raw.location),
       reason: pickText(lead.reason, raw.reason, raw.problemText),
@@ -106,6 +113,18 @@ const normalizeState = (input) => {
       otherPetType: speciesResult.otherPetType,
       dob: pickText(pet.dob, raw.dob, raw.petDob),
       sex: pickText(pet.sex, raw.sex),
+      dateOfVisit: pickText(
+        pet.dateOfVisit,
+        pet.date_of_visit,
+        raw.dateOfVisit,
+        raw.date_of_visit
+      ),
+      timeOfVisit: pickText(
+        pet.timeOfVisit,
+        pet.time_of_visit,
+        raw.timeOfVisit,
+        raw.time_of_visit
+      ),
       issue: pickText(pet.issue, raw.issue, raw.problemText),
       symptoms: Array.isArray(pet.symptoms ?? raw.symptoms)
         ? (pet.symptoms ?? raw.symptoms).map((item) => String(item || "").trim()).filter(Boolean)
@@ -199,6 +218,8 @@ const buildLegacySuccessState = (state) => ({
     otherPetType: state?.pet?.otherPetType || "",
     dob: state?.pet?.dob || "",
     sex: state?.pet?.sex || "",
+    dateOfVisit: state?.pet?.dateOfVisit || "",
+    timeOfVisit: state?.pet?.timeOfVisit || "",
     issue: state?.pet?.issue || "",
     symptoms: Array.isArray(state?.pet?.symptoms) ? state.pet.symptoms : [],
     vaccinationStatus: state?.pet?.vaccinationStatus || "",
@@ -321,6 +342,8 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
     { label: "Parent name", value: displayValue(state.lead.ownerName) },
     { label: "Phone", value: displayValue(state.lead.phone) },
     { label: "Location", value: displayValue(state.lead.area, "Not selected") },
+    { label: "Visit date", value: displayValue(state.pet.dateOfVisit, "Not selected") },
+    { label: "Visit time", value: displayValue(state.pet.timeOfVisit, "Not selected") },
     { label: "Reason", value: displayValue(state.lead.reason, "Not selected") },
   ];
   const amountRows = [

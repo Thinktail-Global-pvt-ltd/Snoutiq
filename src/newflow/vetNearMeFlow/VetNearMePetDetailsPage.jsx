@@ -13,6 +13,7 @@ import { useVetNearMeBooking } from "./VetNearMeBookingContext";
 export default function VetNearMePetDetailsPage() {
   const navigate = useNavigate();
   const fieldIdPrefix = useId();
+  const today = new Date().toISOString().slice(0, 10);
   const breedListId = `${fieldIdPrefix}-breed-options`;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBreedsLoading, setIsBreedsLoading] = useState(false);
@@ -37,6 +38,8 @@ export default function VetNearMePetDetailsPage() {
   const breedInputId = `${fieldIdPrefix}-breed`;
   const dobInputId = `${fieldIdPrefix}-dob`;
   const sexSelectId = `${fieldIdPrefix}-sex`;
+  const visitDateInputId = `${fieldIdPrefix}-visit-date`;
+  const visitTimeInputId = `${fieldIdPrefix}-visit-time`;
   const issueTextareaId = `${fieldIdPrefix}-issue`;
   const symptomsGroupId = `${fieldIdPrefix}-symptoms`;
   const vaccinationSelectId = `${fieldIdPrefix}-vaccination`;
@@ -125,6 +128,14 @@ export default function VetNearMePetDetailsPage() {
 
     if (showOtherPetTypeField && !bookingState.pet.otherPetType.trim()) {
       nextErrors.otherPetType = "Please enter your pet type.";
+    }
+
+    if (!bookingState.pet.dateOfVisit) {
+      nextErrors.dateOfVisit = "Please select the visit date.";
+    }
+
+    if (!bookingState.pet.timeOfVisit) {
+      nextErrors.timeOfVisit = "Please select the visit time.";
     }
 
     if (!bookingState.pet.issue.trim()) {
@@ -307,6 +318,47 @@ export default function VetNearMePetDetailsPage() {
               </option>
             ))}
           </select>
+        </div>
+      </div>
+
+      <div className="sdiv">Visit schedule</div>
+      <div className="half">
+        <div className="field">
+          <label htmlFor={visitDateInputId}>
+            Preferred visit date <span className="required-mark">*</span>
+          </label>
+          <input
+            id={visitDateInputId}
+            type="date"
+            min={today}
+            className={errors.dateOfVisit ? "input-error" : ""}
+            aria-invalid={Boolean(errors.dateOfVisit)}
+            value={bookingState.pet.dateOfVisit}
+            onChange={(event) =>
+              handlePetChange("dateOfVisit", event.target.value)
+            }
+          />
+          {errors.dateOfVisit ? (
+            <div className="field-error">{errors.dateOfVisit}</div>
+          ) : null}
+        </div>
+        <div className="field">
+          <label htmlFor={visitTimeInputId}>
+            Preferred visit time <span className="required-mark">*</span>
+          </label>
+          <input
+            id={visitTimeInputId}
+            type="time"
+            className={errors.timeOfVisit ? "input-error" : ""}
+            aria-invalid={Boolean(errors.timeOfVisit)}
+            value={bookingState.pet.timeOfVisit}
+            onChange={(event) =>
+              handlePetChange("timeOfVisit", event.target.value)
+            }
+          />
+          {errors.timeOfVisit ? (
+            <div className="field-error">{errors.timeOfVisit}</div>
+          ) : null}
         </div>
       </div>
 

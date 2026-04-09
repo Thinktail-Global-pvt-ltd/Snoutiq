@@ -77,8 +77,7 @@ const QUICK_SYMPTOMS = [
     title: "Skin / Itching",
     subtitle: "Hair loss, scratching",
     species: "cat",
-    message:
-      "My cat has circular patches of hair loss and is scratching a lot",
+    message: "My cat has circular patches of hair loss and is scratching a lot",
   },
   {
     key: "lethargy",
@@ -183,7 +182,8 @@ const serializeEntriesForStorage = (entries) =>
 
 const revokeBlobPreviewUrl = (previewUrl) => {
   const value = String(previewUrl || "").trim();
-  if (!value || !value.startsWith("blob:") || typeof URL === "undefined") return;
+  if (!value || !value.startsWith("blob:") || typeof URL === "undefined")
+    return;
   try {
     URL.revokeObjectURL(value);
   } catch {
@@ -205,7 +205,7 @@ const writeDailyUsage = (count) => {
     JSON.stringify({
       date: getTodayKey(),
       count: Math.max(0, Number(count) || 0),
-    })
+    }),
   );
 };
 
@@ -213,9 +213,7 @@ const parseCoordinate = (value) => {
   if (value === undefined || value === null) return null;
   if (typeof value === "string" && !value.trim()) return null;
   const numberValue = Number(value);
-  return Number.isFinite(numberValue)
-    ? Number(numberValue.toFixed(6))
-    : null;
+  return Number.isFinite(numberValue) ? Number(numberValue.toFixed(6)) : null;
 };
 
 const hasProfileCoordinates = (value) =>
@@ -279,7 +277,7 @@ const resolveDetectedLocationLabel = async (latitude, longitude) => {
 
   try {
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`,
     );
     const data = await response.json();
     if (!Array.isArray(data?.results) || data.results.length === 0) return "";
@@ -313,7 +311,7 @@ const writeStoredProfile = (profile) => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(
     ASK_PROFILE_KEY,
-    JSON.stringify(sanitizeAskProfile(profile))
+    JSON.stringify(sanitizeAskProfile(profile)),
   );
 };
 
@@ -324,7 +322,10 @@ const clearStoredProfile = () => {
 
 const readStoredUiState = () => {
   if (typeof window === "undefined") return null;
-  const raw = safeParse(window.sessionStorage.getItem(ASK_UI_STORAGE_KEY), null);
+  const raw = safeParse(
+    window.sessionStorage.getItem(ASK_UI_STORAGE_KEY),
+    null,
+  );
   if (!raw || typeof raw !== "object") return null;
   return {
     inputValue: typeof raw.inputValue === "string" ? raw.inputValue : "",
@@ -332,8 +333,8 @@ const readStoredUiState = () => {
       Boolean(raw.intakeOpen) &&
       Boolean(
         raw.pendingInitialRequest &&
-          typeof raw.pendingInitialRequest.message === "string" &&
-          raw.pendingInitialRequest.message.trim()
+        typeof raw.pendingInitialRequest.message === "string" &&
+        raw.pendingInitialRequest.message.trim(),
       ),
     pendingInitialRequest:
       raw.pendingInitialRequest && typeof raw.pendingInitialRequest === "object"
@@ -361,8 +362,8 @@ const writeStoredUiState = (state) => {
         Boolean(state?.intakeOpen) &&
         Boolean(
           state?.pendingInitialRequest &&
-            typeof state.pendingInitialRequest.message === "string" &&
-            state.pendingInitialRequest.message.trim()
+          typeof state.pendingInitialRequest.message === "string" &&
+          state.pendingInitialRequest.message.trim(),
         ),
       pendingInitialRequest:
         state?.pendingInitialRequest &&
@@ -378,7 +379,7 @@ const writeStoredUiState = (state) => {
                   : "",
             }
           : null,
-    })
+    }),
   );
 };
 
@@ -449,12 +450,12 @@ const buildResumeCards = () => {
       vetPet.petName,
       vetPet.issue,
       vetPet.breed,
-      vetPet.otherPetType
+      vetPet.otherPetType,
     ) ||
-      storedVetNearFlow?.booking?.bookingId ||
-      storedVetNearFlow?.booking?.petId ||
-      storedVetNearFlow?.progress?.petDetailsSubmitted ||
-      storedVetNearFlow?.progress?.paymentCompleted
+    storedVetNearFlow?.booking?.bookingId ||
+    storedVetNearFlow?.booking?.petId ||
+    storedVetNearFlow?.progress?.petDetailsSubmitted ||
+    storedVetNearFlow?.progress?.paymentCompleted,
   );
 
   if (hasVetResume) {
@@ -495,10 +496,10 @@ const buildResumeCards = () => {
       videoSource.type,
       videoSource.species,
       videoSource.breed,
-      videoSource.problemText
+      videoSource.problemText,
     ) ||
-      storedVideoFlow?.paymentMeta?.user_id ||
-      storedVideoFlow?.paymentMeta?.pet_id
+    storedVideoFlow?.paymentMeta?.user_id ||
+    storedVideoFlow?.paymentMeta?.pet_id,
   );
 
   if (hasVideoResume) {
@@ -512,7 +513,11 @@ const buildResumeCards = () => {
       summary: [
         toResumeText(videoSource.name, videoSource.petName),
         formatResumePetType(
-          toResumeText(videoSource.type, videoSource.species, videoSource.petType)
+          toResumeText(
+            videoSource.type,
+            videoSource.species,
+            videoSource.petType,
+          ),
         ),
         toResumeText(videoSource.city, videoSource.location),
       ]
@@ -527,16 +532,16 @@ const buildResumeCards = () => {
 const isVetNearPaymentReady = (value) =>
   Boolean(
     value?.progress?.petDetailsSubmitted &&
-      value?.booking?.bookingId &&
-      value?.booking?.userId &&
-      value?.booking?.petId
+    value?.booking?.bookingId &&
+    value?.booking?.userId &&
+    value?.booking?.petId,
   );
 
 const isVideoCallPaymentReady = (value) =>
   Boolean(
     value?.petDetails &&
-      (value?.paymentMeta?.user_id || value?.petDetails?.user_id) &&
-      (value?.paymentMeta?.pet_id || value?.petDetails?.pet_id)
+    (value?.paymentMeta?.user_id || value?.petDetails?.user_id) &&
+    (value?.paymentMeta?.pet_id || value?.petDetails?.pet_id),
   );
 
 const getSpeciesMeta = (species) => {
@@ -546,7 +551,9 @@ const getSpeciesMeta = (species) => {
   return (
     SPECIES_OPTIONS.find((option) => option.value === normalized) || {
       value: normalized || "pet",
-      label: normalized ? normalized[0].toUpperCase() + normalized.slice(1) : "Pet",
+      label: normalized
+        ? normalized[0].toUpperCase() + normalized.slice(1)
+        : "Pet",
       emoji: "🐾",
     }
   );
@@ -601,14 +608,22 @@ function SearchableBreedField({
 }) {
   const wrapperRef = useRef(null);
   const [open, setOpen] = useState(false);
-  const normalizedValue = String(value || "").trim().toLowerCase();
-  const filteredOptions = (normalizedValue
-    ? options.filter((option) => option.toLowerCase().includes(normalizedValue))
-    : options
+  const normalizedValue = String(value || "")
+    .trim()
+    .toLowerCase();
+  const filteredOptions = (
+    normalizedValue
+      ? options.filter((option) =>
+          option.toLowerCase().includes(normalizedValue),
+        )
+      : options
   ).slice(0, 12);
   const showMenu = open && !loading && filteredOptions.length > 0;
   const showEmptyState =
-    open && !loading && normalizedValue.length > 0 && filteredOptions.length === 0;
+    open &&
+    !loading &&
+    normalizedValue.length > 0 &&
+    filteredOptions.length === 0;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -664,7 +679,9 @@ function SearchableBreedField({
           type="button"
           className="ask-search-select-toggle"
           onClick={() => setOpen((current) => !current)}
-          aria-label={open ? "Hide breed suggestions" : "Show breed suggestions"}
+          aria-label={
+            open ? "Hide breed suggestions" : "Show breed suggestions"
+          }
         >
           <span className="ask-search-select-caret" aria-hidden="true" />
         </button>
@@ -768,8 +785,7 @@ const resolveWatchItems = (assessment) => {
 const resolveSafeToDoWhileWaiting = (assessment) => {
   const response = getAssessmentResponse(assessment);
   const safeItems =
-    response?.safe_to_do_while_waiting ??
-    assessment?.safe_to_do_while_waiting;
+    response?.safe_to_do_while_waiting ?? assessment?.safe_to_do_while_waiting;
   return Array.isArray(safeItems) ? safeItems.filter(Boolean) : [];
 };
 
@@ -782,9 +798,7 @@ const resolveFollowUpQuestion = (assessment) => {
 
   const question = String(raw.question || "").trim();
   const options = Array.isArray(raw.options)
-    ? raw.options
-        .map((option) => String(option || "").trim())
-        .filter(Boolean)
+    ? raw.options.map((option) => String(option || "").trim()).filter(Boolean)
     : [];
 
   if (!question || options.length === 0) return null;
@@ -799,20 +813,20 @@ const resolveFollowUpQuestion = (assessment) => {
 const resolveBeReadyToTellVet = (assessment) => {
   const response = getAssessmentResponse(assessment);
   return String(
-    assessment?.be_ready_to_tell_vet || response?.be_ready_to_tell_vet || ""
+    assessment?.be_ready_to_tell_vet || response?.be_ready_to_tell_vet || "",
   ).trim();
 };
 
 const resolveIndiaContext = (assessment) =>
   String(
-    assessment?.triage_detail?.india_context || assessment?.india_context || ""
+    assessment?.triage_detail?.india_context || assessment?.india_context || "",
   ).trim();
 
 const resolveImageObservation = (assessment) =>
   String(
     assessment?.triage_detail?.image_observation ||
       assessment?.image_observation ||
-      ""
+      "",
   ).trim();
 
 const navigateToAskTarget = (navigate, target, options = {}) => {
@@ -830,7 +844,7 @@ const navigateToAskTarget = (navigate, target, options = {}) => {
       pathname: pathname || "/",
       search: query ? `?${query}` : "",
     },
-    options
+    options,
   );
 };
 
@@ -845,7 +859,7 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
       (entry) =>
         entry?.kind === "user" &&
         typeof entry?.message === "string" &&
-        entry.message.trim()
+        entry.message.trim(),
     )?.message;
   const concern = String(lastUserMessage || inputValue || "").trim();
 
@@ -907,7 +921,7 @@ const derivePossibleCauses = (assessment) => {
   }
 
   const summary = String(
-    getAssessmentResponse(assessment)?.diagnosis_summary || ""
+    getAssessmentResponse(assessment)?.diagnosis_summary || "",
   ).trim();
   const match = summary.match(/possible causes include (.+?)\.?$/i);
   if (!match) return [];
@@ -995,7 +1009,6 @@ function IdleScreen({ species, onSpeciesSelect, onQuickStart }) {
   return (
     <div className="ask-idle">
       <div className="ask-idle-hero">
-        <div className="ask-idle-icon">🐾</div>
         <h1 className="ask-idle-title">
           What&apos;s worrying
           <br />
@@ -1030,7 +1043,6 @@ function IdleScreen({ species, onSpeciesSelect, onQuickStart }) {
           </button>
         ))}
       </div>
-
     </div>
   );
 }
@@ -1080,7 +1092,9 @@ function IntakeModal({
               loading="eager"
               decoding="async"
             />
-            <span className="ask-intake-secure">Private • personalized answer</span>
+            <span className="ask-intake-secure">
+              Private • personalized answer
+            </span>
           </div>
           <button
             type="button"
@@ -1095,7 +1109,7 @@ function IntakeModal({
         <div className="ask-intake-summary">
           <div className="ask-intake-summary-eyebrow">Before we answer</div>
           <h3 id="ask-intake-title">
-            Tell us about {petLabel} so the first AI answer is more specific
+            Tell us about {petLabel} so we can give a personalized answer
           </h3>
           <p>{pendingMessage}</p>
         </div>
@@ -1124,7 +1138,9 @@ function IntakeModal({
               <input
                 type="tel"
                 value={profile.phone}
-                onChange={(event) => onProfileChange("phone", event.target.value)}
+                onChange={(event) =>
+                  onProfileChange("phone", event.target.value)
+                }
                 placeholder="Enter your phone number"
                 autoComplete="tel"
                 inputMode="numeric"
@@ -1143,7 +1159,9 @@ function IntakeModal({
               <input
                 type="text"
                 value={profile.petName}
-                onChange={(event) => onProfileChange("petName", event.target.value)}
+                onChange={(event) =>
+                  onProfileChange("petName", event.target.value)
+                }
                 placeholder="Enter your pet's name"
               />
               {errors.petName ? (
@@ -1192,7 +1210,9 @@ function IntakeModal({
                 <input
                   type="text"
                   value={profile.breed}
-                  onChange={(event) => onProfileChange("breed", event.target.value)}
+                  onChange={(event) =>
+                    onProfileChange("breed", event.target.value)
+                  }
                   placeholder="Enter breed"
                 />
               )}
@@ -1201,9 +1221,7 @@ function IntakeModal({
               ) : null}
               {showBreedSuggestions ? (
                 <small
-                  className={`ask-intake-hint${
-                    breedError ? " is-error" : ""
-                  }`}
+                  className={`ask-intake-hint${breedError ? " is-error" : ""}`}
                 >
                   {breedLoading
                     ? "Loading breeds..."
@@ -1229,14 +1247,6 @@ function IntakeModal({
           <label className="ask-intake-field">
             <span>Location</span>
             <div className="ask-intake-location-row">
-              <input
-                type="text"
-                value={profile.location}
-                placeholder="Tap 'Use current' to fetch location"
-                autoComplete="off"
-                readOnly
-                disabled={submitting || locating}
-              />
               <button
                 type="button"
                 className="ask-intake-location-button"
@@ -1273,8 +1283,9 @@ function IntakeModal({
           </label>
 
           <div className="ask-intake-note">
-            <strong>{speciesMeta.label}</strong> profile is used to personalize the
-            first answer, save the session, and make follow-up guidance more useful.
+            <strong>{speciesMeta.label}</strong> profile is used to personalize
+            the first answer, save the session, and make follow-up guidance more
+            useful.
           </div>
 
           <div className="ask-intake-actions">
@@ -1303,7 +1314,9 @@ function IntakeModal({
 function UserMessage({ entry }) {
   const speciesMeta = getSpeciesMeta(entry?.species);
   const attachment = entry?.attachment || null;
-  const hasAttachmentPreview = Boolean(String(attachment?.previewUrl || "").trim());
+  const hasAttachmentPreview = Boolean(
+    String(attachment?.previewUrl || "").trim(),
+  );
 
   return (
     <div className="ask-message-group">
@@ -1364,7 +1377,8 @@ function NoteMessage({ entry }) {
       <div className="ask-message-row">
         <div className="ask-note-card">
           <div className="ask-note-eyebrow">
-            Previous assessment · {String(entry?.routing || "video_consult").replace(/_/g, " ")}
+            Previous assessment ·{" "}
+            {String(entry?.routing || "video_consult").replace(/_/g, " ")}
           </div>
           <p>{entry?.message}</p>
         </div>
@@ -1406,13 +1420,13 @@ function AssessmentCard({
   const answeredQuestionKey = normalizeQuestionKey(answeredFollowUp?.question);
   const hasAnsweredCurrentQuestion = Boolean(
     currentQuestionKey &&
-      answeredQuestionKey &&
-      currentQuestionKey === answeredQuestionKey
+    answeredQuestionKey &&
+    currentQuestionKey === answeredQuestionKey,
   );
   const selectedFollowUpAnswer = String(
     followUpPending?.answer ||
       (hasAnsweredCurrentQuestion ? answeredFollowUp?.answer : "") ||
-      ""
+      "",
   ).trim();
 
   return (
@@ -1447,7 +1461,9 @@ function AssessmentCard({
                 >
                   {healthScore?.label}
                 </div>
-                <div className="ask-health-subtitle">{healthScore?.subtitle}</div>
+                <div className="ask-health-subtitle">
+                  {healthScore?.subtitle}
+                </div>
               </div>
 
               <div className="ask-gauge">
@@ -1489,7 +1505,9 @@ function AssessmentCard({
 
             <div className="ask-share-row">
               <div className="ask-share-copy">
-                <strong>{healthScore?.share?.title || "Share this score"}</strong>
+                <strong>
+                  {healthScore?.share?.title || "Share this score"}
+                </strong>
                 <span>
                   {healthScore?.share?.helper ||
                     "Help other pet parents find Snoutiq"}
@@ -1549,10 +1567,7 @@ function AssessmentCard({
                 <div className="ask-body-label">Safe to do while waiting</div>
                 <div className="ask-waiting-list">
                   {safeToDoWhileWaiting.map((item, index) => (
-                    <div
-                      key={`${item}-${index}`}
-                      className="ask-waiting-item"
-                    >
+                    <div key={`${item}-${index}`} className="ask-waiting-item">
                       <div className="ask-waiting-index">{index + 1}</div>
                       <span>{item}</span>
                     </div>
@@ -1585,7 +1600,9 @@ function AssessmentCard({
                         key={option}
                         type="button"
                         className={`ask-follow-option${
-                          selectedFollowUpAnswer === option ? " is-selected" : ""
+                          selectedFollowUpAnswer === option
+                            ? " is-selected"
+                            : ""
                         }`}
                         onClick={() =>
                           onFollowUpAnswer(entry, followUpQuestion, option)
@@ -1612,13 +1629,15 @@ function AssessmentCard({
 
                   {hasAnsweredCurrentQuestion ? (
                     <>
-                      {entry?.revisedAssessment || assessment?.revised_assessment ? (
+                      {entry?.revisedAssessment ||
+                      assessment?.revised_assessment ? (
                         <div className="ask-revised-badge">
                           Assessment updated based on your answer
                         </div>
                       ) : null}
                       <div className="ask-follow-answer">
-                        Selected answer: <strong>{answeredFollowUp.answer}</strong>
+                        Selected answer:{" "}
+                        <strong>{answeredFollowUp.answer}</strong>
                       </div>
                     </>
                   ) : null}
@@ -1706,7 +1725,10 @@ function AssessmentCard({
                     <div className="ask-body-label ask-body-label-blue">
                       Vet handover summary
                     </div>
-                    <p>This is the summary a vet can skim quickly if you share it.</p>
+                    <p>
+                      This is the summary a vet can skim quickly if you share
+                      it.
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -1723,7 +1745,9 @@ function AssessmentCard({
           <div className="ask-disclaimer">
             <div className="ask-disclaimer-icon">🤖</div>
             <div>
-              <div className="ask-disclaimer-label">Snoutiq AI - triage only</div>
+              <div className="ask-disclaimer-label">
+                Snoutiq AI - triage only
+              </div>
               <p>
                 AI-generated guidance trained on veterinary cases across India,
                 reviewed for clinical accuracy. Not a diagnosis. Always follow a
@@ -1731,7 +1755,7 @@ function AssessmentCard({
               </p>
             </div>
           </div>
-              {serviceCards.length > 0 ? (
+          {serviceCards.length > 0 ? (
             <div className="ask-service-list">
               {serviceCards.map((card, index) => (
                 <article
@@ -1755,15 +1779,21 @@ function AssessmentCard({
                   </div>
                   <div className="ask-service-title">{card?.title}</div>
                   <div className="ask-service-price-row">
-                    <div className={`ask-service-price ask-service-price-${card?.theme || "video"}`}>
+                    <div
+                      className={`ask-service-price ask-service-price-${card?.theme || "video"}`}
+                    >
                       {card?.price}
                     </div>
                     {card?.orig_price ? (
-                      <div className="ask-service-orig-price">{card.orig_price}</div>
+                      <div className="ask-service-orig-price">
+                        {card.orig_price}
+                      </div>
                     ) : null}
                   </div>
                   {card?.guarantee ? (
-                    <div className="ask-service-guarantee">{card.guarantee}</div>
+                    <div className="ask-service-guarantee">
+                      {card.guarantee}
+                    </div>
                   ) : null}
                   <div className="ask-service-bullets">
                     {(card?.bullets || []).map((bullet, bulletIndex) => (
@@ -1830,19 +1860,24 @@ export default function AskPage() {
     const storedState = readStoredState();
     const storedUiState = readStoredUiState();
     const hasStoredConversation = Boolean(
-      storedState?.sessionId || storedState?.entries?.length
+      storedState?.sessionId || storedState?.entries?.length,
     );
     if (hasStoredConversation) {
       setSpecies(storedState.species || "");
       setSessionId(storedState.sessionId || "");
       setEntries(storedState.entries || []);
     }
-    setAskProfile(hasStoredConversation ? readStoredProfile() : DEFAULT_ASK_PROFILE);
+    setAskProfile(
+      hasStoredConversation ? readStoredProfile() : DEFAULT_ASK_PROFILE,
+    );
     if (storedUiState) {
       setInputValue(storedUiState.inputValue || "");
       setPendingInitialRequest(storedUiState.pendingInitialRequest || null);
       setIntakeOpen(Boolean(storedUiState.intakeOpen));
-      if (!hasStoredConversation && storedUiState.pendingInitialRequest?.species) {
+      if (
+        !hasStoredConversation &&
+        storedUiState.pendingInitialRequest?.species
+      ) {
         setSpecies(storedUiState.pendingInitialRequest.species);
       }
     }
@@ -1904,7 +1939,8 @@ export default function AskPage() {
   }, [entries]);
 
   useEffect(() => {
-    if (typeof document === "undefined" || (!intakeOpen && !flowModal)) return undefined;
+    if (typeof document === "undefined" || (!intakeOpen && !flowModal))
+      return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -1926,11 +1962,11 @@ export default function AskPage() {
   useEffect(
     () => () => {
       attachmentUrlsRef.current.forEach((previewUrl) =>
-        revokeBlobPreviewUrl(previewUrl)
+        revokeBlobPreviewUrl(previewUrl),
       );
       attachmentUrlsRef.current.clear();
     },
-    []
+    [],
   );
 
   useEffect(() => {
@@ -1977,7 +2013,7 @@ export default function AskPage() {
           });
 
           const options = Array.from(
-            new Set([...list.filter(Boolean), "Mixed Breed", "Other"])
+            new Set([...list.filter(Boolean), "Mixed Breed", "Other"]),
           ).sort((left, right) => left.localeCompare(right));
 
           if (!active) return;
@@ -1992,11 +2028,11 @@ export default function AskPage() {
           new Set(
             [
               ...(Array.isArray(response?.data) ? response.data : []).map(
-                (item) => item?.name || item?.id || ""
+                (item) => item?.name || item?.id || "",
               ),
               "Mixed / Other",
-            ].filter(Boolean)
-          )
+            ].filter(Boolean),
+          ),
         ).sort((left, right) => left.localeCompare(right));
 
         if (!active) return;
@@ -2014,7 +2050,10 @@ export default function AskPage() {
             ? "Could not load dog breeds. You can still type manually."
             : "Could not load cat breeds. You can still type manually.";
 
-        breedCacheRef.current[species] = { options: fallback, error: errorText };
+        breedCacheRef.current[species] = {
+          options: fallback,
+          error: errorText,
+        };
         setBreedOptions(fallback);
         setBreedError(errorText);
       } finally {
@@ -2083,7 +2122,7 @@ export default function AskPage() {
 
   const revokeAllAttachmentPreviews = () => {
     attachmentUrlsRef.current.forEach((previewUrl) =>
-      revokeBlobPreviewUrl(previewUrl)
+      revokeBlobPreviewUrl(previewUrl),
     );
     attachmentUrlsRef.current.clear();
     if (attachmentInputRef.current) {
@@ -2135,7 +2174,9 @@ export default function AskPage() {
       setErrorMessage("");
       setToastMessage("Image attached");
     } catch {
-      setToastMessage("Unable to read this image. Please try a different file.");
+      setToastMessage(
+        "Unable to read this image. Please try a different file.",
+      );
     }
   };
 
@@ -2164,7 +2205,7 @@ export default function AskPage() {
     time: overrides.time || getTimeLabel(),
     answeredFollowUp: overrides.answeredFollowUp || null,
     revisedAssessment: Boolean(
-      overrides.revisedAssessment ?? payload?.revised_assessment
+      overrides.revisedAssessment ?? payload?.revised_assessment,
     ),
   });
 
@@ -2274,17 +2315,14 @@ export default function AskPage() {
             message: messageText,
             ...imagePayload,
           })
-        : await apiPostJson(
-            "/api/symptom-check",
-            {
-              ...buildInitialSymptomPayload({
-                messageText,
-                speciesValue,
-                profileValue,
-              }),
-              ...imagePayload,
-            }
-          );
+        : await apiPostJson("/api/symptom-check", {
+            ...buildInitialSymptomPayload({
+              messageText,
+              speciesValue,
+              profileValue,
+            }),
+            ...imagePayload,
+          });
 
       setSessionId(payload?.session_id || "");
       const nextAssessmentEntry = pushAssessmentEntry(payload);
@@ -2317,6 +2355,23 @@ export default function AskPage() {
 
     if (!sessionId) {
       setSpecies(speciesValue);
+      const nextErrors = validateAskProfile(askProfile, speciesValue);
+      const hasSavedProfile = Object.keys(nextErrors).length === 0;
+
+      if (hasSavedProfile) {
+        setPendingInitialRequest(null);
+        setIntakeErrors({});
+        setIntakeOpen(false);
+        await sendAssessmentRequest({
+          messageText,
+          displayText,
+          speciesValue,
+          profileValue: askProfile,
+          attachment,
+        });
+        return;
+      }
+
       setInputValue(rawMessageText);
       setPendingInitialRequest({
         message: messageText,
@@ -2345,8 +2400,7 @@ export default function AskPage() {
     if (field === "location") {
       locationLookupRef.current += 1;
     }
-    const nextValue =
-      field === "phone" ? normalizePhoneInput(value) : value;
+    const nextValue = field === "phone" ? normalizePhoneInput(value) : value;
     setAskProfile((current) => ({
       ...current,
       [field]: nextValue,
@@ -2363,7 +2417,9 @@ export default function AskPage() {
   };
 
   const handleIntakeSpeciesChange = (value) => {
-    const nextSpecies = String(value || "").trim().toLowerCase();
+    const nextSpecies = String(value || "")
+      .trim()
+      .toLowerCase();
 
     setSpecies(nextSpecies);
 
@@ -2482,7 +2538,7 @@ export default function AskPage() {
         enableHighAccuracy: true,
         timeout: 12000,
         maximumAge: 300000,
-      }
+      },
     );
   };
 
@@ -2557,8 +2613,8 @@ export default function AskPage() {
                 answeredFollowUp: { question, answer: answerText },
                 revisedAssessment: payload?.revised_assessment,
               })
-            : currentEntry
-        )
+            : currentEntry,
+        ),
       );
     } catch (error) {
       setErrorMessage(extractErrorMessage(error));
@@ -2619,7 +2675,9 @@ export default function AskPage() {
     });
 
     if (route === "/vet-near-me-pet-details") {
-      const storedVetNearFlow = readStoredFlowSession(ASK_VET_NEAR_STANDALONE_KEY);
+      const storedVetNearFlow = readStoredFlowSession(
+        ASK_VET_NEAR_STANDALONE_KEY,
+      );
       setFlowModal({
         kind: isVetNearPaymentReady(storedVetNearFlow)
           ? "vet-payment"
@@ -2631,7 +2689,7 @@ export default function AskPage() {
 
     if (route === "/video-call-pet-details") {
       const storedVideoCallFlow = readStoredFlowSession(
-        ASK_VIDEO_CALL_STANDALONE_KEY
+        ASK_VIDEO_CALL_STANDALONE_KEY,
       );
       setFlowModal({
         kind: isVideoCallPaymentReady(storedVideoCallFlow)
@@ -2677,7 +2735,11 @@ export default function AskPage() {
     const deeplinkRoute = DEEPLINK_ROUTE_MAP[deeplink];
     if (deeplinkRoute) {
       if (openAskFlowModal(deeplinkRoute)) return;
-      navigateToAskTarget(navigate, deeplinkRoute, getAskRouteOptions(deeplinkRoute));
+      navigateToAskTarget(
+        navigate,
+        deeplinkRoute,
+        getAskRouteOptions(deeplinkRoute),
+      );
       return;
     }
 
@@ -2688,14 +2750,14 @@ export default function AskPage() {
 
   const handleReset = async () => {
     const confirmed = window.confirm(
-      "Start a fresh symptom check? This will clear the current conversation."
+      "Start a fresh symptom check? This will clear the current conversation.",
     );
     if (!confirmed) return;
 
     if (sessionId) {
       try {
         await apiPostJson(
-          `/api/symptom-session/${encodeURIComponent(sessionId)}/reset`
+          `/api/symptom-session/${encodeURIComponent(sessionId)}/reset`,
         );
       } catch {
         // Clear local state even if the backend reset call fails.
@@ -2715,6 +2777,8 @@ export default function AskPage() {
     setIntakeErrors({});
     setLocating(false);
     locationLookupRef.current += 1;
+    pendingScrollEntryIdRef.current = null;
+    setFlowModal(null);
     setLocationStatus({ type: "", text: "" });
     clearStoredState();
     clearStoredUiState();
@@ -2725,7 +2789,9 @@ export default function AskPage() {
     freeChecksLeft > 0
       ? `${freeChecksLeft} free checks left`
       : "Free checks used today";
-  const canSendMessage = Boolean(String(inputValue || "").trim() || pendingAttachment);
+  const canSendMessage = Boolean(
+    String(inputValue || "").trim() || pendingAttachment,
+  );
 
   let flowModalContent = null;
   if (flowModal?.kind === "vet-pet-details") {
@@ -2804,7 +2870,11 @@ export default function AskPage() {
         <meta name="twitter:description" content={ASK_DESCRIPTION} />
         <link rel="canonical" href={ASK_CANONICAL} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
         <link
           href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
           rel="stylesheet"
@@ -2829,10 +2899,10 @@ export default function AskPage() {
         🐾 Free AI Pet Health Check · snoutiq.com/ask · No signup needed
       </div>
 
-        <div className="ask-nav">
-          <div className="ask-logo">
-            <img
-              src={logo}
+      <div className="ask-nav">
+        <div className="ask-logo">
+          <img
+            src={logo}
             alt="SnoutIQ"
             className="ask-logo-image"
             width={130}
@@ -2916,7 +2986,9 @@ export default function AskPage() {
                     onCopyLink={handleCopyLink}
                     onFollowUpAnswer={handleFollowUpAnswer}
                     followUpPending={
-                      followUpPending?.entryId === entry.id ? followUpPending : null
+                      followUpPending?.entryId === entry.id
+                        ? followUpPending
+                        : null
                     }
                   />
                 );
@@ -2992,7 +3064,10 @@ export default function AskPage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {[pendingAttachment?.name, formatBytes(pendingAttachment?.size)]
+                    {[
+                      pendingAttachment?.name,
+                      formatBytes(pendingAttachment?.size),
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </div>
@@ -3008,7 +3083,9 @@ export default function AskPage() {
                     alignItems: "center",
                     justifyContent: "center",
                   }}
-                  onClick={() => clearPendingAttachment({ revokePreview: true })}
+                  onClick={() =>
+                    clearPendingAttachment({ revokePreview: true })
+                  }
                   disabled={loading}
                   aria-label="Remove attached image"
                 >
@@ -3049,7 +3126,12 @@ export default function AskPage() {
                 disabled={loading || intakeOpen}
                 aria-label="Attach pet image"
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  width="18"
+                  height="18"
+                >
                   <path
                     d="M16.5 6.5v8.75a4.25 4.25 0 1 1-8.5 0V5.75a2.75 2.75 0 1 1 5.5 0v8.5a1.25 1.25 0 1 1-2.5 0V7.5"
                     fill="none"

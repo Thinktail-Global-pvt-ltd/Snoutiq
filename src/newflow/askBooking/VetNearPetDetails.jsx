@@ -28,6 +28,8 @@ const DEFAULT_STATE = {
     otherPetType: "",
     dob: "",
     sex: "",
+    dateOfVisit: "",
+    timeOfVisit: "",
     issue: "",
     symptoms: [],
     vaccinationStatus: "",
@@ -102,7 +104,7 @@ const normalizeState = (input) => {
   return {
     lead: {
       ownerName: pickText(lead.ownerName, raw.ownerName),
-      phone: pickText(lead.phone, raw.phone, raw.ownerMobile),
+      phone: normalizePhoneInput(pickText(lead.phone, raw.phone, raw.ownerMobile)),
       species: speciesResult.species,
       area: pickText(lead.area, raw.area, raw.location),
       reason: pickText(lead.reason, raw.reason, raw.problemText),
@@ -122,6 +124,18 @@ const normalizeState = (input) => {
         raw.birthDate
       ),
       sex: pickText(pet.sex, raw.sex),
+      dateOfVisit: pickText(
+        pet.dateOfVisit,
+        pet.date_of_visit,
+        raw.dateOfVisit,
+        raw.date_of_visit
+      ),
+      timeOfVisit: pickText(
+        pet.timeOfVisit,
+        pet.time_of_visit,
+        raw.timeOfVisit,
+        raw.time_of_visit
+      ),
       issue: pickText(pet.issue, raw.issue, raw.problemText, lead.reason, raw.reason),
       symptoms: normalizeSymptoms(pet.symptoms ?? raw.symptoms),
       vaccinationStatus: pickText(pet.vaccinationStatus, raw.vaccinationStatus),
@@ -171,7 +185,7 @@ const mergeNormalizedStates = (...values) =>
       return {
         lead: {
           ownerName: pickText(next.lead.ownerName, current.lead.ownerName),
-          phone: pickText(next.lead.phone, current.lead.phone),
+          phone: normalizePhoneInput(pickText(next.lead.phone, current.lead.phone)),
           species: speciesResult.species,
           area: pickText(next.lead.area, current.lead.area),
           reason: pickText(
@@ -187,6 +201,8 @@ const mergeNormalizedStates = (...values) =>
           otherPetType: speciesResult.otherPetType,
           dob: pickText(next.pet.dob, current.pet.dob),
           sex: pickText(next.pet.sex, current.pet.sex),
+          dateOfVisit: pickText(next.pet.dateOfVisit, current.pet.dateOfVisit),
+          timeOfVisit: pickText(next.pet.timeOfVisit, current.pet.timeOfVisit),
           issue: pickText(
             next.pet.issue,
             next.lead.reason,
@@ -280,12 +296,18 @@ function clearStandaloneVetNearMeState() {
   window.sessionStorage.removeItem(STORAGE_KEY);
 }
 
-const isValidPhone = (value) => String(value || "").replace(/\D/g, "").length >= 10;
+const normalizePhoneInput = (value) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 10);
+
+const isValidPhone = (value) => normalizePhoneInput(value).length === 10;
 
 export default function VetNearPetDetails({ initialState, onBack, onContinue }) {
   const navigate = useNavigate();
   const location = useLocation();
   const fieldIdPrefix = useId();
+  const today = new Date().toISOString().slice(0, 10);
   const storedStandaloneState = readStandaloneVetNearMeState();
   const routeState =
     initialState && typeof initialState === "object"
@@ -435,7 +457,8 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
   };
 
   const updateLead = (field, value) => {
-    setFormState((current) => ({ ...current, lead: { ...current.lead, [field]: value } }));
+    const nextValue = field === "phone" ? normalizePhoneInput(value) : value;
+    setFormState((current) => ({ ...current, lead: { ...current.lead, [field]: nextValue } }));
     clearError(field);
   };
 
@@ -476,6 +499,8 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
     if (!isValidPhone(formState.lead.phone)) nextErrors.phone = "Please enter a valid phone number.";
     if (!formState.lead.species) nextErrors.species = "Please select your pet type.";
     if (!formState.pet.petName.trim()) nextErrors.petName = "Please enter your pet's name.";
+    if (!formState.pet.dateOfVisit) nextErrors.dateOfVisit = "Please select the visit date.";
+    if (!formState.pet.timeOfVisit) nextErrors.timeOfVisit = "Please select the visit time.";
     if (!formState.pet.issue.trim()) nextErrors.issue = "Please describe today's concern.";
     if (showOtherPetTypeField && !formState.pet.otherPetType.trim()) {
       nextErrors.otherPetType = "Please enter your pet type.";
@@ -598,209 +623,11 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
             [&_.cta]:mt-7 [&_.cta]:inline-flex [&_.cta]:w-full [&_.cta]:items-center [&_.cta]:justify-center [&_.cta]:rounded-2xl [&_.cta]:bg-[linear-gradient(135deg,#2457ff_0%,#1d4ed8_100%)] [&_.cta]:px-4 [&_.cta]:py-4 [&_.cta]:text-sm [&_.cta]:font-semibold [&_.cta]:text-white [&_.cta]:shadow-[0_18px_35px_-18px_rgba(37,99,235,0.75)] hover:[&_.cta]:translate-y-[-1px] disabled:[&_.cta]:cursor-not-allowed disabled:[&_.cta]:opacity-60
             [&_.cta-note]:mt-3 [&_.cta-note]:text-center [&_.cta-note]:text-xs [&_.cta-note]:text-slate-500`}
         >
-  
-      {hasHiddenSavedDetails ? (
-        <div className="mb-6 rounded-[24px] border border-[#dbe7ff] bg-[#f8fbff] p-4 shadow-[0_12px_32px_-24px_rgba(37,99,235,0.35)]">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-3">
-                {hiddenSavedSummaryRows.map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-2xl border border-[#d6e3ff] bg-white px-4 py-3"
-                  >
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      {item.label}
-                    </div>
-                    <div className="mt-1 text-sm font-medium text-slate-900">
-                      {item.value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={revealAllPrefilledFields}
-              className="inline-flex items-center justify-center rounded-full border border-[#c8d7ff] bg-white px-4 py-2 text-sm font-semibold text-[#2457ff] transition hover:border-[#9fb8ff] hover:bg-[#f8fbff]"
-            >
-              Edit saved details
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {showYourDetailsSection ? <div className="sdiv">Your details</div> : null}
-      {showOwnerNameField || showPhoneField ? (
-        <div className="half">
-          {showOwnerNameField ? (
-            <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-ownerName`}>Your name <span className="required-mark">*</span></label>
-              <input
-                id={`${fieldIdPrefix}-ownerName`}
-                type="text"
-                className={errors.ownerName ? "input-error" : ""}
-                value={formState.lead.ownerName}
-                onChange={(event) => updateLead("ownerName", event.target.value)}
-                placeholder="Enter your name"
-              />
-              {errors.ownerName ? <div className="field-error">{errors.ownerName}</div> : null}
-            </div>
-          ) : null}
-          {showPhoneField ? (
-            <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-phone`}>Phone number <span className="required-mark">*</span></label>
-              <input
-                id={`${fieldIdPrefix}-phone`}
-                type="tel"
-                className={errors.phone ? "input-error" : ""}
-                value={formState.lead.phone}
-                onChange={(event) => updateLead("phone", event.target.value)}
-                placeholder="Enter phone number"
-              />
-              {errors.phone ? <div className="field-error">{errors.phone}</div> : null}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {showSpeciesField || showAreaField ? (
-        <div className="half">
-          {showSpeciesField ? (
-            <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-species`}>Pet type <span className="required-mark">*</span></label>
-              <select
-                id={`${fieldIdPrefix}-species`}
-                className={errors.species ? "input-error" : ""}
-                value={formState.lead.species}
-                onChange={(event) => handleSpeciesChange(event.target.value)}
-              >
-                <option value="">Select pet type</option>
-                {PET_TYPE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-              {errors.species ? <div className="field-error">{errors.species}</div> : null}
-            </div>
-          ) : null}
-          {showAreaField ? (
-            <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-area`}>Area</label>
-              <input
-                id={`${fieldIdPrefix}-area`}
-                type="text"
-                list={areaListId}
-                value={formState.lead.area}
-                onChange={(event) => updateLead("area", event.target.value)}
-                placeholder="Enter your area"
-              />
-              <datalist id={areaListId}>
-                {AREA_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </datalist>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {showReasonField ? (
-        <div className="field">
-          <label htmlFor={`${fieldIdPrefix}-reason`}>Reason for visit</label>
-          <input
-            id={`${fieldIdPrefix}-reason`}
-            type="text"
-            list={reasonListId}
-            value={formState.lead.reason}
-            onChange={(event) => updateLead("reason", event.target.value)}
-            placeholder="Enter reason for visit"
-          />
-          <datalist id={reasonListId}>
-            {REASON_OPTIONS.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </datalist>
-        </div>
-      ) : null}
 
       {showPetProfileSection ? <div className="sdiv">Pet profile</div> : null}
-      {showPetNameField || showOtherPetTypeInput || showBreedField ? (
-        <div className="half">
-          {showPetNameField ? (
-            <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-petName`}>Pet&apos;s name <span className="required-mark">*</span></label>
-              <input
-                id={`${fieldIdPrefix}-petName`}
-                type="text"
-                className={errors.petName ? "input-error" : ""}
-                value={formState.pet.petName}
-                onChange={(event) => updatePet("petName", event.target.value)}
-                placeholder="Enter your pet's name"
-              />
-              {errors.petName ? <div className="field-error">{errors.petName}</div> : null}
-            </div>
-          ) : null}
-
-          {showOtherPetTypeInput ? (
-            <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-otherPetType`}>Pet type <span className="required-mark">*</span></label>
-              <input
-                id={`${fieldIdPrefix}-otherPetType`}
-                type="text"
-                className={errors.otherPetType ? "input-error" : ""}
-                value={formState.pet.otherPetType}
-                onChange={(event) => updatePet("otherPetType", event.target.value)}
-                placeholder="Enter your pet type"
-              />
-              {errors.otherPetType ? <div className="field-error">{errors.otherPetType}</div> : null}
-            </div>
-          ) : null}
-
-          {showBreedField ? (
-            usesBreedApi && !breedLoadError ? (
-              <div className="field">
-                <label htmlFor={`${fieldIdPrefix}-breed`}>Breed</label>
-                <input
-                  id={`${fieldIdPrefix}-breed`}
-                  type="text"
-                  list={breedListId}
-                  value={formState.pet.breed}
-                  onChange={(event) => updatePet("breed", event.target.value)}
-                  disabled={isBreedsLoading}
-                  placeholder={isBreedsLoading ? "Loading breeds..." : "Enter or select breed"}
-                />
-                <datalist id={breedListId}>
-                  {selectBreedOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </datalist>
-              </div>
-            ) : (
-              <div className="field">
-                <label htmlFor={`${fieldIdPrefix}-breed`}>Breed</label>
-                <input
-                  id={`${fieldIdPrefix}-breed`}
-                  type="text"
-                  value={formState.pet.breed}
-                  onChange={(event) => updatePet("breed", event.target.value)}
-                  placeholder="Enter breed"
-                />
-                {usesBreedApi && breedLoadError ? <div className="fhint">Couldn&apos;t load breeds right now. Enter breed manually.</div> : null}
-              </div>
-            )
-          ) : null}
-        </div>
-      ) : null}
 
       {showDobField || showSexField ? (
         <div className="half">
-          {showDobField ? (
-            <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-dob`}>Date of birth</label>
-              <input id={`${fieldIdPrefix}-dob`} type="date" value={formState.pet.dob} onChange={(event) => updatePet("dob", event.target.value)} />
-              <div className="fhint">Approximate is fine</div>
-            </div>
-          ) : null}
           {showSexField ? (
             <div className="field">
               <label htmlFor={`${fieldIdPrefix}-sex`}>Gender</label>
@@ -815,20 +642,32 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
         </div>
       ) : null}
 
-      <div className="sdiv">Today&apos;s concern</div>
-      {showIssueField ? (
+      <div className="sdiv">Visit schedule</div>
+      <div className="half">
         <div className="field">
-          <label htmlFor={`${fieldIdPrefix}-issue`}>Describe what you&apos;ve noticed <span className="required-mark">*</span></label>
-          <textarea
-            id={`${fieldIdPrefix}-issue`}
-            className={errors.issue ? "input-error" : ""}
-            value={formState.pet.issue}
-            onChange={(event) => updatePet("issue", event.target.value)}
-            placeholder="Enter what you have noticed"
+          <label htmlFor={`${fieldIdPrefix}-dateOfVisit`}>Preferred visit date <span className="required-mark">*</span></label>
+          <input
+            id={`${fieldIdPrefix}-dateOfVisit`}
+            type="date"
+            min={today}
+            className={errors.dateOfVisit ? "input-error" : ""}
+            value={formState.pet.dateOfVisit}
+            onChange={(event) => updatePet("dateOfVisit", event.target.value)}
           />
-          {errors.issue ? <div className="field-error">{errors.issue}</div> : null}
+          {errors.dateOfVisit ? <div className="field-error">{errors.dateOfVisit}</div> : null}
         </div>
-      ) : null}
+        <div className="field">
+          <label htmlFor={`${fieldIdPrefix}-timeOfVisit`}>Preferred visit time <span className="required-mark">*</span></label>
+          <input
+            id={`${fieldIdPrefix}-timeOfVisit`}
+            type="time"
+            className={errors.timeOfVisit ? "input-error" : ""}
+            value={formState.pet.timeOfVisit}
+            onChange={(event) => updatePet("timeOfVisit", event.target.value)}
+          />
+          {errors.timeOfVisit ? <div className="field-error">{errors.timeOfVisit}</div> : null}
+        </div>
+      </div>
 
       {showMedicalHistorySection ? <div className="sdiv">Medical history</div> : null}
       {showVaccinationField || showDewormingField ? (

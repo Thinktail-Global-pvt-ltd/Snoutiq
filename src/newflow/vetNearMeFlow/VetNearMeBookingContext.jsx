@@ -6,6 +6,11 @@ import {
 
 const VetNearMeBookingContext = createContext(null);
 
+const normalizePhoneInput = (value) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 10);
+
 const mergeBookingState = (storedState = {}) => {
   const mergedBooking = {
     ...DEFAULT_BOOKING_STATE.booking,
@@ -21,6 +26,7 @@ const mergeBookingState = (storedState = {}) => {
     lead: {
       ...DEFAULT_BOOKING_STATE.lead,
       ...(storedState.lead || {}),
+      phone: normalizePhoneInput(storedState.lead?.phone),
     },
     pet: {
       ...DEFAULT_BOOKING_STATE.pet,

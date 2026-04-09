@@ -109,6 +109,8 @@ export async function submitPetDetailsStep({ bookingId, petData, species }) {
     breed: breedValue,
     pet_dob: petData.dob || null,
     pet_sex: petData.sex || null,
+    date_of_visit: petData.dateOfVisit || null,
+    time_of_visit: petData.timeOfVisit || null,
     issue_description: petData.issue || null,
     symptoms: petData.symptoms || [],
     vaccination_status: petData.vaccinationStatus || null,

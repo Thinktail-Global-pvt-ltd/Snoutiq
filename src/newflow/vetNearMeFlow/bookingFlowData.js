@@ -35,6 +35,8 @@ export const DEFAULT_BOOKING_STATE = {
     otherPetType: "",
     dob: "",
     sex: "",
+    dateOfVisit: "",
+    timeOfVisit: "",
     issue: "",
     symptoms: [],
     vaccinationStatus: "",

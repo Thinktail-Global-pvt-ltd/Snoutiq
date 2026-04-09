@@ -1016,77 +1016,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                   </section>
                 ) : null}
 
-                {showOwnerSection ? (
-                  <section className={cardBase}>
-                    <div className={cardHeaderBase}>
-                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
-                        <User size={20} className="text-[#3998de]" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-base">Personal details</h3>
-                      </div>
-                    </div>
-
-                    <div className={cardBodyBase}>
-                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-                        {showOwnerNameField ? (
-                          <div className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                              Pet Owner Name <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                              <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                              <input
-                                type="text"
-                                value={details.ownerName}
-                                onChange={(event) => updateField("ownerName", event.target.value)}
-                                placeholder="Enter your full name"
-                                className={`${fieldBase} pl-12 md:pl-12`}
-                              />
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {showOwnerMobileField ? (
-                          <div className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                              Mobile Number <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                              <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                              <input
-                                type="tel"
-                                value={details.ownerMobile}
-                                onChange={(event) => updateField("ownerMobile", normalizePhoneInput(event.target.value))}
-                                placeholder="10-digit mobile number"
-                                className={`${fieldBase} pl-12 md:pl-12`}
-                                inputMode="numeric"
-                              />
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {showCityField ? (
-                          <div className="space-y-2 md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                              City <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                              <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                              <input
-                                type="text"
-                                value={details.city}
-                                onChange={(event) => updateField("city", event.target.value)}
-                                placeholder="Enter city (e.g. Gurugram)"
-                                className={`${fieldBase} pl-12 md:pl-12`}
-                              />
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </section>
-                ) : null}
 
                 {showPetSection ? (
                   <section className={cardBase}>
@@ -1103,24 +1032,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                     <div className={cardBodyBase}>
                       {showPetNameField || showGenderField ? (
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-                          {showPetNameField ? (
-                            <div className="space-y-2">
-                              <label className="block text-sm font-medium text-gray-700">
-                                Pet's Name <span className="text-red-500">*</span>
-                              </label>
-                              <div className="relative">
-                                <PawPrint size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                <input
-                                  type="text"
-                                  value={details.name}
-                                  onChange={(event) => updateField("name", event.target.value)}
-                                  placeholder="Enter your pet's name"
-                                  className={`${fieldBase} pl-12 md:pl-12`}
-                                />
-                              </div>
-                            </div>
-                          ) : null}
-
                           {showGenderField ? (
                             <div className="space-y-2">
                               <label className="block text-sm font-medium text-gray-700">
@@ -1147,116 +1058,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                         </div>
                       ) : null}
 
-                      {showTypeField ? (
-                        <div className="space-y-3">
-                          <label className="block text-sm font-medium text-gray-700">
-                            Pet Type <span className="text-red-500">*</span>
-                          </label>
-                          <div className="grid grid-cols-3 gap-3 md:gap-4">
-                            {["dog", "cat", "exotic"].map((type) => (
-                              <button
-                                key={type}
-                                type="button"
-                                onClick={() => {
-                                  setHasChangesSinceSubmit(true);
-                                  setSubmitError("");
-                                  revealField("breed");
-                                  revealField("exoticType");
-                                  setDetails((current) => ({
-                                    ...current,
-                                    type,
-                                    breed: "",
-                                    exoticType: "",
-                                  }));
-                                }}
-                                className={[
-                                  "rounded-xl border-2 px-3 py-3 flex flex-col items-center gap-2 transition-all duration-200",
-                                  "md:flex-row md:justify-center md:gap-2.5 md:px-3.5 md:py-3.5",
-                                  details.type === type
-                                    ? "border-[#3998de] bg-[#3998de]/5 text-[#3998de]"
-                                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100",
-                                ].join(" ")}
-                              >
-                                <div className={details.type === type ? "text-[#3998de]" : "text-gray-500"}>
-                                  {getPetTypeIcon(type)}
-                                </div>
-                                <span className="capitalize text-sm font-medium">{type}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {showBreedField ? (
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">
-                            Breed <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative" ref={breedDropdownRef}>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                !loadingBreeds && breedOptions.length
-                                  ? setBreedDropdownOpen((current) => !current)
-                                  : null
-                              }
-                              className={`${selectBase} text-left`}
-                              disabled={loadingBreeds || breedOptions.length === 0}
-                            >
-                              {loadingBreeds
-                                ? `Loading ${details.type || "pet"} breeds...`
-                                : selectedBreedLabel || `Select ${details.type || "pet"} breed`}
-                            </button>
-                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-
-                            {breedDropdownOpen ? (
-                              <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
-                                <div className="p-2 border-b border-gray-100">
-                                  <input
-                                    type="text"
-                                    value={breedSearch}
-                                    onChange={(event) => setBreedSearch(event.target.value)}
-                                    placeholder={`Search ${details.type || "pet"} breeds`}
-                                    className={fieldBase}
-                                    autoFocus
-                                  />
-                                </div>
-                                <div className="max-h-56 overflow-auto">
-                                  {filteredBreedOptions.length ? (
-                                    filteredBreedOptions.map((option) => (
-                                      <button
-                                        key={option.value}
-                                        type="button"
-                                        onClick={() => {
-                                          updateField("breed", option.value);
-                                          setBreedDropdownOpen(false);
-                                          setBreedSearch("");
-                                        }}
-                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                                          details.breed === option.value
-                                            ? "bg-gray-50 font-semibold text-gray-900"
-                                            : "text-gray-700"
-                                        }`}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))
-                                  ) : (
-                                    <div className="px-4 py-2 text-sm text-gray-500">No breeds found</div>
-                                  )}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                          {breedError ? (
-                            <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                              <AlertCircle size={12} />
-                              {breedError}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : null}
-
                       {showExoticTypeField ? (
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
@@ -1277,25 +1078,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
 
                       {showPetDobField || showWeightField ? (
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-                          {showPetDobField ? (
-                            <div className="space-y-2">
-                              <label className="block text-sm font-medium text-gray-700">
-                                Pet's Date of Birth <span className="text-red-500">*</span>
-                              </label>
-                              <div className="relative">
-                                <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                <input
-                                  type="date"
-                                  max={todayISO()}
-                                  value={details.petDob}
-                                  onChange={(event) => updateField("petDob", event.target.value)}
-                                  className={`${fieldBase} pl-12 md:pl-12`}
-                                />
-                              </div>
-                              {approxAge ? <p className="text-xs text-gray-500">Approx age: {approxAge}</p> : null}
-                            </div>
-                          ) : null}
-
                           {showWeightField ? (
                             <div className="space-y-2">
                               <label className="block text-sm font-medium text-gray-700">Weight (kg)</label>
@@ -1332,26 +1114,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                     </div>
 
                     <div className={cardBodyBase}>
-                      {showProblemTextField ? (
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">
-                            Describe the issue <span className="text-red-500">*</span>
-                          </label>
-                          <textarea
-                            value={details.problemText}
-                            onChange={(event) => updateField("problemText", event.target.value)}
-                            placeholder="Tell us what symptoms you noticed, when they started, and anything important that changed."
-                            className={textareaBase}
-                          />
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-500">More detail helps us submit the request correctly.</span>
-                            <span className={visibleProblemTextLength > 10 ? "text-emerald-600" : "text-gray-400"}>
-                              {visibleProblemTextLength}/10+ characters
-                            </span>
-                          </div>
-                        </div>
-                      ) : null}
-
                       {showEnergyField || showAppetiteField || showMoodField ? (
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
                           {showEnergyField ? (

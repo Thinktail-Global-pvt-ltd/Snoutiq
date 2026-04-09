@@ -9,8 +9,12 @@ import { useVetNearMeBooking } from "./VetNearMeBookingContext";
 
 const isValidPhone = (value) =>
   String(value || "")
-    .replace(/\s/g, "")
-    .replace(/[^\d+]/g, "").length >= 10;
+    .replace(/\D/g, "").length === 10;
+
+const normalizePhoneInput = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.slice(0, 10);
+};
 
 export default function VetNearMeLeadPage() {
   const navigate = useNavigate();
@@ -30,7 +34,9 @@ export default function VetNearMeLeadPage() {
   const reasonTextareaId = `${fieldIdPrefix}-lead-reason`;
 
   const handleLeadChange = (field, value) => {
-    updateLead({ [field]: value });
+    updateLead({
+      [field]: field === "phone" ? normalizePhoneInput(value) : value,
+    });
 
     setErrors((currentErrors) => {
       if (!currentErrors[field]) {
@@ -137,8 +143,10 @@ export default function VetNearMeLeadPage() {
           id={phoneInputId}
           type="tel"
           className={errors.phone ? "input-error" : ""}
-          placeholder="+91 98xxxxxxxx"
+          placeholder="98xxxxxxxx"
           autoComplete="tel"
+          inputMode="numeric"
+          maxLength={10}
           aria-invalid={Boolean(errors.phone)}
           value={bookingState.lead.phone}
           onChange={(event) => handleLeadChange("phone", event.target.value)}
