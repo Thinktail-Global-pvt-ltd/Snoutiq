@@ -358,6 +358,13 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
         : "border-blue-200 bg-blue-50 text-blue-700";
 
   const setStatus = (type, text) => setPaymentMessage({ type, text });
+  const payButtonHelperText = isPaid
+    ? "Payment already completed for this booking."
+    : !isReady
+      ? "Booking details are incomplete. Please review the form first."
+      : isGatewayLoading
+        ? "Preparing secure payment checkout..."
+        : "";
 
   useEffect(() => {
     if (!isPaid || successfulPayment) return;
@@ -645,6 +652,12 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
               Secure
             </div>
           </div>
+
+          {payButtonHelperText ? (
+            <p className="mb-3 text-xs font-medium text-slate-500">
+              {payButtonHelperText}
+            </p>
+          ) : null}
 
           <button
             type="button"

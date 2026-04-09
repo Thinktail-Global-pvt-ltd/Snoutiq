@@ -67,14 +67,14 @@ const YES_NO_OPTIONS = [
 ];
 
 const fieldBase =
-  "w-full rounded-2xl border border-[#d6e3ff] bg-[#fbfdff] p-3 text-[#0f172a] placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-[#4f6bff]/12 focus:border-[#4f6bff] hover:border-[#bfd0ff] disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed md:p-3.5 md:text-[15px]";
+  "w-full rounded-xl border border-[#d6e3ff] bg-[#fbfdff] px-3 py-2.5 text-sm text-[#0f172a] placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-[#4f6bff]/12 focus:border-[#4f6bff] hover:border-[#bfd0ff] disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed md:px-3.5 md:py-3";
 const selectBase = `${fieldBase} appearance-none pr-12`;
-const textareaBase = `${fieldBase} resize-none min-h-[120px]`;
+const textareaBase = `${fieldBase} resize-none min-h-[104px]`;
 const cardBase =
-  "overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-white/95 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)] backdrop-blur";
+  "overflow-hidden rounded-[24px] border border-[#d6e3ff] bg-white/95 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)] backdrop-blur";
 const cardHeaderBase =
-  "flex items-center gap-3 border-b border-[#e7efff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-5 py-4";
-const cardBodyBase = "px-5 py-5 space-y-4";
+  "flex items-center gap-3 border-b border-[#e7efff] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3.5";
+const cardBodyBase = "px-4 py-4 space-y-3.5";
 
 const pickValue = (...values) => {
   for (const value of values) {
@@ -386,6 +386,19 @@ const getPetTypeIcon = (type) => {
   }
 };
 
+const getPetTypeLabel = (type) => {
+  switch (type) {
+    case "dog":
+      return "Dog";
+    case "cat":
+      return "Cat";
+    case "exotic":
+      return "Exotic";
+    default:
+      return "";
+  }
+};
+
 export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   void vet;
   const location = useLocation();
@@ -448,6 +461,12 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const revealField = (field) => {
     setHiddenPrefillFields((current) =>
       current[field] ? { ...current, [field]: false } : current
+    );
+  };
+
+  const revealAllPrefilledFields = () => {
+    setHiddenPrefillFields((current) =>
+      Object.fromEntries(Object.keys(current).map((key) => [key, false]))
     );
   };
 
@@ -651,26 +670,30 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const showDewormingField = shouldShowField("dewormingYesNo");
   const showMedicalSection =
     showIsNeuteredField || showVaccinatedField || showDewormingField;
-  const isValid =
-    details.ownerName.trim() &&
-    phoneDigits.length === 10 &&
-    details.city.trim().length > 1 &&
-    details.name.trim() &&
-    details.type &&
-    details.petDob &&
-    details.gender &&
-    (!showBreed || details.breed) &&
-    (!isExotic || details.exoticType.trim()) &&
-    details.problemText.trim().length > 10 &&
-    details.lastDaysEnergy &&
-    details.lastDaysAppetite &&
-    details.mood &&
-    details.isNeutered !== "" &&
-    details.vaccinatedYesNo !== "" &&
-    details.dewormingYesNo !== "" &&
-    (canReuseExistingSubmission || (details.hasPhoto && uploadFile));
+  const hiddenSavedCount = Object.values(hiddenPrefillFields).filter(Boolean).length;
+  const hasHiddenSavedDetails = hiddenSavedCount > 0;
+  const hiddenSavedSummaryRows = [
+    {
+      label: "Parent",
+      value: [details.ownerName, details.ownerMobile].filter(Boolean).join(" • "),
+    },
+    {
+      label: "Pet",
+      value: [
+        details.name,
+        getPetTypeLabel(details.type),
+        details.type === "exotic" ? details.exoticType : selectedBreedLabel || details.breed,
+      ]
+        .filter(Boolean)
+        .join(" • "),
+    },
+    {
+      label: "Location",
+      value: details.city,
+    },
+  ].filter((item) => item.value);
 
-  const getSubmitTooltip = () => {
+  const getStepOneTooltip = () => {
     if (!details.ownerName.trim()) return "Please enter owner name";
     if (phoneDigits.length !== 10) return "Please enter 10-digit mobile number";
     if (!details.city.trim()) return "Please enter city name";
@@ -680,6 +703,10 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
     if (isExotic && !details.exoticType.trim()) return "Please specify your pet type";
     if (showBreed && !details.breed) return "Please select breed";
     if (!details.petDob) return "Please select pet's date of birth";
+    return "";
+  };
+
+  const getStepTwoTooltip = () => {
     if (details.problemText.trim().length <= 10) {
       return "Please describe the problem in detail (minimum 10 characters)";
     }
@@ -689,11 +716,30 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
     if (details.isNeutered === "") return "Please select neutered status";
     if (details.vaccinatedYesNo === "") return "Please select vaccination status";
     if (details.dewormingYesNo === "") return "Please select deworming status";
+    return "";
+  };
+
+  const getStepThreeTooltip = () => {
     if (!canReuseExistingSubmission && (!details.hasPhoto || !uploadFile)) {
       return "Please upload a photo or PDF";
     }
     return "";
   };
+
+  const stepOneReady = !getStepOneTooltip();
+  const stepTwoReady = !getStepTwoTooltip();
+  const stepThreeReady = !getStepThreeTooltip();
+  const isValid = stepOneReady && stepTwoReady && stepThreeReady;
+
+  const getSubmitTooltip = () => {
+    const stepOneTooltip = getStepOneTooltip();
+    if (stepOneTooltip) return stepOneTooltip;
+    const stepTwoTooltip = getStepTwoTooltip();
+    if (stepTwoTooltip) return stepTwoTooltip;
+    return getStepThreeTooltip();
+  };
+  const submitTooltip = getSubmitTooltip();
+  const primaryButtonLabel = "Continue to Payment";
 
   const continueToPayment = (petPayload, paymentPayload) => {
     const nextPaymentMeta = stripEmpty({
@@ -946,6 +992,46 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
 
 
               <div className="mt-6 space-y-6">
+                {hasHiddenSavedDetails ? (
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
+                        <BadgeCheck size={20} className="text-[#3998de]" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-base">Saved details applied</h3>
+                        <p className="text-xs text-gray-500">
+                          {hiddenSavedCount} fields are hidden to keep this form short.
+                        </p>
+                      </div>
+                    </div>
+                    <div className={cardBodyBase}>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {hiddenSavedSummaryRows.map((item) => (
+                          <div
+                            key={item.label}
+                            className="rounded-xl border border-[#e5ecff] bg-[#f8fbff] px-3.5 py-2.5"
+                          >
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              {item.label}
+                            </div>
+                            <div className="mt-1 text-sm font-medium text-slate-900">
+                              {item.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={revealAllPrefilledFields}
+                        className="inline-flex items-center justify-center rounded-full border border-[#c8d7ff] bg-white px-3.5 py-1.5 text-sm font-semibold text-[#2457ff] transition hover:border-[#9fb8ff] hover:bg-[#f8fbff]"
+                      >
+                        Edit saved details
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
+
                 {showOwnerSection ? (
                   <section className={cardBase}>
                     <div className={cardHeaderBase}>
@@ -1106,8 +1192,8 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                                   }));
                                 }}
                                 className={[
-                                  "p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all duration-200",
-                                  "md:p-5 md:flex-row md:justify-center md:gap-3 md:rounded-2xl",
+                                  "rounded-xl border-2 px-3 py-3 flex flex-col items-center gap-2 transition-all duration-200",
+                                  "md:flex-row md:justify-center md:gap-2.5 md:px-3.5 md:py-3.5",
                                   details.type === type
                                     ? "border-[#3998de] bg-[#3998de]/5 text-[#3998de]"
                                     : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100",
@@ -1116,7 +1202,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                                 <div className={details.type === type ? "text-[#3998de]" : "text-gray-500"}>
                                   {getPetTypeIcon(type)}
                                 </div>
-                                <span className="capitalize text-sm font-medium md:text-base">{type}</span>
+                                <span className="capitalize text-sm font-medium">{type}</span>
                               </button>
                             ))}
                           </div>
@@ -1420,7 +1506,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                     <label
                       htmlFor="petUploadGallery"
                       className={[
-                        "flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 md:h-48 md:rounded-2xl",
+                        "flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 md:h-44",
                         isDragging ? "border-[#3998de] bg-[#3998de]/5 ring-4 ring-[#3998de]/10" : "border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400",
                         details.hasPhoto && uploadFile ? "bg-emerald-50/30 border-emerald-300" : "",
                       ].join(" ")}
@@ -1441,7 +1527,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                         {details.hasPhoto && uploadFile ? (
                           <>
                             <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-3 md:w-12 md:h-12" />
-                            <p className="mb-1 text-sm text-gray-700 font-medium md:text-base">File ready to upload</p>
+                            <p className="mb-1 text-sm text-gray-700 font-medium md:text-base">1 file attached successfully</p>
       </>
                         ) : (
                           <>
@@ -1507,7 +1593,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                                 }}
                                 className="text-xs font-medium text-red-600 hover:text-red-700 hover:underline"
                               >
-                                Remove
+                                Replace file
                               </button>
                             </div>
                           </div>
@@ -1523,7 +1609,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                   </div>
                 </section>
 
-                <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
+                <div className="rounded-[24px] border border-[#d6e3ff] bg-white/95 p-4 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
 
                   {submitError ? (
                     <div className="mb-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
@@ -1535,8 +1621,8 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                   <Button
                     onClick={handleSubmitClick}
                     disabled={!isValid || submitting}
-                    title={!isValid ? getSubmitTooltip() : undefined}
-                    className={`hidden w-full rounded-2xl text-base font-semibold md:inline-flex md:py-4 ${
+                    title={!isValid ? submitTooltip : undefined}
+                    className={`hidden w-full rounded-xl text-sm font-semibold md:inline-flex md:py-3.5 ${
                       !isValid || submitting
                         ? "cursor-not-allowed bg-slate-300 text-white opacity-50 hover:bg-slate-300"
                         : "bg-[linear-gradient(135deg,#1457ff_0%,#2563eb_55%,#5b8dff_100%)] text-white shadow-[0_20px_45px_-22px_rgba(20,87,255,0.7)]"
@@ -1548,7 +1634,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                         Submitting...
                       </span>
                     ) : (
-                      "Continue to Payment"
+                      primaryButtonLabel
                     )}
                   </Button>
 
@@ -1569,13 +1655,15 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                     <div className="mt-4 hidden rounded-2xl border border-amber-200 bg-amber-50 p-3 md:block">
                       <p className="text-xs text-amber-700 flex items-center gap-1.5">
                         <AlertCircle size={14} />
-                        {getSubmitTooltip()}
+                        {submitTooltip}
                       </p>
                     </div>
                   ) : submitting ? (
                     <p className="mt-4 hidden text-center text-sm text-gray-500 md:block">Uploading your files...</p>
                   ) : (
-                    <p className="mt-4 hidden text-center text-sm text-slate-500 md:block">All fields completed. Ready for payment.</p>
+                    <p className="mt-4 hidden text-center text-sm text-slate-500 md:block">
+                      All details are ready. Continue to payment.
+                    </p>
                   )}
                 </div>
 
@@ -1597,9 +1685,13 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                   : "bg-[linear-gradient(135deg,#1457ff_0%,#2563eb_55%,#5b8dff_100%)] text-white shadow-[0_20px_45px_-22px_rgba(20,87,255,0.7)]"
               }
             >
-              {submitting ? "Submitting..." : "Continue to Payment"}
+              {submitting ? "Submitting..." : primaryButtonLabel}
             </Button>
-            {!isValid ? <p className="text-xs text-red-600 text-center px-2">{getSubmitTooltip()}</p> : null}
+            {!isValid ? (
+              <p className="text-xs text-red-600 text-center px-2">
+                {submitTooltip}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

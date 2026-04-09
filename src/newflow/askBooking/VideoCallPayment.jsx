@@ -477,6 +477,9 @@ export const VideoCallPayment = ({
   const acknowledgementCardClass = acknowledged
     ? "border-[#bcd2ff] bg-[#eff5ff]"
     : "border-[#dbe7ff] bg-white";
+  const payButtonHelperText = !acknowledged
+    ? "Please accept the consultation confirmation to continue."
+    : "";
 
   if (!petDetails || !hasPaymentContext) {
     return (
@@ -669,6 +672,12 @@ export const VideoCallPayment = ({
               </div>
             </div>
           </div>
+
+          {payButtonHelperText ? (
+            <p className="mb-3 text-xs font-medium text-slate-500">
+              {payButtonHelperText}
+            </p>
+          ) : null}
 
           <Button
             onClick={handlePay}

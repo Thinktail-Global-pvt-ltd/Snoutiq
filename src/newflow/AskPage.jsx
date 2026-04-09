@@ -353,6 +353,117 @@ const readStoredFlowSession = (storageKey) => {
   return safeParse(window.sessionStorage.getItem(storageKey), null);
 };
 
+const clearStoredFlowSession = (storageKey) => {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(storageKey);
+};
+
+const toResumeText = (...values) => {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return "";
+};
+
+const formatResumePetType = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+const buildResumeCards = () => {
+  const cards = [];
+  const storedVetNearFlow = readStoredFlowSession(ASK_VET_NEAR_STANDALONE_KEY);
+  const storedVideoFlow = readStoredFlowSession(ASK_VIDEO_CALL_STANDALONE_KEY);
+
+  const vetLead = storedVetNearFlow?.lead || {};
+  const vetPet = storedVetNearFlow?.pet || {};
+  const hasVetResume = Boolean(
+    toResumeText(
+      vetLead.ownerName,
+      vetLead.phone,
+      vetLead.species,
+      vetLead.area,
+      vetLead.reason,
+      vetPet.petName,
+      vetPet.issue,
+      vetPet.breed,
+      vetPet.otherPetType
+    ) ||
+      storedVetNearFlow?.booking?.bookingId ||
+      storedVetNearFlow?.booking?.petId ||
+      storedVetNearFlow?.progress?.petDetailsSubmitted ||
+      storedVetNearFlow?.progress?.paymentCompleted
+  );
+
+  if (hasVetResume) {
+    cards.push({
+      key: ASK_VET_NEAR_STANDALONE_KEY,
+      route: "/vet-near-me-pet-details",
+      title: "Previous booking found",
+      subtitle: isVetNearPaymentReady(storedVetNearFlow)
+        ? "Home vet visit is ready to resume from payment."
+        : "Home vet visit details are saved and ready to continue.",
+      summary: [
+        toResumeText(vetPet.petName),
+        toResumeText(vetLead.species, vetPet.otherPetType),
+        toResumeText(vetLead.area),
+      ]
+        .filter(Boolean)
+        .join(" • "),
+    });
+  }
+
+  const videoSource = {
+    ...(storedVideoFlow?.petDetails &&
+    typeof storedVideoFlow.petDetails === "object"
+      ? storedVideoFlow.petDetails
+      : {}),
+    ...(storedVideoFlow?.draft && typeof storedVideoFlow.draft === "object"
+      ? storedVideoFlow.draft
+      : {}),
+  };
+  const hasVideoResume = Boolean(
+    toResumeText(
+      videoSource.ownerName,
+      videoSource.ownerMobile,
+      videoSource.phone,
+      videoSource.city,
+      videoSource.name,
+      videoSource.petName,
+      videoSource.type,
+      videoSource.species,
+      videoSource.breed,
+      videoSource.problemText
+    ) ||
+      storedVideoFlow?.paymentMeta?.user_id ||
+      storedVideoFlow?.paymentMeta?.pet_id
+  );
+
+  if (hasVideoResume) {
+    cards.push({
+      key: ASK_VIDEO_CALL_STANDALONE_KEY,
+      route: "/video-call-pet-details",
+      title: "Previous booking found",
+      subtitle: isVideoCallPaymentReady(storedVideoFlow)
+        ? "Video consultation is ready to resume from payment."
+        : "Video consultation details are saved and ready to continue.",
+      summary: [
+        toResumeText(videoSource.name, videoSource.petName),
+        formatResumePetType(
+          toResumeText(videoSource.type, videoSource.species, videoSource.petType)
+        ),
+        toResumeText(videoSource.city, videoSource.location),
+      ]
+        .filter(Boolean)
+        .join(" • "),
+    });
+  }
+
+  return cards;
+};
+
 const isVetNearPaymentReady = (value) =>
   Boolean(
     value?.progress?.petDetailsSubmitted &&
@@ -1290,28 +1401,6 @@ function AssessmentCard({
             </div>
           </div>
 
-          <div className="ask-cta-stack">
-            {buttons?.primary ? (
-              <button
-                type="button"
-                className="ask-primary-cta"
-                style={{ backgroundColor: buttons.primary.color || "#1565C0" }}
-                onClick={() => onAction(buttons.primary, assessment)}
-              >
-                {buttons.primary.label}
-              </button>
-            ) : null}
-            {buttons?.secondary ? (
-              <button
-                type="button"
-                className="ask-secondary-cta"
-                onClick={() => onAction(buttons.secondary, assessment)}
-              >
-                {buttons.secondary.label}
-              </button>
-            ) : null}
-          </div>
-
           <div className="ask-result-body">
             <section className="ask-body-section">
               <div className="ask-body-label">What we think is happening</div>
@@ -1616,6 +1705,7 @@ export default function AskPage() {
   const [breedLoading, setBreedLoading] = useState(false);
   const [breedError, setBreedError] = useState("");
   const [flowModal, setFlowModal] = useState(null);
+  const [resumeCards, setResumeCards] = useState([]);
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState({
     type: "",
@@ -1664,6 +1754,10 @@ export default function AskPage() {
     if (!hydratedRef.current) return;
     writeStoredUiState({ inputValue, intakeOpen, pendingInitialRequest });
   }, [inputValue, intakeOpen, pendingInitialRequest]);
+
+  useEffect(() => {
+    setResumeCards(buildResumeCards());
+  }, [flowModal]);
 
   useEffect(() => {
     if (!toastMessage) return undefined;
@@ -2280,6 +2374,16 @@ export default function AskPage() {
     return true;
   };
 
+  const handleResumeBooking = (targetRoute) => {
+    openAskFlowModal(targetRoute);
+  };
+
+  const handleClearResumeBooking = (storageKey) => {
+    clearStoredFlowSession(storageKey);
+    setResumeCards(buildResumeCards());
+    setToastMessage("Saved booking cleared");
+  };
+
   const handleAction = (action, assessment) => {
     const type = String(action?.type || "").trim();
     const deeplink = String(action?.deeplink || "").trim();
@@ -2372,6 +2476,8 @@ export default function AskPage() {
           })
         }
         onPay={() => {
+          clearStoredFlowSession(ASK_VET_NEAR_STANDALONE_KEY);
+          setResumeCards(buildResumeCards());
           setFlowModal(null);
           setToastMessage("Payment successful");
         }}
@@ -2399,6 +2505,8 @@ export default function AskPage() {
           })
         }
         onPay={() => {
+          clearStoredFlowSession(ASK_VIDEO_CALL_STANDALONE_KEY);
+          setResumeCards(buildResumeCards());
           setFlowModal(null);
           setToastMessage("Payment successful");
         }}
@@ -2463,9 +2571,10 @@ export default function AskPage() {
           <button
             type="button"
             className="ask-nav-button"
-            onClick={() =>
-              navigateToAskTarget(navigate, "/20+vetsonline?start=details")
-            }
+            onClick={() => {
+              if (openAskFlowModal("/video-call-pet-details")) return;
+              navigateToAskTarget(navigate, "/video-call-pet-details");
+            }}
           >
             Consult ₹499
           </button>

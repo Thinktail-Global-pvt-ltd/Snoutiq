@@ -304,7 +304,9 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
       routeState
     )
   );
-  const [hiddenPrefillFields] = useState(() => buildHiddenPrefillFields(routePrefill));
+  const [hiddenPrefillFields, setHiddenPrefillFields] = useState(() =>
+    buildHiddenPrefillFields(routePrefill)
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBreedsLoading, setIsBreedsLoading] = useState(false);
   const [breedOptions, setBreedOptions] = useState([]);
@@ -366,6 +368,28 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
   const summaryPetType = showOtherPetTypeField
     ? formState.pet.otherPetType || "Other"
     : formState.lead.species || "Not selected";
+  const hiddenSavedCount = Object.values(hiddenPrefillFields).filter(Boolean).length;
+  const hasHiddenSavedDetails = hiddenSavedCount > 0;
+  const hiddenSavedSummaryRows = [
+    {
+      label: "Parent",
+      value: [formState.lead.ownerName, formState.lead.phone].filter(Boolean).join(" • "),
+    },
+    {
+      label: "Pet",
+      value: [
+        formState.pet.petName,
+        summaryPetType,
+        formState.pet.breed || formState.pet.otherPetType,
+      ]
+        .filter(Boolean)
+        .join(" • "),
+    },
+    {
+      label: "Location",
+      value: formState.lead.area,
+    },
+  ].filter((item) => item.value);
   const completedCount = [ownerReady, petReady, concernReady].filter(Boolean).length;
 
   useEffect(() => {
@@ -418,6 +442,12 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
   const updatePet = (field, value) => {
     setFormState((current) => ({ ...current, pet: { ...current.pet, [field]: value } }));
     clearError(field);
+  };
+
+  const revealAllPrefilledFields = () => {
+    setHiddenPrefillFields((current) =>
+      Object.fromEntries(Object.keys(current).map((key) => [key, false]))
+    );
   };
 
   const toggleSymptom = (value) => {
@@ -569,6 +599,45 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
             [&_.cta-note]:mt-3 [&_.cta-note]:text-center [&_.cta-note]:text-xs [&_.cta-note]:text-slate-500`}
         >
   
+      {hasHiddenSavedDetails ? (
+        <div className="mb-6 rounded-[24px] border border-[#dbe7ff] bg-[#f8fbff] p-4 shadow-[0_12px_32px_-24px_rgba(37,99,235,0.35)]">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2457ff]">
+                  Saved details applied
+                </div>
+                <p className="mt-1 text-sm text-slate-600">
+                  {hiddenSavedCount} fields are hidden to keep this form short.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {hiddenSavedSummaryRows.map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-2xl border border-[#d6e3ff] bg-white px-4 py-3"
+                  >
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      {item.label}
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-slate-900">
+                      {item.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={revealAllPrefilledFields}
+              className="inline-flex items-center justify-center rounded-full border border-[#c8d7ff] bg-white px-4 py-2 text-sm font-semibold text-[#2457ff] transition hover:border-[#9fb8ff] hover:bg-[#f8fbff]"
+            >
+              Edit saved details
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {showYourDetailsSection ? <div className="sdiv">Your details</div> : null}
       {showOwnerNameField || showPhoneField ? (
         <div className="half">
