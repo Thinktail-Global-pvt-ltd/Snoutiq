@@ -18,6 +18,8 @@ class HomeServiceRequiredByPet extends Model
         'pet_type',
         'area',
         'reason_for_visit',
+        'date_of_visit',
+        'time_of_visit',
         'concern_description',
         'symptoms',
         'vaccination_status',
@@ -40,6 +42,7 @@ class HomeServiceRequiredByPet extends Model
 
     protected $casts = [
         'symptoms' => 'array',
+        'date_of_visit' => 'date',
         'amount_payable' => 'decimal:2',
         'amount_paid' => 'decimal:2',
         'step1_completed_at' => 'datetime',

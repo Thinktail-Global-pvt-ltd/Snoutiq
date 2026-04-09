@@ -103,6 +103,8 @@ class HomeVetBookingController extends Controller
             'breed' => ['nullable', 'string', 'max:255'],
             'pet_dob' => ['nullable', 'date'],
             'pet_sex' => ['nullable', 'string', 'max:60'],
+            'date_of_visit' => ['nullable', 'date'],
+            'time_of_visit' => ['nullable', 'date_format:H:i'],
             'issue_description' => ['nullable', 'string'],
             'symptoms' => ['nullable', 'array'],
             'symptoms.*' => ['string', 'max:120'],
@@ -178,6 +180,8 @@ class HomeVetBookingController extends Controller
 
             $booking->fill([
                 'pet_id' => $pet->id,
+                'date_of_visit' => $data['date_of_visit'] ?? null,
+                'time_of_visit' => ! empty($data['time_of_visit']) ? $data['time_of_visit'].':00' : null,
                 'concern_description' => $data['issue_description'] ?? null,
                 'symptoms' => $data['symptoms'] ?? null,
                 'vaccination_status' => $data['vaccination_status'] ?? null,
