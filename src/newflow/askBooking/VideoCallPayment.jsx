@@ -1,16 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../../components/Button";
-import { PET_FLOW_STEPS, ProgressBar } from "../../components/Sharedcomponents";
 import { apiPost } from "../../lib/api";
 import {
-  ShieldCheck,
-  ArrowRight,
-  BadgeCheck,
   CheckCircle2,
   ChevronLeft,
-  CreditCard,
-  Lock,
   MessageCircle,
   Video,
 } from "lucide-react";
@@ -21,6 +15,11 @@ const STATIC_CONSULTATION_AMOUNT = 599;
 const STATIC_SERVICE_AMOUNT = 0;
 const STATIC_DISCOUNT_AMOUNT = 100;
 const GST_RATE = 0.18;
+const DESCRIBE_CONSULT_POINTS = Object.freeze([
+  "Share clear symptoms and at least one photo for faster review.",
+  "Online consultation is for guidance. Emergency cases may still need a clinic visit.",
+  "Consultation starts after payment confirmation and doctor assignment.",
+]);
 
 const loadRazorpayScript = () =>
   new Promise((resolve) => {
@@ -295,10 +294,16 @@ export const VideoCallPayment = ({
   );
 
   const statusClassName = useMemo(() => {
-    if (statusType === "success") return "text-emerald-600";
-    if (statusType === "error") return "text-red-600";
-    if (statusType === "info") return "text-blue-600";
-    return "text-stone-400";
+    if (statusType === "success") {
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    }
+    if (statusType === "error") {
+      return "border-red-200 bg-red-50 text-red-700";
+    }
+    if (statusType === "info") {
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    }
+    return "border-slate-200 bg-slate-50 text-slate-500";
   }, [statusType]);
 
   const hasPaymentContext = Boolean(
@@ -445,24 +450,23 @@ export const VideoCallPayment = ({
   };
 
   const acknowledgementCardClass = acknowledged
-    ? "border-[#bfd0ff] bg-[linear-gradient(135deg,#f7faff_0%,#eef4ff_100%)] shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]"
-    : "border-[#d6e3ff] bg-white hover:border-[#bfd0ff] hover:bg-[#f8fbff]";
+    ? "border-[#bcd2ff] bg-[#eff5ff]"
+    : "border-[#dbe7ff] bg-white";
 
   if (!petDetails || !hasPaymentContext) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md text-center rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
-          <h2 className="text-lg font-extrabold text-slate-900">
-            Payment link not ready
+      <div className="min-h-screen bg-[#f8fbff] px-4 py-12">
+        <div className="mx-auto w-full max-w-md rounded-[24px] border border-slate-200 bg-white p-6 text-center shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Payment not ready
           </h2>
           <p className="mt-2 text-sm text-slate-600">
-            Please start the consultation form again so we can generate your
-            payment.
+            Please start the consultation again.
           </p>
           <button
             type="button"
             onClick={handleBack}
-            className="mt-5 w-full rounded-2xl bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-extrabold py-3 text-sm shadow-md shadow-blue-200 transition-all"
+            className="mt-5 w-full rounded-2xl bg-[#2563eb] py-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
           >
             Start Consultation
           </button>
@@ -472,311 +476,158 @@ export const VideoCallPayment = ({
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.14),_transparent_28%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] flex flex-col">
-      <div className="sticky top-0 z-40 border-b border-[#dbe5ff] bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6">
+    <div className="min-h-screen bg-[#f8fbff] text-slate-900">
+      <div className="sticky top-0 z-40 border-b border-[#e3ecff] bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3">
           <button
             type="button"
             onClick={handleBack}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d6e3ff] bg-white text-slate-600 transition hover:bg-[#f8fbff]"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-[#dbe7ff] bg-white text-slate-600 transition hover:bg-[#f8fbff]"
             aria-label="Go back"
           >
             <ChevronLeft size={18} />
           </button>
           <div className="min-w-0 flex-1">
-            <div className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4f6bff] md:text-left">
-              Snoutiq Checkout
+            <div className="text-base font-semibold text-slate-900">
+              Complete payment
             </div>
-            <div className="text-center text-base font-semibold text-slate-900 md:text-left md:text-lg">
-              Secure Razorpay payment
+            <div className="text-xs text-slate-500">
+              Secure consultation checkout
             </div>
-          </div>
-          <div className="hidden items-center gap-2 rounded-full border border-[#d6e3ff] bg-[#f8fbff] px-3 py-1.5 text-xs font-semibold text-[#2457ff] md:flex">
-            <Lock size={14} />
-            Powered by Razorpay
           </div>
         </div>
       </div>
 
-      <div className="w-full">
-        <div className="flex-1 overflow-y-auto px-4 pb-44 pt-4 md:px-6 md:pb-20 md:pt-8">
-          <div className="mx-auto w-full max-w-6xl">
-            <div className="md:flex md:items-center md:justify-between md:gap-6">
-              <ProgressBar current={3} steps={PET_FLOW_STEPS} />
-              <div className="hidden items-center gap-2 rounded-full border border-[#d6e3ff] bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm md:flex">
-                <BadgeCheck size={14} className="text-[#2457ff]" />
-                Final payment step
+      <div className="px-4 pb-36 pt-4 md:pb-40 md:pt-6">
+        <div className="mx-auto max-w-lg space-y-4">
+          <div className="rounded-[24px] border border-[#dbe7ff] bg-white p-5 shadow-[0_10px_30px_-24px_rgba(37,99,235,0.35)]">
+            <div className="text-sm font-semibold text-slate-900">
+              Consultation summary
+            </div>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Pet name</span>
+                <span className="text-right font-medium text-slate-900">
+                  {paymentPetName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Pet type</span>
+                <span className="text-right font-medium text-slate-900">
+                  {paymentPetType}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Parent name</span>
+                <span className="text-right font-medium text-slate-900">
+                  {paymentOwnerName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500">Location</span>
+                <span className="text-right font-medium text-slate-900">
+                  {paymentLocation}
+                </span>
               </div>
             </div>
+          </div>
 
-            <div className="mt-4 overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(135deg,#072a9b_0%,#1457ff_50%,#6ba3ff_100%)] shadow-[0_24px_70px_-42px_rgba(20,87,255,0.8)]">
-              <div className="grid gap-6 px-5 py-6 text-white md:grid-cols-[minmax(0,1fr)_250px] md:px-7 md:py-7">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/90">
-                    <Lock size={12} />
-                    Step 2 of 2
-                  </div>
-                  <h1 className="mt-4 text-2xl font-semibold tracking-tight md:text-[30px]">
-                    Review and pay on a Razorpay-style secure checkout
-                  </h1>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-white/82 md:text-[15px]">
-                    Your consultation request is saved. Complete payment to confirm
-                    the booking and receive next updates on WhatsApp.
-                  </p>
-                  <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-white/88">
-                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-                      UPI / Cards / Net Banking
-                    </span>
-                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-                      Instant confirmation
-                    </span>
-                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-                      GST invoice available
-                    </span>
-                  </div>
+          <div className="rounded-[24px] border border-[#dbe7ff] bg-white p-5 shadow-[0_10px_30px_-24px_rgba(37,99,235,0.35)]">
+            <div className="text-sm font-semibold text-slate-900">
+              Amount details
+            </div>
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <div className="flex items-center justify-between gap-4">
+                <span>Consultation fee</span>
+                <span className="font-medium text-slate-900">
+                  Rs {formatInr(consultationAmount)}
+                </span>
+              </div>
+
+              {discountAmount > 0 ? (
+                <div className="flex items-center justify-between gap-4 text-emerald-700">
+                  <span>Discount</span>
+                  <span className="font-medium">
+                    - Rs {formatInr(discountAmount)}
+                  </span>
                 </div>
+              ) : null}
 
-                <div className="rounded-[24px] border border-white/15 bg-white/10 p-4 backdrop-blur">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/75">
-                    Payable now
-                  </div>
+              <div className="flex items-center justify-between gap-4">
+                <span>GST (18%)</span>
+                <span className="font-medium text-slate-900">
+                  Rs {formatInr(gstAmount)}
+                </span>
+              </div>
+
+              <div className="flex items-end justify-between gap-4 border-t border-[#e8efff] pt-4">
+                <span className="font-semibold text-slate-900">Total payable</span>
+                <div className="text-right">
                   {discountAmount > 0 ? (
-                    <div className="mt-2 text-xs text-white/65 line-through">
+                    <div className="text-[11px] text-slate-400 line-through">
                       Rs {formatInr(toInt(totalBeforeDiscount))}
                     </div>
                   ) : null}
-                  <div className="mt-1 text-3xl font-semibold text-white">
+                  <div className="text-xl font-semibold text-slate-900">
                     Rs {formatInr(createOrderAmountInr)}
                   </div>
-                  <div className="mt-4 space-y-2 text-sm text-white/82">
-                    <div className="flex items-center justify-between">
-                      <span>Pet</span>
-                      <span className="font-medium text-white">{paymentPetName}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Parent</span>
-                      <span className="font-medium text-white">{paymentOwnerName}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Location</span>
-                      <span className="font-medium text-white">{paymentLocation}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_340px]">
-              <div className="space-y-6">
-                <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)] md:p-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-900 md:text-base">
-                        Payment summary
-                      </h3>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Same amount that opens on Razorpay
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                      Instant confirmation
-                    </span>
-                  </div>
-
-                  <div className="mt-5 space-y-3 text-sm text-slate-600">
-                    <div className="flex justify-between">
-                      <span>Consultation charge</span>
-                      <span>Rs {formatInr(consultationAmount)}</span>
-                    </div>
-
-                    {service > 0 ? (
-                      <div className="flex justify-between">
-                        <span>Service charge</span>
-                        <span>Rs {formatInr(service)}</span>
-                      </div>
-                    ) : null}
-
-                    {discountAmount > 0 ? (
-                      <div className="flex justify-between font-semibold text-emerald-700">
-                        <span>Special discount</span>
-                        <span>- Rs {formatInr(discountAmount)}</span>
-                      </div>
-                    ) : null}
-
-                    <div className="flex justify-between">
-                      <span>Taxable amount</span>
-                      <span>Rs {formatInr(taxableAmount)}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span>GST (18%)</span>
-                      <span>Rs {formatInr(gstAmount)}</span>
-                    </div>
-
-                    <div className="flex items-end justify-between border-t border-[#e7efff] pt-4 font-semibold text-slate-900">
-                      <span>Total to pay</span>
-                      <div className="text-right">
-                        {discountAmount > 0 ? (
-                          <div className="text-[11px] font-medium text-slate-400 line-through">
-                            Rs {formatInr(toInt(totalBeforeDiscount))}
-                          </div>
-                        ) : null}
-                        <div className="text-xl font-bold text-slate-900">
-                          Rs {formatInr(createOrderAmountInr)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#4f6bff]">
-                    <CreditCard size={14} />
-                    Invoice details
-                  </div>
-                  <label className="mt-4 block text-[11px] font-semibold text-slate-600">
-                    GST Number (optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={gstNumber}
-                    onChange={(e) => setGstNumber(e.target.value)}
-                    placeholder="07ABCDE1234F1Z5"
-                    className="mt-2 w-full rounded-2xl border border-[#d6e3ff] bg-[#fbfdff] px-3 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[#2457ff] focus:outline-none focus:ring-4 focus:ring-[#4f6bff]/12"
-                  />
-                  <p className="mt-2 text-[11px] text-slate-500">
-                    Add your GST number if a tax invoice is required.
-                  </p>
-                </div>
-
-                <label
-                  className={`flex cursor-pointer items-start gap-3 rounded-[28px] border p-5 text-slate-600 transition-all ${acknowledgementCardClass}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={acknowledged}
-                    onChange={(e) => setAcknowledged(e.target.checked)}
-                    className="mt-1 h-4 w-4 shrink-0 accent-[#2457ff]"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-sm font-semibold text-slate-900">
-                        I acknowledge and agree to proceed
-                      </div>
-                      <span className="rounded-full border border-[#bfd0ff] bg-white/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#2457ff]">
-                        Required
-                      </span>
-                    </div>
-                    <div className="mt-1.5 text-xs leading-5 text-slate-600">
-                      I understand the limitations and conditions of this
-                      consultation.
-                    </div>
-                    <div className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-[#2457ff]">
-                      <ShieldCheck size={12} />
-                      Please confirm before continuing to payment.
-                    </div>
-                  </div>
-                </label>
-
-                {statusMessage ? (
-                  <div className="rounded-[24px] border border-[#d6e3ff] bg-white/95 px-4 py-3 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
-                    <p className={`text-xs text-center ${statusClassName}`}>
-                      {statusMessage}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="space-y-4 md:sticky md:top-28">
-                <div className="rounded-[28px] border border-[#d6e3ff] bg-white/95 p-5 shadow-[0_18px_45px_-30px_rgba(37,99,235,0.35)]">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#4f6bff]">
-                    Booking summary
-                  </div>
-                  <div className="mt-4 space-y-3 text-sm text-slate-600">
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Pet parent</span>
-                      <span className="text-right font-medium text-slate-900">
-                        {paymentOwnerName}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Pet</span>
-                      <span className="text-right font-medium text-slate-900">
-                        {paymentPetName}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Pet type</span>
-                      <span className="text-right font-medium text-slate-900">
-                        {paymentPetType}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Location</span>
-                      <span className="text-right font-medium text-slate-900">
-                        {paymentLocation}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="hidden overflow-hidden rounded-[28px] border border-[#d6e3ff] bg-[linear-gradient(135deg,#0b2fa6_0%,#1457ff_55%,#4f8cff_100%)] p-5 text-white shadow-[0_24px_70px_-42px_rgba(20,87,255,0.8)] md:block">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/90">
-                    <Lock size={12} />
-                    Pay securely
-                  </div>
-                  <div className="mt-3 text-2xl font-semibold">
-                    Rs {formatInr(createOrderAmountInr)}
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-white/82">
-                    Razorpay opens UPI, cards and net banking after you confirm
-                    below.
-                  </p>
-
-                  <Button
-                    onClick={handlePay}
-                    disabled={isPaying || !acknowledged}
-                    fullWidth
-                    className={`mt-5 flex items-center justify-between rounded-2xl px-5 py-4 text-base font-semibold ${
-                      isPaying || !acknowledged
-                        ? "cursor-not-allowed bg-white/30 text-white opacity-50"
-                        : "bg-white text-[#1457ff] shadow-[0_20px_40px_-22px_rgba(15,23,42,0.35)] hover:bg-[#f8fbff]"
-                    }`}
-                  >
-                    <span>
-                      {isPaying
-                        ? "Processing..."
-                        : `Pay Rs ${formatInr(createOrderAmountInr)}`}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      Proceed <ArrowRight size={18} />
-                    </span>
-                  </Button>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-white/82">
-                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-                      Secure UPI / Card
-                    </span>
-                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-                      Powered by Razorpay
-                    </span>
-                  </div>
-
-                  {isOfferApplied ? (
-                    <p className="mt-4 text-[11px] font-medium text-emerald-200">
-                      Special discount applied: Rs {formatInr(discountAmount)} OFF
-                    </p>
-                  ) : null}
                 </div>
               </div>
             </div>
           </div>
+
+          <div className="rounded-[24px] border border-[#dbe7ff] bg-white p-5 shadow-[0_10px_30px_-24px_rgba(37,99,235,0.35)]">
+            <label className="block text-sm font-semibold text-slate-900">
+              GST number
+            </label>
+            <input
+              type="text"
+              value={gstNumber}
+              onChange={(e) => setGstNumber(e.target.value)}
+              placeholder="07ABCDE1234F1Z5"
+              className="mt-3 w-full rounded-2xl border border-[#dbe7ff] bg-[#fbfdff] px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[#2563eb] focus:outline-none focus:ring-4 focus:ring-[#2563eb]/10"
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              Add GST number if needed.
+            </p>
+          </div>
+
+          <div className="rounded-[24px] border border-red-200 bg-red-50 p-4">
+            <div className="space-y-2">
+              {DESCRIBE_CONSULT_POINTS.map((point) => (
+                <div key={point} className="flex items-start gap-2 text-sm text-red-700">
+                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
+                  <span>{point}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <label
+            className={`flex cursor-pointer items-center gap-3 rounded-[24px] border p-4 text-sm text-slate-700 transition ${acknowledgementCardClass}`}
+          >
+            <input
+              type="checkbox"
+              checked={acknowledged}
+              onChange={(e) => setAcknowledged(e.target.checked)}
+              className="h-4 w-4 shrink-0 accent-[#2563eb]"
+            />
+            <span className="font-medium text-slate-900">
+              I agree to continue with this consultation.
+            </span>
+          </label>
+
+          {statusMessage ? (
+            <div className={`rounded-[20px] border px-4 py-3 text-sm ${statusClassName}`}>
+              {statusMessage}
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#d6e3ff] bg-white/95 backdrop-blur md:hidden">
-        <div className="mx-auto w-full max-w-5xl px-4 pb-4 pt-3">
-          <div className="mb-3 flex items-end justify-between">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#dbe7ff] bg-white/95 backdrop-blur">
+        <div className="mx-auto w-full max-w-lg px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
+          <div className="mb-3 flex items-end justify-between gap-4">
             <div>
               <p className="text-[11px] font-medium text-slate-500">
                 Total payable
@@ -792,38 +643,22 @@ export const VideoCallPayment = ({
                 </span>
               </div>
             </div>
-
-            {discountAmount > 0 ? (
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                Rs {formatInr(discountAmount)} OFF
-              </span>
-            ) : null}
           </div>
 
           <Button
             onClick={handlePay}
             disabled={isPaying || !acknowledged}
             fullWidth
-            className={`flex items-center justify-between rounded-2xl py-3.5 text-sm font-semibold ${
+            className={`rounded-2xl py-3.5 text-sm font-semibold ${
               isPaying || !acknowledged
                 ? "cursor-not-allowed bg-slate-300 text-white opacity-50"
-                : "bg-[linear-gradient(135deg,#1457ff_0%,#2563eb_55%,#5b8dff_100%)] text-white shadow-[0_20px_45px_-22px_rgba(20,87,255,0.7)]"
+                : "bg-[#2563eb] text-white shadow-[0_18px_36px_-22px_rgba(37,99,235,0.7)] hover:bg-[#1d4ed8]"
             }`}
           >
-            <span>
-              {isPaying
-                ? "Processing..."
-                : `Pay Rs ${formatInr(createOrderAmountInr)}`}
-            </span>
-            <span className="flex items-center gap-2 text-white/90">
-              Proceed <ArrowRight size={16} />
-            </span>
+            {isPaying
+              ? "Processing..."
+              : `Pay Rs ${formatInr(createOrderAmountInr)}`}
           </Button>
-
-          <p className="mt-2 text-[10px] text-center text-slate-500 flex items-center justify-center gap-1">
-            <ShieldCheck size={10} className="text-emerald-600" />
-            Secure UPI / Card Payment
-          </p>
         </div>
       </div>
 
@@ -837,8 +672,7 @@ export const VideoCallPayment = ({
               Payment confirmed
             </div>
             <p className="text-sm text-stone-500 mt-2">
-              Your payment is successful. Our team will review your request and
-              contact you shortly.
+              Payment successful. Our team will contact you shortly.
             </p>
           </div>
         </div>
