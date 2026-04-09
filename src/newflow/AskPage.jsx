@@ -29,8 +29,12 @@ const DEFAULT_ASK_PROFILE = {
   petName: "",
   breed: "",
   dob: "",
-  location: "Delhi NCR",
+  location: "",
+  lat: "",
+  long: "",
 };
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+const CURRENT_LOCATION_FALLBACK_LABEL = "Current location";
 
 const QUICK_SYMPTOMS = [
   {
@@ -151,6 +155,80 @@ const writeDailyUsage = (count) => {
   );
 };
 
+const parseCoordinate = (value) => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && !value.trim()) return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue)
+    ? Number(numberValue.toFixed(6))
+    : null;
+};
+
+const hasProfileCoordinates = (value) =>
+  parseCoordinate(value?.lat) !== null && parseCoordinate(value?.long) !== null;
+
+const shouldAutoFillDetectedLocation = (value) => {
+  const text = String(value || "").trim();
+  return (
+    !text ||
+    text === DEFAULT_ASK_PROFILE.location ||
+    text === CURRENT_LOCATION_FALLBACK_LABEL
+  );
+};
+
+const buildGoogleLocationLabel = (result) => {
+  const components = Array.isArray(result?.address_components)
+    ? result.address_components
+    : [];
+  const labels = [];
+  const pushLabel = (value) => {
+    const text = String(value || "").trim();
+    if (text && !labels.includes(text)) {
+      labels.push(text);
+    }
+  };
+
+  components.forEach((component) => {
+    const types = Array.isArray(component?.types) ? component.types : [];
+    if (
+      types.includes("sublocality_level_1") ||
+      types.includes("sublocality") ||
+      types.includes("neighborhood") ||
+      types.includes("locality") ||
+      types.includes("administrative_area_level_2") ||
+      types.includes("administrative_area_level_1")
+    ) {
+      pushLabel(component.long_name);
+    }
+  });
+
+  if (labels.length > 0) {
+    return labels.slice(0, 2).join(", ");
+  }
+
+  return String(result?.formatted_address || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(", ");
+};
+
+const resolveDetectedLocationLabel = async (latitude, longitude) => {
+  if (!GOOGLE_MAPS_API_KEY) return "";
+
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
+    );
+    const data = await response.json();
+    if (!Array.isArray(data?.results) || data.results.length === 0) return "";
+    return buildGoogleLocationLabel(data.results[0]);
+  } catch {
+    return "";
+  }
+};
+
 const sanitizeAskProfile = (value) => {
   const raw = value && typeof value === "object" ? value : {};
   return {
@@ -159,7 +237,9 @@ const sanitizeAskProfile = (value) => {
     petName: String(raw.petName || "").trim(),
     breed: String(raw.breed || "").trim(),
     dob: String(raw.dob || "").trim(),
-    location: String(raw.location || DEFAULT_ASK_PROFILE.location).trim(),
+    location: String(raw.location ?? DEFAULT_ASK_PROFILE.location).trim(),
+    lat: parseCoordinate(raw.lat ?? raw.latitude) ?? "",
+    long: parseCoordinate(raw.long ?? raw.longitude) ?? "",
   };
 };
 
@@ -175,6 +255,11 @@ const writeStoredProfile = (profile) => {
     ASK_PROFILE_KEY,
     JSON.stringify(sanitizeAskProfile(profile))
   );
+};
+
+const clearStoredProfile = () => {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(ASK_PROFILE_KEY);
 };
 
 const readStoredUiState = () => {
@@ -247,7 +332,7 @@ const readStoredState = () => {
   const raw = safeParse(window.localStorage.getItem(ASK_STORAGE_KEY), null);
   if (!raw || typeof raw !== "object") return null;
   return {
-    species: typeof raw.species === "string" ? raw.species : "dog",
+    species: typeof raw.species === "string" ? raw.species : "",
     sessionId: typeof raw.sessionId === "string" ? raw.sessionId : "",
     entries: Array.isArray(raw.entries) ? raw.entries : [],
   };
@@ -446,8 +531,11 @@ function SearchableBreedField({
   );
 }
 
-const validateAskProfile = (profile) => {
+const validateAskProfile = (profile, species) => {
   const next = sanitizeAskProfile(profile);
+  const normalizedSpecies = String(species || "")
+    .trim()
+    .toLowerCase();
   const errors = {};
 
   if (!next.ownerName) {
@@ -459,8 +547,19 @@ const validateAskProfile = (profile) => {
   if (!next.petName) {
     errors.petName = "Enter your pet's name";
   }
+  if (!normalizedSpecies) {
+    errors.species = "Select pet type";
+  }
+  if (!next.breed) {
+    errors.breed = "Enter your pet's breed";
+  }
+  if (!next.dob) {
+    errors.dob = "Select date of birth";
+  }
   if (!next.location) {
     errors.location = "Enter your location";
+  } else if (!hasProfileCoordinates(next)) {
+    errors.location = "Use current location to attach latitude and longitude";
   }
 
   return errors;
@@ -564,6 +663,9 @@ const navigateToAskTarget = (navigate, target, options = {}) => {
 
 const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
   const profile = sanitizeAskProfile(askProfile);
+  const locationLabel =
+    profile.location ||
+    (hasProfileCoordinates(profile) ? CURRENT_LOCATION_FALLBACK_LABEL : "");
   const lastUserMessage = [...(Array.isArray(entries) ? entries : [])]
     .reverse()
     .find(
@@ -578,14 +680,18 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
     ownerName: profile.ownerName,
     ownerMobile: profile.phone,
     phone: profile.phone,
+    lat: profile.lat,
+    long: profile.long,
+    latitude: profile.lat,
+    longitude: profile.long,
     petName: profile.petName,
     name: profile.petName,
     breed: profile.breed,
     dob: profile.dob,
     petDob: profile.dob,
-    location: profile.location,
-    city: profile.location,
-    area: profile.location,
+    location: locationLabel,
+    city: locationLabel,
+    area: locationLabel,
     species,
     type: species,
     reason: concern,
@@ -597,8 +703,10 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
       ownerName: profile.ownerName,
       phone: profile.phone,
       species,
-      area: profile.location,
+      area: locationLabel,
       reason: concern,
+      lat: profile.lat,
+      long: profile.long,
     },
     pet: {
       petName: profile.petName,
@@ -764,9 +872,13 @@ function IntakeModal({
   breedOptions,
   breedLoading,
   breedError,
+  locating,
+  locationStatus,
+  locationStatusType,
   onClose,
   onProfileChange,
   onSpeciesChange,
+  onUseCurrentLocation,
   onSubmit,
 }) {
   if (!open) return null;
@@ -774,6 +886,7 @@ function IntakeModal({
   const speciesMeta = getSpeciesMeta(species);
   const petLabel = profile?.petName?.trim() || "your pet";
   const showBreedSuggestions = species === "dog" || species === "cat";
+  const coordinatesReady = hasProfileCoordinates(profile);
 
   return (
     <div className="ask-modal-backdrop" role="presentation">
@@ -869,12 +982,16 @@ function IntakeModal({
                 value={species}
                 onChange={(event) => onSpeciesChange(event.target.value)}
               >
+                <option value="">Select pet type</option>
                 {SPECIES_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </select>
+              {errors.species ? (
+                <small className="ask-intake-error">{errors.species}</small>
+              ) : null}
             </label>
           </div>
 
@@ -897,6 +1014,9 @@ function IntakeModal({
                   placeholder="Enter breed"
                 />
               )}
+              {errors.breed ? (
+                <small className="ask-intake-error">{errors.breed}</small>
+              ) : null}
               {showBreedSuggestions ? (
                 <small
                   className={`ask-intake-hint${
@@ -918,21 +1038,55 @@ function IntakeModal({
                 value={profile.dob}
                 onChange={(event) => onProfileChange("dob", event.target.value)}
               />
+              {errors.dob ? (
+                <small className="ask-intake-error">{errors.dob}</small>
+              ) : null}
             </label>
           </div>
 
           <label className="ask-intake-field">
             <span>Location</span>
-            <input
-              type="text"
-              value={profile.location}
-              onChange={(event) => onProfileChange("location", event.target.value)}
-              placeholder="Enter your location"
-              autoComplete="address-level2"
-            />
+            <div className="ask-intake-location-row">
+              <input
+                type="text"
+                value={profile.location}
+                onChange={(event) => onProfileChange("location", event.target.value)}
+                placeholder="Enter your location"
+                autoComplete="address-level2"
+              />
+              <button
+                type="button"
+                className="ask-intake-location-button"
+                onClick={onUseCurrentLocation}
+                disabled={submitting || locating}
+              >
+                {locating ? "Locating..." : "Use current"}
+              </button>
+            </div>
             {errors.location ? (
               <small className="ask-intake-error">{errors.location}</small>
             ) : null}
+            {locationStatus ? (
+              <small
+                className={`ask-intake-hint${
+                  locationStatusType === "error"
+                    ? " is-error"
+                    : locationStatusType === "success"
+                      ? " is-success"
+                      : ""
+                }`}
+              >
+                {locationStatus}
+              </small>
+            ) : coordinatesReady ? (
+              <small className="ask-intake-hint is-success">
+                Current device coordinates are attached to this request.
+              </small>
+            ) : (
+              <small className="ask-intake-hint">
+                Use current location to attach latitude and longitude.
+              </small>
+            )}
           </label>
 
           <div className="ask-intake-note">
@@ -1444,7 +1598,8 @@ export default function AskPage() {
   const textareaRef = useRef(null);
   const hydratedRef = useRef(false);
   const breedCacheRef = useRef({});
-  const [species, setSpecies] = useState("dog");
+  const locationLookupRef = useRef(0);
+  const [species, setSpecies] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [entries, setEntries] = useState([]);
   const [inputValue, setInputValue] = useState("");
@@ -1461,21 +1616,31 @@ export default function AskPage() {
   const [breedLoading, setBreedLoading] = useState(false);
   const [breedError, setBreedError] = useState("");
   const [flowModal, setFlowModal] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [locationStatus, setLocationStatus] = useState({
+    type: "",
+    text: "",
+  });
 
   useEffect(() => {
     const storedState = readStoredState();
-    const storedProfile = readStoredProfile();
     const storedUiState = readStoredUiState();
-    if (storedState) {
-      setSpecies(storedState.species || "dog");
+    const hasStoredConversation = Boolean(
+      storedState?.sessionId || storedState?.entries?.length
+    );
+    if (hasStoredConversation) {
+      setSpecies(storedState.species || "");
       setSessionId(storedState.sessionId || "");
       setEntries(storedState.entries || []);
     }
-    setAskProfile(storedProfile);
+    setAskProfile(hasStoredConversation ? readStoredProfile() : DEFAULT_ASK_PROFILE);
     if (storedUiState) {
       setInputValue(storedUiState.inputValue || "");
       setPendingInitialRequest(storedUiState.pendingInitialRequest || null);
       setIntakeOpen(Boolean(storedUiState.intakeOpen));
+      if (!hasStoredConversation && storedUiState.pendingInitialRequest?.species) {
+        setSpecies(storedUiState.pendingInitialRequest.species);
+      }
     }
     setChecksToday(readDailyUsage());
     hydratedRef.current = true;
@@ -1693,18 +1858,26 @@ export default function AskPage() {
     profileValue,
   }) => {
     const nextProfile = sanitizeAskProfile(profileValue);
+    const latitude = parseCoordinate(nextProfile.lat);
+    const longitude = parseCoordinate(nextProfile.long);
+    const hasCoordinates = latitude !== null && longitude !== null;
     const user = {};
     const pets = {};
+    const locationValue =
+      nextProfile.location ||
+      (hasCoordinates ? CURRENT_LOCATION_FALLBACK_LABEL : undefined);
     const payload = {
       message: messageText,
       species: speciesValue,
       type: speciesValue,
       phone: nextProfile.phone || undefined,
-      location: nextProfile.location || undefined,
+      location: locationValue,
       owner_name: nextProfile.ownerName || undefined,
       pet_name: nextProfile.petName || undefined,
       breed: nextProfile.breed || undefined,
       dob: nextProfile.dob || undefined,
+      lat: latitude ?? undefined,
+      long: longitude ?? undefined,
     };
 
     if (nextProfile.ownerName) {
@@ -1712,6 +1885,12 @@ export default function AskPage() {
     }
     if (nextProfile.phone) {
       user.phone = nextProfile.phone;
+    }
+    if (latitude !== null) {
+      user.lat = latitude;
+    }
+    if (longitude !== null) {
+      user.long = longitude;
     }
     if (nextProfile.petName) {
       pets.pet_name = nextProfile.petName;
@@ -1782,40 +1961,28 @@ export default function AskPage() {
     }
   };
 
- const handleSend = async ({ message, nextSpecies } = {}) => {
-  const messageText = String(message ?? inputValue).trim();
-  const speciesValue = String(nextSpecies || species || "dog").trim() || "dog";
+  const handleSend = async ({ message, nextSpecies } = {}) => {
+    const messageText = String(message ?? inputValue).trim();
+    const speciesValue = String(nextSpecies || species || "")
+      .trim()
+      .toLowerCase();
 
-  if (!messageText || loading) return;
+    if (!messageText || loading) return;
 
-  if (!sessionId) {
-    const storedProfile = sanitizeAskProfile(readStoredProfile());
-    const profileErrors = validateAskProfile(storedProfile);
-
-    setSpecies(speciesValue);
-
-    if (Object.keys(profileErrors).length === 0) {
-      setAskProfile(storedProfile);
-      await sendAssessmentRequest({
-        messageText,
-        speciesValue,
-        profileValue: storedProfile,
+    if (!sessionId) {
+      setSpecies(speciesValue);
+      setInputValue(messageText);
+      setPendingInitialRequest({
+        message: messageText,
+        species: speciesValue,
       });
+      setIntakeErrors({});
+      setIntakeOpen(true);
       return;
     }
 
-    setInputValue(messageText);
-    setPendingInitialRequest({
-      message: messageText,
-      species: speciesValue,
-    });
-    setIntakeErrors({});
-    setIntakeOpen(true);
-    return;
-  }
-
-  await sendAssessmentRequest({ messageText, speciesValue });
-};
+    await sendAssessmentRequest({ messageText, speciesValue });
+  };
 
   const handleQuickStart = (item) => {
     setSpecies(item.species);
@@ -1823,6 +1990,9 @@ export default function AskPage() {
   };
 
   const handleIntakeProfileChange = (field, value) => {
+    if (field === "location") {
+      locationLookupRef.current += 1;
+    }
     setAskProfile((current) => ({
       ...current,
       [field]: value,
@@ -1833,13 +2003,135 @@ export default function AskPage() {
       delete next[field];
       return next;
     });
+    if (field === "location") {
+      setLocationStatus({ type: "", text: "" });
+    }
+  };
+
+  const handleIntakeSpeciesChange = (value) => {
+    setSpecies(value);
+    setIntakeErrors((current) => {
+      if (!current.species) return current;
+      const next = { ...current };
+      delete next.species;
+      return next;
+    });
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (loading || locating) return;
+
+    if (
+      typeof window === "undefined" ||
+      !window.navigator ||
+      !window.navigator.geolocation
+    ) {
+      setLocationStatus({
+        type: "error",
+        text: "Current location is not supported on this device.",
+      });
+      return;
+    }
+
+    setLocating(true);
+    setLocationStatus({
+      type: "info",
+      text: "Fetching current location...",
+    });
+
+    window.navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude = parseCoordinate(position?.coords?.latitude);
+        const longitude = parseCoordinate(position?.coords?.longitude);
+        const lookupId = Date.now();
+
+        if (latitude === null || longitude === null) {
+          setLocationStatus({
+            type: "error",
+            text: "Could not read current location. Please enter it manually.",
+          });
+          setLocating(false);
+          return;
+        }
+
+        locationLookupRef.current = lookupId;
+        setAskProfile((current) => {
+          return {
+            ...current,
+            lat: latitude,
+            long: longitude,
+            location: shouldAutoFillDetectedLocation(current?.location)
+              ? CURRENT_LOCATION_FALLBACK_LABEL
+              : current.location,
+          };
+        });
+        setIntakeErrors((current) => {
+          if (!current.location) return current;
+          const next = { ...current };
+          delete next.location;
+          return next;
+        });
+        setLocationStatus({
+          type: "success",
+          text: "Current location selected. You can edit it if needed.",
+        });
+        setLocating(false);
+
+        resolveDetectedLocationLabel(latitude, longitude)
+          .then((resolvedLocation) => {
+            if (!resolvedLocation || locationLookupRef.current !== lookupId) {
+              return;
+            }
+
+            setAskProfile((current) => {
+              const currentLat = parseCoordinate(current?.lat);
+              const currentLong = parseCoordinate(current?.long);
+              if (currentLat !== latitude || currentLong !== longitude) {
+                return current;
+              }
+              if (!shouldAutoFillDetectedLocation(current?.location)) {
+                return current;
+              }
+
+              return {
+                ...current,
+                location: resolvedLocation,
+              };
+            });
+            setLocationStatus({
+              type: "success",
+              text: "Location autofilled from current device.",
+            });
+          })
+          .catch(() => {});
+      },
+      (error) => {
+        const message =
+          error?.code === 1
+            ? "Location permission was blocked. Please allow it and try again."
+            : error?.code === 2
+              ? "Current location is unavailable right now."
+              : error?.code === 3
+                ? "Location request timed out. Please try again."
+                : "Could not fetch current location.";
+        setLocationStatus({ type: "error", text: message });
+        setLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 300000,
+      }
+    );
   };
 
   const handleCloseIntake = () => {
     if (loading) return;
+    locationLookupRef.current += 1;
     setIntakeOpen(false);
     setPendingInitialRequest(null);
     setIntakeErrors({});
+    setLocationStatus({ type: "", text: "" });
   };
 
   const handleIntakeSubmit = async (event) => {
@@ -1847,7 +2139,7 @@ export default function AskPage() {
 
     if (!pendingInitialRequest || loading) return;
 
-    const nextErrors = validateAskProfile(askProfile);
+    const nextErrors = validateAskProfile(askProfile, species);
     if (Object.keys(nextErrors).length > 0) {
       setIntakeErrors(nextErrors);
       return;
@@ -2034,10 +2326,19 @@ export default function AskPage() {
 
     setEntries([]);
     setSessionId("");
+    setSpecies("");
     setInputValue("");
     setErrorMessage("");
     setFollowUpPending(null);
+    setAskProfile(DEFAULT_ASK_PROFILE);
+    setPendingInitialRequest(null);
+    setIntakeOpen(false);
+    setIntakeErrors({});
+    setLocating(false);
+    locationLookupRef.current += 1;
+    setLocationStatus({ type: "", text: "" });
     clearStoredState();
+    clearStoredProfile();
     clearStoredUiState();
     setToastMessage("Started fresh");
   };
@@ -2289,9 +2590,13 @@ export default function AskPage() {
         breedOptions={breedOptions}
         breedLoading={breedLoading}
         breedError={breedError}
+        locating={locating}
+        locationStatus={locationStatus.text}
+        locationStatusType={locationStatus.type}
         onClose={handleCloseIntake}
         onProfileChange={handleIntakeProfileChange}
-        onSpeciesChange={setSpecies}
+        onSpeciesChange={handleIntakeSpeciesChange}
+        onUseCurrentLocation={handleUseCurrentLocation}
         onSubmit={handleIntakeSubmit}
       />
 
