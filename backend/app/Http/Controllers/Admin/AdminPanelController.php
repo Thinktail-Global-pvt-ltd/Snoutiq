@@ -885,6 +885,10 @@ class AdminPanelController extends Controller
                 'conversion_transaction_type' => null,
                 'conversion_transaction_status' => null,
                 'conversion_transaction_at' => null,
+                'conversion_transaction_doctor_id' => null,
+                'conversion_transaction_doctor_name' => null,
+                'conversion_transaction_clinic_id' => null,
+                'conversion_transaction_clinic_name' => null,
                 'conversion_lag_minutes' => null,
                 'crm_activity_logs' => [],
                 'crm_next_action' => null,
@@ -1765,6 +1769,8 @@ class AdminPanelController extends Controller
         $hasTransactionCallSession = $hasTransactionsTable && Schema::hasColumn('transactions', 'call_session');
         $hasTransactionPetId = $hasTransactionsTable && Schema::hasColumn('transactions', 'pet_id');
         $hasTransactionFcmNotificationId = $hasTransactionsTable && Schema::hasColumn('transactions', 'fcm_notification_id');
+        $hasTransactionDoctorId = $hasTransactionsTable && Schema::hasColumn('transactions', 'doctor_id');
+        $hasTransactionClinicId = $hasTransactionsTable && Schema::hasColumn('transactions', 'clinic_id');
         $supportsConversionTracking = $hasTransactionUserId && $hasTransactionCreatedAt;
         $convertedUsersCount = 0;
 
@@ -1799,6 +1805,12 @@ class AdminPanelController extends Controller
                 if ($hasTransactionFcmNotificationId) {
                     $transactionQuery->addSelect('fcm_notification_id');
                 }
+                if ($hasTransactionDoctorId) {
+                    $transactionQuery->addSelect('doctor_id');
+                }
+                if ($hasTransactionClinicId) {
+                    $transactionQuery->addSelect('clinic_id');
+                }
                 if ($hasTransactionMetadata) {
                     $transactionQuery->addSelect('metadata');
                 }
@@ -1818,6 +1830,43 @@ class AdminPanelController extends Controller
                     ->orderBy('created_at')
                     ->orderBy('id')
                     ->get();
+
+                $doctorNameLookup = [];
+                $clinicNameLookup = [];
+
+                if ($hasTransactionDoctorId) {
+                    $doctorIds = $leadTransactions
+                        ->pluck('doctor_id')
+                        ->filter(fn ($doctorId) => is_numeric($doctorId) && (int) $doctorId > 0)
+                        ->map(fn ($doctorId) => (int) $doctorId)
+                        ->unique()
+                        ->values();
+
+                    if ($doctorIds->isNotEmpty()) {
+                        $doctorNameLookup = Doctor::query()
+                            ->whereIn('id', $doctorIds->all())
+                            ->pluck('doctor_name', 'id')
+                            ->mapWithKeys(fn ($doctorName, $doctorId) => [(int) $doctorId => (string) $doctorName])
+                            ->all();
+                    }
+                }
+
+                if ($hasTransactionClinicId) {
+                    $clinicIds = $leadTransactions
+                        ->pluck('clinic_id')
+                        ->filter(fn ($clinicId) => is_numeric($clinicId) && (int) $clinicId > 0)
+                        ->map(fn ($clinicId) => (int) $clinicId)
+                        ->unique()
+                        ->values();
+
+                    if ($clinicIds->isNotEmpty()) {
+                        $clinicNameLookup = VetRegisterationTemp::query()
+                            ->whereIn('id', $clinicIds->all())
+                            ->pluck('name', 'id')
+                            ->mapWithKeys(fn ($clinicName, $clinicId) => [(int) $clinicId => (string) $clinicName])
+                            ->all();
+                    }
+                }
 
                 foreach ($leadTransactions as $leadTransaction) {
                     $userId = is_numeric($leadTransaction->user_id) ? (int) $leadTransaction->user_id : 0;
@@ -1890,6 +1939,14 @@ class AdminPanelController extends Controller
                         'status' => $transactionStatus !== '' ? $transactionStatus : null,
                         'pet_id' => $hasTransactionPetId && is_numeric($leadTransaction->pet_id) ? (int) $leadTransaction->pet_id : null,
                         'fcm_notification_id' => $transactionFcmNotificationId,
+                        'doctor_id' => $hasTransactionDoctorId && is_numeric($leadTransaction->doctor_id) ? (int) $leadTransaction->doctor_id : null,
+                        'doctor_name' => $hasTransactionDoctorId && is_numeric($leadTransaction->doctor_id)
+                            ? ($doctorNameLookup[(int) $leadTransaction->doctor_id] ?? null)
+                            : null,
+                        'clinic_id' => $hasTransactionClinicId && is_numeric($leadTransaction->clinic_id) ? (int) $leadTransaction->clinic_id : null,
+                        'clinic_name' => $hasTransactionClinicId && is_numeric($leadTransaction->clinic_id)
+                            ? ($clinicNameLookup[(int) $leadTransaction->clinic_id] ?? null)
+                            : null,
                         'session_keys' => array_keys($sessionKeys),
                     ];
                 }
@@ -2120,6 +2177,18 @@ class AdminPanelController extends Controller
                     $leadUser['conversion_transaction_type'] = (string) ($matchedTransaction['type'] ?? 'unknown');
                     $leadUser['conversion_transaction_status'] = $matchedTransaction['status'] ?? null;
                     $leadUser['conversion_transaction_at'] = (string) ($matchedTransaction['created_at'] ?? '');
+                    $leadUser['conversion_transaction_doctor_id'] = is_numeric($matchedTransaction['doctor_id'] ?? null)
+                        ? (int) $matchedTransaction['doctor_id']
+                        : null;
+                    $leadUser['conversion_transaction_doctor_name'] = !empty($matchedTransaction['doctor_name'])
+                        ? (string) $matchedTransaction['doctor_name']
+                        : null;
+                    $leadUser['conversion_transaction_clinic_id'] = is_numeric($matchedTransaction['clinic_id'] ?? null)
+                        ? (int) $matchedTransaction['clinic_id']
+                        : null;
+                    $leadUser['conversion_transaction_clinic_name'] = !empty($matchedTransaction['clinic_name'])
+                        ? (string) $matchedTransaction['clinic_name']
+                        : null;
                     $leadUser['conversion_lag_minutes'] = is_numeric($lagMinutes) ? (int) $lagMinutes : null;
 
                     $matchedNotificationId = is_numeric($matchedNotification['id'] ?? null)
@@ -2388,6 +2457,11 @@ class AdminPanelController extends Controller
             'filteredTargetUsers' => $filteredTargetUsers,
             'leadFilter' => $leadFilter,
             'runtimeWarnings' => array_values(array_unique($runtimeWarnings)),
+            'transactionDoctorOptions' => Doctor::query()
+                ->where('exported_from_excell', 1)
+                ->select('id', 'vet_registeration_id', 'doctor_name')
+                ->orderBy('doctor_name')
+                ->get(),
             'summary' => [
                 'neutering_leads' => $neuteringLeadCount,
                 'video_follow_up_leads' => $videoFollowUpLeadCount,
@@ -3896,9 +3970,16 @@ class AdminPanelController extends Controller
         return view('admin.appointment-transactions', compact('transactions', 'allDoctors', 'latestAssignmentLogs', 'doctorNameLookup'));
     }
 
-    public function updateAppointmentTransactionDoctor(Request $request, Transaction $transaction): RedirectResponse
+    public function updateAppointmentTransactionDoctor(Request $request, Transaction $transaction): RedirectResponse|JsonResponse
     {
         if (! $this->isAppointmentTransaction($transaction)) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only video consultation appointment transactions can be reassigned from this page.',
+                ], 422);
+            }
+
             return redirect()
                 ->route('admin.transactions.appointments')
                 ->withErrors(['doctor_id' => 'Only video consultation appointment transactions can be reassigned from this page.']);
@@ -3909,11 +3990,19 @@ class AdminPanelController extends Controller
         ]);
 
         $doctor = Doctor::query()
+            ->with('clinic:id,name')
             ->select('id', 'vet_registeration_id', 'doctor_name')
             ->where('exported_from_excell', 1)
             ->find((int) $data['doctor_id']);
 
         if (! $doctor) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Please select a valid Excel-export doctor (exported_from_excell = 1).',
+                ], 422);
+            }
+
             return redirect()
                 ->route('admin.transactions.appointments')
                 ->withErrors(['doctor_id' => 'Please select a valid Excel-export doctor (exported_from_excell = 1).']);
@@ -3925,6 +4014,25 @@ class AdminPanelController extends Controller
         $nextClinicId = $doctor->vet_registeration_id ? (int) $doctor->vet_registeration_id : null;
 
         if ($previousDoctorId === $nextDoctorId && $previousClinicId === $nextClinicId) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => sprintf(
+                        'No change for transaction #%d. Doctor already assigned: %s (ID: %d).',
+                        $transaction->id,
+                        $doctor->doctor_name ?? 'N/A',
+                        $doctor->id
+                    ),
+                    'transaction' => [
+                        'id' => (int) $transaction->id,
+                        'doctor_id' => $nextDoctorId,
+                        'doctor_name' => $doctor->doctor_name,
+                        'clinic_id' => $nextClinicId,
+                        'clinic_name' => $doctor->clinic?->name,
+                    ],
+                ]);
+            }
+
             return redirect()
                 ->route('admin.transactions.appointments')
                 ->with('status', sprintf(
@@ -3973,6 +4081,27 @@ class AdminPanelController extends Controller
                 'changed_by_name' => optional($request->user())->name,
                 'created_at' => now(),
                 'updated_at' => now(),
+            ]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => sprintf(
+                    'Doctor/clinic updated for transaction #%d. Previous Doctor ID: %s, Assigned: %s (ID: %d), Clinic ID: %s.',
+                    $transaction->id,
+                    $previousDoctorId ?? 'NULL',
+                    $doctor->doctor_name ?? 'N/A',
+                    $doctor->id,
+                    $transaction->clinic_id ?? 'NULL'
+                ),
+                'transaction' => [
+                    'id' => (int) $transaction->id,
+                    'doctor_id' => $nextDoctorId,
+                    'doctor_name' => $doctor->doctor_name,
+                    'clinic_id' => $nextClinicId,
+                    'clinic_name' => $doctor->clinic?->name,
+                ],
             ]);
         }
 

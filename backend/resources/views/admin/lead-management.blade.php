@@ -913,6 +913,50 @@
         font-family: 'DM Mono', monospace;
     }
 
+    .crm-service-assignment {
+        margin-top: 0.55rem;
+        border-top: 1px solid var(--crm-border);
+        padding-top: 0.55rem;
+        display: grid;
+        gap: 0.45rem;
+    }
+
+    .crm-service-assignment-summary {
+        display: grid;
+        gap: 0.18rem;
+    }
+
+    .crm-service-assignment-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.6rem;
+        font-size: 0.68rem;
+        color: var(--crm-ink-2);
+    }
+
+    .crm-service-assignment-row strong {
+        color: var(--crm-ink);
+        font-weight: 600;
+        text-align: right;
+    }
+
+    .crm-service-assignment-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        align-items: center;
+    }
+
+    .crm-service-assignment-form .crm-select {
+        min-width: 250px;
+        flex: 1 1 250px;
+    }
+
+    .crm-service-assignment-note {
+        font-size: 0.66rem;
+        color: var(--crm-ink-3);
+    }
+
     .crm-add-service {
         border: 1px dashed var(--crm-border-2);
         border-radius: var(--crm-radius-sm);
@@ -1577,6 +1621,19 @@
                 'conversion_transaction_type' => (string) ($leadUser['conversion_transaction_type'] ?? ''),
                 'conversion_transaction_status' => (string) ($leadUser['conversion_transaction_status'] ?? ''),
                 'conversion_transaction_at' => (string) ($leadUser['conversion_transaction_at'] ?? ''),
+                'conversion_transaction_doctor_id' => is_numeric($leadUser['conversion_transaction_doctor_id'] ?? null)
+                    ? (int) $leadUser['conversion_transaction_doctor_id']
+                    : null,
+                'conversion_transaction_doctor_name' => (string) ($leadUser['conversion_transaction_doctor_name'] ?? ''),
+                'conversion_transaction_clinic_id' => is_numeric($leadUser['conversion_transaction_clinic_id'] ?? null)
+                    ? (int) $leadUser['conversion_transaction_clinic_id']
+                    : null,
+                'conversion_transaction_clinic_name' => (string) ($leadUser['conversion_transaction_clinic_name'] ?? ''),
+                'conversion_transaction_doctor_reassignable' => in_array(
+                    strtolower(trim((string) ($leadUser['conversion_transaction_type'] ?? ''))),
+                    ['video_consult', 'excell_export_campaign'],
+                    true
+                ),
                 'conversion_lag_minutes' => is_numeric($leadUser['conversion_lag_minutes'] ?? null)
                     ? (int) $leadUser['conversion_lag_minutes']
                     : null,
@@ -1613,6 +1670,7 @@
     $nextActionRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.next-action')
         ? route('admin.lead-management.users.next-action', ['user' => '__USER_ID__'])
         : '';
+    $transactionDoctorUpdateRouteTemplate = route('admin.transactions.appointments.doctor', ['transaction' => '__TXN_ID__']);
 
     $paginationWindow = [];
     if ($filteredTargetUsers instanceof \Illuminate\Pagination\LengthAwarePaginator && $filteredTargetUsers->total() > 0) {
@@ -1669,7 +1727,7 @@
     </div>
 
     <div class="crm-filter-bar">
-        <form class="crm-filter-form" method="GET" action="{{ route('admin.lead-management') }}">
+        <form id="crmFilterForm" class="crm-filter-form" method="GET" action="{{ route('admin.lead-management') }}">
             <label for="lead_filter">Category</label>
             <select id="lead_filter" name="lead_filter" class="crm-select">
                 <option value="all" @selected($leadFilter === 'all')>All targeted users</option>
@@ -2054,6 +2112,8 @@
     const deleteRouteTemplate = @json($deleteRouteTemplate);
     const logActionRouteTemplate = @json($logActionRouteTemplate);
     const nextActionRouteTemplate = @json($nextActionRouteTemplate);
+    const transactionDoctorUpdateRouteTemplate = @json($transactionDoctorUpdateRouteTemplate);
+    const transactionDoctorOptions = @json($transactionDoctorOptions);
     const csrfToken = @json(csrf_token());
 
     const listEl = document.getElementById('crmLeadList');
@@ -2063,6 +2123,8 @@
     const searchInput = document.getElementById('crmSearchInput');
     const sortSelect = document.getElementById('crmSortSelect');
     const sidebarFilterWrap = document.getElementById('crmSidebarFilters');
+    const filterForm = document.getElementById('crmFilterForm');
+    const leadFilterSelect = document.getElementById('lead_filter');
     const toastEl = document.getElementById('crmToast');
 
     if (!listEl || !detailWrapEl || !detailEmptyEl || !leadCountEl || !searchInput || !sortSelect || !sidebarFilterWrap) {
@@ -2076,9 +2138,25 @@
         String(nowDate.getDate()).padStart(2, '0'),
     ].join('-');
 
+    const serviceToLeadFilterMap = {
+        neutering: 'neutering',
+        video: 'video_follow_up_video',
+        clinic: 'video_follow_up_in_clinic',
+        vaccination: 'vaccination',
+    };
+
+    const leadFilterToServiceMap = {
+        neutering: 'neutering',
+        video_follow_up_video: 'video',
+        video_follow_up_in_clinic: 'clinic',
+        vaccination: 'vaccination',
+    };
+
+    const initialService = leadFilterToServiceMap[String((pageMeta && pageMeta.lead_filter) || '').toLowerCase()] || 'all';
+
     const state = {
         pipeline: 'all',
-        service: 'all',
+        service: initialService,
         search: '',
         sortBy: 'next_action',
         selectedLeadId: leadData.length ? Number(leadData[0].id) : null,
@@ -2134,6 +2212,7 @@
     };
 
     const modalIds = ['log', 'txn', 'next', 'pet'];
+    let activeDetailTab = 'profile';
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -2557,6 +2636,12 @@
             services.push({
                 title: `Transaction #${Number(lead.conversion_transaction_id || 0)}`,
                 amount: '₹0',
+                transactionId: Number(lead.conversion_transaction_id || 0),
+                transactionDoctorId: Number(lead.conversion_transaction_doctor_id || 0) || null,
+                transactionDoctorName: String(lead.conversion_transaction_doctor_name || ''),
+                transactionClinicId: Number(lead.conversion_transaction_clinic_id || 0) || null,
+                transactionClinicName: String(lead.conversion_transaction_clinic_name || ''),
+                canReassignDoctor: Boolean(lead.conversion_transaction_doctor_reassignable),
                 tags: [
                     lead.conversion_transaction_type || 'Unknown type',
                     lead.conversion_transaction_status || 'status n/a',
@@ -2668,6 +2753,9 @@
         const latestInternalNote = latestLogWithNotes
             ? String(latestLogWithNotes.notes || '').trim()
             : '';
+        const activeTab = ['profile', 'timeline', 'services', 'notifications'].includes(activeDetailTab)
+            ? activeDetailTab
+            : 'profile';
 
         const categoryPills = (lead.category_tags || []).length
             ? (lead.category_tags || []).map((tag) => `<span class="crm-pill crm-pill-blue">${escapeHtml(tag)}</span>`).join(' ')
@@ -2745,13 +2833,13 @@
             </div>
 
             <div class="crm-tabs" id="crmDetailTabs">
-                <button type="button" class="crm-tab active" data-tab="profile">Profile</button>
-                <button type="button" class="crm-tab" data-tab="timeline">Timeline</button>
-                <button type="button" class="crm-tab" data-tab="services">Services</button>
-                <button type="button" class="crm-tab" data-tab="notifications">Notifications</button>
+                <button type="button" class="crm-tab ${activeTab === 'profile' ? 'active' : ''}" data-tab="profile">Profile</button>
+                <button type="button" class="crm-tab ${activeTab === 'timeline' ? 'active' : ''}" data-tab="timeline">Timeline</button>
+                <button type="button" class="crm-tab ${activeTab === 'services' ? 'active' : ''}" data-tab="services">Services</button>
+                <button type="button" class="crm-tab ${activeTab === 'notifications' ? 'active' : ''}" data-tab="notifications">Notifications</button>
             </div>
 
-            <div class="crm-tab-content active" data-tab-content="profile">
+            <div class="crm-tab-content ${activeTab === 'profile' ? 'active' : ''}" data-tab-content="profile">
                 <div class="crm-grid-2">
                     <div class="crm-card">
                         <div class="crm-card-title">Owner Details</div>
@@ -2795,7 +2883,7 @@
                 </div>
             </div>
 
-            <div class="crm-tab-content" data-tab-content="timeline">
+            <div class="crm-tab-content ${activeTab === 'timeline' ? 'active' : ''}" data-tab-content="timeline">
                 <div class="crm-card">
                     <div class="crm-card-title">Activity Timeline <button type="button" data-open-modal="log">+ Log</button></div>
                     ${timelineItems.length ? timelineItems.map((item) => `
@@ -2814,7 +2902,7 @@
                 </div>
             </div>
 
-            <div class="crm-tab-content" data-tab-content="services">
+            <div class="crm-tab-content ${activeTab === 'services' ? 'active' : ''}" data-tab-content="services">
                 <div class="crm-add-service" data-open-modal="txn">+ Add a service transaction</div>
                 ${services.length ? services.map((svc) => `
                     <div class="crm-service-card">
@@ -2825,6 +2913,45 @@
                         <div class="crm-service-meta">
                             ${(svc.tags || []).map((tag) => `<span class="crm-service-tag">${escapeHtml(tag)}</span>`).join('')}
                         </div>
+                        ${svc.transactionId ? `
+                            <div class="crm-service-assignment">
+                                <div class="crm-service-assignment-summary">
+                                    <div class="crm-service-assignment-row">
+                                        <span>Current doctor</span>
+                                        <strong>${escapeHtml(svc.transactionDoctorName || 'Unassigned')}</strong>
+                                    </div>
+                                    <div class="crm-service-assignment-row">
+                                        <span>Current clinic</span>
+                                        <strong>${escapeHtml(svc.transactionClinicName || (svc.transactionClinicId ? `ID ${svc.transactionClinicId}` : 'Unassigned'))}</strong>
+                                    </div>
+                                </div>
+                                ${svc.canReassignDoctor ? `
+                                    <div class="crm-service-assignment-form">
+                                        <select class="crm-select" data-transaction-doctor-select data-transaction-id="${Number(svc.transactionId)}" ${transactionDoctorOptions.length ? '' : 'disabled'}>
+                                            <option value="">Select doctor</option>
+                                            ${transactionDoctorOptions.map((doctor) => `
+                                                <option value="${Number(doctor.id)}" ${Number(svc.transactionDoctorId || 0) === Number(doctor.id) ? 'selected' : ''}>
+                                                    ${escapeHtml(doctor.doctor_name || 'Unnamed Doctor')} (ID: ${Number(doctor.id)})
+                                                </option>
+                                            `).join('')}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            class="crm-btn primary"
+                                            data-update-transaction-doctor
+                                            data-transaction-id="${Number(svc.transactionId)}"
+                                            ${transactionDoctorOptions.length ? '' : 'disabled'}
+                                        >
+                                            Update Doctor
+                                        </button>
+                                    </div>
+                                ` : `
+                                    <div class="crm-service-assignment-note">
+                                        Doctor reassignment is only enabled for video consult and Excel export campaign transactions.
+                                    </div>
+                                `}
+                            </div>
+                        ` : ''}
                     </div>
                 `).join('') : `
                     <div class="crm-card">
@@ -2835,7 +2962,7 @@
                 `}
             </div>
 
-            <div class="crm-tab-content" data-tab-content="notifications">
+            <div class="crm-tab-content ${activeTab === 'notifications' ? 'active' : ''}" data-tab-content="notifications">
                 <div class="crm-card">
                     <div class="crm-card-title">Notification Log — ${Number(totalNotifs)} sent · ${Number(clickedNotifs)} clicked · ${lead.conversion_captured ? 1 : 0} converted</div>
                     ${buildNotificationRows(lead)}
@@ -2855,6 +2982,7 @@
         tabButtons.forEach((button) => {
             button.addEventListener('click', () => {
                 const tab = button.getAttribute('data-tab');
+                activeDetailTab = tab || 'profile';
                 tabButtons.forEach((btn) => btn.classList.toggle('active', btn === button));
                 tabContents.forEach((content) => {
                     const isActive = content.getAttribute('data-tab-content') === tab;
@@ -2883,6 +3011,25 @@
             button.addEventListener('click', () => {
                 const modalKey = button.getAttribute('data-open-modal');
                 openModal(modalKey);
+            });
+        });
+
+        detailWrapEl.querySelectorAll('[data-update-transaction-doctor]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const transactionId = Number(button.getAttribute('data-transaction-id') || 0);
+                if (!Number.isFinite(transactionId) || transactionId <= 0) {
+                    showToast('Invalid transaction selected.');
+                    return;
+                }
+
+                const select = detailWrapEl.querySelector(`[data-transaction-doctor-select][data-transaction-id="${transactionId}"]`);
+                const doctorId = Number(select?.value || 0);
+                if (!Number.isFinite(doctorId) || doctorId <= 0) {
+                    showToast('Please select a doctor first.');
+                    return;
+                }
+
+                await updateTransactionDoctor(transactionId, doctorId, button);
             });
         });
     }
@@ -2981,6 +3128,11 @@
         return String(template).replace('__USER_ID__', String(Number(userId)));
     }
 
+    function buildTransactionRoute(template, transactionId) {
+        if (!template) return '';
+        return String(template).replace('__TXN_ID__', String(Number(transactionId)));
+    }
+
     function normalizeActivityPayload(payload, fallback = {}) {
         if (!payload || typeof payload !== 'object') {
             return {
@@ -3038,6 +3190,68 @@
         }
 
         return data;
+    }
+
+    async function updateTransactionDoctor(transactionId, doctorId, button) {
+        const lead = getSelectedLead();
+        if (!lead) return;
+
+        const apiUrl = buildTransactionRoute(transactionDoctorUpdateRouteTemplate, transactionId);
+        if (!apiUrl) {
+            showToast('Doctor update route is missing.');
+            return;
+        }
+
+        const originalLabel = button ? button.textContent : '';
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Updating...';
+        }
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ doctor_id: doctorId }),
+            });
+
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (_error) {
+                data = null;
+            }
+
+            if (!response.ok || !data || data.status !== 'success') {
+                const message = data?.message || `Doctor update failed (${response.status})`;
+                throw new Error(message);
+            }
+
+            if (Number(lead.conversion_transaction_id || 0) === Number(transactionId)) {
+                const transaction = data.transaction && typeof data.transaction === 'object'
+                    ? data.transaction
+                    : {};
+                lead.conversion_transaction_doctor_id = Number(transaction.doctor_id || doctorId);
+                lead.conversion_transaction_doctor_name = String(transaction.doctor_name || '');
+                lead.conversion_transaction_clinic_id = transaction.clinic_id ? Number(transaction.clinic_id) : null;
+                lead.conversion_transaction_clinic_name = String(transaction.clinic_name || '');
+            }
+
+            renderDetail();
+            showToast(data.message || 'Doctor updated.');
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : 'Failed to update doctor.');
+        } finally {
+            if (button && button.isConnected) {
+                button.disabled = false;
+                button.textContent = originalLabel;
+            }
+        }
     }
 
     function attachActionSavers() {
@@ -3240,6 +3454,7 @@
             const leadId = Number(card.getAttribute('data-lead-id'));
             if (!Number.isFinite(leadId)) return;
             state.selectedLeadId = leadId;
+            activeDetailTab = 'profile';
             renderLeadList();
             renderDetail();
         });
@@ -3258,11 +3473,33 @@
 
             const serviceBtn = event.target.closest('[data-service]');
             if (!serviceBtn) return;
-            const selectedService = String(serviceBtn.getAttribute('data-service') || 'all');
-            state.service = selectedService === state.service ? 'all' : selectedService;
+
+            const selectedService = String(serviceBtn.getAttribute('data-service') || 'all').toLowerCase();
+            const selectedLeadFilter = serviceToLeadFilterMap[selectedService] || 'all';
+
+            if (!filterForm || !leadFilterSelect) {
+                state.service = selectedService;
+                updateSidebarActiveState();
+                renderLeadList();
+                renderDetail();
+                return;
+            }
+
+            state.service = selectedService;
             updateSidebarActiveState();
-            renderLeadList();
-            renderDetail();
+
+            leadFilterSelect.value = selectedLeadFilter;
+
+            let pageInput = filterForm.querySelector('input[name="page"]');
+            if (!pageInput) {
+                pageInput = document.createElement('input');
+                pageInput.type = 'hidden';
+                pageInput.name = 'page';
+                filterForm.appendChild(pageInput);
+            }
+            pageInput.value = '1';
+
+            filterForm.submit();
         });
     }
 
