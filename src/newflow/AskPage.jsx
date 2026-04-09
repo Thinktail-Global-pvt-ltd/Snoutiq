@@ -591,6 +591,26 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
     reason: concern,
     issue: concern,
     problemText: concern,
+    dateOfBirth: profile.dob,
+    birthDate: profile.dob,
+    lead: {
+      ownerName: profile.ownerName,
+      phone: profile.phone,
+      species,
+      area: profile.location,
+      reason: concern,
+    },
+    pet: {
+      petName: profile.petName,
+      breed: profile.breed,
+      dob: profile.dob,
+      petDob: profile.dob,
+      dateOfBirth: profile.dob,
+      birthDate: profile.dob,
+      species,
+      type: species,
+      issue: concern,
+    },
   };
 };
 
