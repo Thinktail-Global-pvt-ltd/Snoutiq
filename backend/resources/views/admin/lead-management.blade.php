@@ -1738,6 +1738,7 @@
                 <option value="vaccination" @selected($leadFilter === 'vaccination')>Vaccination reminder leads</option>
                 <option value="both" @selected($leadFilter === 'both')>Users in both categories</option>
             </select>
+            <input type="hidden" id="crmSearchQueryField" name="q" value="{{ request('q', '') }}">
 
             <label for="limit">Lead scan</label>
             <input id="limit" name="limit" type="number" min="25" max="1000" value="{{ $limit }}" class="crm-input" style="width: 95px; min-width: 95px;">
@@ -1838,7 +1839,7 @@
 
             <div class="crm-side-filters">
                 <label class="crm-side-filter-label" for="crmSearchInput">Search</label>
-                <input id="crmSearchInput" type="text" class="crm-input" placeholder="Name, phone, pet..." style="width: 100%; margin-bottom: 0.55rem;">
+                <input id="crmSearchInput" type="text" class="crm-input" placeholder="Name, phone, pet..." value="{{ request('q', '') }}" style="width: 100%; margin-bottom: 0.55rem;">
 
                 <label class="crm-side-filter-label" for="crmSortSelect">Sort by</label>
                 <select id="crmSortSelect" class="crm-select" style="width: 100%;">
@@ -2125,6 +2126,7 @@
     const sidebarFilterWrap = document.getElementById('crmSidebarFilters');
     const filterForm = document.getElementById('crmFilterForm');
     const leadFilterSelect = document.getElementById('lead_filter');
+    const searchQueryField = document.getElementById('crmSearchQueryField');
     const toastEl = document.getElementById('crmToast');
 
     if (!listEl || !detailWrapEl || !detailEmptyEl || !leadCountEl || !searchInput || !sortSelect || !sidebarFilterWrap) {
@@ -2213,6 +2215,7 @@
 
     const modalIds = ['log', 'txn', 'next', 'pet'];
     let activeDetailTab = 'profile';
+    let searchSubmitTimer = null;
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -3141,6 +3144,20 @@
         return String(template).replace('__TXN_ID__', String(Number(transactionId)));
     }
 
+    function resetFilterFormPage() {
+        if (!filterForm) return;
+
+        let pageInput = filterForm.querySelector('input[name="page"]');
+        if (!pageInput) {
+            pageInput = document.createElement('input');
+            pageInput.type = 'hidden';
+            pageInput.name = 'page';
+            filterForm.appendChild(pageInput);
+        }
+
+        pageInput.value = '1';
+    }
+
     function normalizeActivityPayload(payload, fallback = {}) {
         if (!payload || typeof payload !== 'object') {
             return {
@@ -3497,26 +3514,40 @@
             updateSidebarActiveState();
 
             leadFilterSelect.value = selectedLeadFilter;
-
-            let pageInput = filterForm.querySelector('input[name="page"]');
-            if (!pageInput) {
-                pageInput = document.createElement('input');
-                pageInput.type = 'hidden';
-                pageInput.name = 'page';
-                filterForm.appendChild(pageInput);
-            }
-            pageInput.value = '1';
-
+            resetFilterFormPage();
             filterForm.submit();
         });
     }
 
     function attachSearchSortHandlers() {
-        searchInput.addEventListener('input', () => {
-            state.search = String(searchInput.value || '');
-            renderLeadList();
-            renderDetail();
-        });
+        if (filterForm && searchQueryField) {
+            const submitSearch = () => {
+                searchQueryField.value = String(searchInput.value || '');
+                resetFilterFormPage();
+                filterForm.submit();
+            };
+
+            searchInput.addEventListener('input', () => {
+                searchQueryField.value = String(searchInput.value || '');
+                window.clearTimeout(searchSubmitTimer);
+                searchSubmitTimer = window.setTimeout(() => {
+                    submitSearch();
+                }, 250);
+            });
+
+            searchInput.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                window.clearTimeout(searchSubmitTimer);
+                submitSearch();
+            });
+        } else {
+            searchInput.addEventListener('input', () => {
+                state.search = String(searchInput.value || '');
+                renderLeadList();
+                renderDetail();
+            });
+        }
 
         sortSelect.addEventListener('change', () => {
             state.sortBy = String(sortSelect.value || 'next_action');

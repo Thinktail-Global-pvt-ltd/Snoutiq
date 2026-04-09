@@ -619,12 +619,14 @@ class AdminPanelController extends Controller
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:200'],
             'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,video_follow_up_video,video_follow_up_in_clinic,vaccination,both'],
+            'q' => ['nullable', 'string', 'max:255'],
         ]);
 
         $limit = (int) ($filters['limit'] ?? 250);
         $perPage = (int) ($filters['per_page'] ?? 5);
         $page = max((int) $request->query('page', 1), 1);
         $leadFilter = strtolower((string) ($filters['lead_filter'] ?? 'all'));
+        $searchTerm = trim((string) ($filters['q'] ?? ''));
 
         $hasUsersTable = Schema::hasTable('users');
         $hasUserCity = $hasUsersTable && Schema::hasColumn('users', 'city');
@@ -915,6 +917,61 @@ class AdminPanelController extends Controller
             } catch (\Throwable $e) {
                 return null;
             }
+        };
+
+        $matchesLeadSearch = static function (array $leadUser, string $searchTerm): bool {
+            if ($searchTerm === '') {
+                return true;
+            }
+
+            $needle = strtolower(trim($searchTerm));
+            if ($needle === '') {
+                return true;
+            }
+
+            $searchableValues = [
+                $leadUser['id'] ?? '',
+                $leadUser['name'] ?? '',
+                $leadUser['email'] ?? '',
+                $leadUser['phone'] ?? '',
+                $leadUser['city'] ?? '',
+                $leadUser['prescription_follow_up_type'] ?? '',
+                $leadUser['conversion_transaction_type'] ?? '',
+            ];
+
+            foreach (['neutering_pet_names', 'notified_vaccination_pet_names'] as $petKey) {
+                foreach (($leadUser[$petKey] ?? []) as $petValue) {
+                    $searchableValues[] = $petValue;
+                }
+            }
+
+            $categoryTerms = [];
+            if (!empty($leadUser['has_neutering'])) {
+                $categoryTerms[] = 'neutering';
+            }
+            if (!empty($leadUser['has_video_follow_up'])) {
+                $categoryTerms[] = 'follow up';
+            }
+            if (!empty($leadUser['has_video_follow_up_video'])) {
+                $categoryTerms[] = 'video follow up';
+            }
+            if (!empty($leadUser['has_video_follow_up_in_clinic'])) {
+                $categoryTerms[] = 'in clinic';
+            }
+            if (!empty($leadUser['has_vaccination_reminder'])) {
+                $categoryTerms[] = 'vaccination';
+            }
+
+            $searchableValues = array_merge($searchableValues, $categoryTerms);
+
+            foreach ($searchableValues as $value) {
+                $haystack = strtolower(trim((string) $value));
+                if ($haystack !== '' && str_contains($haystack, $needle)) {
+                    return true;
+                }
+            }
+
+            return false;
         };
 
         $normalizeSessionKey = static fn ($value): string => strtolower(trim((string) $value));
@@ -2406,6 +2463,7 @@ class AdminPanelController extends Controller
                         || (bool) $leadUser['has_vaccination_reminder'],
                 };
             })
+            ->filter(fn (array $leadUser): bool => $matchesLeadSearch($leadUser, $searchTerm))
             ->sort(function (array $left, array $right): int {
                 $leftDate = $left['next_follow_up_date'] ?? '9999-12-31';
                 $rightDate = $right['next_follow_up_date'] ?? '9999-12-31';
