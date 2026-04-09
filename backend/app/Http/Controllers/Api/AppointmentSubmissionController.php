@@ -24,6 +24,16 @@ class AppointmentSubmissionController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
+        $resolvedClinicId = $this->resolveClinicId($request);
+        if (!$request->filled('clinic_id') && $resolvedClinicId !== null) {
+            $request->merge(['clinic_id' => $resolvedClinicId]);
+        }
+
+        $resolvedDoctorId = $this->resolveDoctorId($request);
+        if (!$request->filled('doctor_id') && $resolvedDoctorId !== null) {
+            $request->merge(['doctor_id' => $resolvedDoctorId]);
+        }
+
         $petValidation = ['nullable', 'integer'];
         if (Schema::hasTable('pets')) {
             $petValidation[] = 'exists:pets,id';
@@ -32,8 +42,8 @@ class AppointmentSubmissionController extends Controller
         $validated = $request->validate([
             'user_id' => ['nullable', 'integer'],
             'patient_id' => ['nullable', 'integer'],
-            'clinic_id' => ['required', 'integer', 'exists:vet_registerations_temp,id'],
-            'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
+            'clinic_id' => ['nullable', 'integer', 'exists:vet_registerations_temp,id'],
+            'doctor_id' => ['nullable', 'integer', 'exists:doctors,id'],
             'patient_name' => ['required', 'string', 'max:255'],
             'patient_phone' => ['nullable', 'string', 'max:20'],
             'patient_email' => ['nullable', 'email', 'max:191'],
@@ -57,8 +67,19 @@ class AppointmentSubmissionController extends Controller
             ], 500);
         }
 
-        $clinic = VetRegisterationTemp::findOrFail($validated['clinic_id']);
-        $doctor = Doctor::findOrFail($validated['doctor_id']);
+        $doctor = !empty($validated['doctor_id'])
+            ? Doctor::find((int) $validated['doctor_id'])
+            : null;
+        $clinic = !empty($validated['clinic_id'])
+            ? VetRegisterationTemp::find((int) $validated['clinic_id'])
+            : null;
+
+        if (!$clinic && $doctor && $doctor->vet_registeration_id) {
+            $clinic = VetRegisterationTemp::find((int) $doctor->vet_registeration_id);
+            if ($clinic) {
+                $validated['clinic_id'] = (int) $clinic->id;
+            }
+        }
 
         $patientId = $request->input('user_id') ?? $request->input('patient_id');
         $user = $patientId ? User::find((int) $patientId) : null;
@@ -87,13 +108,17 @@ class AppointmentSubmissionController extends Controller
                     $payload['role'] = 'pet';
                 }
 
-                if (Schema::hasColumn('users', 'last_vet_id')) {
+                if ($clinic && Schema::hasColumn('users', 'last_vet_id')) {
                     $payload['last_vet_id'] = $clinic->id;
                 }
 
                 $user = User::create($payload);
             }
-        } elseif (Schema::hasColumn('users', 'last_vet_id') && (int) $user->last_vet_id !== (int) $clinic->id) {
+        } elseif (
+            $clinic
+            && Schema::hasColumn('users', 'last_vet_id')
+            && (int) $user->last_vet_id !== (int) $clinic->id
+        ) {
             $user->last_vet_id = $clinic->id;
             $user->save();
         }
@@ -105,11 +130,11 @@ class AppointmentSubmissionController extends Controller
             ], 422);
         }
 
-        $clinic = VetRegisterationTemp::findOrFail($validated['clinic_id']);
-
         $notesPayload = [
-            'clinic_name' => $clinic->name,
-            'doctor_name' => $doctor->doctor_name ?? $doctor->name ?? null,
+            'clinic_name' => $clinic?->name,
+            'clinic_id' => $clinic?->id,
+            'doctor_name' => $doctor?->doctor_name ?? $doctor?->name ?? null,
+            'doctor_id' => $doctor?->id,
             'patient_user_id' => $user->id,
             'patient_email' => $user->email,
             'amount_paise' => $validated['amount'] ?? null,
@@ -138,11 +163,11 @@ class AppointmentSubmissionController extends Controller
         }
 
         $appointmentPayload = [
-            'vet_registeration_id' => $clinic->id,
-            'doctor_id' => $doctor->id,
+            'vet_registeration_id' => $clinic?->id,
+            'doctor_id' => $doctor?->id,
             'pet_id' => $validated['pet_id'] ?? null,
             'name' => $validated['patient_name'],
-            'mobile' => $validated['patient_phone'] ?? ($user->phone ?? null),
+            'mobile' => $validated['patient_phone'] ?? ($user->phone ?? 'N/A'),
             'pet_name' => $validated['pet_name'] ?? null,
             'appointment_date' => $validated['date'],
             'appointment_time' => $validated['time_slot'],
@@ -1053,5 +1078,155 @@ class AppointmentSubmissionController extends Controller
             'timestamp' => $timestamp?->toDateTimeString(),
             'duration_seconds' => $session->duration_seconds,
         ];
+    }
+
+    private function resolveClinicId(Request $request): ?int
+    {
+        foreach (['clinic_id', 'vet_registeration_id', 'vet_id'] as $key) {
+            $parsed = $this->parsePositiveInt($request->input($key) ?? $request->query($key));
+            if ($parsed !== null) {
+                return $parsed;
+            }
+        }
+
+        $headerClinicId = $this->firstPositiveHeaderInt($request, [
+            'X-Clinic-Id',
+            'X-Vet-Id',
+            'X-Vet-Registeration-Id',
+            'X-Vet-Registerations-Temp-Id',
+        ]);
+        if ($headerClinicId !== null) {
+            return $headerClinicId;
+        }
+
+        $headerUserId = $this->firstPositiveHeaderInt($request, [
+            'X-User-Id',
+            'X-Acting-User',
+            'X-Session-User',
+        ]);
+        if (
+            $headerUserId !== null
+            && Schema::hasTable('vet_registerations_temp')
+            && DB::table('vet_registerations_temp')->where('id', $headerUserId)->exists()
+        ) {
+            return $headerUserId;
+        }
+
+        $slug = trim((string) (
+            $request->input('vet_slug')
+            ?? $request->query('vet_slug')
+            ?? $request->input('clinic_slug')
+            ?? $request->query('clinic_slug')
+            ?? ''
+        ));
+        if (
+            $slug !== ''
+            && Schema::hasTable('vet_registerations_temp')
+            && Schema::hasColumn('vet_registerations_temp', 'slug')
+        ) {
+            $row = DB::table('vet_registerations_temp')
+                ->select('id')
+                ->whereRaw('LOWER(slug) = ?', [strtolower($slug)])
+                ->first();
+            if ($row) {
+                return (int) $row->id;
+            }
+        }
+
+        $sessionClinicId = $this->parsePositiveInt(
+            session('clinic_id')
+                ?? session('vet_registerations_temp_id')
+                ?? session('vet_registeration_id')
+                ?? session('vet_id')
+                ?? data_get(session('user'), 'clinic_id')
+                ?? data_get(session('auth_full'), 'clinic_id')
+                ?? data_get(session('auth_full'), 'user.clinic_id')
+                ?? data_get(session('auth_full'), 'vet_registeration_id')
+                ?? data_get(session('auth_full'), 'vet_registerations_temp_id')
+        );
+        if ($sessionClinicId !== null) {
+            return $sessionClinicId;
+        }
+
+        $doctorId = $this->resolveDoctorId($request);
+        if ($doctorId !== null) {
+            $clinicId = $this->lookupDoctorClinicId($doctorId);
+            if ($clinicId !== null) {
+                return $clinicId;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveDoctorId(Request $request): ?int
+    {
+        foreach (['doctor_id', 'doctorId'] as $key) {
+            $parsed = $this->parsePositiveInt($request->input($key) ?? $request->query($key));
+            if ($parsed !== null) {
+                return $parsed;
+            }
+        }
+
+        $headerDoctorId = $this->firstPositiveHeaderInt($request, ['X-Doctor-Id']);
+        if ($headerDoctorId !== null) {
+            return $headerDoctorId;
+        }
+
+        return $this->parsePositiveInt(
+            session('doctor_id')
+                ?? data_get(session('auth_full'), 'doctor_id')
+                ?? data_get(session('auth_full'), 'user.doctor_id')
+                ?? data_get(session('user'), 'doctor_id')
+        );
+    }
+
+    private function lookupDoctorClinicId(?int $doctorId): ?int
+    {
+        if (!$doctorId) {
+            return null;
+        }
+
+        $clinicId = Doctor::query()
+            ->where('id', $doctorId)
+            ->value('vet_registeration_id');
+
+        return $this->parsePositiveInt($clinicId);
+    }
+
+    private function firstPositiveHeaderInt(Request $request, array $headerNames): ?int
+    {
+        foreach ($headerNames as $headerName) {
+            $parsed = $this->parsePositiveInt($request->header($headerName));
+            if ($parsed !== null) {
+                return $parsed;
+            }
+        }
+
+        return null;
+    }
+
+    private function parsePositiveInt(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value > 0 ? $value : null;
+        }
+
+        if (is_string($value)) {
+            $value = trim($value);
+            if ($value === '' || !preg_match('/^\d+$/', $value)) {
+                return null;
+            }
+
+            $parsed = (int) $value;
+            return $parsed > 0 ? $parsed : null;
+        }
+
+        if (is_numeric($value)) {
+            $parsed = (int) $value;
+            return $parsed > 0 ? $parsed : null;
+        }
+
+        return null;
     }
 }
