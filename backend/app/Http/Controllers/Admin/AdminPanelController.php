@@ -897,6 +897,7 @@ class AdminPanelController extends Controller
                 'conversion_transaction_doctor_name' => null,
                 'conversion_transaction_clinic_id' => null,
                 'conversion_transaction_clinic_name' => null,
+                'related_transactions' => [],
                 'conversion_lag_minutes' => null,
                 'crm_activity_logs' => [],
                 'crm_next_action' => null,
@@ -1838,6 +1839,7 @@ class AdminPanelController extends Controller
         $hasTransactionFcmNotificationId = $hasTransactionsTable && Schema::hasColumn('transactions', 'fcm_notification_id');
         $hasTransactionDoctorId = $hasTransactionsTable && Schema::hasColumn('transactions', 'doctor_id');
         $hasTransactionClinicId = $hasTransactionsTable && Schema::hasColumn('transactions', 'clinic_id');
+        $hasTransactionAmountPaise = $hasTransactionsTable && Schema::hasColumn('transactions', 'amount_paise');
         $supportsConversionTracking = $hasTransactionUserId && $hasTransactionCreatedAt;
         $convertedUsersCount = 0;
 
@@ -1878,6 +1880,9 @@ class AdminPanelController extends Controller
                 if ($hasTransactionClinicId) {
                     $transactionQuery->addSelect('clinic_id');
                 }
+                if ($hasTransactionAmountPaise) {
+                    $transactionQuery->addSelect('amount_paise');
+                }
                 if ($hasTransactionMetadata) {
                     $transactionQuery->addSelect('metadata');
                 }
@@ -1892,6 +1897,7 @@ class AdminPanelController extends Controller
                 ];
 
                 $transactionsByUser = [];
+                $relatedTransactionsByUser = [];
                 $leadTransactions = $transactionQuery
                     ->whereIn('user_id', $leadUserIds)
                     ->orderBy('created_at')
@@ -1949,9 +1955,6 @@ class AdminPanelController extends Controller
                     $transactionStatus = $hasTransactionStatus
                         ? strtolower(trim((string) ($leadTransaction->status ?? '')))
                         : '';
-                    if ($hasTransactionStatus && $transactionStatus !== '' && !in_array($transactionStatus, $successfulStatuses, true)) {
-                        continue;
-                    }
 
                     $transactionType = $hasTransactionType
                         ? trim((string) ($leadTransaction->type ?? ''))
@@ -1995,15 +1998,18 @@ class AdminPanelController extends Controller
                         }
                     }
 
-                    if (!isset($transactionsByUser[$userId])) {
-                        $transactionsByUser[$userId] = [];
+                    if (!isset($relatedTransactionsByUser[$userId])) {
+                        $relatedTransactionsByUser[$userId] = [];
                     }
 
-                    $transactionsByUser[$userId][] = [
+                    $transactionRow = [
                         'id' => (int) ($leadTransaction->id ?? 0),
                         'created_at' => $transactionAt,
                         'type' => $transactionType,
                         'status' => $transactionStatus !== '' ? $transactionStatus : null,
+                        'amount_paise' => $hasTransactionAmountPaise && is_numeric($leadTransaction->amount_paise)
+                            ? (int) $leadTransaction->amount_paise
+                            : null,
                         'pet_id' => $hasTransactionPetId && is_numeric($leadTransaction->pet_id) ? (int) $leadTransaction->pet_id : null,
                         'fcm_notification_id' => $transactionFcmNotificationId,
                         'doctor_id' => $hasTransactionDoctorId && is_numeric($leadTransaction->doctor_id) ? (int) $leadTransaction->doctor_id : null,
@@ -2016,6 +2022,18 @@ class AdminPanelController extends Controller
                             : null,
                         'session_keys' => array_keys($sessionKeys),
                     ];
+
+                    $relatedTransactionsByUser[$userId][] = $transactionRow;
+
+                    if ($hasTransactionStatus && $transactionStatus !== '' && !in_array($transactionStatus, $successfulStatuses, true)) {
+                        continue;
+                    }
+
+                    if (!isset($transactionsByUser[$userId])) {
+                        $transactionsByUser[$userId] = [];
+                    }
+
+                    $transactionsByUser[$userId][] = $transactionRow;
                 }
 
                 $notificationMatchesTransaction = static function (array $notification, array $transaction) use ($normalizeSessionKey): bool {
@@ -2046,11 +2064,16 @@ class AdminPanelController extends Controller
                     return true;
                 };
 
-                $targetUsers = $targetUsers->map(function (array $leadUser) use ($transactionsByUser, $notificationMatchesTransaction): array {
+                $targetUsers = $targetUsers->map(function (array $leadUser) use ($transactionsByUser, $relatedTransactionsByUser, $notificationMatchesTransaction): array {
                     $userId = is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0;
                     if ($userId <= 0) {
                         return $leadUser;
                     }
+
+                    $leadUser['related_transactions'] = collect($relatedTransactionsByUser[$userId] ?? [])
+                        ->sortByDesc('created_at')
+                        ->values()
+                        ->all();
 
                     $userTransactions = $transactionsByUser[$userId] ?? [];
                     if (empty($userTransactions)) {
@@ -4041,11 +4064,15 @@ class AdminPanelController extends Controller
 
     public function updateAppointmentTransactionDoctor(Request $request, Transaction $transaction): RedirectResponse|JsonResponse
     {
-        if (! $this->isAppointmentTransaction($transaction)) {
+        $allowsLeadManagementReassignment = $request->expectsJson()
+            && is_numeric($transaction->user_id ?? null)
+            && (int) $transaction->user_id > 0;
+
+        if (! $this->isAppointmentTransaction($transaction) && ! $allowsLeadManagementReassignment) {
             if ($request->expectsJson()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Only video consultation appointment transactions can be reassigned from this page.',
+                    'message' => 'Only appointment transactions or lead-linked transactions can be reassigned from this page.',
                 ], 422);
             }
 

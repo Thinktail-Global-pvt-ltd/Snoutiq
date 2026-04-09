@@ -1571,6 +1571,26 @@
                     'event_at' => trim((string) ($crmNextActionRaw['event_at'] ?? '')),
                 ]
                 : null;
+            $relatedTransactions = collect($leadUser['related_transactions'] ?? [])
+                ->map(function ($item): array {
+                    $row = is_array($item) ? $item : [];
+
+                    return [
+                        'id' => is_numeric($row['id'] ?? null) ? (int) $row['id'] : 0,
+                        'created_at' => trim((string) ($row['created_at'] ?? '')),
+                        'type' => trim((string) ($row['type'] ?? '')),
+                        'status' => trim((string) ($row['status'] ?? '')),
+                        'amount_paise' => is_numeric($row['amount_paise'] ?? null) ? (int) $row['amount_paise'] : null,
+                        'doctor_id' => is_numeric($row['doctor_id'] ?? null) ? (int) $row['doctor_id'] : null,
+                        'doctor_name' => trim((string) ($row['doctor_name'] ?? '')),
+                        'clinic_id' => is_numeric($row['clinic_id'] ?? null) ? (int) $row['clinic_id'] : null,
+                        'clinic_name' => trim((string) ($row['clinic_name'] ?? '')),
+                        'can_reassign_doctor' => is_numeric($row['id'] ?? null) && (int) ($row['id'] ?? 0) > 0,
+                    ];
+                })
+                ->filter(fn (array $row): bool => (int) ($row['id'] ?? 0) > 0)
+                ->values()
+                ->all();
 
             return [
                 'id' => $leadId,
@@ -1634,6 +1654,7 @@
                     ['video_consult', 'excell_export_campaign'],
                     true
                 ),
+                'related_transactions' => $relatedTransactions,
                 'conversion_lag_minutes' => is_numeric($leadUser['conversion_lag_minutes'] ?? null)
                     ? (int) $leadUser['conversion_lag_minutes']
                     : null,
@@ -2276,6 +2297,15 @@
         });
     }
 
+    function formatInrFromPaise(value) {
+        const paise = Number(value);
+        if (!Number.isFinite(paise) || paise <= 0) return '₹0';
+        return `₹${(paise / 100).toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })}`;
+    }
+
     function formatDateForInput(value) {
         if (!value) return '';
         const date = parseDateValue(value);
@@ -2633,10 +2663,10 @@
     }
 
     function buildServices(lead) {
-        const services = [];
+        const transactionServices = new Map();
 
-        if (lead.conversion_captured) {
-            services.push({
+        if (lead.conversion_captured && Number(lead.conversion_transaction_id || 0) > 0) {
+            transactionServices.set(Number(lead.conversion_transaction_id), {
                 title: `Transaction #${Number(lead.conversion_transaction_id || 0)}`,
                 amount: '₹0',
                 transactionId: Number(lead.conversion_transaction_id || 0),
@@ -2645,6 +2675,7 @@
                 transactionClinicId: Number(lead.conversion_transaction_clinic_id || 0) || null,
                 transactionClinicName: String(lead.conversion_transaction_clinic_name || ''),
                 canReassignDoctor: Boolean(lead.conversion_transaction_doctor_reassignable),
+                isAttributedConversion: true,
                 tags: [
                     lead.conversion_transaction_type || 'Unknown type',
                     lead.conversion_transaction_status || 'status n/a',
@@ -2653,6 +2684,38 @@
                 ],
             });
         }
+
+        (lead.related_transactions || []).forEach((txn) => {
+            const transactionId = Number(txn.id || 0);
+            if (!Number.isFinite(transactionId) || transactionId <= 0) return;
+
+            const existing = transactionServices.get(transactionId);
+            const transactionType = String(txn.type || '').trim() || 'Unknown type';
+            const transactionStatus = String(txn.status || '').trim() || 'status n/a';
+            const transactionDate = formatDate(txn.created_at);
+            const mergedTags = [
+                ...(existing?.tags || []),
+                transactionType,
+                transactionStatus,
+                transactionDate,
+                existing?.isAttributedConversion ? '' : 'Linked transaction',
+            ].filter(Boolean);
+
+            transactionServices.set(transactionId, {
+                title: existing?.title || `Transaction #${transactionId}`,
+                amount: formatInrFromPaise(txn.amount_paise),
+                transactionId,
+                transactionDoctorId: Number(txn.doctor_id || 0) || null,
+                transactionDoctorName: String(txn.doctor_name || ''),
+                transactionClinicId: Number(txn.clinic_id || 0) || null,
+                transactionClinicName: String(txn.clinic_name || ''),
+                canReassignDoctor: Boolean(txn.can_reassign_doctor),
+                isAttributedConversion: Boolean(existing?.isAttributedConversion),
+                tags: [...new Set(mergedTags)],
+            });
+        });
+
+        const services = Array.from(transactionServices.values());
 
         (lead.manual_services || []).forEach((svc) => {
             services.push({
@@ -2911,7 +2974,7 @@
                 ${reassignableServiceCount === 0 ? `
                     <div class="crm-card" style="margin-bottom: 0.5rem;">
                         <div class="crm-empty" style="padding: 1rem 0.8rem;">
-                            Change doctor option tab me tabhi dikhega jab is lead ke paas converted <span class="crm-code">video_consult</span> ya <span class="crm-code">excell_export_campaign</span> transaction ho.
+                            Change doctor option tab me tabhi dikhega jab is lead ke paas user-linked transaction row ho.
                         </div>
                     </div>
                 ` : ''}
@@ -3265,6 +3328,22 @@
                 lead.conversion_transaction_doctor_name = String(transaction.doctor_name || '');
                 lead.conversion_transaction_clinic_id = transaction.clinic_id ? Number(transaction.clinic_id) : null;
                 lead.conversion_transaction_clinic_name = String(transaction.clinic_name || '');
+            }
+
+            if (Array.isArray(lead.related_transactions)) {
+                lead.related_transactions = lead.related_transactions.map((txn) => {
+                    if (Number(txn.id || 0) !== Number(transactionId)) {
+                        return txn;
+                    }
+
+                    return {
+                        ...txn,
+                        doctor_id: Number(data.transaction?.doctor_id || doctorId),
+                        doctor_name: String(data.transaction?.doctor_name || ''),
+                        clinic_id: data.transaction?.clinic_id ? Number(data.transaction.clinic_id) : null,
+                        clinic_name: String(data.transaction?.clinic_name || ''),
+                    };
+                });
             }
 
             renderDetail();
