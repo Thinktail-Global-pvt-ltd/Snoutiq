@@ -19,6 +19,7 @@ use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\View\View;
 use App\Services\CallAnalyticsService;
+use App\Services\ConsultationBookingWhatsAppService;
 use App\Services\DoctorAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -34,6 +35,7 @@ class AdminPanelController extends Controller
     public function __construct(
         private readonly DoctorAvailabilityService $doctorAvailabilityService,
         private readonly CallAnalyticsService $callAnalyticsService,
+        private readonly ConsultationBookingWhatsAppService $consultationBookingWhatsAppService,
     ) {
     }
 
@@ -4201,17 +4203,39 @@ class AdminPanelController extends Controller
             ]);
         }
 
+        $whatsAppMeta = null;
+        if ($this->isExcellExportTransaction($transaction)) {
+            try {
+                $whatsAppMeta = $this->consultationBookingWhatsAppService
+                    ->sendExcelExportAssignmentNotifications($transaction);
+            } catch (\Throwable $e) {
+                report($e);
+                Log::warning('admin.transaction.doctor_assignment.whatsapp_failed', [
+                    'transaction_id' => $transaction->id,
+                    'doctor_id' => $nextDoctorId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $statusMessage = sprintf(
+            'Doctor/clinic updated for transaction #%d. Previous Doctor ID: %s, Assigned: %s (ID: %d), Clinic ID: %s.',
+            $transaction->id,
+            $previousDoctorId ?? 'NULL',
+            $doctor->doctor_name ?? 'N/A',
+            $doctor->id,
+            $transaction->clinic_id ?? 'NULL'
+        );
+
+        $whatsAppMessage = $this->doctorAssignmentWhatsAppStatusMessage($whatsAppMeta);
+        if ($whatsAppMessage !== '') {
+            $statusMessage .= ' ' . $whatsAppMessage;
+        }
+
         if ($request->expectsJson()) {
             return response()->json([
                 'status' => 'success',
-                'message' => sprintf(
-                    'Doctor/clinic updated for transaction #%d. Previous Doctor ID: %s, Assigned: %s (ID: %d), Clinic ID: %s.',
-                    $transaction->id,
-                    $previousDoctorId ?? 'NULL',
-                    $doctor->doctor_name ?? 'N/A',
-                    $doctor->id,
-                    $transaction->clinic_id ?? 'NULL'
-                ),
+                'message' => $statusMessage,
                 'transaction' => [
                     'id' => (int) $transaction->id,
                     'doctor_id' => $nextDoctorId,
@@ -4219,19 +4243,13 @@ class AdminPanelController extends Controller
                     'clinic_id' => $nextClinicId,
                     'clinic_name' => $doctor->clinic?->name,
                 ],
+                'notifications' => $whatsAppMeta,
             ]);
         }
 
         return redirect()
             ->route('admin.transactions.appointments')
-            ->with('status', sprintf(
-                'Doctor/clinic updated for transaction #%d. Previous Doctor ID: %s, Assigned: %s (ID: %d), Clinic ID: %s.',
-                $transaction->id,
-                $previousDoctorId ?? 'NULL',
-                $doctor->doctor_name ?? 'N/A',
-                $doctor->id,
-                $transaction->clinic_id ?? 'NULL'
-            ));
+            ->with('status', $statusMessage);
     }
 
     public function deleteAppointmentTransaction(Transaction $transaction): RedirectResponse
@@ -4275,6 +4293,30 @@ class AdminPanelController extends Controller
 
         return in_array($type, ['video_consult', 'excell_export_campaign'], true)
             || in_array($orderType, ['video_consult', 'excell_export_campaign'], true);
+    }
+
+    private function doctorAssignmentWhatsAppStatusMessage(?array $whatsAppMeta): string
+    {
+        if (! is_array($whatsAppMeta)) {
+            return '';
+        }
+
+        $parentSent = (bool) data_get($whatsAppMeta, 'parent_whatsapp.sent', false);
+        $vetSent = (bool) data_get($whatsAppMeta, 'vet_whatsapp.sent', false);
+
+        if ($parentSent && $vetSent) {
+            return 'WhatsApp sent to the pet parent and assigned doctor.';
+        }
+
+        if ($parentSent) {
+            return 'WhatsApp sent to the pet parent.';
+        }
+
+        if ($vetSent) {
+            return 'WhatsApp sent to the assigned doctor.';
+        }
+
+        return '';
     }
 
     private function addJoinedSelectIfColumnExists(

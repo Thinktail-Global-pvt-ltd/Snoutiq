@@ -720,16 +720,8 @@ class PaymentController extends Controller
 
                     $prescriptionDocMeta = $this->sendDoctorPrescriptionDocument($context);
                 } elseif ($orderType === 'excell_export_campaign' && $this->isSuccessfulPaymentStatus($status)) {
-                    $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
-                        context: $context,
-                        notes: $notes,
-                        amountInInr: $amountInInr
-                    );
-                    $vetWhatsAppMeta = $this->notifyVetExcelExportCampaignAssigned(
-                        context: $context,
-                        notes: $notes,
-                        amountInInr: $amountInInr
-                    );
+                    // Excel export campaign WhatsApp is deferred until a doctor is assigned
+                    // from the admin lead/transaction management flow.
                 }
 
                 $vetPushMeta = $this->notifyDoctorPaymentCaptured(
