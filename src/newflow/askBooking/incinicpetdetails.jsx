@@ -168,10 +168,6 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
       onBack();
       return;
     }
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
     navigate(ASK_ROUTE, { replace: true });
   };
 

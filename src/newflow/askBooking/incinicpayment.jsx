@@ -115,7 +115,10 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
       onBack();
       return;
     }
-    navigate(IN_CLINIC_PET_DETAILS_ROUTE, { state: appointmentState });
+    navigate(IN_CLINIC_PET_DETAILS_ROUTE, {
+      replace: true,
+      state: appointmentState,
+    });
   };
 
   const handleGoToAsk = () => {
