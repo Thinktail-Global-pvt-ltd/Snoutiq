@@ -1344,7 +1344,7 @@ function IntakeModal({
             </label>
 
             <label className="ask-intake-field">
-              <span>Phone number</span>
+              <span>WhatsApp number</span>
               <input
                 type="tel"
                 value={profile.phone}

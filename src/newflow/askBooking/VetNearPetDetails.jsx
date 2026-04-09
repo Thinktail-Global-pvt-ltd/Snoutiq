@@ -502,6 +502,12 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
     if (!formState.pet.dateOfVisit) nextErrors.dateOfVisit = "Please select the visit date.";
     if (!formState.pet.timeOfVisit) nextErrors.timeOfVisit = "Please select the visit time.";
     if (!formState.pet.issue.trim()) nextErrors.issue = "Please describe today's concern.";
+    if (!formState.pet.vaccinationStatus) {
+      nextErrors.vaccinationStatus = "Please select vaccination status.";
+    }
+    if (!formState.pet.deworming) {
+      nextErrors.deworming = "Please select last deworming date.";
+    }
     if (showOtherPetTypeField && !formState.pet.otherPetType.trim()) {
       nextErrors.otherPetType = "Please enter your pet type.";
     }
@@ -674,9 +680,12 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
         <div className="half">
           {showVaccinationField ? (
             <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-vaccinationStatus`}>Vaccination status</label>
+              <label htmlFor={`${fieldIdPrefix}-vaccinationStatus`}>
+                Vaccination status <span className="required-mark">*</span>
+              </label>
               <select
                 id={`${fieldIdPrefix}-vaccinationStatus`}
+                className={errors.vaccinationStatus ? "input-error" : ""}
                 value={formState.pet.vaccinationStatus}
                 onChange={(event) => updatePet("vaccinationStatus", event.target.value)}
               >
@@ -685,12 +694,26 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
                   <option key={option} value={option}>{option}</option>
                 ))}
               </select>
+              {errors.vaccinationStatus ? (
+                <div className="field-error">{errors.vaccinationStatus}</div>
+              ) : null}
             </div>
           ) : null}
           {showDewormingField ? (
             <div className="field">
-              <label htmlFor={`${fieldIdPrefix}-deworming`}>Last deworming</label>
-              <input id={`${fieldIdPrefix}-deworming`} type="date" value={formState.pet.deworming} onChange={(event) => updatePet("deworming", event.target.value)} />
+              <label htmlFor={`${fieldIdPrefix}-deworming`}>
+                Last deworming <span className="required-mark">*</span>
+              </label>
+              <input
+                id={`${fieldIdPrefix}-deworming`}
+                type="date"
+                className={errors.deworming ? "input-error" : ""}
+                value={formState.pet.deworming}
+                onChange={(event) => updatePet("deworming", event.target.value)}
+              />
+              {errors.deworming ? (
+                <div className="field-error">{errors.deworming}</div>
+              ) : null}
             </div>
           ) : null}
         </div>

@@ -306,7 +306,7 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
   };
 
   const summaryRows = [
-    { label: "Patient", value: appointmentState.patientName || "-" },
+    { label: "Pet Parent Name", value: appointmentState.patientName || "-" },
     { label: "Phone", value: appointmentState.patientPhone || "-" },
     { label: "Email", value: appointmentState.patientEmail || "-" },
     { label: "Pet", value: appointmentState.petName || "-" },
