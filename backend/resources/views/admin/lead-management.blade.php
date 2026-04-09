@@ -2732,6 +2732,7 @@
         const clickedNotifs = Number(lead.clicked_notifications_count || 0);
         const clickRate = totalNotifs > 0 ? Math.round((clickedNotifs / totalNotifs) * 100) : 0;
         const serviceCount = services.length;
+        const reassignableServiceCount = services.filter((svc) => Boolean(svc.transactionId) && Boolean(svc.canReassignDoctor)).length;
         const createdDate = parseDateValue(lead.created_at || '');
         const daysSinceCreated = createdDate
             ? Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)))
@@ -2904,6 +2905,13 @@
 
             <div class="crm-tab-content ${activeTab === 'services' ? 'active' : ''}" data-tab-content="services">
                 <div class="crm-add-service" data-open-modal="txn">+ Add a service transaction</div>
+                ${reassignableServiceCount === 0 ? `
+                    <div class="crm-card" style="margin-bottom: 0.5rem;">
+                        <div class="crm-empty" style="padding: 1rem 0.8rem;">
+                            Change doctor option tab me tabhi dikhega jab is lead ke paas converted <span class="crm-code">video_consult</span> ya <span class="crm-code">excell_export_campaign</span> transaction ho.
+                        </div>
+                    </div>
+                ` : ''}
                 ${services.length ? services.map((svc) => `
                     <div class="crm-service-card">
                         <div class="crm-service-head">
