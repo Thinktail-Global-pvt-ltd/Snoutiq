@@ -638,6 +638,14 @@ class AdminPanelController extends Controller
             $leadUserColumnsWithCreatedAt[] = 'created_at';
         }
 
+        $allUsers = collect();
+        if ($hasUsersTable) {
+            $allUsers = User::query()
+                ->select($leadUserColumnsWithCreatedAt)
+                ->orderByDesc($hasUserCreatedAt ? 'created_at' : 'id')
+                ->get();
+        }
+
         $hasPetsTable = Schema::hasTable('pets');
         $hasPetBreed = $hasPetsTable && Schema::hasColumn('pets', 'breed');
         $hasPetCreatedAt = $hasPetsTable && Schema::hasColumn('pets', 'created_at');
@@ -839,8 +847,6 @@ class AdminPanelController extends Controller
             }
         }
 
-        $targetUsers = collect();
-
         $initializeLeadUser = static function (?User $user, int $fallbackUserId = 0): array {
             return [
                 'id' => $user?->id ? (int) $user->id : $fallbackUserId,
@@ -848,7 +854,7 @@ class AdminPanelController extends Controller
                 'email' => $user?->email,
                 'phone' => $user?->phone,
                 'city' => $user?->city,
-                'user_created_at' => null,
+                'user_created_at' => $user?->created_at ? (string) $user->created_at : null,
                 'prescription_follow_up_date' => null,
                 'prescription_follow_up_type' => null,
                 'has_neutering' => false,
@@ -894,6 +900,10 @@ class AdminPanelController extends Controller
                 'crm_next_action' => null,
             ];
         };
+
+        $targetUsers = $allUsers->mapWithKeys(
+            static fn (User $user): array => [(int) $user->id => $initializeLeadUser($user, (int) $user->id)]
+        );
 
         $normalizeDateTime = static function ($value): ?string {
             if (empty($value)) {
@@ -2384,6 +2394,7 @@ class AdminPanelController extends Controller
             ->values()
             ->filter(function (array $leadUser) use ($leadFilter): bool {
                 return match ($leadFilter) {
+                    'all' => true,
                     'neutering' => (bool) $leadUser['has_neutering'],
                     'video_follow_up' => (bool) $leadUser['has_video_follow_up'],
                     'video_follow_up_video' => (bool) $leadUser['has_video_follow_up_video'],

@@ -1317,7 +1317,7 @@
 @section('content')
 @php
     $filterLabels = [
-        'all' => 'All Targeted Users',
+        'all' => 'All Users',
         'neutering' => 'Neutering Package Leads',
         'video_follow_up' => 'All Follow-up Leads',
         'video_follow_up_video' => 'Video Follow-up Leads',
@@ -1719,7 +1719,7 @@
             Snoutiq CRM
         </div>
         <div class="crm-top-stats">
-            <div class="crm-stat">Active leads: <b>{{ number_format($summary['filtered_users'] ?? 0) }}</b></div>
+            <div class="crm-stat">Visible users: <b>{{ number_format($summary['filtered_users'] ?? 0) }}</b></div>
             <div class="crm-stat">Converted users: <b>{{ number_format($summary['converted_users'] ?? 0) }}</b></div>
             <div class="crm-stat">Pending actions: <b>{{ number_format($overdueCount + $dueTodayCount) }}</b></div>
             <div class="crm-stat">Filter: <b>{{ $activeFilterLabel }}</b></div>
@@ -1730,7 +1730,7 @@
         <form id="crmFilterForm" class="crm-filter-form" method="GET" action="{{ route('admin.lead-management') }}">
             <label for="lead_filter">Category</label>
             <select id="lead_filter" name="lead_filter" class="crm-select">
-                <option value="all" @selected($leadFilter === 'all')>All targeted users</option>
+                <option value="all" @selected($leadFilter === 'all')>All users</option>
                 <option value="neutering" @selected($leadFilter === 'neutering')>Neutering package leads</option>
                 <option value="video_follow_up" @selected($leadFilter === 'video_follow_up')>All follow-up leads</option>
                 <option value="video_follow_up_video" @selected($leadFilter === 'video_follow_up_video')>Video follow-up leads</option>
@@ -1739,7 +1739,7 @@
                 <option value="both" @selected($leadFilter === 'both')>Users in both categories</option>
             </select>
 
-            <label for="limit">Rows</label>
+            <label for="limit">Lead scan</label>
             <input id="limit" name="limit" type="number" min="25" max="1000" value="{{ $limit }}" class="crm-input" style="width: 95px; min-width: 95px;">
 
             <label for="per_page">Page size</label>
@@ -1787,7 +1787,7 @@
             <div class="crm-sidebar-scroll" id="crmSidebarFilters">
                 <div class="crm-sidebar-section">Pipeline</div>
                 <button type="button" class="crm-side-item active" data-pipeline="all">
-                    <span><i class="bi bi-grid-3x3-gap-fill"></i> All leads</span>
+                    <span><i class="bi bi-grid-3x3-gap-fill"></i> All users</span>
                     <span class="crm-side-count">{{ number_format($summary['filtered_users'] ?? 0) }}</span>
                 </button>
                 <button type="button" class="crm-side-item" data-pipeline="new">
