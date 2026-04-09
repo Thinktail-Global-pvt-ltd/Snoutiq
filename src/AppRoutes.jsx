@@ -113,6 +113,12 @@ const VetNearMePetDetailsPage = lazy(() =>
 const VetNearMePaymentPage = lazy(() =>
   import("./newflow/askBooking/VetNearPayment")
 );
+const InClinicPetDetailsPage = lazy(() =>
+  import("./newflow/askBooking/incinicpetdetails")
+);
+const InClinicPaymentPage = lazy(() =>
+  import("./newflow/askBooking/incinicpayment")
+);
 const KittenVaccinationDelhi = lazy(() =>
   import("./newflow/KittenVaccinationDelhi")
 );
@@ -135,6 +141,8 @@ export default function AppRoutes() {
         <Route path="/video-call-payment" element={<VideoCallPayment />} />
        <Route path="/vet-near-me-pet-details" element={<VetNearMePetDetailsPage />} />
         <Route path="/vet-near-me-payment" element={<VetNearMePaymentPage />} />
+        <Route path="/in-clinic-pet-details" element={<InClinicPetDetailsPage />} />
+        <Route path="/in-clinic-payment" element={<InClinicPaymentPage />} />
 
 
         <Route path="/about" element={<NewAbout />} />

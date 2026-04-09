@@ -14,6 +14,21 @@ const getDisplayBreedName = (value) =>
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
+const pickText = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return "";
+};
+
+const normalizeTimeSlot = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  return /^\d{2}:\d{2}$/.test(text) ? `${text}:00` : text;
+};
+
 const buildApiError = async (response) => {
   const data = await response.json().catch(() => null);
   const validationErrors =
@@ -187,6 +202,29 @@ export async function createHomeServiceOrder({
   };
 }
 
+export async function createAppointmentOrder({ amount, userId, petId }) {
+  const normalizedAmount = Math.round(Number(amount) || 0);
+
+  const response = await postBookingStep("/api/create-order", {
+    amount: normalizedAmount,
+    order_type: "appointment",
+    user_id: userId,
+    pet_id: petId,
+  });
+
+  return {
+    ok: Boolean(
+      response?.success && (response?.order_id || response?.order?.id) && response?.key,
+    ),
+    key: response?.key ?? "",
+    orderId: response?.order_id ?? response?.order?.id ?? "",
+    amountPaise: response?.order?.amount ?? normalizedAmount * 100,
+    currency: response?.order?.currency ?? "INR",
+    error: response?.error || response?.message || "",
+    raw: response,
+  };
+}
+
 export async function verifyHomeServicePayment({
   bookingId,
   userId,
@@ -222,6 +260,116 @@ export async function verifyHomeServicePayment({
       "",
     paymentReference: razorpayPaymentId || "",
     error: response?.error || response?.message || "",
+    raw: response,
+  };
+}
+
+export async function verifyAppointmentPayment({
+  userId,
+  petId,
+  razorpayOrderId,
+  razorpayPaymentId,
+  razorpaySignature,
+}) {
+  const response = await postBookingStep("/api/rzp/verify", {
+    razorpay_order_id: razorpayOrderId,
+    razorpay_payment_id: razorpayPaymentId,
+    razorpay_signature: razorpaySignature,
+    order_type: "appointment",
+    user_id: userId,
+    pet_id: petId,
+  });
+
+  return {
+    ok: Boolean(response?.success),
+    paymentReference: razorpayPaymentId || "",
+    error: response?.error || response?.message || "",
+    raw: response,
+  };
+}
+
+export async function submitInClinicAppointment(appointmentData = {}) {
+  const response = await postBookingStep("/api/appointments/submit", {
+    user_id: pickText(
+      appointmentData.userId,
+      appointmentData.user_id,
+      appointmentData.patient?.userId,
+      appointmentData.paymentMeta?.user_id
+    ),
+    patient_name: pickText(
+      appointmentData.patientName,
+      appointmentData.patient_name,
+      appointmentData.ownerName
+    ),
+    patient_phone: pickText(
+      appointmentData.patientPhone,
+      appointmentData.patient_phone,
+      appointmentData.phone,
+      appointmentData.ownerMobile
+    )
+      .replace(/\D/g, "")
+      .slice(-10),
+    patient_email: pickText(
+      appointmentData.patientEmail,
+      appointmentData.patient_email,
+      appointmentData.email
+    ),
+    pet_name: pickText(
+      appointmentData.petName,
+      appointmentData.pet_name,
+      appointmentData.name
+    ),
+    date: pickText(
+      appointmentData.date,
+      appointmentData.appointmentDate,
+      appointmentData.date_of_visit
+    ),
+    time_slot: normalizeTimeSlot(
+      pickText(
+        appointmentData.timeSlot,
+        appointmentData.time_slot,
+        appointmentData.time_of_visit
+      )
+    ),
+    amount: Number(appointmentData.amount) || 0,
+    currency: pickText(appointmentData.currency, "INR").toUpperCase(),
+    razorpay_order_id: pickText(
+      appointmentData.razorpayOrderId,
+      appointmentData.razorpay_order_id,
+      appointmentData.orderId
+    ),
+    razorpay_payment_id: pickText(
+      appointmentData.razorpayPaymentId,
+      appointmentData.razorpay_payment_id,
+      appointmentData.paymentId
+    ),
+    razorpay_signature: pickText(
+      appointmentData.razorpaySignature,
+      appointmentData.razorpay_signature,
+      appointmentData.signature
+    ),
+    notes: pickText(
+      appointmentData.notes,
+      appointmentData.reason,
+      appointmentData.issue_description,
+      appointmentData.problemText
+    ),
+  });
+
+  return {
+    ok: Boolean(response?.success || response?.status === "success"),
+    appointmentId:
+      response?.data?.appointment?.id ??
+      response?.data?.appointment?.appointment_table?.id ??
+      response?.data?.appointment_id ??
+      response?.data?.id ??
+      response?.appointment_id ??
+      response?.id ??
+      null,
+    message:
+      response?.message ||
+      response?.data?.message ||
+      (response?.status === "success" ? "Appointment submitted successfully." : ""),
     raw: response,
   };
 }

@@ -99,7 +99,7 @@ const SPECIES_OPTIONS = [
 
 const CTA_ROUTE_MAP = {
   video_consult: "/video-call-pet-details",
-  clinic: "/vet-near-me-pet-details",
+  clinic: "/in-clinic-pet-details",
   vet_at_home: "/vet-near-me-pet-details",
   emergency: "/vet-near-me-pet-details",
   govt: "/vet-near-me-pet-details",
@@ -108,8 +108,8 @@ const CTA_ROUTE_MAP = {
 const DEEPLINK_ROUTE_MAP = {
   "snoutiq://video-consult": "/video-call-pet-details",
   "snoutiq://vet-at-home": "/vet-near-me-pet-details",
-  "snoutiq://clinic-booking": "/vet-near-me-pet-details",
-  "snoutiq://find-clinic": "/vet-near-me-pet-details",
+  "snoutiq://clinic-booking": "/in-clinic-pet-details",
+  "snoutiq://find-clinic": "/in-clinic-pet-details",
   "snoutiq://emergency": "/vet-near-me-pet-details",
   "snoutiq://govt-hospitals": "/vet-near-me-pet-details",
 };
@@ -135,6 +135,19 @@ const safeParse = (value, fallback) => {
   } catch {
     return fallback;
   }
+};
+
+const firstFilledValue = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) return trimmed;
+      continue;
+    }
+    return value;
+  }
+  return undefined;
 };
 
 const formatBytes = (bytes) => {
@@ -853,6 +866,75 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
   const locationLabel =
     profile.location ||
     (hasProfileCoordinates(profile) ? CURRENT_LOCATION_FALLBACK_LABEL : "");
+  const latestAssessmentPayload = [...(Array.isArray(entries) ? entries : [])]
+    .reverse()
+    .find(
+      (entry) =>
+        entry?.kind === "assessment" &&
+        entry?.payload &&
+        typeof entry.payload === "object",
+    )?.payload;
+  const assessmentState =
+    latestAssessmentPayload?.state &&
+    typeof latestAssessmentPayload.state === "object"
+      ? latestAssessmentPayload.state
+      : {};
+  const assessmentUser =
+    latestAssessmentPayload?.user &&
+    typeof latestAssessmentPayload.user === "object"
+      ? latestAssessmentPayload.user
+      : assessmentState?.user && typeof assessmentState.user === "object"
+        ? assessmentState.user
+        : {};
+  const assessmentPatient =
+    assessmentState?.patient && typeof assessmentState.patient === "object"
+      ? assessmentState.patient
+      : {};
+  const assessmentPet =
+    latestAssessmentPayload?.pet &&
+    typeof latestAssessmentPayload.pet === "object"
+      ? latestAssessmentPayload.pet
+      : latestAssessmentPayload?.pets &&
+          typeof latestAssessmentPayload.pets === "object"
+        ? latestAssessmentPayload.pets
+        : assessmentState?.pet && typeof assessmentState.pet === "object"
+          ? assessmentState.pet
+          : {};
+  const assessmentPaymentMeta =
+    latestAssessmentPayload?.paymentMeta &&
+    typeof latestAssessmentPayload.paymentMeta === "object"
+      ? latestAssessmentPayload.paymentMeta
+      : assessmentState?.paymentMeta &&
+          typeof assessmentState.paymentMeta === "object"
+        ? assessmentState.paymentMeta
+        : {};
+  const resolvedUserId = firstFilledValue(
+    latestAssessmentPayload?.user_id,
+    latestAssessmentPayload?.userId,
+    latestAssessmentPayload?.user?.id,
+    assessmentState?.user_id,
+    assessmentState?.userId,
+    assessmentState?.user?.id,
+    assessmentPatient?.user_id,
+    assessmentPatient?.userId,
+    assessmentPatient?.user?.id,
+    assessmentPaymentMeta?.user_id,
+    assessmentPaymentMeta?.userId,
+  );
+  const resolvedPetId = firstFilledValue(
+    latestAssessmentPayload?.pet_id,
+    latestAssessmentPayload?.petId,
+    latestAssessmentPayload?.pet?.id,
+    latestAssessmentPayload?.pets?.id,
+    assessmentState?.pet_id,
+    assessmentState?.petId,
+    assessmentState?.pet?.id,
+    assessmentPet?.pet_id,
+    assessmentPet?.petId,
+    assessmentPet?.id,
+    assessmentPaymentMeta?.pet_id,
+    assessmentPaymentMeta?.petId,
+  );
   const lastUserMessage = [...(Array.isArray(entries) ? entries : [])]
     .reverse()
     .find(
@@ -864,6 +946,10 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
   const concern = String(lastUserMessage || inputValue || "").trim();
 
   return {
+    userId: resolvedUserId,
+    user_id: resolvedUserId,
+    petId: resolvedPetId,
+    pet_id: resolvedPetId,
     ownerName: profile.ownerName,
     ownerMobile: profile.phone,
     phone: profile.phone,
@@ -886,6 +972,39 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
     problemText: concern,
     dateOfBirth: profile.dob,
     birthDate: profile.dob,
+    user: {
+      ...assessmentUser,
+      ...(resolvedUserId !== undefined ? { id: resolvedUserId } : {}),
+    },
+    patient: {
+      ...assessmentPatient,
+      ...(resolvedUserId !== undefined
+        ? {
+            userId: firstFilledValue(
+              assessmentPatient?.userId,
+              assessmentPatient?.user_id,
+              resolvedUserId,
+            ),
+            user_id: firstFilledValue(
+              assessmentPatient?.user_id,
+              assessmentPatient?.userId,
+              resolvedUserId,
+            ),
+            user: {
+              ...(assessmentPatient?.user &&
+              typeof assessmentPatient.user === "object"
+                ? assessmentPatient.user
+                : {}),
+              id: firstFilledValue(assessmentPatient?.user?.id, resolvedUserId),
+            },
+          }
+        : {}),
+    },
+    paymentMeta: {
+      ...assessmentPaymentMeta,
+      ...(resolvedUserId !== undefined ? { user_id: resolvedUserId } : {}),
+      ...(resolvedPetId !== undefined ? { pet_id: resolvedPetId } : {}),
+    },
     lead: {
       ownerName: profile.ownerName,
       phone: profile.phone,
@@ -896,6 +1015,22 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
       long: profile.long,
     },
     pet: {
+      ...assessmentPet,
+      ...(resolvedPetId !== undefined
+        ? {
+            id: firstFilledValue(assessmentPet?.id, resolvedPetId),
+            petId: firstFilledValue(
+              assessmentPet?.petId,
+              assessmentPet?.pet_id,
+              resolvedPetId,
+            ),
+            pet_id: firstFilledValue(
+              assessmentPet?.pet_id,
+              assessmentPet?.petId,
+              resolvedPetId,
+            ),
+          }
+        : {}),
       petName: profile.petName,
       breed: profile.breed,
       dob: profile.dob,
@@ -905,6 +1040,81 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
       species,
       type: species,
       issue: concern,
+    },
+    state: {
+      ...assessmentState,
+      ...(resolvedUserId !== undefined
+        ? {
+            user_id: firstFilledValue(
+              assessmentState?.user_id,
+              assessmentState?.userId,
+              resolvedUserId,
+            ),
+            userId: firstFilledValue(
+              assessmentState?.userId,
+              assessmentState?.user_id,
+              resolvedUserId,
+            ),
+          }
+        : {}),
+      ...(resolvedPetId !== undefined
+        ? {
+            pet_id: firstFilledValue(
+              assessmentState?.pet_id,
+              assessmentState?.petId,
+              resolvedPetId,
+            ),
+            petId: firstFilledValue(
+              assessmentState?.petId,
+              assessmentState?.pet_id,
+              resolvedPetId,
+            ),
+          }
+        : {}),
+      user: {
+        ...assessmentUser,
+        ...(resolvedUserId !== undefined ? { id: resolvedUserId } : {}),
+      },
+      patient: {
+        ...assessmentPatient,
+        ...(resolvedUserId !== undefined
+          ? {
+              userId: firstFilledValue(
+                assessmentPatient?.userId,
+                assessmentPatient?.user_id,
+                resolvedUserId,
+              ),
+              user_id: firstFilledValue(
+                assessmentPatient?.user_id,
+                assessmentPatient?.userId,
+                resolvedUserId,
+              ),
+            }
+          : {}),
+      },
+      pet: {
+        ...assessmentPet,
+        ...(resolvedPetId !== undefined
+          ? {
+              id: firstFilledValue(assessmentPet?.id, resolvedPetId),
+              petId: firstFilledValue(
+                assessmentPet?.petId,
+                assessmentPet?.pet_id,
+                resolvedPetId,
+              ),
+              pet_id: firstFilledValue(
+                assessmentPet?.pet_id,
+                assessmentPet?.petId,
+                resolvedPetId,
+              ),
+            }
+          : {}),
+      },
+      paymentMeta: {
+        ...assessmentPaymentMeta,
+        ...(resolvedUserId !== undefined ? { user_id: resolvedUserId } : {}),
+        ...(resolvedPetId !== undefined ? { pet_id: resolvedPetId } : {}),
+      },
     },
   };
 };
@@ -2716,6 +2926,14 @@ export default function AskPage() {
     setToastMessage("Saved booking cleared");
   };
 
+  const handleFlowPaymentSuccessHome = (storageKey) => {
+    clearStoredFlowSession(storageKey);
+    setResumeCards(buildResumeCards());
+    setFlowModal(null);
+    setToastMessage("Payment successful");
+    navigate("/ask", { replace: true });
+  };
+
   const handleAction = (action, assessment) => {
     const type = String(action?.type || "").trim();
     const deeplink = String(action?.deeplink || "").trim();
@@ -2816,12 +3034,9 @@ export default function AskPage() {
             payload: null,
           })
         }
-        onPay={() => {
-          clearStoredFlowSession(ASK_VET_NEAR_STANDALONE_KEY);
-          setResumeCards(buildResumeCards());
-          setFlowModal(null);
-          setToastMessage("Payment successful");
-        }}
+        onSuccessHome={() =>
+          handleFlowPaymentSuccessHome(ASK_VET_NEAR_STANDALONE_KEY)
+        }
       />
     );
   } else if (flowModal?.kind === "video-pet-details") {
@@ -2845,12 +3060,9 @@ export default function AskPage() {
             payload: null,
           })
         }
-        onPay={() => {
-          clearStoredFlowSession(ASK_VIDEO_CALL_STANDALONE_KEY);
-          setResumeCards(buildResumeCards());
-          setFlowModal(null);
-          setToastMessage("Payment successful");
-        }}
+        onSuccessHome={() =>
+          handleFlowPaymentSuccessHome(ASK_VIDEO_CALL_STANDALONE_KEY)
+        }
       />
     );
   }

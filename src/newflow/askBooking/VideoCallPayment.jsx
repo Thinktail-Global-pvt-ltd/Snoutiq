@@ -11,6 +11,7 @@ import {
 
 const FLOW_STORAGE_KEY = "snoutiq-video-call-copied-flow";
 const PET_DETAILS_ROUTE = "/video-call-pet-details";
+const ASK_HOME_ROUTE = "/ask";
 const CONSULTATION_BOOKED_ROUTE = "/consultation-booked";
 const STATIC_CONSULTATION_AMOUNT = 599;
 const STATIC_SERVICE_AMOUNT = 0;
@@ -181,6 +182,7 @@ export const VideoCallPayment = ({
   paymentMeta: paymentMetaProp,
   onPay,
   onBack,
+  onSuccessHome,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -229,6 +231,8 @@ export const VideoCallPayment = ({
   const [gstNumber, setGstNumber] = useState(
     () => paymentMeta?.gst_number || ""
   );
+  const shouldShowSuccessHomeButton =
+    typeof onSuccessHome === "function" || !onPay;
 
   useEffect(() => {
     writeStoredFlow({
@@ -259,6 +263,12 @@ export const VideoCallPayment = ({
   useEffect(() => {
     if (!successfulPayment) return undefined;
 
+    setShowSuccessModal(true);
+  }, [successfulPayment]);
+
+  useEffect(() => {
+    if (!successfulPayment || shouldShowSuccessHomeButton) return undefined;
+
     const timeoutId = window.setTimeout(() => {
       if (onPay) {
         onPay(successfulPayment);
@@ -276,7 +286,7 @@ export const VideoCallPayment = ({
     }, SUCCESS_REDIRECT_DELAY);
 
     return () => window.clearTimeout(timeoutId);
-  }, [navigate, onPay, successfulPayment, vet]);
+  }, [navigate, onPay, shouldShowSuccessHomeButton, successfulPayment, vet]);
 
   const paymentContext = useMemo(
     () =>
@@ -377,6 +387,18 @@ export const VideoCallPayment = ({
     });
   };
 
+  const handleSuccessHome = () => {
+    if (!successfulPayment) return;
+    setShowSuccessModal(false);
+
+    if (typeof onSuccessHome === "function") {
+      onSuccessHome(successfulPayment);
+      return;
+    }
+
+    navigate(ASK_HOME_ROUTE, { replace: true });
+  };
+
   const handlePay = async () => {
     if (isPaying) return;
 
@@ -442,9 +464,13 @@ export const VideoCallPayment = ({
               throw new Error(verify?.error || "Verification failed");
             }
 
-            updateStatus("success", "Payment successful. Redirecting in 3 seconds.");
+            updateStatus(
+              "success",
+              shouldShowSuccessHomeButton
+                ? "Payment successful."
+                : "Payment successful. Redirecting in 3 seconds."
+            );
             setSuccessfulPayment(verify);
-            setShowSuccessModal(true);
           } catch (error) {
             updateStatus(
               "error",
@@ -546,7 +572,7 @@ export const VideoCallPayment = ({
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <span className="text-slate-500">Parent name</span>
+                <span className="text-slate-500">Pet Parent name</span>
                 <span className="text-right font-medium text-slate-900">
                   {paymentOwnerName}
                 </span>
@@ -706,8 +732,19 @@ export const VideoCallPayment = ({
               Payment confirmed
             </div>
             <p className="text-sm text-stone-500 mt-2">
-              Payment successful. Redirecting in 3 seconds.
+              {shouldShowSuccessHomeButton
+                ? "Thank you. Your payment is confirmed."
+                : "Payment successful. Redirecting in 3 seconds."}
             </p>
+            {shouldShowSuccessHomeButton ? (
+              <button
+                type="button"
+                onClick={handleSuccessHome}
+                className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-[#2563eb] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+              >
+                Home
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

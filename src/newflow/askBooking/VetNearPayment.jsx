@@ -16,6 +16,7 @@ import "../vetNearMeFlow/VetNearMeBooking.css";
 
 const STORAGE_KEY = "snoutiq-vet-near-me-standalone";
 const PET_DETAILS_ROUTE = "/vet-near-me-pet-details";
+const ASK_HOME_ROUTE = "/ask";
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
 const SUCCESS_REDIRECT_DELAY = 3000;
 const DEFAULT_STATE = {
@@ -270,7 +271,12 @@ const hasRequiredContext = (state) => {
   );
 };
 
-export default function VetNearPayment({ initialState, onBack, onPay }) {
+export default function VetNearPayment({
+  initialState,
+  onBack,
+  onPay,
+  onSuccessHome,
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const routeState = hasRequiredContext(normalizeState(initialState))
@@ -285,6 +291,8 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
   const [paymentMessage, setPaymentMessage] = useState({ type: "", text: "" });
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [successfulPayment, setSuccessfulPayment] = useState(null);
+  const shouldShowSuccessHomeButton =
+    typeof onSuccessHome === "function" || !onPay;
 
   useEffect(() => {
     writeStandaloneVetNearMeState(state);
@@ -339,7 +347,7 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
     "rounded-[24px] border border-[#dbe7ff] bg-white p-5 shadow-[0_10px_30px_-24px_rgba(37,99,235,0.25)]";
   const summaryRows = [
     { label: "Pet", value: displayValue(petSummary, "Not selected") },
-    { label: "Parent name", value: displayValue(state.lead.ownerName) },
+    { label: "Pet Parent name", value: displayValue(state.lead.ownerName) },
     { label: "Phone", value: displayValue(state.lead.phone) },
     { label: "Location", value: displayValue(state.lead.area, "Not selected") },
     { label: "Visit date", value: displayValue(state.pet.dateOfVisit, "Not selected") },
@@ -395,9 +403,13 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
   }, [isPaid, state, successfulPayment]);
 
   useEffect(() => {
-    if (!successfulPayment) return undefined;
-
+    if (!successfulPayment) return;
     setShowSuccessAlert(true);
+  }, [successfulPayment]);
+
+  useEffect(() => {
+    if (!successfulPayment || shouldShowSuccessHomeButton) return undefined;
+
     const timeoutId = window.setTimeout(() => {
       if (onPay) {
         onPay(successfulPayment);
@@ -414,7 +426,7 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
     }, SUCCESS_REDIRECT_DELAY);
 
     return () => window.clearTimeout(timeoutId);
-  }, [navigate, onPay, successfulPayment]);
+  }, [navigate, onPay, shouldShowSuccessHomeButton, successfulPayment]);
 
   const handleBack = () => {
     if (onBack) {
@@ -422,6 +434,18 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
       return;
     }
     navigate(PET_DETAILS_ROUTE);
+  };
+
+  const handleSuccessHome = () => {
+    if (!successfulPayment) return;
+    setShowSuccessAlert(false);
+
+    if (typeof onSuccessHome === "function") {
+      onSuccessHome(successfulPayment);
+      return;
+    }
+
+    navigate(ASK_HOME_ROUTE, { replace: true });
   };
 
   const handlePayment = async () => {
@@ -516,7 +540,12 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
             setState(nextState);
             writeStandaloneVetNearMeState(nextState);
             setSuccessfulPayment(buildSuccessPayload(nextState));
-            setStatus("success", "Payment successful. Redirecting in 3 seconds.");
+            setStatus(
+              "success",
+              shouldShowSuccessHomeButton
+                ? "Payment successful."
+                : "Payment successful. Redirecting in 3 seconds.",
+            );
             setIsSubmitting(false);
           } catch (error) {
             setStatus("error", error?.message || "Payment verification failed. Please try again.");
@@ -713,8 +742,19 @@ export default function VetNearPayment({ initialState, onBack, onPay }) {
               Payment successful
             </div>
             <p className="mt-2 text-sm text-slate-500">
-              Redirecting in 3 seconds.
+              {shouldShowSuccessHomeButton
+                ? "Thank you. Your booking is confirmed."
+                : "Redirecting in 3 seconds."}
             </p>
+            {shouldShowSuccessHomeButton ? (
+              <button
+                type="button"
+                onClick={handleSuccessHome}
+                className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-[#2563eb] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+              >
+                Home
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
