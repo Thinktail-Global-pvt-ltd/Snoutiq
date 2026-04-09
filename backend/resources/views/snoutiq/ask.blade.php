@@ -186,20 +186,33 @@ body{font-family:'DM Sans',sans-serif;background:#EEF2F7;color:var(--ink);displa
 .rlcta{background:var(--orange);color:#fff;border:none;width:100%;padding:14px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;transition:background .15s}
 .rlcta:hover{background:var(--orange-lt)}
 .rllater{background:transparent;border:1.5px solid var(--border);color:var(--muted);width:100%;padding:11px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
-.ibar{border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:flex-end;background:var(--white);flex-shrink:0;position:sticky;bottom:0;z-index:100}
+.ibar-wrap{border-top:1px solid var(--border);background:var(--white);flex-shrink:0;position:sticky;bottom:0;z-index:100}
+.attach-preview{display:none;padding:10px 12px 0}
+.attach-preview.show{display:block}
+.attach-chip{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px 10px}
+.attach-thumb{width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#e5e7eb}
+.attach-copy{min-width:0;flex:1}
+.attach-name{font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.attach-meta{font-size:11.5px;color:var(--muted);margin-top:2px}
+.attach-remove{border:none;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;padding:6px 4px;flex-shrink:0}
+.attach-remove:hover{color:var(--red)}
+.ibar{padding:10px 12px;display:flex;gap:8px;align-items:flex-end}
+.attachbtn{width:42px;height:42px;background:var(--surface);border:1.5px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s,border-color .15s,color .15s;background .15s;color:var(--ink-mid);font-size:17px}
+.attachbtn:hover,.attachbtn.active{border-color:var(--blue);background:var(--blue-pale);color:var(--blue)}
 .inp{flex:1;border:1.5px solid var(--border);border-radius:22px;padding:10px 15px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);background:var(--surface);resize:none;outline:none;transition:border-color .2s;min-height:42px;max-height:100px}
 .inp:focus{border-color:var(--blue);background:var(--white)}
 .inp::placeholder{color:#9CA3AF}
 .sendbtn{width:42px;height:42px;background:var(--blue);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .15s,background .15s}
 .sendbtn:hover{background:var(--blue-mid);transform:scale(1.05)}
 .sendbtn svg{width:17px;height:17px;fill:#fff}
+.uattach{margin-top:7px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.18);border-radius:50px;padding:5px 9px;font-size:11.5px;font-weight:700;color:#fff}
 .live-thread{display:flex;flex-direction:column;gap:14px}
 .live-empty{border:1.5px dashed var(--border);border-radius:var(--r);padding:18px 16px;color:var(--muted);font-size:13.5px;line-height:1.5;background:var(--surface);text-align:center}
 .loading-row{display:flex;justify-content:flex-start}
 .loading-row .tbub{background:var(--white)}
 .errbox{background:#fff5f5;border:1px solid #fecaca;color:#991b1b;border-radius:var(--r-sm);padding:12px 14px;font-size:13px;line-height:1.45}
 .mini-meta{font-size:11px;color:var(--muted);margin-bottom:8px}
-@media(max-width:480px){.ub-title{font-size:19px}.idle-h{font-size:23px}.qgrid{grid-template-columns:1fr 1fr}.cbdy{padding:13px}.cbody{padding:13px 11px}}
+@media(max-width:480px){.ub-title{font-size:19px}.idle-h{font-size:23px}.qgrid{grid-template-columns:1fr 1fr}.cbdy{padding:13px}.cbody{padding:13px 11px}.attach-chip{align-items:flex-start}.attach-remove{padding-top:10px}}
 </style>
 </head>
 <body>
@@ -571,20 +584,36 @@ body{font-family:'DM Sans',sans-serif;background:#EEF2F7;color:var(--ink);displa
       </div>
     </div>
   </div>
-  <div class="ibar">
-    <textarea class="inp" id="inp" placeholder="Describe your pet's symptoms…" rows="1" oninput="resize(this)"></textarea>
-    <button class="sendbtn" onclick="send()">
-      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-    </button>
+  <div class="ibar-wrap">
+    <div class="attach-preview" id="attachPreview">
+      <div class="attach-chip">
+        <img class="attach-thumb" id="attachThumb" alt="Attachment preview">
+        <div class="attach-copy">
+          <div class="attach-name" id="attachName">Image attached</div>
+          <div class="attach-meta" id="attachMeta">Will be reviewed with your next message</div>
+        </div>
+        <button class="attach-remove" type="button" onclick="clearAttachment()">Remove</button>
+      </div>
+    </div>
+    <div class="ibar">
+      <button class="attachbtn" id="attachBtn" type="button" onclick="openAttachmentPicker()" aria-label="Upload image">📷</button>
+      <textarea class="inp" id="inp" placeholder="Describe your pet's symptoms or attach a photo…" rows="1" oninput="resize(this)"></textarea>
+      <button class="sendbtn" onclick="send()">
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+    <input id="imgUpload" type="file" accept="image/*" hidden>
   </div>
 </div>
 <script>
 const ASK_URL = @json(url('/ask'));
 const API_BASE = @json(url('/api'));
 const SESSION_STORAGE_KEY = 'snoutiq_symptom_session_id';
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 let species = 'dog';
 let currentSessionId = sessionStorage.getItem(SESSION_STORAGE_KEY) || '';
 let isSending = false;
+let pendingImage = null;
 
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach((screen) => screen.classList.remove('on'));
@@ -604,6 +633,112 @@ function setSp(btn, sp) {
 function qsend(txt) {
   document.getElementById('inp').value = txt;
   send();
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes || 0);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(value / 1024))} KB`;
+}
+
+function buildImagePayload(attachment = pendingImage) {
+  if (!attachment?.base64) return {};
+  return {
+    image_base64: attachment.base64,
+    image_mime: attachment.mime || 'image/jpeg',
+  };
+}
+
+function defaultImageMessage() {
+  return currentSessionId
+    ? 'Please review this new image and update the assessment.'
+    : 'Please review this image and tell me what you see.';
+}
+
+function renderAttachmentState() {
+  const preview = document.getElementById('attachPreview');
+  const thumb = document.getElementById('attachThumb');
+  const name = document.getElementById('attachName');
+  const meta = document.getElementById('attachMeta');
+  const btn = document.getElementById('attachBtn');
+  if (!preview || !thumb || !name || !meta || !btn) return;
+
+  if (!pendingImage) {
+    preview.classList.remove('show');
+    thumb.removeAttribute('src');
+    btn.classList.remove('active');
+    return;
+  }
+
+  preview.classList.add('show');
+  thumb.src = pendingImage.previewUrl;
+  name.textContent = pendingImage.name || 'Image attached';
+  meta.textContent = `${pendingImage.mime || 'image'}${pendingImage.size ? ` · ${formatBytes(pendingImage.size)}` : ''}`;
+  btn.classList.add('active');
+}
+
+function clearAttachment(resetInput = true) {
+  pendingImage = null;
+  renderAttachmentState();
+  if (resetInput) {
+    const input = document.getElementById('imgUpload');
+    if (input) {
+      input.value = '';
+    }
+  }
+}
+
+function openAttachmentPicker() {
+  if (isSending) return;
+  document.getElementById('imgUpload')?.click();
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Unable to read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleAttachmentChange(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+
+  if (!String(file.type || '').startsWith('image/')) {
+    window.alert('Please choose an image file.');
+    return;
+  }
+
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    window.alert('Please choose an image under 5 MB.');
+    return;
+  }
+
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    const [, base64 = ''] = dataUrl.split(',', 2);
+    if (!base64) {
+      throw new Error('Empty image payload.');
+    }
+
+    pendingImage = {
+      base64,
+      mime: file.type || 'image/jpeg',
+      name: file.name || 'Attached image',
+      size: file.size || 0,
+      previewUrl: dataUrl,
+    };
+    renderAttachmentState();
+  } catch (_) {
+    clearAttachment(false);
+    window.alert('Unable to read this image. Please try a different file.');
+  }
 }
 
 function speciesLabel(sp) {
@@ -666,13 +801,16 @@ function appendHtml(html) {
   document.getElementById('cbody').scrollTop = document.getElementById('cbody').scrollHeight;
 }
 
-function renderUserBlock(message) {
+function renderUserBlock(message, attachment = null) {
   const pill = `${speciesEmoji(species)} ${speciesLabel(species)} · Live AI session`;
+  const attachmentTag = attachment
+    ? `<div class="uattach">📷 Image attached</div>`
+    : '';
   return `
     <div style="display:flex;justify-content:flex-end"><div class="ppill">${escapeHtml(pill)}</div></div>
     <div class="mrow" data-kind="user-message">
       <div>
-        <div class="mbub">${escapeHtml(message)}</div>
+        <div class="mbub">${escapeHtml(message)}${attachmentTag}</div>
         <div class="mtime">${escapeHtml(formatTime())}</div>
       </div>
     </div>
@@ -1122,11 +1260,15 @@ async function postJson(url, payload) {
 async function send() {
   if (isSending) return;
   const el = document.getElementById('inp');
-  const msg = el.value.trim();
-  if (!msg) return;
+  const rawMsg = el.value.trim();
+  const attachment = pendingImage ? { ...pendingImage } : null;
+  if (!rawMsg && !attachment) return;
+
+  const msg = rawMsg || defaultImageMessage();
+  const visualMsg = rawMsg || 'Image uploaded for review.';
 
   isSending = true;
-  appendHtml(renderUserBlock(msg));
+  appendHtml(renderUserBlock(visualMsg, attachment));
   const loadingId = `loading-${Date.now()}`;
   appendHtml(renderLoadingBlock(loadingId));
 
@@ -1136,8 +1278,8 @@ async function send() {
   try {
     const endpoint = currentSessionId ? `${API_BASE}/symptom-followup` : `${API_BASE}/symptom-check`;
     const payload = currentSessionId
-      ? { session_id: currentSessionId, message: msg }
-      : { message: msg, species };
+      ? { session_id: currentSessionId, message: msg, ...buildImagePayload(attachment) }
+      : { message: msg, species, ...buildImagePayload(attachment) };
 
     const result = await postJson(endpoint, payload);
     if (!result.ok || !result.json) {
@@ -1152,6 +1294,7 @@ async function send() {
 
     updateBadge(result.json.turn ?? null);
     replaceLoadingWithCard(loadingId, result.json);
+    clearAttachment();
   } catch (_) {
     replaceLoadingWithError(loadingId, 'Network error while fetching the assessment.');
   } finally {
@@ -1175,10 +1318,12 @@ async function answerFQ(btn, id, answerText) {
     isSending = true;
     const question = btn.closest('.fcard')?.querySelector('.fq')?.textContent?.trim() || '';
     const answerValue = btn.dataset.answer || answerText || btn.textContent.trim();
+    const attachment = pendingImage ? { ...pendingImage } : null;
     const result = await postJson(`${API_BASE}/symptom-answer`, {
       session_id: currentSessionId,
       question,
       answer: answerValue,
+      ...buildImagePayload(attachment),
     });
 
     upd.classList.remove('show');
@@ -1206,6 +1351,7 @@ async function answerFQ(btn, id, answerText) {
       });
       ensureLiveThreadVisible();
     }
+    clearAttachment();
   } catch (_) {
     upd.classList.remove('show');
     opts.querySelectorAll('.fopt').forEach((button) => {
@@ -1257,6 +1403,7 @@ if (storedSpecies) {
 }
 
 updateBadge();
+renderAttachmentState();
 
 document.getElementById('inp').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -1264,6 +1411,8 @@ document.getElementById('inp').addEventListener('keydown', (e) => {
     send();
   }
 });
+
+document.getElementById('imgUpload').addEventListener('change', handleAttachmentChange);
 </script>
 </body>
 </html>

@@ -337,7 +337,9 @@ class SnoutiqSymptomController extends Controller
             $routing,
             $triageJson,
             $state['history'] ?? [],
-            $state['follow_up_history'] ?? []
+            $state['follow_up_history'] ?? [],
+            $imageB64,
+            $imageMime
         );
 
         // ── Update state ──────────────────────────────────────────────────────
@@ -385,6 +387,8 @@ class SnoutiqSymptomController extends Controller
             'user_id'    => 'nullable|integer',
             'session_id' => 'nullable|string|max:100',
             'message'    => 'required|string|max:600',
+            'image_base64' => 'nullable|string',
+            'image_mime' => 'nullable|string|max:20',
         ]);
 
         $sessionId = $this->resolveExistingSessionId($data['session_id'] ?? null);
@@ -399,6 +403,8 @@ class SnoutiqSymptomController extends Controller
         $request->merge([
             'pet_id' => 0,
             'session_id' => $sessionId,
+            'image_base64' => $data['image_base64'] ?? null,
+            'image_mime' => $data['image_mime'] ?? null,
         ]); // pet loaded from cached session
         return $this->check($request);
     }
@@ -511,6 +517,8 @@ class SnoutiqSymptomController extends Controller
             'session_id' => 'nullable|string|max:100',
             'question'   => 'required|string|max:300',
             'answer'     => 'required|string|max:200',
+            'image_base64' => 'nullable|string',
+            'image_mime' => 'nullable|string|max:20',
         ]);
 
         $sessionId = $this->resolveExistingSessionId($data['session_id'] ?? null);
@@ -543,6 +551,8 @@ class SnoutiqSymptomController extends Controller
             'pet_id' => 0,
             'message' => $message,
             'session_id' => $sessionId,
+            'image_base64' => $data['image_base64'] ?? null,
+            'image_mime' => $data['image_mime'] ?? null,
         ]);
 
         $response = $this->check($internal);
@@ -1326,7 +1336,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         string $routing,
         array $triage,
         array $history = [],
-        array $followUpHistory = []
+        array $followUpHistory = [],
+        ?string $imageB64 = null,
+        string $imageMime = 'image/jpeg'
     ): array
     {
         $routingInstructions = [
@@ -1358,6 +1370,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             ($imageObservation !== '' ? "Image observation: {$imageObservation}\n" : '') .
             "India context: " . ($triage['india_context_note'] ?? '') . "\n\n" .
             "Instruction: " . ($routingInstructions[$routing] ?? $routingInstructions['video_consult']) . "\n\n" .
+            ($imageB64 ? "An image is attached. Use only visible findings from the image and keep observations modest and concrete.\n" : '') .
             "The `message` field must sound natural and should reference what the owner is seeing right now. " .
             "If there is recent conversation history, continue from it instead of restarting.\n\n" .
             "Make `safe_to_do_while_waiting` a list of 3-4 very safe, low-risk steps the owner can do while waiting. " .
@@ -1378,7 +1391,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             '"be_ready_to_tell_vet":"One concise sentence for the section titled Be ready to tell the vet",' .
             '"follow_up_question":{"label":"One question to narrow this down","question":"One focused question","options":["Option 1","Option 2","Option 3"]}}';
 
-        $raw     = $this->geminiCall($prompt, self::RESPONSE_MAX_TOKENS);
+        $raw = $imageB64
+            ? $this->geminiCallWithImage($prompt, $imageB64, $imageMime, self::RESPONSE_MAX_TOKENS)
+            : $this->geminiCall($prompt, self::RESPONSE_MAX_TOKENS);
         $decoded = $this->decodeJson($raw);
 
         if (is_array($decoded)) {
@@ -1414,6 +1429,10 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
 
     private function geminiCallWithImage(string $prompt, string $imageB64, string $mime, int $maxTokens = 500): string
     {
+        if (mb_strlen($prompt) > self::MAX_PROMPT_CHARS) {
+            $prompt = mb_substr($prompt, 0, self::MAX_PROMPT_CHARS);
+        }
+
         // Strip data URI prefix if present
         if (preg_match('/^data:[^;]+;base64,(.+)$/s', $imageB64, $m)) {
             $imageB64 = $m[1];
@@ -2722,7 +2741,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
                 'location' => $pet['location'] ?? ($data['location'] ?? null),
                 'user_message' => mb_substr($question, 0, 65535),
                 'assistant_message' => mb_substr((string) ($response['message'] ?? ''), 0, 65535),
-                'request_payload_json' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                'request_payload_json' => json_encode($this->sanitizePayloadForStorage($data), JSON_UNESCAPED_UNICODE),
                 'response_payload_json' => json_encode($response, JSON_UNESCAPED_UNICODE),
                 'state_payload_json' => json_encode($state, JSON_UNESCAPED_UNICODE),
                 'created_at' => now(),
@@ -2734,5 +2753,16 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
                 'session_id' => $sessionId,
             ]);
         }
+    }
+
+    private function sanitizePayloadForStorage(array $data): array
+    {
+        if (!empty($data['image_base64'])) {
+            $data['image_present'] = true;
+            $data['image_bytes_estimate'] = strlen((string) $data['image_base64']);
+            $data['image_base64'] = '[omitted base64 image]';
+        }
+
+        return $data;
     }
 }
