@@ -169,11 +169,6 @@ function writeStandaloneVetNearMeState(value) {
   window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeState(value)));
 }
 
-function clearStandaloneVetNearMeState() {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(STORAGE_KEY);
-}
-
 const displayValue = (value, fallback = "-") => {
   const text = String(value || "").trim();
   return text || fallback;
@@ -318,7 +313,6 @@ export default function VetNearPayment({
 
   useEffect(() => {
     if (!hasRequiredContext(state)) {
-      clearStandaloneVetNearMeState();
       if (onBack) {
         onBack();
         return;

@@ -450,26 +450,29 @@ const buildResumeCards = () => {
   const cards = [];
   const storedVetNearFlow = readStoredFlowSession(ASK_VET_NEAR_STANDALONE_KEY);
   const storedVideoFlow = readStoredFlowSession(ASK_VIDEO_CALL_STANDALONE_KEY);
+  const vetFlowCompleted = isVetNearFlowCompleted(storedVetNearFlow);
+  const videoFlowCompleted = isVideoCallFlowCompleted(storedVideoFlow);
 
   const vetLead = storedVetNearFlow?.lead || {};
   const vetPet = storedVetNearFlow?.pet || {};
-  const hasVetResume = Boolean(
-    toResumeText(
-      vetLead.ownerName,
-      vetLead.phone,
-      vetLead.species,
-      vetLead.area,
-      vetLead.reason,
-      vetPet.petName,
-      vetPet.issue,
-      vetPet.breed,
-      vetPet.otherPetType,
-    ) ||
-    storedVetNearFlow?.booking?.bookingId ||
-    storedVetNearFlow?.booking?.petId ||
-    storedVetNearFlow?.progress?.petDetailsSubmitted ||
-    storedVetNearFlow?.progress?.paymentCompleted,
-  );
+  const hasVetResume =
+    !vetFlowCompleted &&
+    Boolean(
+      toResumeText(
+        vetLead.ownerName,
+        vetLead.phone,
+        vetLead.species,
+        vetLead.area,
+        vetLead.reason,
+        vetPet.petName,
+        vetPet.issue,
+        vetPet.breed,
+        vetPet.otherPetType,
+      ) ||
+        storedVetNearFlow?.booking?.bookingId ||
+        storedVetNearFlow?.booking?.petId ||
+        storedVetNearFlow?.progress?.petDetailsSubmitted,
+    );
 
   if (hasVetResume) {
     cards.push({
@@ -499,20 +502,21 @@ const buildResumeCards = () => {
       : {}),
   };
   const hasVideoResume = Boolean(
-    toResumeText(
-      videoSource.ownerName,
-      videoSource.ownerMobile,
-      videoSource.phone,
-      videoSource.city,
-      videoSource.name,
-      videoSource.petName,
-      videoSource.type,
-      videoSource.species,
-      videoSource.breed,
-      videoSource.problemText,
-    ) ||
-    storedVideoFlow?.paymentMeta?.user_id ||
-    storedVideoFlow?.paymentMeta?.pet_id,
+    !videoFlowCompleted &&
+      (toResumeText(
+        videoSource.ownerName,
+        videoSource.ownerMobile,
+        videoSource.phone,
+        videoSource.city,
+        videoSource.name,
+        videoSource.petName,
+        videoSource.type,
+        videoSource.species,
+        videoSource.breed,
+        videoSource.problemText,
+      ) ||
+        storedVideoFlow?.paymentMeta?.user_id ||
+        storedVideoFlow?.paymentMeta?.pet_id),
   );
 
   if (hasVideoResume) {
@@ -542,19 +546,38 @@ const buildResumeCards = () => {
   return cards;
 };
 
+const isVetNearFlowCompleted = (value) =>
+  Boolean(
+    value?.progress?.paymentCompleted ||
+      String(value?.booking?.paymentStatus || "")
+        .trim()
+        .toLowerCase() === "paid",
+  );
+
 const isVetNearPaymentReady = (value) =>
   Boolean(
-    value?.progress?.petDetailsSubmitted &&
-    value?.booking?.bookingId &&
-    value?.booking?.userId &&
-    value?.booking?.petId,
+    !isVetNearFlowCompleted(value) &&
+      value?.progress?.petDetailsSubmitted &&
+      value?.booking?.bookingId &&
+      value?.booking?.userId &&
+      value?.booking?.petId,
+  );
+
+const isVideoCallFlowCompleted = (value) =>
+  Boolean(
+    value?.paymentCompleted ||
+      String(value?.paymentStatus || "")
+        .trim()
+        .toLowerCase() === "paid" ||
+      value?.successfulPayment?.success,
   );
 
 const isVideoCallPaymentReady = (value) =>
   Boolean(
-    value?.petDetails &&
-    (value?.paymentMeta?.user_id || value?.petDetails?.user_id) &&
-    (value?.paymentMeta?.pet_id || value?.petDetails?.pet_id),
+    !isVideoCallFlowCompleted(value) &&
+      value?.petDetails &&
+      (value?.paymentMeta?.user_id || value?.petDetails?.user_id) &&
+      (value?.paymentMeta?.pet_id || value?.petDetails?.pet_id),
   );
 
 const getSpeciesMeta = (species) => {
@@ -2295,8 +2318,7 @@ export default function AskPage() {
       })
       .catch(() => {
         if (!active) return;
-        setSessionId("");
-        clearStoredState();
+        // Keep stored progress intact so transient fetch failures do not wipe Ask state.
       });
 
     return () => {
@@ -2926,8 +2948,7 @@ export default function AskPage() {
     setToastMessage("Saved booking cleared");
   };
 
-  const handleFlowPaymentSuccessHome = (storageKey) => {
-    clearStoredFlowSession(storageKey);
+  const handleFlowPaymentSuccessHome = () => {
     setResumeCards(buildResumeCards());
     setFlowModal(null);
     setToastMessage("Payment successful");
@@ -3034,9 +3055,7 @@ export default function AskPage() {
             payload: null,
           })
         }
-        onSuccessHome={() =>
-          handleFlowPaymentSuccessHome(ASK_VET_NEAR_STANDALONE_KEY)
-        }
+        onSuccessHome={handleFlowPaymentSuccessHome}
       />
     );
   } else if (flowModal?.kind === "video-pet-details") {
@@ -3060,9 +3079,7 @@ export default function AskPage() {
             payload: null,
           })
         }
-        onSuccessHome={() =>
-          handleFlowPaymentSuccessHome(ASK_VIDEO_CALL_STANDALONE_KEY)
-        }
+        onSuccessHome={handleFlowPaymentSuccessHome}
       />
     );
   }

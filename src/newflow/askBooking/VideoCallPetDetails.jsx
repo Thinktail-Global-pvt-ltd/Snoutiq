@@ -177,6 +177,15 @@ const writeStoredFlow = (value) => {
   window.sessionStorage.setItem(FLOW_STORAGE_KEY, JSON.stringify(value));
 };
 
+const isStoredFlowCompleted = (value) =>
+  Boolean(
+    value?.paymentCompleted ||
+      String(value?.paymentStatus || "")
+        .trim()
+        .toLowerCase() === "paid" ||
+      value?.successfulPayment?.success
+  );
+
 const extractPaymentMeta = (petDetails, paymentMeta) => {
   const userId = toNumber(
     pickValue(
@@ -404,6 +413,10 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const location = useLocation();
   const navigate = useNavigate();
   const storedFlow = useMemo(() => readStoredFlow(), []);
+  const storedFlowCompleted = useMemo(
+    () => isStoredFlowCompleted(storedFlow),
+    [storedFlow]
+  );
   const routeState =
     initialState && typeof initialState === "object"
       ? initialState
@@ -415,7 +428,10 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
       ? routeState.prefill
       : null;
   const storedPetDetails = routeState?.petDetails || storedFlow?.petDetails || null;
-  const storedPaymentMeta = routeState?.paymentMeta || storedFlow?.paymentMeta || null;
+  const storedPaymentMeta =
+    routeState?.paymentMeta ||
+    (!storedFlowCompleted ? storedFlow?.paymentMeta : null) ||
+    null;
   const storedDraft = routeState?.draft || storedFlow?.draft || null;
   const prefillSource = {
     ...(routePrefill || {}),
@@ -454,7 +470,10 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
     [storedPaymentMeta, storedPetDetails]
   );
   const hasExistingSubmission = Boolean(
-    existingPaymentMeta?.user_id && existingPaymentMeta?.pet_id && storedPetDetails
+    !storedFlowCompleted &&
+      existingPaymentMeta?.user_id &&
+      existingPaymentMeta?.pet_id &&
+      storedPetDetails
   );
   const isPrefilled = (field) => Boolean(hiddenPrefillFields[field]);
   const shouldShowField = (field) => !isPrefilled(field);

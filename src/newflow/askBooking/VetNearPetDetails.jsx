@@ -291,10 +291,35 @@ function writeStandaloneVetNearMeState(value) {
   window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeState(value)));
 }
 
-function clearStandaloneVetNearMeState() {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(STORAGE_KEY);
-}
+const isCompletedStandaloneVetNearMeState = (value) =>
+  Boolean(
+    value?.progress?.paymentCompleted ||
+      String(value?.booking?.paymentStatus || "")
+        .trim()
+        .toLowerCase() === "paid"
+  );
+
+const stripCompletedBookingContext = (value) => {
+  const normalized = normalizeState(value);
+  if (!isCompletedStandaloneVetNearMeState(normalized)) return normalized;
+  return normalizeState({
+    ...normalized,
+    booking: {
+      ...normalized.booking,
+      bookingId: null,
+      userId: null,
+      petId: null,
+      latestCompletedStep: 0,
+      paymentStatus: "pending",
+      paymentReference: "",
+      bookingReference: "",
+    },
+    progress: {
+      petDetailsSubmitted: false,
+      paymentCompleted: false,
+    },
+  });
+};
 
 const normalizePhoneInput = (value) =>
   String(value || "")
@@ -308,7 +333,9 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
   const location = useLocation();
   const fieldIdPrefix = useId();
   const today = new Date().toISOString().slice(0, 10);
-  const storedStandaloneState = readStandaloneVetNearMeState();
+  const storedStandaloneState = stripCompletedBookingContext(
+    readStandaloneVetNearMeState()
+  );
   const routeState =
     initialState && typeof initialState === "object"
       ? initialState
@@ -495,8 +522,6 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
 
   const validate = () => {
     const nextErrors = {};
-    if (!formState.lead.ownerName.trim()) nextErrors.ownerName = "Please enter your name.";
-    if (!isValidPhone(formState.lead.phone)) nextErrors.phone = "Please enter a valid phone number.";
     if (!formState.lead.species) nextErrors.species = "Please select your pet type.";
     if (!formState.pet.petName.trim()) nextErrors.petName = "Please enter your pet's name.";
     if (!formState.pet.dateOfVisit) nextErrors.dateOfVisit = "Please select the visit date.";
@@ -516,7 +541,11 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
   };
 
   const handleContinue = async () => {
+    console.log('ahi');
+    console.log(validate,"ankit");
+    
     if (!validate()) return;
+console.log(validate,"snkit");
 
     try {
       setIsSubmitting(true);
@@ -570,9 +599,6 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
       }
       navigate("/vet-near-me-payment", { state: nextState });
     } catch (error) {
-      if (/booking session|session is incomplete|step 1/i.test(String(error?.message || ""))) {
-        clearStandaloneVetNearMeState();
-      }
       window.alert(error?.message || "Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);

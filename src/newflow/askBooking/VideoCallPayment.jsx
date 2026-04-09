@@ -235,9 +235,15 @@ export const VideoCallPayment = ({
     typeof onSuccessHome === "function" || !onPay;
 
   useEffect(() => {
+    const currentStoredFlow = readStoredFlow() || {};
     writeStoredFlow({
+      ...currentStoredFlow,
       petDetails,
       paymentMeta: {
+        ...(currentStoredFlow.paymentMeta &&
+        typeof currentStoredFlow.paymentMeta === "object"
+          ? currentStoredFlow.paymentMeta
+          : {}),
         ...paymentMeta,
         gst_number: gstNumber || paymentMeta?.gst_number || "",
       },
@@ -470,6 +476,22 @@ export const VideoCallPayment = ({
                 ? "Payment successful."
                 : "Payment successful. Redirecting in 3 seconds."
             );
+            const currentStoredFlow = readStoredFlow() || {};
+            writeStoredFlow({
+              ...currentStoredFlow,
+              petDetails,
+              paymentMeta: {
+                ...(currentStoredFlow.paymentMeta &&
+                typeof currentStoredFlow.paymentMeta === "object"
+                  ? currentStoredFlow.paymentMeta
+                  : {}),
+                ...paymentMeta,
+                gst_number: gstNumber || paymentMeta?.gst_number || "",
+              },
+              paymentCompleted: true,
+              paymentStatus: "paid",
+              successfulPayment: verify,
+            });
             setSuccessfulPayment(verify);
           } catch (error) {
             updateStatus(
