@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Lock } from "lucide-react";
 import {
   createHomeServiceOrder,
   verifyHomeServicePayment,
 } from "../vetNearMeFlow/bookingFlowApi";
 import {
+  BOOKING_FLOW_ROUTES,
+  BOOKING_FLOW_STORAGE_KEY,
   BOOKING_GST_AMOUNT,
   BOOKING_PRICING,
   BOOKING_TOTAL_PRICE,
@@ -15,6 +17,7 @@ import "../vetNearMeFlow/VetNearMeBooking.css";
 const STORAGE_KEY = "snoutiq-vet-near-me-standalone";
 const PET_DETAILS_ROUTE = "/vet-near-me-pet-details";
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+const SUCCESS_REDIRECT_DELAY = 3000;
 const DEFAULT_STATE = {
   lead: { ownerName: "", phone: "", species: "", area: "", reason: "" },
   pet: {
@@ -182,6 +185,56 @@ const loadRazorpayCheckout = () =>
     document.body.appendChild(script);
   });
 
+const buildLegacySuccessState = (state) => ({
+  lead: {
+    name: state?.lead?.ownerName || "",
+    phone: state?.lead?.phone || "",
+    species: state?.lead?.species || "",
+    area: state?.lead?.area || "",
+    reason: state?.lead?.reason || "",
+  },
+  pet: {
+    petName: state?.pet?.petName || "",
+    breed: state?.pet?.breed || "",
+    otherPetType: state?.pet?.otherPetType || "",
+    dob: state?.pet?.dob || "",
+    sex: state?.pet?.sex || "",
+    issue: state?.pet?.issue || "",
+    symptoms: Array.isArray(state?.pet?.symptoms) ? state.pet.symptoms : [],
+    vaccinationStatus: state?.pet?.vaccinationStatus || "",
+    deworming: state?.pet?.deworming || "",
+    history: state?.pet?.history || "",
+    medications: state?.pet?.medications || "",
+    allergies: state?.pet?.allergies || "",
+    notes: state?.pet?.notes || "",
+  },
+  booking: {
+    bookingId: state?.booking?.bookingId ?? null,
+    userId: state?.booking?.userId ?? null,
+    petId: state?.booking?.petId ?? null,
+    latestCompletedStep: state?.booking?.latestCompletedStep ?? 3,
+    paymentStatus: state?.booking?.paymentStatus || "paid",
+    paymentProvider: "razorpay",
+    paymentReference: state?.booking?.paymentReference || "",
+    bookingReference: state?.booking?.bookingReference || "",
+  },
+  progress: {
+    leadSubmitted: true,
+    petDetailsSubmitted: true,
+    paymentCompleted: true,
+  },
+});
+
+const buildSuccessPayload = (state) => ({
+  bookingReference: state?.booking?.bookingReference || "",
+  paymentReference: state?.booking?.paymentReference || "",
+  paymentStatus: state?.booking?.paymentStatus || "paid",
+  bookingId: state?.booking?.bookingId ?? null,
+  userId: state?.booking?.userId ?? null,
+  petId: state?.booking?.petId ?? null,
+  legacyState: buildLegacySuccessState(state),
+});
+
 const hasRequiredContext = (state) => {
   const phoneDigits = String(state?.lead?.phone || "").replace(/\D/g, "");
   return Boolean(
@@ -196,7 +249,7 @@ const hasRequiredContext = (state) => {
   );
 };
 
-export default function VetNearPayment({ initialState, onBack }) {
+export default function VetNearPayment({ initialState, onBack, onPay }) {
   const navigate = useNavigate();
   const location = useLocation();
   const routeState = hasRequiredContext(normalizeState(initialState))
@@ -209,6 +262,8 @@ export default function VetNearPayment({ initialState, onBack }) {
   const [isGatewayLoading, setIsGatewayLoading] = useState(true);
   const [isGatewayReady, setIsGatewayReady] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState({ type: "", text: "" });
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successfulPayment, setSuccessfulPayment] = useState(null);
 
   useEffect(() => {
     writeStandaloneVetNearMeState(state);
@@ -303,6 +358,33 @@ export default function VetNearPayment({ initialState, onBack }) {
         : "border-blue-200 bg-blue-50 text-blue-700";
 
   const setStatus = (type, text) => setPaymentMessage({ type, text });
+
+  useEffect(() => {
+    if (!isPaid || successfulPayment) return;
+    setSuccessfulPayment(buildSuccessPayload(state));
+  }, [isPaid, state, successfulPayment]);
+
+  useEffect(() => {
+    if (!successfulPayment) return undefined;
+
+    setShowSuccessAlert(true);
+    const timeoutId = window.setTimeout(() => {
+      if (onPay) {
+        onPay(successfulPayment);
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          BOOKING_FLOW_STORAGE_KEY,
+          JSON.stringify(successfulPayment.legacyState)
+        );
+      }
+      navigate(BOOKING_FLOW_ROUTES.success, { replace: true });
+    }, SUCCESS_REDIRECT_DELAY);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [navigate, onPay, successfulPayment]);
 
   const handleBack = () => {
     if (onBack) {
@@ -403,7 +485,8 @@ export default function VetNearPayment({ initialState, onBack }) {
 
             setState(nextState);
             writeStandaloneVetNearMeState(nextState);
-            setStatus("success", "Payment successful. Your booking is confirmed.");
+            setSuccessfulPayment(buildSuccessPayload(nextState));
+            setStatus("success", "Payment successful. Redirecting in 3 seconds.");
             setIsSubmitting(false);
           } catch (error) {
             setStatus("error", error?.message || "Payment verification failed. Please try again.");
@@ -583,6 +666,22 @@ export default function VetNearPayment({ initialState, onBack }) {
           </button>
         </div>
       </div>
+
+      {showSuccessAlert ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-sm rounded-[28px] bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <CheckCircle2 size={28} />
+            </div>
+            <div className="text-lg font-bold text-slate-900">
+              Payment successful
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Redirecting in 3 seconds.
+            </p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

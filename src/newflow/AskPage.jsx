@@ -2371,6 +2371,10 @@ export default function AskPage() {
             payload: null,
           })
         }
+        onPay={() => {
+          setFlowModal(null);
+          setToastMessage("Payment successful");
+        }}
       />
     );
   } else if (flowModal?.kind === "video-pet-details") {
@@ -2394,6 +2398,10 @@ export default function AskPage() {
             payload: null,
           })
         }
+        onPay={() => {
+          setFlowModal(null);
+          setToastMessage("Payment successful");
+        }}
       />
     );
   }

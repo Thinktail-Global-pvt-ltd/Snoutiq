@@ -11,10 +11,12 @@ import {
 
 const FLOW_STORAGE_KEY = "snoutiq-video-call-copied-flow";
 const PET_DETAILS_ROUTE = "/video-call-pet-details";
+const CONSULTATION_BOOKED_ROUTE = "/consultation-booked";
 const STATIC_CONSULTATION_AMOUNT = 599;
 const STATIC_SERVICE_AMOUNT = 0;
 const STATIC_DISCOUNT_AMOUNT = 100;
 const GST_RATE = 0.18;
+const SUCCESS_REDIRECT_DELAY = 3000;
 const DESCRIBE_CONSULT_POINTS = Object.freeze([
   "Share clear symptoms and at least one photo for faster review.",
   "Online consultation is for guidance. Emergency cases may still need a clinic visit.",
@@ -222,6 +224,7 @@ export const VideoCallPayment = ({
   const [statusType, setStatusType] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successfulPayment, setSuccessfulPayment] = useState(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [gstNumber, setGstNumber] = useState(
     () => paymentMeta?.gst_number || ""
@@ -252,6 +255,28 @@ export const VideoCallPayment = ({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!successfulPayment) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      if (onPay) {
+        onPay(successfulPayment);
+        return;
+      }
+
+      navigate(CONSULTATION_BOOKED_ROUTE, {
+        replace: true,
+        state: {
+          vet,
+          verify: successfulPayment,
+          skipConversion: true,
+        },
+      });
+    }, SUCCESS_REDIRECT_DELAY);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [navigate, onPay, successfulPayment, vet]);
 
   const paymentContext = useMemo(
     () =>
@@ -417,9 +442,9 @@ export const VideoCallPayment = ({
               throw new Error(verify?.error || "Verification failed");
             }
 
-            updateStatus("success", "Payment successful.");
+            updateStatus("success", "Payment successful. Redirecting in 3 seconds.");
+            setSuccessfulPayment(verify);
             setShowSuccessModal(true);
-            onPay?.(verify);
           } catch (error) {
             updateStatus(
               "error",
@@ -672,7 +697,7 @@ export const VideoCallPayment = ({
               Payment confirmed
             </div>
             <p className="text-sm text-stone-500 mt-2">
-              Payment successful. Our team will contact you shortly.
+              Payment successful. Redirecting in 3 seconds.
             </p>
           </div>
         </div>
