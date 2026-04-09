@@ -4280,16 +4280,16 @@ class AdminPanelController extends Controller
 
     private function isExcellExportTransaction(Transaction $transaction): bool
     {
-        $type = strtolower((string) ($transaction->type ?? ''));
-        $orderType = strtolower((string) data_get($transaction->metadata, 'order_type', ''));
+        $type = $this->normalizeAppointmentTransactionType($transaction->type ?? null);
+        $orderType = $this->normalizeAppointmentTransactionType(data_get($transaction->metadata, 'order_type'));
 
         return $type === 'excell_export_campaign' || $orderType === 'excell_export_campaign';
     }
 
     private function isAppointmentTransaction(Transaction $transaction): bool
     {
-        $type = strtolower((string) ($transaction->type ?? ''));
-        $orderType = strtolower((string) data_get($transaction->metadata, 'order_type', ''));
+        $type = $this->normalizeAppointmentTransactionType($transaction->type ?? null);
+        $orderType = $this->normalizeAppointmentTransactionType(data_get($transaction->metadata, 'order_type'));
 
         return in_array($type, ['video_consult', 'excell_export_campaign'], true)
             || in_array($orderType, ['video_consult', 'excell_export_campaign'], true);
@@ -4316,7 +4316,37 @@ class AdminPanelController extends Controller
             return 'WhatsApp sent to the assigned doctor.';
         }
 
-        return '';
+        $parentReason = trim((string) data_get($whatsAppMeta, 'parent_whatsapp.reason', ''));
+        $vetReason = trim((string) data_get($whatsAppMeta, 'vet_whatsapp.reason', ''));
+        $parts = [];
+
+        if ($parentReason !== '') {
+            $parts[] = 'pet parent: ' . str_replace('_', ' ', $parentReason);
+        }
+
+        if ($vetReason !== '') {
+            $parts[] = 'doctor: ' . str_replace('_', ' ', $vetReason);
+        }
+
+        if (empty($parts)) {
+            return '';
+        }
+
+        return 'WhatsApp not sent (' . implode('; ', $parts) . ').';
+    }
+
+    private function normalizeAppointmentTransactionType(?string $type): string
+    {
+        if (! is_string($type)) {
+            return '';
+        }
+
+        $normalized = strtolower(trim(str_replace(['-', ' '], '_', $type)));
+
+        return match ($normalized) {
+            'excel_export_campaign' => 'excell_export_campaign',
+            default => $normalized,
+        };
     }
 
     private function addJoinedSelectIfColumnExists(

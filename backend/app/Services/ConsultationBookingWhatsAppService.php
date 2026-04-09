@@ -25,13 +25,6 @@ class ConsultationBookingWhatsAppService
             ];
         }
 
-        if (! $this->isSuccessfulPaymentStatus($transaction->status)) {
-            return [
-                'parent_whatsapp' => ['sent' => false, 'reason' => 'payment_not_captured'],
-                'vet_whatsapp' => ['sent' => false, 'reason' => 'payment_not_captured'],
-            ];
-        }
-
         $context = [
             'channel_name' => $this->resolveChannelName($transaction, $metadata),
             'clinic_id' => $transaction->clinic_id ? (int) $transaction->clinic_id : $this->toNullableInt($metadata['clinic_id'] ?? null),
@@ -423,16 +416,6 @@ class ConsultationBookingWhatsAppService
             'excel_export_campaign' => 'excell_export_campaign',
             default => $normalized,
         };
-    }
-
-    private function isSuccessfulPaymentStatus(?string $status): bool
-    {
-        $normalized = strtolower(trim((string) $status));
-        if ($normalized === '') {
-            return false;
-        }
-
-        return in_array($normalized, ['captured', 'authorized', 'paid', 'success', 'successful', 'verified', 'completed'], true);
     }
 
     private function toNullableInt(mixed $value): ?int
