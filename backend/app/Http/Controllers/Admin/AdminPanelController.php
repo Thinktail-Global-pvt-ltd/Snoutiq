@@ -2470,6 +2470,28 @@ class AdminPanelController extends Controller
             }
         }
 
+        $latestRelatedTransactionTimestamp = static function (array $leadUser): string {
+            $timestamps = collect($leadUser['related_transactions'] ?? [])
+                ->pluck('created_at')
+                ->filter(fn ($value) => is_string($value) && trim($value) !== '')
+                ->map(fn ($value) => trim((string) $value))
+                ->values()
+                ->all();
+
+            $conversionTimestamp = trim((string) ($leadUser['conversion_transaction_at'] ?? ''));
+            if ($conversionTimestamp !== '') {
+                $timestamps[] = $conversionTimestamp;
+            }
+
+            if (empty($timestamps)) {
+                return '';
+            }
+
+            rsort($timestamps, SORT_STRING);
+
+            return (string) ($timestamps[0] ?? '');
+        };
+
         $filteredTargetUsers = $targetUsers
             ->values()
             ->filter(function (array $leadUser) use ($leadFilter): bool {
@@ -2488,6 +2510,12 @@ class AdminPanelController extends Controller
             })
             ->filter(fn (array $leadUser): bool => $matchesLeadSearch($leadUser, $searchTerm))
             ->sort(function (array $left, array $right): int {
+                $leftLatestTransaction = $latestRelatedTransactionTimestamp($left);
+                $rightLatestTransaction = $latestRelatedTransactionTimestamp($right);
+                if ($leftLatestTransaction !== $rightLatestTransaction) {
+                    return strcmp((string) $rightLatestTransaction, (string) $leftLatestTransaction);
+                }
+
                 $leftDate = $left['next_follow_up_date'] ?? '9999-12-31';
                 $rightDate = $right['next_follow_up_date'] ?? '9999-12-31';
                 if ($leftDate !== $rightDate) {

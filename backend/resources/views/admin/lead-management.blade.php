@@ -1864,6 +1864,7 @@
 
                 <label class="crm-side-filter-label" for="crmSortSelect">Sort by</label>
                 <select id="crmSortSelect" class="crm-select" style="width: 100%;">
+                    <option value="latest_transaction">Latest transaction</option>
                     <option value="next_action">Next action date</option>
                     <option value="last_updated">Latest notification</option>
                     <option value="highest_activity">Highest activity</option>
@@ -2181,7 +2182,7 @@
         pipeline: 'all',
         service: initialService,
         search: '',
-        sortBy: 'next_action',
+        sortBy: 'latest_transaction',
         selectedLeadId: leadData.length ? Number(leadData[0].id) : null,
         leads: (leadData || []).map((lead) => {
             const serverActivities = Array.isArray(lead.crm_activity_logs)
@@ -2486,6 +2487,14 @@
                 const left = String(a.created_at || '');
                 const right = String(b.created_at || '');
                 return right.localeCompare(left);
+            }
+
+            if (state.sortBy === 'latest_transaction') {
+                const left = getLatestTransactionTimestamp(a);
+                const right = getLatestTransactionTimestamp(b);
+                if (left !== right) {
+                    return String(right).localeCompare(String(left));
+                }
             }
 
             if (state.sortBy === 'last_updated') {
