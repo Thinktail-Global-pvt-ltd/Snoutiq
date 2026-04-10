@@ -10,6 +10,10 @@ import VetNearPayment from "./askBooking/VetNearPayment";
 import VideoCallPetDetails from "./askBooking/VideoCallPetDetails";
 import { VideoCallPayment } from "./askBooking/VideoCallPayment";
 import { getAskProfile, saveAskProfile } from "./askBooking/askProfileStorage";
+import {
+  clearAskBookingAttachment,
+  saveAskBookingAttachment,
+} from "./askBooking/askBookingAttachmentStorage";
 import "./AskPage.css";
 
 const ASK_TITLE = "Snoutiq - Is My Pet Okay? Free AI Pet Health Check";
@@ -2333,7 +2337,13 @@ export default function AskPage() {
     resizeTextarea();
   }, [inputValue]);
 
-  const clearPendingAttachment = ({ revokePreview = true } = {}) => {
+  const clearPendingAttachment = ({
+    revokePreview = true,
+    clearStored = true,
+  } = {}) => {
+    if (clearStored) {
+      void clearAskBookingAttachment();
+    }
     setPendingAttachment((current) => {
       if (revokePreview && current?.previewUrl) {
         revokeBlobPreviewUrl(current.previewUrl);
@@ -2396,6 +2406,12 @@ export default function AskPage() {
         name: file.name || "Attached image",
         size: file.size || 0,
         previewUrl,
+      });
+      await saveAskBookingAttachment({
+        file,
+        mime: file.type || "image/jpeg",
+        name: file.name || "Attached image",
+        size: file.size || 0,
       });
       setErrorMessage("");
       setToastMessage("Image attached");
@@ -2610,7 +2626,7 @@ export default function AskPage() {
     ]);
     setInputValue("");
     if (attachment) {
-      clearPendingAttachment({ revokePreview: false });
+      clearPendingAttachment({ revokePreview: false, clearStored: false });
     }
     setLoading(true);
 
@@ -2933,7 +2949,7 @@ export default function AskPage() {
       const identifiers = extractAssessmentIdentifiers(payload);
 
       if (attachment) {
-        clearPendingAttachment({ revokePreview: true });
+        clearPendingAttachment({ revokePreview: true, clearStored: false });
       }
       setSessionId(payload?.session_id || sessionId);
       saveAskProfile({

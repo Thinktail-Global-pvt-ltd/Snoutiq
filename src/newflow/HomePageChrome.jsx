@@ -432,6 +432,7 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
     { name: "For Vets", href: "/vets" },
     { name: "For Clinics", href: "/clinics" },
     { name: "About Us", href: "/about" },
+    { name: "AI Symptom Checker", href: "/ask", isNew: true },
   ];
 
   const go = (to) => {
@@ -506,14 +507,19 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
           </div>
 
           <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-8">
+            <div className="ml-10 flex items-center space-x-8">
               {navLinks.map((link) => (
                 <Link
                   key={link.name}
                   to={link.href}
-                  className="text-sm font-medium text-slate-700 transition-colors hover:text-brand"
+                  className="relative inline-flex h-10 items-center justify-center text-sm font-medium text-slate-700 transition-colors hover:text-brand"
                 >
-                  {link.name}
+                  <span>{link.name}</span>
+                  {link.isNew ? (
+                    <span className="absolute -right-10 top-0 -translate-x-1/2 -translate-y-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase leading-none tracking-[0.12em] text-white shadow-sm">
+                      New
+                    </span>
+                  ) : null}
                 </Link>
               ))}
             </div>
@@ -555,10 +561,17 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
               <Link
                 key={link.name}
                 to={link.href}
-                className="block rounded-md px-3 py-2 text-base font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                className="flex min-h-[3rem] items-center rounded-md px-3 py-1 text-base font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                 onClick={() => setIsOpen(false)}
               >
-                {link.name}
+                <span className="relative inline-flex h-10 items-center">
+                  <span>{link.name}</span>
+                  {link.isNew ? (
+                    <span className="absolute -right-10 top-0 -translate-x-1/2 -translate-y-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase leading-none tracking-[0.12em] text-white shadow-sm">
+                      New
+                    </span>
+                  ) : null}
+                </span>
               </Link>
             ))}
 

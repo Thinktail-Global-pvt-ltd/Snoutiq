@@ -28,6 +28,11 @@ import {
   Upload,
   User,
 } from "lucide-react";
+import {
+  clearAskBookingAttachment,
+  getAskBookingAttachment,
+  saveAskBookingAttachment as saveAskBookingFile,
+} from "./askBookingAttachmentStorage";
 import { getAskProfile, saveAskProfile } from "./askProfileStorage";
 
 const PAYMENT_ROUTE = "/video-call-payment";
@@ -334,6 +339,10 @@ const buildProfilePrefill = () => {
   };
 };
 
+const resolveIncomingPrefill = (source) => {
+  const raw = source && typeof source === "object" ? source : {};
+  return raw.prefill && typeof raw.prefill === "object" ? raw.prefill : raw;
+};
 
 const buildHiddenPrefillFields = (source) => {
   const prepared = buildInitialDetails(source);
@@ -355,6 +364,17 @@ const buildHiddenPrefillFields = (source) => {
     vaccinatedYesNo: Boolean(prepared.vaccinatedYesNo),
     dewormingYesNo: Boolean(prepared.dewormingYesNo),
     weightKg: Boolean(prepared.weightKg),
+  };
+};
+
+const buildVideoCallInitialState = (initialState) => {
+  const profilePrefill = buildProfilePrefill();
+  const incomingPrefill = resolveIncomingPrefill(initialState);
+  const mergedPrefill = { ...profilePrefill, ...incomingPrefill };
+
+  return {
+    details: buildInitialDetails(mergedPrefill),
+    hiddenPrefillFields: buildHiddenPrefillFields(mergedPrefill),
   };
 };
 
@@ -412,15 +432,35 @@ const getPetTypeLabel = (type) => {
   }
 };
 
+const ensureStoredAttachmentFile = (attachment) => {
+  const rawFile = attachment?.file;
+  if (!(rawFile instanceof Blob)) return null;
+  if (rawFile instanceof File) return rawFile;
+  return new File([rawFile], attachment?.name || "ask-attachment", {
+    type: attachment?.mime || rawFile.type || "application/octet-stream",
+  });
+};
+
+const buildStoredAttachmentPreviewUrl = (file) => {
+  if (!(file instanceof Blob) || !String(file.type || "").startsWith("image/")) {
+    return "";
+  }
+  if (typeof URL === "undefined") return "";
+  return URL.createObjectURL(file);
+};
+
 export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   void vet;
   const navigate = useNavigate();
-  void initialState;
   const storedPetDetails = null;
   const storedPaymentMeta = null;
   const existingPaymentMeta = {};
+  const initialPrefillState = useMemo(
+    () => buildVideoCallInitialState(initialState),
+    [initialState]
+  );
 
-  const [details, setDetails] = useState(() => buildProfilePrefill());
+  const [details, setDetails] = useState(() => initialPrefillState.details);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState("");
   const [uploadMeta, setUploadMeta] = useState(null);
@@ -435,7 +475,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const [breedError, setBreedError] = useState("");
   const [hasChangesSinceSubmit, setHasChangesSinceSubmit] = useState(false);
   const [hiddenPrefillFields, setHiddenPrefillFields] = useState(() =>
-    buildHiddenPrefillFields(buildProfilePrefill())
+    initialPrefillState.hiddenPrefillFields
   );
   const breedDropdownRef = useRef(null);
   const hasExistingSubmission = Boolean(
@@ -462,6 +502,56 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
     revealField(field);
     setDetails((current) => ({ ...current, [field]: value }));
   };
+
+  useEffect(() => {
+    setDetails(initialPrefillState.details);
+    setHiddenPrefillFields(initialPrefillState.hiddenPrefillFields);
+  }, [initialPrefillState]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const syncIncomingData = async () => {
+      const savedAskProfile = getAskProfile();
+      const incomingPrefill = resolveIncomingPrefill(initialState);
+      const profilePrefill = buildProfilePrefill();
+      const storedAskAttachment = await getAskBookingAttachment();
+
+      if (!isActive) return;
+
+      console.groupCollapsed("[VideoCallPetDetails] incoming details");
+      console.log("initialState prop:", initialState ?? null);
+      console.log("resolved incoming prefill:", incomingPrefill);
+      console.log("saved ask profile:", savedAskProfile);
+      console.log("saved ask booking attachment:", storedAskAttachment);
+      console.log("profile prefill:", profilePrefill);
+      console.log("initial prefill state:", initialPrefillState);
+      console.groupEnd();
+
+      const nextStoredFile = ensureStoredAttachmentFile(storedAskAttachment);
+      if (!nextStoredFile) return;
+
+      setUploadFile((current) => current || nextStoredFile);
+      setUploadPreviewUrl((current) => current || buildStoredAttachmentPreviewUrl(nextStoredFile));
+      setUploadMeta((current) =>
+        current || {
+          name: storedAskAttachment?.name || nextStoredFile.name,
+          size: storedAskAttachment?.size || nextStoredFile.size,
+          type: storedAskAttachment?.mime || nextStoredFile.type,
+          compressedSize: null,
+        }
+      );
+      setDetails((current) =>
+        current.hasPhoto ? current : { ...current, hasPhoto: true }
+      );
+    };
+
+    void syncIncomingData();
+
+    return () => {
+      isActive = false;
+    };
+  }, [initialPrefillState, initialState]);
 
   useEffect(() => {
     if (!breedDropdownOpen) return undefined;
@@ -683,9 +773,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   };
 
   const getStepTwoTooltip = () => {
-    if (details.problemText.trim().length <= 10) {
-      return "Please describe the problem in detail (minimum 10 characters)";
-    }
     if (!details.lastDaysEnergy) return "Please select energy level";
     if (!details.lastDaysAppetite) return "Please select appetite";
     if (!details.mood) return "Please select mood";
@@ -723,6 +810,11 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
       gst_number: pickValue(paymentPayload?.gst_number, storedPaymentMeta?.gst_number),
     });
 
+    console.groupCollapsed("[VideoCallPetDetails] continue to payment");
+    console.log("pet payload:", petPayload);
+    console.log("payment payload:", nextPaymentMeta);
+    console.groupEnd();
+
     setHasChangesSinceSubmit(false);
 
     if (onSubmit) {
@@ -757,18 +849,29 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
     setHasChangesSinceSubmit(true);
     setSubmitError("");
     setDetails((current) => ({ ...current, hasPhoto: true }));
+    await saveAskBookingFile({
+      file,
+      mime: file.type || "application/octet-stream",
+      name: file.name || "Attached file",
+      size: file.size || 0,
+    });
   };
 
   const submitObservation = async () => {
     if (!isValid || submitting) return;
 
     if (canReuseExistingSubmission && storedPetDetails) {
+      console.groupCollapsed("[VideoCallPetDetails] reusing existing submission");
+      console.log("stored pet details:", storedPetDetails);
+      console.log("existing payment meta:", existingPaymentMeta);
+      console.groupEnd();
       continueToPayment(storedPetDetails, existingPaymentMeta);
       return;
     }
 
     setSubmitError("");
     setSubmitting(true);
+    let didOpenSubmitLogGroup = false;
 
     try {
       let fileToSend = uploadFile;
@@ -779,6 +882,39 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
           current ? { ...current, compressedSize: compressed?.size ?? null } : current
         );
       }
+
+      const observationPayload = stripEmpty({
+        name: details.ownerName,
+        phone: formatPhone(details.ownerMobile),
+        city: details.city.trim(),
+        type: details.type || "",
+        dob: details.petDob || "",
+        pet_name: details.name || "",
+        weight: details.weightKg !== "" ? details.weightKg : undefined,
+        gender: details.gender || "",
+        breed:
+          details.type === "exotic" ? details.exoticType.trim() : details.breed || "",
+        reported_symptom: details.problemText || "",
+        appetite: details.lastDaysAppetite || undefined,
+        energy: details.lastDaysEnergy || undefined,
+        mood: details.mood || undefined,
+        is_neutered: details.isNeutered !== "" ? details.isNeutered : undefined,
+        vaccenated_yes_no:
+          details.vaccinatedYesNo !== "" ? details.vaccinatedYesNo : undefined,
+        deworming_yes_no:
+          details.dewormingYesNo !== "" ? details.dewormingYesNo : undefined,
+        pet_doc2: details.petDoc2?.trim() || undefined,
+      });
+
+      console.groupCollapsed("[VideoCallPetDetails] submit observation");
+      didOpenSubmitLogGroup = true;
+      console.log("current details:", details);
+      console.log("upload file:", fileToSend ? {
+        name: fileToSend.name,
+        type: fileToSend.type,
+        size: fileToSend.size,
+      } : null);
+      console.log("api payload:", observationPayload);
 
       const fd = new FormData();
       fd.append("name", details.ownerName);
@@ -812,6 +948,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
         body: fd,
       });
       const data = await res.json().catch(() => ({}));
+      console.log("api response:", data);
       if (!res.ok) throw new Error(data?.message || "Failed to submit observation");
 
       const observation = data?.data ?? data ?? {};
@@ -903,10 +1040,17 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
         call_session_id: nextPaymentMeta.call_session_id,
       });
 
+      console.log("next payment meta:", nextPaymentMeta);
+      console.log("next payload:", nextPayload);
+
       continueToPayment(nextPayload, nextPaymentMeta);
     } catch (error) {
+      console.error("[VideoCallPetDetails] submit observation failed:", error);
       setSubmitError(error?.message || "Something went wrong. Please try again.");
     } finally {
+      if (didOpenSubmitLogGroup) {
+        console.groupEnd();
+      }
       setSubmitting(false);
     }
   };
@@ -1259,6 +1403,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
                                 type="button"
                                 onClick={() => {
                                   if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+                                  void clearAskBookingAttachment();
                                   setUploadFile(null);
                                   setUploadPreviewUrl("");
                                   setUploadMeta(null);
