@@ -1,9 +1,10 @@
-import React, { useEffect, useId, useMemo, useState } from "react";
+import React, { useId, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { createAppointmentOrder } from "../vetNearMeFlow/bookingFlowApi";
 import {
   ASK_ROUTE,
+  DEFAULT_IN_CLINIC_STATE,
   hasInClinicIdentifiers,
   IN_CLINIC_MISSING_CONTEXT_MESSAGE,
   IN_CLINIC_PAYMENT_ROUTE,
@@ -14,11 +15,30 @@ import {
   mergeInClinicStates,
   normalizePhoneInput,
   normalizeTimeInput,
-  readInClinicStoredState,
   resolveInClinicState,
-  writeInClinicStoredState,
 } from "./inClinicFlowShared";
 import "../vetNearMeFlow/VetNearMeBooking.css";
+import { getAskProfile, saveAskProfile } from "./askProfileStorage";
+
+const buildProfileFormState = (contextState) => {
+  const profile = getAskProfile();
+  return {
+    ...DEFAULT_IN_CLINIC_STATE,
+    userId: contextState?.userId || profile.userId || "",
+    petId: contextState?.petId || profile.petId || "",
+    patientName: profile.ownerName || "",
+    patientPhone: profile.phone || "",
+    patientEmail: contextState?.patientEmail || profile.email || "",
+    petName: profile.petName || "",
+    date: "",
+    timeSlot: "",
+    notes: profile.lastProblemText || "",
+  };
+};
+
+const buildHiddenPrefillFields = (state) => ({
+  patientEmail: Boolean(state.patientEmail),
+});
 
 export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
   const navigate = useNavigate();
@@ -29,13 +49,18 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
     initialState && typeof initialState === "object" ? initialState : null;
   const locationState =
     location.state && typeof location.state === "object" ? location.state : null;
+  const contextState = useMemo(
+    () =>
+      resolveInClinicState({
+        initialState: propState,
+        locationState,
+      }),
+    [locationState, propState],
+  );
 
-  const [formState, setFormState] = useState(() =>
-    resolveInClinicState({
-      storedState: readInClinicStoredState(),
-      initialState: propState,
-      locationState,
-    }),
+  const [formState, setFormState] = useState(() => buildProfileFormState(contextState));
+  const [hiddenPrefillFields] = useState(() =>
+    buildHiddenPrefillFields(buildProfileFormState(contextState)),
   );
   const [errors, setErrors] = useState({});
   const [submitState, setSubmitState] = useState({
@@ -43,10 +68,6 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
     type: "",
     text: "",
   });
-
-  useEffect(() => {
-    writeInClinicStoredState(formState);
-  }, [formState]);
 
   const clearError = (field) => {
     setErrors((current) => {
@@ -71,6 +92,8 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
     clearError(field);
   };
 
+  const showPatientEmailField = !hiddenPrefillFields.patientEmail;
+
   const validate = (state = formState) => {
     const nextErrors = {};
     if (!String(state.patientName || "").trim()) {
@@ -94,14 +117,13 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
 
   const handleContinue = async () => {
     if (submitState.loading) return;
-    const preparedState = resolveInClinicState({
-      storedState: readInClinicStoredState(),
-      initialState: propState,
-      locationState,
-      currentState: formState,
-    });
-    console.log(preparedState,"ankit");
-    
+    const preparedState = mergeInClinicStates(
+      {
+        userId: contextState.userId,
+        petId: contextState.petId,
+      },
+      formState,
+    );
 
     if (!validate(preparedState)) return;
     if (!hasInClinicIdentifiers(preparedState)) {
@@ -114,7 +136,6 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
     }
 
     setFormState(preparedState);
-    writeInClinicStoredState(preparedState);
 
     setSubmitState({
       loading: true,
@@ -141,7 +162,16 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
         paymentCurrency: order.currency || IN_CLINIC_PRICING.currency,
       });
 
-      writeInClinicStoredState(nextState);
+      saveAskProfile({
+        ownerName: nextState.patientName,
+        phone: nextState.patientPhone,
+        email: nextState.patientEmail,
+        petName: nextState.petName,
+        lastProblemText: nextState.notes,
+        ...(nextState.userId ? { userId: nextState.userId } : {}),
+        ...(nextState.petId ? { petId: nextState.petId } : {}),
+      });
+
       setSubmitState({
         loading: false,
         type: "success",
@@ -218,22 +248,24 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
         >
           <div className="sdiv">Patient details</div>
 
-          <div className="field">
-            <label htmlFor={`${fieldIdPrefix}-patientEmail`}>
-              Patient email <span className="required-mark">*</span>
-            </label>
-            <input
-              id={`${fieldIdPrefix}-patientEmail`}
-              type="email"
-              className={errors.patientEmail ? "input-error" : ""}
-              value={formState.patientEmail}
-              onChange={(event) => updateField("patientEmail", event.target.value)}
-              placeholder="rahul@example.com"
-            />
-            {errors.patientEmail ? (
-              <div className="field-error">{errors.patientEmail}</div>
-            ) : null}
-          </div>
+          {showPatientEmailField ? (
+            <div className="field">
+              <label htmlFor={`${fieldIdPrefix}-patientEmail`}>
+                Patient email <span className="required-mark">*</span>
+              </label>
+              <input
+                id={`${fieldIdPrefix}-patientEmail`}
+                type="email"
+                className={errors.patientEmail ? "input-error" : ""}
+                value={formState.patientEmail}
+                onChange={(event) => updateField("patientEmail", event.target.value)}
+                placeholder="rahul@example.com"
+              />
+              {errors.patientEmail ? (
+                <div className="field-error">{errors.patientEmail}</div>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="sdiv">Appointment details</div>
           <div className="half">

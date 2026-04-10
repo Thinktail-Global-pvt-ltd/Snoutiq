@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { PET_FLOW_STEPS, ProgressBar } from "../../components/Sharedcomponents";
 import { apiBaseUrl } from "../../lib/api";
@@ -28,8 +28,8 @@ import {
   Upload,
   User,
 } from "lucide-react";
+import { getAskProfile, saveAskProfile } from "./askProfileStorage";
 
-const FLOW_STORAGE_KEY = "snoutiq-video-call-copied-flow";
 const PAYMENT_ROUTE = "/video-call-payment";
 const PET_FORM_SUBMIT_TAG_ID = "AW-107928384221313";
 const PET_FORM_SUBMIT_EVENT_NAME = "pet_form_submit";
@@ -161,30 +161,6 @@ const normalizePetType = (value) => {
     exoticType: raw.charAt(0).toUpperCase() + raw.slice(1),
   };
 };
-
-const readStoredFlow = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(FLOW_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-const writeStoredFlow = (value) => {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(FLOW_STORAGE_KEY, JSON.stringify(value));
-};
-
-const isStoredFlowCompleted = (value) =>
-  Boolean(
-    value?.paymentCompleted ||
-      String(value?.paymentStatus || "")
-        .trim()
-        .toLowerCase() === "paid" ||
-      value?.successfulPayment?.success
-  );
 
 const extractPaymentMeta = (petDetails, paymentMeta) => {
   const userId = toNumber(
@@ -331,6 +307,34 @@ const buildDraftDetails = (source) => ({
   hasPhoto: false,
 });
 
+const buildProfilePrefill = () => {
+  const profile = getAskProfile();
+  return {
+    ...buildInitialDetails({
+      ownerName: profile.ownerName || "",
+      ownerMobile: profile.phone || "",
+      city: profile.location || "",
+      name: profile.petName || "",
+      type: profile.petType || "",
+      species: profile.petType || "",
+      petDob: profile.dob || "",
+      problemText: profile.lastProblemText || "",
+      gender: profile.gender || "",
+      weightKg: profile.weightKg || "",
+      energy: profile.lastDaysEnergy || "",
+      appetite: profile.lastDaysAppetite || "",
+      mood: profile.mood || "",
+      vaccinatedYesNo: profile.vaccinatedYesNo || "",
+      dewormingYesNo: profile.dewormingYesNo || "",
+      isNeutered: profile.isNeutered || "",
+      lat: profile.lat || "",
+      long: profile.long || "",
+    }),
+    breed: profile.breed || "",
+  };
+};
+
+
 const buildHiddenPrefillFields = (source) => {
   const prepared = buildInitialDetails(source);
   return {
@@ -410,39 +414,13 @@ const getPetTypeLabel = (type) => {
 
 export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   void vet;
-  const location = useLocation();
   const navigate = useNavigate();
-  const storedFlow = useMemo(() => readStoredFlow(), []);
-  const storedFlowCompleted = useMemo(
-    () => isStoredFlowCompleted(storedFlow),
-    [storedFlow]
-  );
-  const routeState =
-    initialState && typeof initialState === "object"
-      ? initialState
-      : location.state && typeof location.state === "object"
-        ? location.state
-        : {};
-  const routePrefill =
-    routeState?.prefill && typeof routeState.prefill === "object"
-      ? routeState.prefill
-      : null;
-  const storedPetDetails = routeState?.petDetails || storedFlow?.petDetails || null;
-  const storedPaymentMeta =
-    routeState?.paymentMeta ||
-    (!storedFlowCompleted ? storedFlow?.paymentMeta : null) ||
-    null;
-  const storedDraft = routeState?.draft || storedFlow?.draft || null;
-  const prefillSource = {
-    ...(routePrefill || {}),
-    ...(storedPetDetails && typeof storedPetDetails === "object" ? storedPetDetails : {}),
-    ...(storedDraft && typeof storedDraft === "object" ? storedDraft : {}),
-  };
-  const initialHasChangesSinceSubmit = Boolean(
-    storedDraft && !areDraftDetailsEqual(storedDraft, storedPetDetails)
-  );
+  void initialState;
+  const storedPetDetails = null;
+  const storedPaymentMeta = null;
+  const existingPaymentMeta = {};
 
-  const [details, setDetails] = useState(() => buildInitialDetails(prefillSource));
+  const [details, setDetails] = useState(() => buildProfilePrefill());
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState("");
   const [uploadMeta, setUploadMeta] = useState(null);
@@ -455,26 +433,15 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const [breedDropdownOpen, setBreedDropdownOpen] = useState(false);
   const [loadingBreeds, setLoadingBreeds] = useState(false);
   const [breedError, setBreedError] = useState("");
-  const [hasChangesSinceSubmit, setHasChangesSinceSubmit] = useState(
-    initialHasChangesSinceSubmit
-  );
+  const [hasChangesSinceSubmit, setHasChangesSinceSubmit] = useState(false);
   const [hiddenPrefillFields, setHiddenPrefillFields] = useState(() =>
-    routePrefill && !storedPetDetails && !storedDraft
-      ? buildHiddenPrefillFields(routePrefill)
-      : {}
+    buildHiddenPrefillFields(buildProfilePrefill())
   );
   const breedDropdownRef = useRef(null);
-
-  const existingPaymentMeta = useMemo(
-    () => extractPaymentMeta(storedPetDetails, storedPaymentMeta),
-    [storedPaymentMeta, storedPetDetails]
-  );
   const hasExistingSubmission = Boolean(
-    !storedFlowCompleted &&
-      existingPaymentMeta?.user_id &&
-      existingPaymentMeta?.pet_id &&
-      storedPetDetails
+    existingPaymentMeta?.user_id && existingPaymentMeta?.pet_id && storedPetDetails
   );
+
   const isPrefilled = (field) => Boolean(hiddenPrefillFields[field]);
   const shouldShowField = (field) => !isPrefilled(field);
   const revealField = (field) => {
@@ -495,16 +462,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
     revealField(field);
     setDetails((current) => ({ ...current, [field]: value }));
   };
-
-  useEffect(() => {
-    const currentStoredFlow = readStoredFlow() || {};
-    writeStoredFlow({
-      ...currentStoredFlow,
-      petDetails: currentStoredFlow.petDetails || storedPetDetails || null,
-      paymentMeta: currentStoredFlow.paymentMeta || storedPaymentMeta || null,
-      draft: buildDraftDetails(details),
-    });
-  }, [details, storedPaymentMeta, storedPetDetails]);
 
   useEffect(() => {
     if (!breedDropdownOpen) return undefined;
@@ -763,22 +720,13 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
   const continueToPayment = (petPayload, paymentPayload) => {
     const nextPaymentMeta = stripEmpty({
       ...paymentPayload,
-      gst_number: pickValue(
-        paymentPayload?.gst_number,
-        storedPaymentMeta?.gst_number,
-        storedFlow?.paymentMeta?.gst_number
-      ),
+      gst_number: pickValue(paymentPayload?.gst_number, storedPaymentMeta?.gst_number),
     });
 
     setHasChangesSinceSubmit(false);
-    writeStoredFlow({
-      petDetails: petPayload,
-      paymentMeta: nextPaymentMeta,
-      draft: buildDraftDetails(petPayload),
-    });
 
     if (onSubmit) {
-      onSubmit(petPayload);
+      onSubmit(petPayload, nextPaymentMeta);
       return;
     }
 
@@ -900,6 +848,27 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
         )
       );
 
+      saveAskProfile({
+        ownerName: details.ownerName,
+        phone: details.ownerMobile,
+        petName: details.name,
+        petType: details.type,
+        breed: details.breed,
+        dob: details.petDob,
+        location: details.city,
+        lastProblemText: details.problemText,
+        gender: details.gender,
+        weightKg: details.weightKg,
+        lastDaysEnergy: details.lastDaysEnergy,
+        lastDaysAppetite: details.lastDaysAppetite,
+        mood: details.mood,
+        vaccinatedYesNo: details.vaccinatedYesNo,
+        dewormingYesNo: details.dewormingYesNo,
+        isNeutered: details.isNeutered,
+        ...(userId !== undefined && userId !== null ? { userId } : {}),
+        ...(petId !== undefined && petId !== null ? { petId } : {}),
+      });
+
       const nextPaymentMeta = stripEmpty({
         user_id: userId,
         pet_id: petId,
@@ -921,10 +890,7 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
           data?.data?.callSessionId,
           existingPaymentMeta?.call_session_id
         ),
-        gst_number: pickValue(
-          storedPaymentMeta?.gst_number,
-          storedFlow?.paymentMeta?.gst_number
-        ),
+        gst_number: pickValue(storedPaymentMeta?.gst_number),
       });
 
       const nextPayload = stripEmpty({
@@ -998,43 +964,6 @@ export default function VideoCallPetDetails({ initialState, onSubmit, vet }) {
           <div className="flex-1 px-4 pb-28 pt-4 md:px-6 md:pb-20 md:pt-8">
             <div className="mx-auto w-full max-w-6xl">
               <div className="mt-6 space-y-6">
-                {hasHiddenSavedDetails ? (
-                  <section className={cardBase}>
-                    <div className={cardHeaderBase}>
-                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
-                        <BadgeCheck size={20} className="text-[#3998de]" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-base">Personal Details</h3>
-                      </div>
-                    </div>
-                    <div className={cardBodyBase}>
-                      <div className="grid gap-3 md:grid-cols-3">
-                        {hiddenSavedSummaryRows.map((item) => (
-                          <div
-                            key={item.label}
-                            className="rounded-xl border border-[#e5ecff] bg-[#f8fbff] px-3.5 py-2.5"
-                          >
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                              {item.label}
-                            </div>
-                            <div className="mt-1 text-sm font-medium text-slate-900">
-                              {item.value}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={revealAllPrefilledFields}
-                        className="inline-flex items-center justify-center rounded-full border border-[#c8d7ff] bg-white px-3.5 py-1.5 text-sm font-semibold text-[#2457ff] transition hover:border-[#9fb8ff] hover:bg-[#f8fbff]"
-                      >
-                        Edit saved details
-                      </button>
-                    </div>
-                  </section>
-                ) : null}
-
 
                 {showPetSection ? (
                   <section className={cardBase}>

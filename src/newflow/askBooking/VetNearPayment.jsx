@@ -14,7 +14,6 @@ import {
 } from "../vetNearMeFlow/bookingFlowData";
 import "../vetNearMeFlow/VetNearMeBooking.css";
 
-const STORAGE_KEY = "snoutiq-vet-near-me-standalone";
 const PET_DETAILS_ROUTE = "/vet-near-me-pet-details";
 const ASK_HOME_ROUTE = "/ask";
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
@@ -155,18 +154,11 @@ const normalizeState = (input) => {
 };
 
 function readStandaloneVetNearMeState() {
-  if (typeof window === "undefined") return DEFAULT_STATE;
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    return raw ? normalizeState(JSON.parse(raw)) : DEFAULT_STATE;
-  } catch {
-    return DEFAULT_STATE;
-  }
+  return DEFAULT_STATE;
 }
 
 function writeStandaloneVetNearMeState(value) {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeState(value)));
+  void value;
 }
 
 const displayValue = (value, fallback = "-") => {
@@ -277,8 +269,9 @@ export default function VetNearPayment({
   const routeState = hasRequiredContext(normalizeState(initialState))
     ? normalizeState(initialState)
     : normalizeState(location.state);
-  const storedState = readStandaloneVetNearMeState();
-  const resolvedInitialState = hasRequiredContext(routeState) ? routeState : storedState;
+  const resolvedInitialState = hasRequiredContext(routeState)
+    ? routeState
+    : readStandaloneVetNearMeState();
   const [state, setState] = useState(resolvedInitialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGatewayLoading, setIsGatewayLoading] = useState(true);
@@ -288,10 +281,6 @@ export default function VetNearPayment({
   const [successfulPayment, setSuccessfulPayment] = useState(null);
   const shouldShowSuccessHomeButton =
     typeof onSuccessHome === "function" || !onPay;
-
-  useEffect(() => {
-    writeStandaloneVetNearMeState(state);
-  }, [state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -331,6 +320,7 @@ export default function VetNearPayment({
 
   const petTypeSummary = state.lead.species === "Other" ? state.pet.otherPetType : state.lead.species;
   const petSummary = [state.pet.petName, petTypeSummary, state.pet.breed].filter(Boolean).join(" / ");
+  const reasonSummary = state.lead.reason || state.pet.issue;
   const bookingReferenceFallback = useMemo(
     () => (state.booking.bookingId ? `SNQ-HS-${state.booking.bookingId}` : "SNQ-HS-PENDING"),
     [state.booking.bookingId]
@@ -346,7 +336,7 @@ export default function VetNearPayment({
     { label: "Location", value: displayValue(state.lead.area, "Not selected") },
     { label: "Visit date", value: displayValue(state.pet.dateOfVisit, "Not selected") },
     { label: "Visit time", value: displayValue(state.pet.timeOfVisit, "Not selected") },
-    { label: "Reason", value: displayValue(state.lead.reason, "Not selected") },
+    { label: "Reason", value: displayValue(reasonSummary, "Not selected") },
   ];
   const amountRows = [
     {
@@ -427,7 +417,7 @@ export default function VetNearPayment({
       onBack();
       return;
     }
-    navigate(PET_DETAILS_ROUTE);
+    navigate(PET_DETAILS_ROUTE, { replace: true, state });
   };
 
   const handleSuccessHome = () => {
@@ -532,7 +522,6 @@ export default function VetNearPayment({
             });
 
             setState(nextState);
-            writeStandaloneVetNearMeState(nextState);
             setSuccessfulPayment(buildSuccessPayload(nextState));
             setStatus(
               "success",

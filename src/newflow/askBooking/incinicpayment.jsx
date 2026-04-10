@@ -18,9 +18,7 @@ import {
   isValidEmail,
   isValidPhone,
   mergeInClinicStates,
-  readInClinicStoredState,
   resolveInClinicState,
-  writeInClinicStoredState,
 } from "./inClinicFlowShared";
 
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
@@ -65,11 +63,9 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
     initialState && typeof initialState === "object" ? initialState : null;
   const locationState =
     location.state && typeof location.state === "object" ? location.state : null;
-  const storedState = readInClinicStoredState();
 
   const [appointmentState, setAppointmentState] = useState(() =>
     resolveInClinicState({
-      storedState,
       initialState: propState,
       locationState,
     }),
@@ -85,10 +81,6 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
     hasRequiredVisibleAppointmentDetails(appointmentState);
   const isReady = hasResolvedIds && hasVisibleDetails;
   const isPaid = appointmentState.paymentStatus === "paid";
-
-  useEffect(() => {
-    writeInClinicStoredState(appointmentState);
-  }, [appointmentState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,7 +127,6 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
   const handlePayment = async () => {
     if (isSubmitting || isPaid) return;
     const preparedState = resolveInClinicState({
-      storedState: readInClinicStoredState(),
       initialState: propState,
       locationState,
       currentState: appointmentState,
@@ -199,7 +190,6 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
           paymentCurrency: order.currency || IN_CLINIC_PRICING.currency,
         });
         setAppointmentState(paymentState);
-        writeInClinicStoredState(paymentState);
       }
 
       setStatus("info", "Opening secure Razorpay checkout...");
@@ -269,7 +259,6 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
             });
 
             setAppointmentState(nextState);
-            writeInClinicStoredState(nextState);
             setSuccessfulAppointment({
               appointmentId: submit.appointmentId,
               paymentReference: paymentResponse?.razorpay_payment_id || "",

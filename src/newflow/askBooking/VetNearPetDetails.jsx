@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
 } from "lucide-react";
@@ -18,8 +18,8 @@ import {
   VACCINATION_OPTIONS,
 } from "../vetNearMeFlow/bookingFlowData";
 import "../vetNearMeFlow/VetNearMeBooking.css";
+import { getAskProfile, saveAskProfile } from "./askProfileStorage";
 
-const STORAGE_KEY = "snoutiq-vet-near-me-standalone";
 const DEFAULT_STATE = {
   lead: { ownerName: "", phone: "", species: "", area: "", reason: "" },
   pet: {
@@ -276,48 +276,24 @@ const buildHiddenPrefillFields = (source) => {
   };
 };
 
-function readStandaloneVetNearMeState() {
-  if (typeof window === "undefined") return DEFAULT_STATE;
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    return raw ? normalizeState(JSON.parse(raw)) : DEFAULT_STATE;
-  } catch {
-    return DEFAULT_STATE;
-  }
-}
-
-function writeStandaloneVetNearMeState(value) {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeState(value)));
-}
-
-const isCompletedStandaloneVetNearMeState = (value) =>
-  Boolean(
-    value?.progress?.paymentCompleted ||
-      String(value?.booking?.paymentStatus || "")
-        .trim()
-        .toLowerCase() === "paid"
-  );
-
-const stripCompletedBookingContext = (value) => {
-  const normalized = normalizeState(value);
-  if (!isCompletedStandaloneVetNearMeState(normalized)) return normalized;
+const buildProfilePrefillState = () => {
+  const profile = getAskProfile();
   return normalizeState({
-    ...normalized,
-    booking: {
-      ...normalized.booking,
-      bookingId: null,
-      userId: null,
-      petId: null,
-      latestCompletedStep: 0,
-      paymentStatus: "pending",
-      paymentReference: "",
-      bookingReference: "",
-    },
-    progress: {
-      petDetailsSubmitted: false,
-      paymentCompleted: false,
-    },
+    userId: profile.userId || "",
+    petId: profile.petId || "",
+    ownerName: profile.ownerName || "",
+    phone: profile.phone || "",
+    species: profile.petType || "",
+    type: profile.petType || "",
+    petName: profile.petName || "",
+    breed: profile.breed || "",
+    dob: profile.dob || "",
+    sex: profile.gender || "",
+    location: profile.location || "",
+    lat: profile.lat || "",
+    long: profile.long || "",
+    reason: profile.lastProblemText || "",
+    issue: profile.lastProblemText || "",
   });
 };
 
@@ -330,31 +306,11 @@ const isValidPhone = (value) => normalizePhoneInput(value).length === 10;
 
 export default function VetNearPetDetails({ initialState, onBack, onContinue }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const fieldIdPrefix = useId();
   const today = new Date().toISOString().slice(0, 10);
-  const storedStandaloneState = stripCompletedBookingContext(
-    readStandaloneVetNearMeState()
-  );
-  const routeState =
-    initialState && typeof initialState === "object"
-      ? initialState
-      : location.state && typeof location.state === "object"
-        ? location.state
-        : {};
-  const routePrefill =
-    routeState?.prefill && typeof routeState.prefill === "object"
-      ? routeState.prefill
-      : null;
-  const [formState, setFormState] = useState(() =>
-    mergeNormalizedStates(
-      routePrefill,
-      storedStandaloneState,
-      routeState
-    )
-  );
+  const [formState, setFormState] = useState(() => buildProfilePrefillState());
   const [hiddenPrefillFields, setHiddenPrefillFields] = useState(() =>
-    buildHiddenPrefillFields(routePrefill)
+    buildHiddenPrefillFields(buildProfilePrefillState())
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBreedsLoading, setIsBreedsLoading] = useState(false);
@@ -442,8 +398,21 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
   const completedCount = [ownerReady, petReady, concernReady].filter(Boolean).length;
 
   useEffect(() => {
-    writeStandaloneVetNearMeState(formState);
-  }, [formState]);
+    const savedAskProfile = getAskProfile();
+    const normalizedInitialState = normalizeState(initialState);
+    const profilePrefillState = buildProfilePrefillState();
+
+    console.groupCollapsed("[VetNearPetDetails] incoming details");
+    console.log("initialState prop:", initialState ?? null);
+    console.log("saved ask profile:", savedAskProfile);
+    console.log("normalized initialState:", normalizedInitialState);
+    console.log("profile prefill state:", profilePrefillState);
+    console.log(
+      "hidden prefill fields from profile:",
+      buildHiddenPrefillFields(profilePrefillState),
+    );
+    console.groupEnd();
+  }, [initialState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -541,11 +510,15 @@ export default function VetNearPetDetails({ initialState, onBack, onContinue }) 
   };
 
   const handleContinue = async () => {
-    console.log('ahi');
-    console.log(validate,"ankit");
-    
-    if (!validate()) return;
-console.log(validate,"snkit");
+    const isValid = validate();
+
+    console.groupCollapsed("[VetNearPetDetails] continue clicked");
+    console.log("current formState:", formState);
+    console.log("hiddenPrefillFields state:", hiddenPrefillFields);
+    console.log("validation passed:", isValid);
+    console.groupEnd();
+
+    if (!isValid) return;
 
     try {
       setIsSubmitting(true);
@@ -554,13 +527,22 @@ console.log(validate,"snkit");
       let latestCompletedStep = formState.booking.latestCompletedStep;
 
       if (!bookingId || !userId) {
+        const leadReason = formState.lead.reason || formState.pet.issue;
+        console.log("[VetNearPetDetails] submitLeadStep payload:", {
+          name: formState.lead.ownerName,
+          phone: formState.lead.phone,
+          species: formState.lead.species,
+          area: formState.lead.area,
+          reason: leadReason,
+        });
         const leadResponse = await submitLeadStep({
           name: formState.lead.ownerName,
           phone: formState.lead.phone,
           species: formState.lead.species,
           area: formState.lead.area,
-          reason: formState.lead.reason,
+          reason: leadReason,
         });
+        console.log("[VetNearPetDetails] submitLeadStep response:", leadResponse);
         if (!leadResponse?.ok || !leadResponse.bookingId || !leadResponse.userId) {
           throw new Error("Booking could not be created.");
         }
@@ -569,15 +551,24 @@ console.log(validate,"snkit");
         latestCompletedStep = leadResponse.latestCompletedStep ?? 1;
       }
 
+      console.log("[VetNearPetDetails] submitPetDetailsStep payload:", {
+        bookingId,
+        petData: formState.pet,
+        species: formState.lead.species,
+      });
       const petResponse = await submitPetDetailsStep({
         bookingId,
         petData: formState.pet,
         species: formState.lead.species,
       });
+      console.log("[VetNearPetDetails] submitPetDetailsStep response:", petResponse);
       if (!petResponse?.ok) throw new Error("Pet details could not be submitted.");
 
       const nextState = normalizeState({
-        lead: formState.lead,
+        lead: {
+          ...formState.lead,
+          reason: formState.lead.reason || formState.pet.issue,
+        },
         pet: formState.pet,
         booking: {
           bookingId: petResponse.bookingId ?? bookingId,
@@ -591,8 +582,23 @@ console.log(validate,"snkit");
         progress: { petDetailsSubmitted: true, paymentCompleted: false },
       });
 
+      saveAskProfile({
+        ownerName: formState.lead.ownerName,
+        phone: formState.lead.phone,
+        petName: formState.pet.petName,
+        petType: formState.lead.species,
+        breed: formState.pet.breed,
+        dob: formState.pet.dob,
+        gender: formState.pet.sex,
+        location: formState.lead.area,
+        lastProblemText: formState.pet.issue,
+        ...(nextState.booking.userId ? { userId: nextState.booking.userId } : {}),
+        ...(nextState.booking.petId ? { petId: nextState.booking.petId } : {}),
+      });
+
+      console.log("[VetNearPetDetails] next navigation state:", nextState);
+
       setFormState(nextState);
-      writeStandaloneVetNearMeState(nextState);
       if (onContinue) {
         onContinue(nextState);
         return;
@@ -610,7 +616,7 @@ console.log(validate,"snkit");
       onBack();
       return;
     }
-    if (typeof window !== "undefined" && window.history.length > 1) navigate(-1);
+    navigate("/ask", { replace: true });
   };
 
   return (

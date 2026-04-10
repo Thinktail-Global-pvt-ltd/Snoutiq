@@ -9,7 +9,6 @@ import {
   Video,
 } from "lucide-react";
 
-const FLOW_STORAGE_KEY = "snoutiq-video-call-copied-flow";
 const PET_DETAILS_ROUTE = "/video-call-pet-details";
 const ASK_HOME_ROUTE = "/ask";
 const CONSULTATION_BOOKED_ROUTE = "/consultation-booked";
@@ -76,18 +75,11 @@ const stripEmpty = (payload) =>
   );
 
 const readStoredFlow = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(FLOW_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return null;
 };
 
 const writeStoredFlow = (value) => {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(FLOW_STORAGE_KEY, JSON.stringify(value));
+  void value;
 };
 
 const extractPaymentMeta = (petDetails, paymentMeta) => {
@@ -186,19 +178,18 @@ export const VideoCallPayment = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const storedFlow = readStoredFlow();
   const routeState =
     location.state && typeof location.state === "object" ? location.state : {};
 
   const petDetails =
-    petDetailsProp || routeState?.petDetails || storedFlow?.petDetails || null;
+    petDetailsProp || routeState?.petDetails || null;
   const paymentMeta = useMemo(
     () =>
       extractPaymentMeta(
         petDetails,
-        paymentMetaProp || routeState?.paymentMeta || storedFlow?.paymentMeta
+        paymentMetaProp || routeState?.paymentMeta
       ),
-    [paymentMetaProp, petDetails, routeState?.paymentMeta, storedFlow?.paymentMeta]
+    [paymentMetaProp, petDetails, routeState?.paymentMeta]
   );
 
   const consultationAmount = STATIC_CONSULTATION_AMOUNT;
@@ -233,22 +224,6 @@ export const VideoCallPayment = ({
   );
   const shouldShowSuccessHomeButton =
     typeof onSuccessHome === "function" || !onPay;
-
-  useEffect(() => {
-    const currentStoredFlow = readStoredFlow() || {};
-    writeStoredFlow({
-      ...currentStoredFlow,
-      petDetails,
-      paymentMeta: {
-        ...(currentStoredFlow.paymentMeta &&
-        typeof currentStoredFlow.paymentMeta === "object"
-          ? currentStoredFlow.paymentMeta
-          : {}),
-        ...paymentMeta,
-        gst_number: gstNumber || paymentMeta?.gst_number || "",
-      },
-    });
-  }, [gstNumber, paymentMeta, petDetails]);
 
   useEffect(() => {
     if (!gstNumber && paymentMeta?.gst_number) {
@@ -476,22 +451,6 @@ export const VideoCallPayment = ({
                 ? "Payment successful."
                 : "Payment successful. Redirecting in 3 seconds."
             );
-            const currentStoredFlow = readStoredFlow() || {};
-            writeStoredFlow({
-              ...currentStoredFlow,
-              petDetails,
-              paymentMeta: {
-                ...(currentStoredFlow.paymentMeta &&
-                typeof currentStoredFlow.paymentMeta === "object"
-                  ? currentStoredFlow.paymentMeta
-                  : {}),
-                ...paymentMeta,
-                gst_number: gstNumber || paymentMeta?.gst_number || "",
-              },
-              paymentCompleted: true,
-              paymentStatus: "paid",
-              successfulPayment: verify,
-            });
             setSuccessfulPayment(verify);
           } catch (error) {
             updateStatus(

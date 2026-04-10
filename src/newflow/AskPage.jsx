@@ -9,6 +9,7 @@ import VetNearPetDetails from "./askBooking/VetNearPetDetails";
 import VetNearPayment from "./askBooking/VetNearPayment";
 import VideoCallPetDetails from "./askBooking/VideoCallPetDetails";
 import { VideoCallPayment } from "./askBooking/VideoCallPayment";
+import { getAskProfile, saveAskProfile } from "./askBooking/askProfileStorage";
 import "./AskPage.css";
 
 const ASK_TITLE = "Snoutiq - Is My Pet Okay? Free AI Pet Health Check";
@@ -16,7 +17,6 @@ const ASK_DESCRIPTION =
   "Free AI pet symptom checker for Indian pet parents. Get expert triage guidance in seconds. No signup needed.";
 const ASK_CANONICAL = "https://snoutiq.com/ask";
 const ASK_STORAGE_KEY = "snoutiq-ask-state-v1";
-const ASK_PROFILE_KEY = "snoutiq-ask-profile-v1";
 const ASK_UI_STORAGE_KEY = "snoutiq-ask-ui-v1";
 const ASK_DAILY_USAGE_KEY = "snoutiq-ask-daily-usage-v1";
 const ASK_VET_NEAR_STANDALONE_KEY = "snoutiq-vet-near-me-standalone";
@@ -28,11 +28,15 @@ const DEFAULT_ASK_PROFILE = {
   ownerName: "",
   phone: "",
   petName: "",
+  petType: "",
   breed: "",
   dob: "",
   location: "",
   lat: "",
   long: "",
+  lastProblemText: "",
+  userId: "",
+  petId: "",
 };
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 const CURRENT_LOCATION_FALLBACK_LABEL = "Current location";
@@ -229,6 +233,11 @@ const parseCoordinate = (value) => {
   return Number.isFinite(numberValue) ? Number(numberValue.toFixed(6)) : null;
 };
 
+const normalizeIdentifier = (value) => {
+  if (value === undefined || value === null) return "";
+  return String(value).trim();
+};
+
 const hasProfileCoordinates = (value) =>
   parseCoordinate(value?.lat) !== null && parseCoordinate(value?.long) !== null;
 
@@ -306,31 +315,16 @@ const sanitizeAskProfile = (value) => {
     ownerName: String(raw.ownerName || "").trim(),
     phone: normalizePhoneInput(raw.phone),
     petName: String(raw.petName || "").trim(),
+    petType: String(raw.petType || raw.species || "").trim().toLowerCase(),
     breed: String(raw.breed || "").trim(),
     dob: String(raw.dob || "").trim(),
     location: String(raw.location ?? DEFAULT_ASK_PROFILE.location).trim(),
     lat: parseCoordinate(raw.lat ?? raw.latitude) ?? "",
     long: parseCoordinate(raw.long ?? raw.longitude) ?? "",
+    lastProblemText: String(raw.lastProblemText || "").trim(),
+    userId: normalizeIdentifier(raw.userId ?? raw.user_id),
+    petId: normalizeIdentifier(raw.petId ?? raw.pet_id),
   };
-};
-
-const readStoredProfile = () => {
-  if (typeof window === "undefined") return DEFAULT_ASK_PROFILE;
-  const raw = safeParse(window.localStorage.getItem(ASK_PROFILE_KEY), null);
-  return sanitizeAskProfile(raw);
-};
-
-const writeStoredProfile = (profile) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    ASK_PROFILE_KEY,
-    JSON.stringify(sanitizeAskProfile(profile)),
-  );
-};
-
-const clearStoredProfile = () => {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(ASK_PROFILE_KEY);
 };
 
 const readStoredUiState = () => {
@@ -423,13 +417,12 @@ const clearStoredState = () => {
 };
 
 const readStoredFlowSession = (storageKey) => {
-  if (typeof window === "undefined") return null;
-  return safeParse(window.sessionStorage.getItem(storageKey), null);
+  void storageKey;
+  return null;
 };
 
 const clearStoredFlowSession = (storageKey) => {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(storageKey);
+  void storageKey;
 };
 
 const toResumeText = (...values) => {
@@ -943,6 +936,7 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
     assessmentPatient?.user?.id,
     assessmentPaymentMeta?.user_id,
     assessmentPaymentMeta?.userId,
+    profile.userId,
   );
   const resolvedPetId = firstFilledValue(
     latestAssessmentPayload?.pet_id,
@@ -957,6 +951,7 @@ const buildAskPrefillState = ({ askProfile, species, entries, inputValue }) => {
     assessmentPet?.id,
     assessmentPaymentMeta?.pet_id,
     assessmentPaymentMeta?.petId,
+    profile.petId,
   );
   const lastUserMessage = [...(Array.isArray(entries) ? entries : [])]
     .reverse()
@@ -1514,12 +1509,6 @@ function IntakeModal({
               </small>
             )}
           </label>
-
-          <div className="ask-intake-note">
-            <strong>{speciesMeta.label}</strong> profile is used to personalize
-            the first answer, save the session, and make follow-up guidance more
-            useful.
-          </div>
 
           <div className="ask-intake-actions">
             <button
@@ -2101,7 +2090,7 @@ export default function AskPage() {
       setEntries(storedState.entries || []);
     }
     setAskProfile(
-      hasStoredConversation ? readStoredProfile() : DEFAULT_ASK_PROFILE,
+      hasStoredConversation ? getAskProfile() : DEFAULT_ASK_PROFILE,
     );
     if (storedUiState) {
       setInputValue(storedUiState.inputValue || "");
@@ -2130,11 +2119,6 @@ export default function AskPage() {
   useEffect(() => {
     writeDailyUsage(checksToday);
   }, [checksToday]);
-
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-    writeStoredProfile(askProfile);
-  }, [askProfile]);
 
   useEffect(() => {
     if (!hydratedRef.current) return;
@@ -2468,8 +2452,13 @@ export default function AskPage() {
       dob: nextProfile.dob || undefined,
       lat: latitude ?? undefined,
       long: longitude ?? undefined,
+      user_id: nextProfile.userId || undefined,
+      pet_id: nextProfile.petId || undefined,
     };
 
+    if (nextProfile.userId) {
+      user.id = nextProfile.userId;
+    }
     if (nextProfile.ownerName) {
       user.name = nextProfile.ownerName;
     }
@@ -2485,6 +2474,10 @@ export default function AskPage() {
     if (nextProfile.petName) {
       pets.pet_name = nextProfile.petName;
       pets.name = nextProfile.petName;
+    }
+    if (nextProfile.petId) {
+      pets.id = nextProfile.petId;
+      pets.pet_id = nextProfile.petId;
     }
     if (nextProfile.breed) {
       pets.breed = nextProfile.breed;
@@ -2505,6 +2498,78 @@ export default function AskPage() {
     }
 
     return payload;
+  };
+
+  const extractAssessmentIdentifiers = (value) => {
+    const raw = value && typeof value === "object" ? value : {};
+    const data = raw.data && typeof raw.data === "object" ? raw.data : {};
+    const nestedData =
+      data.data && typeof data.data === "object" ? data.data : {};
+    const state = raw.state && typeof raw.state === "object" ? raw.state : {};
+    const user = raw.user && typeof raw.user === "object" ? raw.user : {};
+    const patient =
+      raw.patient && typeof raw.patient === "object"
+        ? raw.patient
+        : state.patient && typeof state.patient === "object"
+          ? state.patient
+          : {};
+    const pet =
+      raw.pet && typeof raw.pet === "object"
+        ? raw.pet
+        : raw.pets && typeof raw.pets === "object"
+          ? raw.pets
+          : state.pet && typeof state.pet === "object"
+            ? state.pet
+            : {};
+    const paymentMeta =
+      raw.paymentMeta && typeof raw.paymentMeta === "object"
+        ? raw.paymentMeta
+        : state.paymentMeta && typeof state.paymentMeta === "object"
+          ? state.paymentMeta
+          : {};
+
+    return {
+      userId: firstFilledValue(
+        raw.user_id,
+        raw.userId,
+        raw.user?.id,
+        data.user_id,
+        data.userId,
+        data.user?.id,
+        nestedData.user_id,
+        nestedData.userId,
+        nestedData.user?.id,
+        state.user_id,
+        state.userId,
+        state.user?.id,
+        user.id,
+        patient.user_id,
+        patient.userId,
+        patient.user?.id,
+        paymentMeta.user_id,
+        paymentMeta.userId,
+      ),
+      petId: firstFilledValue(
+        raw.pet_id,
+        raw.petId,
+        raw.pet?.id,
+        raw.pets?.id,
+        data.pet_id,
+        data.petId,
+        data.pet?.id,
+        nestedData.pet_id,
+        nestedData.petId,
+        nestedData.pet?.id,
+        state.pet_id,
+        state.petId,
+        state.pet?.id,
+        pet.pet_id,
+        pet.petId,
+        pet.id,
+        paymentMeta.pet_id,
+        paymentMeta.petId,
+      ),
+    };
   };
 
   const sendAssessmentRequest = async ({
@@ -2556,7 +2621,18 @@ export default function AskPage() {
             ...imagePayload,
           });
 
+      const identifiers = extractAssessmentIdentifiers(payload);
       setSessionId(payload?.session_id || "");
+      if (
+        displayText &&
+        displayText !== defaultImageVisualMessage
+      ) {
+        saveAskProfile({
+          lastProblemText: displayText,
+          ...(identifiers.userId !== undefined ? { userId: identifiers.userId } : {}),
+          ...(identifiers.petId !== undefined ? { petId: identifiers.petId } : {}),
+        });
+      }
       const nextAssessmentEntry = pushAssessmentEntry(payload);
       pendingScrollEntryIdRef.current = nextAssessmentEntry.id;
       setEntries((current) => [...current, nextAssessmentEntry]);
@@ -2657,6 +2733,7 @@ export default function AskPage() {
 
     setAskProfile((current) => ({
       ...current,
+      petType: nextSpecies,
       breed: "",
     }));
 
@@ -2795,6 +2872,19 @@ export default function AskPage() {
     }
 
     const request = pendingInitialRequest;
+    saveAskProfile({
+      ownerName: askProfile.ownerName,
+      phone: askProfile.phone,
+      petName: askProfile.petName,
+      petType: species,
+      breed: askProfile.breed,
+      dob: askProfile.dob,
+      location: askProfile.location,
+      lat: askProfile.lat,
+      long: askProfile.long,
+      lastProblemText: request.message,
+    });
+
     setIntakeErrors({});
     setIntakeOpen(false);
     setPendingInitialRequest(null);
@@ -2830,11 +2920,17 @@ export default function AskPage() {
         answer: answerText,
         ...buildImagePayload(attachment),
       });
+      const identifiers = extractAssessmentIdentifiers(payload);
 
       if (attachment) {
         clearPendingAttachment({ revokePreview: true });
       }
       setSessionId(payload?.session_id || sessionId);
+      saveAskProfile({
+        lastProblemText: `${question}\nAnswer: ${answerText}`,
+        ...(identifiers.userId !== undefined ? { userId: identifiers.userId } : {}),
+        ...(identifiers.petId !== undefined ? { petId: identifiers.petId } : {}),
+      });
       pendingScrollEntryIdRef.current = entry.id;
       setEntries((current) =>
         current.map((currentEntry) =>
@@ -3021,6 +3117,7 @@ export default function AskPage() {
     setLocationStatus({ type: "", text: "" });
     clearStoredState();
     clearStoredUiState();
+    // Profile stays intact. Only the current conversation is reset.
     setToastMessage("Started fresh");
   };
 
@@ -3038,10 +3135,10 @@ export default function AskPage() {
       <VetNearPetDetails
         initialState={flowModal.payload}
         onBack={() => setFlowModal(null)}
-        onContinue={() =>
+        onContinue={(nextState) =>
           setFlowModal({
             kind: "vet-payment",
-            payload: null,
+            payload: nextState || flowModal.payload || null,
           })
         }
       />
@@ -3049,10 +3146,11 @@ export default function AskPage() {
   } else if (flowModal?.kind === "vet-payment") {
     flowModalContent = (
       <VetNearPayment
+        initialState={flowModal.payload}
         onBack={() =>
           setFlowModal({
             kind: "vet-pet-details",
-            payload: null,
+            payload: flowModal.payload || null,
           })
         }
         onSuccessHome={handleFlowPaymentSuccessHome}
@@ -3062,10 +3160,13 @@ export default function AskPage() {
     flowModalContent = (
       <VideoCallPetDetails
         initialState={flowModal.payload}
-        onSubmit={() =>
+        onSubmit={(petDetails, paymentMeta) =>
           setFlowModal({
             kind: "video-payment",
-            payload: null,
+            payload: {
+              petDetails: petDetails || null,
+              paymentMeta: paymentMeta || null,
+            },
           })
         }
       />
@@ -3073,10 +3174,12 @@ export default function AskPage() {
   } else if (flowModal?.kind === "video-payment") {
     flowModalContent = (
       <VideoCallPayment
+        petDetails={flowModal.payload?.petDetails || null}
+        paymentMeta={flowModal.payload?.paymentMeta || null}
         onBack={() =>
           setFlowModal({
             kind: "video-pet-details",
-            payload: null,
+            payload: flowModal.payload || null,
           })
         }
         onSuccessHome={handleFlowPaymentSuccessHome}

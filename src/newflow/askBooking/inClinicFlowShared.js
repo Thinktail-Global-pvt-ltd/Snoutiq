@@ -331,26 +331,13 @@ export const mergeInClinicStates = (...values) =>
     );
 
 export const readInClinicStoredState = () => {
-  if (typeof window === "undefined") return { ...DEFAULT_IN_CLINIC_STATE };
-  try {
-    const raw = window.sessionStorage.getItem(IN_CLINIC_FLOW_STORAGE_KEY);
-    return raw
-      ? mergeInClinicStates(JSON.parse(raw))
-      : { ...DEFAULT_IN_CLINIC_STATE };
-  } catch {
-    return { ...DEFAULT_IN_CLINIC_STATE };
-  }
+  return { ...DEFAULT_IN_CLINIC_STATE };
 };
 
 export const writeInClinicStoredState = (state) => {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(
-    IN_CLINIC_FLOW_STORAGE_KEY,
-    JSON.stringify(mergeInClinicStates(state)),
-  );
+  void state;
 };
 
 export const clearInClinicStoredState = () => {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(IN_CLINIC_FLOW_STORAGE_KEY);
+  return undefined;
 };
