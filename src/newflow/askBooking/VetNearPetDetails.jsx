@@ -289,6 +289,8 @@ const buildProfilePrefillState = () => {
     breed: profile.breed || "",
     dob: profile.dob || "",
     sex: profile.gender || "",
+    vaccinationStatus: profile.vaccinatedYesNo || "",
+    deworming: profile.dewormingYesNo || "",
     location: profile.location || "",
     lat: profile.lat || "",
     long: profile.long || "",

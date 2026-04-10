@@ -331,16 +331,15 @@ export default function VetNearPayment({
     "rounded-[24px] border border-[#dbe7ff] bg-white p-5 shadow-[0_10px_30px_-24px_rgba(37,99,235,0.25)]";
   const summaryRows = [
     { label: "Pet", value: displayValue(petSummary, "Not selected") },
-    { label: "Pet Parent name", value: displayValue(state.lead.ownerName) },
-    { label: "Phone", value: displayValue(state.lead.phone) },
-    { label: "Location", value: displayValue(state.lead.area, "Not selected") },
+    { label: "Pet Parent Name", value: displayValue(state.lead.ownerName) },
+    { label: "WhatsApp Number", value: displayValue(state.lead.phone) },
     { label: "Visit date", value: displayValue(state.pet.dateOfVisit, "Not selected") },
     { label: "Visit time", value: displayValue(state.pet.timeOfVisit, "Not selected") },
     { label: "Reason", value: displayValue(reasonSummary, "Not selected") },
   ];
   const amountRows = [
     {
-      label: "Home vet visit",
+      label: "Home Vet Visit",
       value: `Rs ${formatCurrency(BOOKING_PRICING.originalPrice)}`,
     },
     {
@@ -349,7 +348,7 @@ export default function VetNearPayment({
       tone: "success",
     },
     {
-      label: "After discount",
+      label: "After Discount",
       value: `Rs ${formatCurrency(BOOKING_PRICING.currentPrice)}`,
     },
     {
@@ -632,7 +631,7 @@ export default function VetNearPayment({
               ))}
 
               <div className="flex items-center justify-between gap-4 border-t border-[#e8efff] pt-4">
-                <span className="font-semibold text-slate-900">Total payable</span>
+                <span className="font-semibold text-slate-900">Total Payable</span>
                 <span className="text-xl font-semibold text-slate-900">
                   Rs {formatCurrency(BOOKING_TOTAL_PRICE)}
                 </span>
@@ -676,7 +675,7 @@ export default function VetNearPayment({
           <div className="mb-3 flex items-center justify-between gap-4">
             <div>
               <p className="text-[11px] font-medium text-slate-500">
-                Total payable
+                Total Payable
               </p>
               <div className="text-lg font-bold text-slate-900">
                 Rs {formatCurrency(BOOKING_TOTAL_PRICE)}

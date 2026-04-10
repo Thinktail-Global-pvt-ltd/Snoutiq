@@ -299,16 +299,16 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
 
   const summaryRows = [
     { label: "Pet Parent Name", value: appointmentState.patientName || "-" },
-    { label: "Phone", value: appointmentState.patientPhone || "-" },
-    { label: "Email", value: appointmentState.patientEmail || "-" },
-    { label: "Pet", value: appointmentState.petName || "-" },
+    { label: "WhatsApp Number", value: appointmentState.patientPhone || "-" },
+    { label: "Email Address", value: appointmentState.patientEmail || "-" },
+    { label: "Pet Name", value: appointmentState.petName || "-" },
     {
-      label: "Appointment slot",
+      label: "Appointment Slot",
       value: [appointmentState.date, appointmentState.timeSlot]
         .filter(Boolean)
         .join(" / ") || "-",
     },
-    { label: "Notes", value: appointmentState.notes || "Not added" },
+    { label: "Description", value: appointmentState.notes || "Not added" },
   ];
 
   const amountRows = [
@@ -401,7 +401,7 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
       <div className="px-4 pb-36 pt-4 md:pb-40 md:pt-6">
         <div className="mx-auto max-w-lg space-y-4">
           <div className="rounded-[24px] border border-[#dbe7ff] bg-white p-5 shadow-[0_10px_30px_-24px_rgba(37,99,235,0.25)]">
-            <div className="text-sm font-semibold text-slate-900">Appointment summary</div>
+            <div className="text-sm font-semibold text-slate-900">Appointment Summary</div>
             <div className="mt-4 space-y-3 text-sm">
               {summaryRows.map((item) => (
                 <div
@@ -418,7 +418,7 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
           </div>
 
           <div className="rounded-[24px] border border-[#dbe7ff] bg-white p-5 shadow-[0_10px_30px_-24px_rgba(37,99,235,0.25)]">
-            <div className="text-sm font-semibold text-slate-900">Amount details</div>
+            <div className="text-sm font-semibold text-slate-900">Amount Details</div>
             <div className="mt-4 space-y-3 text-sm">
               {amountRows.map((item) => (
                 <div
@@ -433,7 +433,7 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
               ))}
 
               <div className="flex items-center justify-between gap-4 border-t border-[#e8efff] pt-4">
-                <span className="font-semibold text-slate-900">Total payable</span>
+                <span className="font-semibold text-slate-900">Total Payable</span>
                 <span className="text-xl font-semibold text-slate-900">
                   Rs {formatInr(IN_CLINIC_PRICING.totalAmount)}
                 </span>
@@ -455,7 +455,7 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
         <div className="mx-auto w-full max-w-lg px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
           <div className="mb-3 flex items-center justify-between gap-4">
             <div>
-              <p className="text-[11px] font-medium text-slate-500">Total payable</p>
+              <p className="text-[11px] font-medium text-slate-500">Total Payable</p>
               <div className="text-lg font-bold text-slate-900">
                 Rs {formatInr(IN_CLINIC_PRICING.totalAmount)}
               </div>

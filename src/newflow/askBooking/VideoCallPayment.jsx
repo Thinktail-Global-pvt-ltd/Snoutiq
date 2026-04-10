@@ -533,7 +533,7 @@ export const VideoCallPayment = ({
         </div>
       </div>
 
-      <div className="px-4 pb-36 pt-4 md:pb-40 md:pt-6">
+      <div className="px-4 pb-44 pt-4 md:pb-44 md:pt-6">
         <div className="mx-auto max-w-lg space-y-4">
           <div className="rounded-[24px] border border-[#dbe7ff] bg-white p-5 shadow-[0_10px_30px_-24px_rgba(37,99,235,0.35)]">
             <div className="text-sm font-semibold text-slate-900">
@@ -556,12 +556,6 @@ export const VideoCallPayment = ({
                 <span className="text-slate-500">Pet Parent name</span>
                 <span className="text-right font-medium text-slate-900">
                   {paymentOwnerName}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-slate-500">Location</span>
-                <span className="text-right font-medium text-slate-900">
-                  {paymentLocation}
                 </span>
               </div>
             </div>
@@ -639,15 +633,15 @@ export const VideoCallPayment = ({
           </div>
 
           <label
-            className={`flex cursor-pointer items-center gap-3 rounded-[24px] border p-4 text-sm text-slate-700 transition ${acknowledgementCardClass}`}
+            className={`mb-8 flex cursor-pointer items-center gap-4 rounded-[24px] border p-4 text-sm text-slate-700 transition ${acknowledgementCardClass}`}
           >
             <input
               type="checkbox"
               checked={acknowledged}
               onChange={(e) => setAcknowledged(e.target.checked)}
-              className="h-4 w-4 shrink-0 accent-[#2563eb]"
+              className="h-4 w-4 shrink-0 self-center accent-[#2563eb]"
             />
-            <span className="font-medium text-slate-900">
+            <span className="font-medium leading-6 text-slate-900">
               I agree to continue with this consultation.
             </span>
           </label>

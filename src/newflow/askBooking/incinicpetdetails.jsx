@@ -246,9 +246,11 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
             [&_.cta]:mt-7 [&_.cta]:inline-flex [&_.cta]:w-full [&_.cta]:items-center [&_.cta]:justify-center [&_.cta]:rounded-2xl [&_.cta]:bg-[linear-gradient(135deg,#2457ff_0%,#1d4ed8_100%)] [&_.cta]:px-4 [&_.cta]:py-4 [&_.cta]:text-sm [&_.cta]:font-semibold [&_.cta]:text-white [&_.cta]:shadow-[0_18px_35px_-18px_rgba(37,99,235,0.75)] hover:[&_.cta]:translate-y-[-1px] disabled:[&_.cta]:cursor-not-allowed disabled:[&_.cta]:opacity-60
             [&_.cta-note]:mt-3 [&_.cta-note]:text-center [&_.cta-note]:text-xs [&_.cta-note]:text-slate-500`}
         >
-          <div className="sdiv">Patient details</div>
+
 
           {showPatientEmailField ? (
+            <>
+                    <div className="sdiv">Patient details</div>
             <div className="field">
               <label htmlFor={`${fieldIdPrefix}-patientEmail`}>
                 Patient email <span className="required-mark">*</span>
@@ -265,6 +267,7 @@ export default function InClinicPetDetails({ initialState, onBack, onSubmit }) {
                 <div className="field-error">{errors.patientEmail}</div>
               ) : null}
             </div>
+            </>
           ) : null}
 
           <div className="sdiv">Appointment details</div>
