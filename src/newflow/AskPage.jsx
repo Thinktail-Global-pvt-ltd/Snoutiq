@@ -2075,6 +2075,7 @@ export default function AskPage() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [toastClickable, setToastClickable] = useState(false);
   const [checksToday, setChecksToday] = useState(0);
   const [followUpPending, setFollowUpPending] = useState(null);
   const [askProfile, setAskProfile] = useState(DEFAULT_ASK_PROFILE);
@@ -2136,7 +2137,10 @@ export default function AskPage() {
 
   useEffect(() => {
     if (!toastMessage) return undefined;
-    const timer = window.setTimeout(() => setToastMessage(""), 2200);
+    const timer = window.setTimeout(() => {
+      setToastMessage("");
+      setToastClickable(false);
+    }, 2200);
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
 
@@ -2656,7 +2660,16 @@ export default function AskPage() {
       setEntries((current) => [...current, nextAssessmentEntry]);
 
       if (!isFollowup) {
-        setChecksToday((count) => count + 1);
+        setChecksToday((count) => {
+          const next = count + 1;
+          if (next >= FREE_CHECK_LIMIT) {
+            setToastMessage(
+              "Free checks used today. Tap to book a vet — ₹499 only →"
+            );
+            setToastClickable(true);
+          }
+          return next;
+        });
       }
     } catch (error) {
       setErrorMessage(extractErrorMessage(error));
@@ -3580,7 +3593,19 @@ export default function AskPage() {
         </div>
       ) : null}
 
-      {toastMessage ? <div className="ask-toast">{toastMessage}</div> : null}
+      {toastMessage ? (
+        <div
+          className={`ask-toast${toastClickable ? " ask-toast-cta" : ""}`}
+          onClick={() => {
+            if (!toastClickable) return;
+            if (openAskFlowModal("/video-call-pet-details")) return;
+            navigateToAskTarget(navigate, "/video-call-pet-details");
+          }}
+          style={{ cursor: toastClickable ? "pointer" : "default" }}
+        >
+          {toastMessage}
+        </div>
+      ) : null}
     </div>
   );
 }

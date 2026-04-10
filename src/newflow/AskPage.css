@@ -1687,6 +1687,19 @@
   color: #fff;
   font-size: 12px;
   font-weight: 700;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.ask-toast-cta {
+  background: #1457ff;
+  box-shadow: 0 4px 16px rgba(20, 87, 255, 0.35);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.ask-toast-cta:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
 }
 
 @media (max-width: 480px) {
