@@ -2094,47 +2094,24 @@ export default function AskPage() {
   });
 
   useEffect(() => {
-    const storedState = readStoredState();
-    const storedUiState = readStoredUiState();
-    const storedProfile = getAskProfile();
-    const hasStoredConversation = Boolean(
-      storedState?.sessionId || storedState?.entries?.length,
-    );
-    const restoredSpecies = String(
-      storedState?.species ||
-        storedUiState?.pendingInitialRequest?.species ||
-        storedProfile?.petType ||
-        "",
-    )
-      .trim()
-      .toLowerCase();
-    const canBypassStoredIntake = Boolean(
-      storedUiState?.pendingInitialRequest?.message &&
-      Object.keys(validateAskProfile(storedProfile, restoredSpecies)).length ===
-        0,
-    );
-    if (hasStoredConversation) {
-      setSpecies(storedState.species || "");
-      setSessionId(storedState.sessionId || "");
-      setEntries(storedState.entries || []);
-    } else if (restoredSpecies) {
-      setSpecies(restoredSpecies);
-    }
-    setAskProfile(storedProfile);
-    if (storedUiState) {
-      setInputValue(storedUiState.inputValue || "");
-      setPendingInitialRequest(
-        canBypassStoredIntake
-          ? null
-          : storedUiState.pendingInitialRequest || null,
-      );
-      setIntakeOpen(
-        Boolean(storedUiState.intakeOpen) && !canBypassStoredIntake,
-      );
-    }
-    setChecksToday(readDailyUsage());
-    hydratedRef.current = true;
-  }, []);
+  clearStoredState();
+  clearStoredUiState();
+
+  // ✅ ab sirf profile load karo
+  const storedProfile = getAskProfile();
+
+  const restoredSpecies = String(storedProfile?.petType || "")
+    .trim()
+    .toLowerCase();
+
+  if (restoredSpecies) {
+    setSpecies(restoredSpecies);
+  }
+
+  setAskProfile(storedProfile);
+  setChecksToday(readDailyUsage());
+  hydratedRef.current = true;
+}, []);
 
   useEffect(() => {
     if (!hydratedRef.current) return;
