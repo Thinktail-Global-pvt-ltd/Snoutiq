@@ -319,7 +319,9 @@ const sanitizeAskProfile = (value) => {
     ownerName: String(raw.ownerName || "").trim(),
     phone: normalizePhoneInput(raw.phone),
     petName: String(raw.petName || "").trim(),
-    petType: String(raw.petType || raw.species || "").trim().toLowerCase(),
+    petType: String(raw.petType || raw.species || "")
+      .trim()
+      .toLowerCase(),
     breed: String(raw.breed || "").trim(),
     dob: String(raw.dob || "").trim(),
     location: String(raw.location ?? DEFAULT_ASK_PROFILE.location).trim(),
@@ -466,9 +468,9 @@ const buildResumeCards = () => {
         vetPet.breed,
         vetPet.otherPetType,
       ) ||
-        storedVetNearFlow?.booking?.bookingId ||
-        storedVetNearFlow?.booking?.petId ||
-        storedVetNearFlow?.progress?.petDetailsSubmitted,
+      storedVetNearFlow?.booking?.bookingId ||
+      storedVetNearFlow?.booking?.petId ||
+      storedVetNearFlow?.progress?.petDetailsSubmitted,
     );
 
   if (hasVetResume) {
@@ -500,20 +502,20 @@ const buildResumeCards = () => {
   };
   const hasVideoResume = Boolean(
     !videoFlowCompleted &&
-      (toResumeText(
-        videoSource.ownerName,
-        videoSource.ownerMobile,
-        videoSource.phone,
-        videoSource.city,
-        videoSource.name,
-        videoSource.petName,
-        videoSource.type,
-        videoSource.species,
-        videoSource.breed,
-        videoSource.problemText,
-      ) ||
-        storedVideoFlow?.paymentMeta?.user_id ||
-        storedVideoFlow?.paymentMeta?.pet_id),
+    (toResumeText(
+      videoSource.ownerName,
+      videoSource.ownerMobile,
+      videoSource.phone,
+      videoSource.city,
+      videoSource.name,
+      videoSource.petName,
+      videoSource.type,
+      videoSource.species,
+      videoSource.breed,
+      videoSource.problemText,
+    ) ||
+      storedVideoFlow?.paymentMeta?.user_id ||
+      storedVideoFlow?.paymentMeta?.pet_id),
   );
 
   if (hasVideoResume) {
@@ -546,35 +548,35 @@ const buildResumeCards = () => {
 const isVetNearFlowCompleted = (value) =>
   Boolean(
     value?.progress?.paymentCompleted ||
-      String(value?.booking?.paymentStatus || "")
-        .trim()
-        .toLowerCase() === "paid",
+    String(value?.booking?.paymentStatus || "")
+      .trim()
+      .toLowerCase() === "paid",
   );
 
 const isVetNearPaymentReady = (value) =>
   Boolean(
     !isVetNearFlowCompleted(value) &&
-      value?.progress?.petDetailsSubmitted &&
-      value?.booking?.bookingId &&
-      value?.booking?.userId &&
-      value?.booking?.petId,
+    value?.progress?.petDetailsSubmitted &&
+    value?.booking?.bookingId &&
+    value?.booking?.userId &&
+    value?.booking?.petId,
   );
 
 const isVideoCallFlowCompleted = (value) =>
   Boolean(
     value?.paymentCompleted ||
-      String(value?.paymentStatus || "")
-        .trim()
-        .toLowerCase() === "paid" ||
-      value?.successfulPayment?.success,
+    String(value?.paymentStatus || "")
+      .trim()
+      .toLowerCase() === "paid" ||
+    value?.successfulPayment?.success,
   );
 
 const isVideoCallPaymentReady = (value) =>
   Boolean(
     !isVideoCallFlowCompleted(value) &&
-      value?.petDetails &&
-      (value?.paymentMeta?.user_id || value?.petDetails?.user_id) &&
-      (value?.paymentMeta?.pet_id || value?.petDetails?.pet_id),
+    value?.petDetails &&
+    (value?.paymentMeta?.user_id || value?.petDetails?.user_id) &&
+    (value?.paymentMeta?.pet_id || value?.petDetails?.pet_id),
   );
 
 const getSpeciesMeta = (species) => {
@@ -1315,15 +1317,24 @@ function IntakeModal({
       >
         <div className="ask-intake-header">
           <div className="ask-intake-brand">
-            <img
-              src={logo}
-              alt="SnoutIQ"
-              className="ask-intake-logo"
-              width={110}
-              height={20}
-              loading="eager"
-              decoding="async"
-            />
+            <a
+              href="https://www.snoutiq.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-4 inline-flex items-center"
+              aria-label="Open SnoutIQ website"
+            >
+              <img
+                src={logo}
+                alt="SnoutIQ"
+                className="ask-intake-logo"
+                width={130}
+                height={24}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
+              />
+            </a>
             <span className="ask-intake-secure">
               Private • personalized answer
             </span>
@@ -2099,8 +2110,8 @@ export default function AskPage() {
       .toLowerCase();
     const canBypassStoredIntake = Boolean(
       storedUiState?.pendingInitialRequest?.message &&
-        Object.keys(validateAskProfile(storedProfile, restoredSpecies)).length ===
-          0,
+      Object.keys(validateAskProfile(storedProfile, restoredSpecies)).length ===
+        0,
     );
     if (hasStoredConversation) {
       setSpecies(storedState.species || "");
@@ -2113,9 +2124,13 @@ export default function AskPage() {
     if (storedUiState) {
       setInputValue(storedUiState.inputValue || "");
       setPendingInitialRequest(
-        canBypassStoredIntake ? null : storedUiState.pendingInitialRequest || null,
+        canBypassStoredIntake
+          ? null
+          : storedUiState.pendingInitialRequest || null,
       );
-      setIntakeOpen(Boolean(storedUiState.intakeOpen) && !canBypassStoredIntake);
+      setIntakeOpen(
+        Boolean(storedUiState.intakeOpen) && !canBypassStoredIntake,
+      );
     }
     setChecksToday(readDailyUsage());
     hydratedRef.current = true;
@@ -2649,14 +2664,15 @@ export default function AskPage() {
 
       const identifiers = extractAssessmentIdentifiers(payload);
       setSessionId(payload?.session_id || "");
-      if (
-        displayText &&
-        displayText !== defaultImageVisualMessage
-      ) {
+      if (displayText && displayText !== defaultImageVisualMessage) {
         saveAskProfile({
           lastProblemText: displayText,
-          ...(identifiers.userId !== undefined ? { userId: identifiers.userId } : {}),
-          ...(identifiers.petId !== undefined ? { petId: identifiers.petId } : {}),
+          ...(identifiers.userId !== undefined
+            ? { userId: identifiers.userId }
+            : {}),
+          ...(identifiers.petId !== undefined
+            ? { petId: identifiers.petId }
+            : {}),
         });
       }
       const nextAssessmentEntry = pushAssessmentEntry(payload);
@@ -2675,7 +2691,9 @@ export default function AskPage() {
 
   const handleSend = async ({ message, nextSpecies } = {}) => {
     const rawMessageText = String(message ?? inputValue).trim();
-    const speciesValue = String(nextSpecies || species || askProfile.petType || "")
+    const speciesValue = String(
+      nextSpecies || species || askProfile.petType || "",
+    )
       .trim()
       .toLowerCase();
     const attachment = pendingAttachment;
@@ -2954,8 +2972,12 @@ export default function AskPage() {
       setSessionId(payload?.session_id || sessionId);
       saveAskProfile({
         lastProblemText: `${question}\nAnswer: ${answerText}`,
-        ...(identifiers.userId !== undefined ? { userId: identifiers.userId } : {}),
-        ...(identifiers.petId !== undefined ? { petId: identifiers.petId } : {}),
+        ...(identifiers.userId !== undefined
+          ? { userId: identifiers.userId }
+          : {}),
+        ...(identifiers.petId !== undefined
+          ? { petId: identifiers.petId }
+          : {}),
       });
       pendingScrollEntryIdRef.current = entry.id;
       setEntries((current) =>

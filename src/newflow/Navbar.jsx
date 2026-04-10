@@ -9,11 +9,11 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
   const navigate = useNavigate();
 
   const navLinks = [
+    { name: "AI Symptom Checker", href: "/ask", isNew: true },
     { name: "For Pet Parents", href: "/parents" },
     { name: "For Vets", href: "/vets" },
     { name: "For Clinics", href: "/clinics" },
     { name: "About Us", href: "/about" },
-    { name: "AI Symptom Checker", href: "/ask", isNew: true },
   ];
 
   const go = (to) => {

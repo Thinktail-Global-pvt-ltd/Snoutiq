@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snoutiq Standee — 2ft × 5ft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #c8c8c8;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 20px;
+    min-height: 100vh;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .print-note {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    background: #222; color: #fff; font-size: 12px; padding: 6px 16px;
+    border-radius: 50px; white-space: nowrap; z-index: 100;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .standee {
+    width: 500px;
+    background: white;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    position: relative;
+  }
+
+  .s-header {
+    background: #0a2d5c;
+    padding: 22px 30px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .logo-image {
+    width: 136px;
+    height: auto;
+    display: block;
+  }
+  .logo-text {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 900;
+    color: white;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+  .logo-dot { color: #F57C00; }
+  .logo-tagline {
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .event-badge {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 50px;
+    padding: 6px 14px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.85);
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .event-badge span { display: block; font-size: 10px; opacity: 0.7; }
+
+  .s-illustration {
+    background: linear-gradient(180deg, #C5DFF5 0%, #E8F4FF 60%, #F5EDD8 100%);
+    height: 310px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-image {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  .s-headline {
+    background: #1565C0;
+    padding: 28px 36px 24px;
+    text-align: center;
+  }
+  .headline-pre {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 8px;
+  }
+  .headline-main {
+    font-family: 'Fraunces', serif;
+    font-size: 46px;
+    font-weight: 900;
+    color: white;
+    line-height: 1.05;
+    margin-bottom: 10px;
+    letter-spacing: -1px;
+  }
+  .headline-main em { color: #FFD54F; font-style: italic; }
+  .headline-sub {
+    font-size: 15px;
+    color: rgba(255,255,255,0.82);
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  .s-trust {
+    background: white;
+    padding: 18px 24px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    border-bottom: 1px solid #E5E7EB;
+  }
+  .trust-pill {
+    background: #F0F7FF;
+    border: 1px solid #BFDBFE;
+    border-radius: 50px;
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #1565C0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .trust-pill::before {
+    content: "✓";
+    color: #22c55e;
+    font-weight: 900;
+  }
+
+  .s-how {
+    background: #F9FAFB;
+    padding: 20px 30px;
+    border-bottom: 1px solid #E5E7EB;
+  }
+  .how-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6B7280;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .how-steps {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+  }
+  .how-step {
+    flex: 1;
+    text-align: center;
+    padding: 0 8px;
+    position: relative;
+  }
+  .how-step:not(:last-child)::after {
+    content: "→";
+    position: absolute;
+    right: -8px;
+    top: 14px;
+    color: #9CA3AF;
+    font-size: 16px;
+    transform: translateY(-50%);
+  }
+  .how-num {
+    width: 32px; height: 32px;
+    background: #1565C0;
+    color: white;
+    border-radius: 50%;
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 6px;
+  }
+  .how-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    line-height: 1.3;
+  }
+  .how-sub {
+    font-size: 10.5px;
+    color: #9CA3AF;
+    margin-top: 2px;
+  }
+
+  .s-services {
+    background: white;
+    padding: 18px 24px;
+    border-bottom: 3px solid #F0F0F0;
+  }
+  .svc-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6B7280;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .svc-row {
+    display: flex;
+    align-items: center;
+    padding: 11px 14px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    gap: 12px;
+  }
+  .svc-row:last-child { margin-bottom: 0; }
+  .svc-row.free { background: #EFF6FF; border: 1px solid #BFDBFE; }
+  .svc-row.video { background: #EFF6FF; border: 1px solid #93C5FD; }
+  .svc-row.vah { background: #F5F3FF; border: 1px solid #C4B5FD; }
+  .svc-row.clinic { background: #F0FDF4; border: 1px solid #86EFAC; }
+  .svc-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; flex-shrink: 0;
+  }
+  .svc-icon.free { background: #DBEAFE; }
+  .svc-icon.video { background: #DBEAFE; }
+  .svc-icon.vah { background: #EDE9FE; }
+  .svc-icon.clinic { background: #DCFCE7; }
+  .svc-info { flex: 1; }
+  .svc-name { font-size: 13.5px; font-weight: 700; color: #111827; line-height: 1.2; }
+  .svc-detail { font-size: 11px; color: #6B7280; margin-top: 2px; }
+  .svc-price-block { text-align: right; flex-shrink: 0; }
+  .svc-price { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 900; }
+  .svc-price.blue { color: #1565C0; }
+  .svc-price.purple { color: #6A1B9A; }
+  .svc-price.green { color: #2E7D32; }
+  .svc-price.free-clr { color: #15803D; font-size: 17px; }
+  .svc-strikethrough { font-size: 11px; color: #9CA3AF; text-decoration: line-through; }
+  .svc-guarantee { font-size: 10px; color: #9CA3AF; display: block; }
+
+  .s-cta {
+    background: #F57C00;
+    padding: 22px 30px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .qr-box {
+    width: 100px; height: 100px;
+    background: white;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 6px;
+  }
+  .qr-inner {
+    width: 88px; height: 88px;
+    position: relative;
+  }
+  .qr-image {
+    width: 88px;
+    height: 88px;
+    display: block;
+    object-fit: contain;
+  }
+  .cta-text { flex: 1; }
+  .cta-scan {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: white;
+    line-height: 1.1;
+    margin-bottom: 6px;
+  }
+  .cta-url {
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.95);
+    letter-spacing: 0.01em;
+    background: rgba(0,0,0,0.15);
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 50px;
+    margin-bottom: 6px;
+  }
+  .cta-free {
+    font-size: 12px;
+    color: rgba(255,255,255,0.8);
+    font-weight: 500;
+  }
+
+  .s-footer {
+    background: #0a2d5c;
+    padding: 14px 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .footer-logo {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.9);
+  }
+  .footer-logo b { color: #F57C00; }
+  .footer-logo-image {
+    width: 92px;
+    height: auto;
+    display: block;
+  }
+  .footer-tagline {
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<!-- <div class="print-note">Standee preview · 2ft × 5ft · snoutiq.com/ask</div> -->
+
+<div class="standee">
+  <div class="s-header">
+    <div class="logo-wrap">
+      <img class="logo-image" src="/logo1.png" alt="Snoutiq">
+      <div class="logo-tagline">India's Pet Health AI</div>
+    </div>
+    <div class="event-badge">
+      &#128062; Pet Parent
+      <span>Meet &amp; Greet</span>
+    </div>
+  </div>
+
+  <div class="s-illustration">
+    <img class="hero-image" src="/standee-hero.jpg.jpeg" alt="Snoutiq pet parent hero">
+  </div>
+
+  <div class="s-headline">
+    <div class="headline-pre">Free for all pet parents · No signup needed</div>
+    <div class="headline-main">Is my pet<br><em>okay?</em></div>
+    <div class="headline-sub">Describe the symptoms. Get expert triage guidance in 30 seconds.</div>
+  </div>
+
+  <div class="s-trust">
+    <div class="trust-pill">100% free</div>
+    <div class="trust-pill">India AI</div>
+    <div class="trust-pill">Vet-reviewed</div>
+  </div>
+
+  <div class="s-how">
+    <div class="how-label">How it works</div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-num">1</div>
+        <div class="how-text">Describe symptoms</div>
+        <div class="how-sub">In plain words</div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">2</div>
+        <div class="how-text">AI analyses</div>
+        <div class="how-sub">India-trained</div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">3</div>
+        <div class="how-text">Get your plan</div>
+        <div class="how-sub">+ Health score</div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">4</div>
+        <div class="how-text">Book if needed</div>
+        <div class="how-sub">Vet in minutes</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="s-services">
+    <div class="svc-label">If you need a vet — we've got you covered</div>
+
+    <div class="svc-row free">
+      <div class="svc-icon free">&#129302;</div>
+      <div class="svc-info">
+        <div class="svc-name">AI Symptom Check</div>
+        <div class="svc-detail">Instant triage · Pet health score · No signup</div>
+      </div>
+      <div class="svc-price-block">
+        <div class="svc-price free-clr">FREE</div>
+        <div class="svc-guarantee">3 checks/day</div>
+      </div>
+    </div>
+
+    <div class="svc-row video">
+      <div class="svc-icon video">&#128241;</div>
+      <div class="svc-info">
+        <div class="svc-name">Video Consultation</div>
+        <div class="svc-detail">Experienced vets · Connect in 15 mins</div>
+      </div>
+      <div class="svc-price-block">
+        <div class="svc-price blue">&#8377;499</div>
+        <div class="svc-strikethrough">&#8377;599</div>
+        <div class="svc-guarantee">Money-back guarantee</div>
+      </div>
+    </div>
+
+    <div class="svc-row vah">
+      <div class="svc-icon vah">&#127968;</div>
+      <div class="svc-info">
+        <div class="svc-name">Vet at Home</div>
+        <div class="svc-detail">Gurgaon &amp; Delhi NCR · Vet at door in 60 mins</div>
+      </div>
+      <div class="svc-price-block">
+        <div class="svc-price purple">&#8377;999</div>
+        <div class="svc-guarantee">60 min or money back</div>
+      </div>
+    </div>
+
+    <div class="svc-row clinic">
+      <div class="svc-icon clinic">&#128506;</div>
+      <div class="svc-info">
+        <div class="svc-name">Confirmed Clinic Booking</div>
+        <div class="svc-detail">Skip the queue · Nearest available vet</div>
+      </div>
+      <div class="svc-price-block">
+        <div class="svc-price green">&#8377;350</div>
+        <div class="svc-guarantee">Appointment guaranteed</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="s-cta">
+    <div class="qr-box">
+      <img class="qr-image" src="/ismupetokay.png" alt="Scan Snoutiq QR">
+    </div>
+    <div class="cta-text">
+      <div class="cta-scan">Scan to check<br>your pet — free</div>
+      <div class="cta-url">snoutiq.com/ask</div>
+      <div class="cta-free">No app. No signup. Works on any phone.</div>
+    </div>
+  </div>
+
+  <div class="s-footer">
+    <img class="footer-logo-image" src="/logo1.png" alt="Snoutiq">
+    <div class="footer-tagline">
+      India's Pet Telehealth Platform<br>
+      ThinkTail Global Pvt. Ltd.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

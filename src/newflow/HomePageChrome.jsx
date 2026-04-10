@@ -1,9 +1,4 @@
-import React, {
-  forwardRef,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { forwardRef, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 const HOME_LOGO_SRC = "/logo.webp";
@@ -41,7 +36,10 @@ export const ArrowRight = createIcon("ArrowRight", [
 ]);
 
 export const CalendarDays = createIcon("CalendarDays", [
-  <path key="frame" d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />,
+  <path
+    key="frame"
+    d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"
+  />,
   <path key="head" d="M16 2v4M8 2v4M4 10h16" />,
   <path key="day-1" d="M8 14h.01" />,
   <path key="day-2" d="M12 14h.01" />,
@@ -55,7 +53,10 @@ export const ChevronDown = createIcon("ChevronDown", [
 ]);
 
 export const FileText = createIcon("FileText", [
-  <path key="file" d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" />,
+  <path
+    key="file"
+    d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"
+  />,
   <path key="fold" d="M14 2v5h5" />,
   <path key="line-1" d="M9 13h6" />,
   <path key="line-2" d="M9 17h6" />,
@@ -63,7 +64,10 @@ export const FileText = createIcon("FileText", [
 ]);
 
 export const HeartPulse = createIcon("HeartPulse", [
-  <path key="heart" d="M19.5 12.6 12 20l-7.5-7.4a4.8 4.8 0 0 1 6.8-6.8L12 6.5l.7-.7a4.8 4.8 0 0 1 6.8 6.8Z" />,
+  <path
+    key="heart"
+    d="M19.5 12.6 12 20l-7.5-7.4a4.8 4.8 0 0 1 6.8-6.8L12 6.5l.7-.7a4.8 4.8 0 0 1 6.8 6.8Z"
+  />,
   <path key="pulse" d="M3 12h3l2 3 3-6 2 3h8" />,
 ]);
 
@@ -77,7 +81,10 @@ export const PawPrint = createIcon("PawPrint", [
   <ellipse key="toe-2" cx="15.5" cy="7" rx="1.6" ry="2.1" />,
   <ellipse key="toe-3" cx="6" cy="12" rx="1.7" ry="2.2" />,
   <ellipse key="toe-4" cx="18" cy="12" rx="1.7" ry="2.2" />,
-  <path key="pad" d="M12 20c-2.8 0-5-1.7-5-3.9 0-2 1.9-3.7 4.5-4.2.3-.1.7-.1 1 0 2.6.5 4.5 2.2 4.5 4.2 0 2.2-2.2 3.9-5 3.9Z" />,
+  <path
+    key="pad"
+    d="M12 20c-2.8 0-5-1.7-5-3.9 0-2 1.9-3.7 4.5-4.2.3-.1.7-.1 1 0 2.6.5 4.5 2.2 4.5 4.2 0 2.2-2.2 3.9-5 3.9Z"
+  />,
 ]);
 
 export const Scissors = createIcon("Scissors", [
@@ -206,7 +213,8 @@ const getPetSelectionConfig = (title = "", href = "") => {
   if (isVaccinationCard) {
     return {
       heading: "Choose your pet for vaccination",
-      subheading: "Select pet type to open the correct vaccination package page.",
+      subheading:
+        "Select pet type to open the correct vaccination package page.",
       options: [
         {
           key: "dog",
@@ -272,7 +280,9 @@ export function ServiceCard({
   const handleContinue = () => {
     if (!selectionConfig || !selectedPet) return;
 
-    const option = selectionConfig.options.find((item) => item.key === selectedPet);
+    const option = selectionConfig.options.find(
+      (item) => item.key === selectedPet,
+    );
     if (!option?.route) return;
 
     closeSelector();
@@ -368,7 +378,9 @@ export function ServiceCard({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <p className="text-sm text-slate-600">{selectionConfig.subheading}</p>
+              <p className="text-sm text-slate-600">
+                {selectionConfig.subheading}
+              </p>
             </div>
 
             <div className="space-y-3 p-5">
@@ -392,7 +404,9 @@ export function ServiceCard({
                     </div>
 
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-slate-900">{option.label}</p>
+                      <p className="text-sm font-bold text-slate-900">
+                        {option.label}
+                      </p>
                       <p className="text-xs text-slate-500">{option.desc}</p>
                     </div>
 
@@ -428,11 +442,11 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
   const navigate = useNavigate();
 
   const navLinks = [
+    { name: "AI Symptom Checker", href: "/ask", isNew: true },
     { name: "For Pet Parents", href: "/parents" },
     { name: "For Vets", href: "/vets" },
     { name: "For Clinics", href: "/clinics" },
     { name: "About Us", href: "/about" },
-    { name: "AI Symptom Checker", href: "/ask", isNew: true },
   ];
 
   const go = (to) => {
@@ -592,8 +606,6 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
   );
 }
 
-
-
 export function Footer() {
   return (
     <footer className="border-t border-slate-200 bg-white py-10 text-slate-600 sm:py-12">
@@ -634,7 +646,11 @@ export function Footer() {
                 aria-label="Facebook"
               >
                 <span className="sr-only">Facebook</span>
-                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="h-6 w-6"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path d="M22 12c0-5.5-4.5-10-10-10S2 6.5 2 12c0 5 3.7 9.1 8.4 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7C18.3 21.1 22 17 22 12Z" />
                 </svg>
               </a>
@@ -645,7 +661,11 @@ export function Footer() {
                 aria-label="Instagram"
               >
                 <span className="sr-only">Instagram</span>
-                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="h-6 w-6"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3Zm5 2.8A5.2 5.2 0 1 1 6.8 12 5.2 5.2 0 0 1 12 6.8Zm0 2A3.2 3.2 0 1 0 15.2 12 3.2 3.2 0 0 0 12 8.8Zm5.5-3.4a1.1 1.1 0 1 1-1.1 1.1 1.1 1.1 0 0 1 1.1-1.1Z" />
                 </svg>
               </a>
@@ -745,7 +765,10 @@ export function Footer() {
             <h3 className="mb-4 font-semibold text-slate-900">Company</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/about" className="transition-colors hover:text-brand">
+                <Link
+                  to="/about"
+                  className="transition-colors hover:text-brand"
+                >
                   About Us
                 </Link>
               </li>

@@ -1359,9 +1359,9 @@
 
 .ask-intake-logo {
   display: block;
-  height: 20px;
+  height: 24px;
   width: auto;
-  max-width: 120px;
+  max-width: 130px;
   object-fit: contain;
   filter: brightness(0) invert(1);
 }
