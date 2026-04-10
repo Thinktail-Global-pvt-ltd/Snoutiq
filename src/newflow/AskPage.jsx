@@ -2081,27 +2081,37 @@ export default function AskPage() {
   useEffect(() => {
     const storedState = readStoredState();
     const storedUiState = readStoredUiState();
+    const storedProfile = getAskProfile();
     const hasStoredConversation = Boolean(
       storedState?.sessionId || storedState?.entries?.length,
+    );
+    const restoredSpecies = String(
+      storedState?.species ||
+        storedUiState?.pendingInitialRequest?.species ||
+        storedProfile?.petType ||
+        "",
+    )
+      .trim()
+      .toLowerCase();
+    const canBypassStoredIntake = Boolean(
+      storedUiState?.pendingInitialRequest?.message &&
+        Object.keys(validateAskProfile(storedProfile, restoredSpecies)).length ===
+          0,
     );
     if (hasStoredConversation) {
       setSpecies(storedState.species || "");
       setSessionId(storedState.sessionId || "");
       setEntries(storedState.entries || []);
+    } else if (restoredSpecies) {
+      setSpecies(restoredSpecies);
     }
-    setAskProfile(
-      hasStoredConversation ? getAskProfile() : DEFAULT_ASK_PROFILE,
-    );
+    setAskProfile(storedProfile);
     if (storedUiState) {
       setInputValue(storedUiState.inputValue || "");
-      setPendingInitialRequest(storedUiState.pendingInitialRequest || null);
-      setIntakeOpen(Boolean(storedUiState.intakeOpen));
-      if (
-        !hasStoredConversation &&
-        storedUiState.pendingInitialRequest?.species
-      ) {
-        setSpecies(storedUiState.pendingInitialRequest.species);
-      }
+      setPendingInitialRequest(
+        canBypassStoredIntake ? null : storedUiState.pendingInitialRequest || null,
+      );
+      setIntakeOpen(Boolean(storedUiState.intakeOpen) && !canBypassStoredIntake);
     }
     setChecksToday(readDailyUsage());
     hydratedRef.current = true;
@@ -2649,7 +2659,7 @@ export default function AskPage() {
 
   const handleSend = async ({ message, nextSpecies } = {}) => {
     const rawMessageText = String(message ?? inputValue).trim();
-    const speciesValue = String(nextSpecies || species || "")
+    const speciesValue = String(nextSpecies || species || askProfile.petType || "")
       .trim()
       .toLowerCase();
     const attachment = pendingAttachment;
