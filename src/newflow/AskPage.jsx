@@ -1321,7 +1321,6 @@ function IntakeModal({
               href="https://www.snoutiq.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="mb-4 inline-flex items-center"
               aria-label="Open SnoutIQ website"
             >
               <img
@@ -2094,24 +2093,24 @@ export default function AskPage() {
   });
 
   useEffect(() => {
-  clearStoredState();
-  clearStoredUiState();
+    clearStoredState();
+    clearStoredUiState();
 
-  // ✅ ab sirf profile load karo
-  const storedProfile = getAskProfile();
+    // ✅ ab sirf profile load karo
+    const storedProfile = getAskProfile();
 
-  const restoredSpecies = String(storedProfile?.petType || "")
-    .trim()
-    .toLowerCase();
+    const restoredSpecies = String(storedProfile?.petType || "")
+      .trim()
+      .toLowerCase();
 
-  if (restoredSpecies) {
-    setSpecies(restoredSpecies);
-  }
+    if (restoredSpecies) {
+      setSpecies(restoredSpecies);
+    }
 
-  setAskProfile(storedProfile);
-  setChecksToday(readDailyUsage());
-  hydratedRef.current = true;
-}, []);
+    setAskProfile(storedProfile);
+    setChecksToday(readDailyUsage());
+    hydratedRef.current = true;
+  }, []);
 
   useEffect(() => {
     if (!hydratedRef.current) return;
@@ -3258,15 +3257,23 @@ export default function AskPage() {
 
       <div className="ask-nav">
         <div className="ask-logo">
-          <img
-            src={logo}
-            alt="SnoutIQ"
-            className="ask-logo-image"
-            width={130}
-            height={24}
-            loading="eager"
-            decoding="async"
-          />
+          <a
+            href="https://www.snoutiq.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center"
+            aria-label="Open SnoutIQ website"
+          >
+            <img
+              src={logo}
+              alt="SnoutIQ"
+              className="ask-logo-image"
+              width={130}
+              height={24}
+              loading="eager"
+              decoding="async"
+            />
+          </a>
         </div>
         <div className="ask-nav-actions">
           <div className="ask-badge">{navBadgeText}</div>
