@@ -2174,6 +2174,7 @@ Route::post('/downloads/track', [ReferralController::class, 'trackDownload'])->n
 Route::post('/ask/chat-rooms/new', [SnoutiqSymptomController::class, 'createWebChatRoom']);
 Route::get('/ask/chat/listRooms', [SnoutiqSymptomController::class, 'listWebChatRooms']);
 Route::get('/ask/chat-rooms/{session_id}/chats', [SnoutiqSymptomController::class, 'webChatHistory']);
+Route::delete('/ask/chat-rooms/{session_id}', [SnoutiqSymptomController::class, 'deleteWebChatRoom']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
 Route::post('/chat/send', [SnoutiqSymptomController::class, 'chatSend']);
 Route::post('/symptom-check', [SnoutiqSymptomController::class, 'check']);

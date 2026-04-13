@@ -821,6 +821,52 @@ class SnoutiqSymptomController extends Controller
         ]);
     }
 
+    /**
+     * DELETE /api/ask/chat-rooms/{session_id}
+     * Deletes an Ask chat room and all turns from web_chat_campaign.
+     */
+    public function deleteWebChatRoom(Request $request, string $session_id): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => 'required|integer',
+        ]);
+
+        if (!Schema::hasTable('web_chat_campaign')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'web_chat_campaign table is missing.',
+            ], 500);
+        }
+
+        $exists = DB::table('web_chat_campaign')
+            ->where('session_id', $session_id)
+            ->where('user_id', (int) $data['user_id'])
+            ->exists();
+
+        if (!$exists) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Room not found for this user',
+            ], 404);
+        }
+
+        $deletedRows = DB::table('web_chat_campaign')
+            ->where('session_id', $session_id)
+            ->where('user_id', (int) $data['user_id'])
+            ->delete();
+
+        Cache::forget("snoutiq_symptom:{$session_id}");
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Ask chat room deleted successfully.',
+            'deleted' => [
+                'chat_room_token' => $session_id,
+                'rows_deleted' => $deletedRows,
+            ],
+        ]);
+    }
+
     private function webChatRoomTitle($rows, $firstMessageRow = null): string
     {
         foreach ($rows as $row) {

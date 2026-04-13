@@ -125,4 +125,64 @@ class AskWebChatCampaignApiTest extends TestCase
             ->assertJsonPath('chats.0.question', 'My dog is vomiting')
             ->assertJsonPath('chats.0.answer', 'A video consult is recommended.');
     }
+
+    public function test_delete_room_removes_only_matching_user_session_rows(): void
+    {
+        DB::table('web_chat_campaign')->insert([
+            [
+                'session_id' => 'room_delete',
+                'user_id' => 123,
+                'pet_id' => 456,
+                'turn' => 1,
+                'routing' => 'video_consult',
+                'score' => 6,
+                'user_message' => 'My dog is vomiting',
+                'assistant_message' => 'A video consult is recommended.',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'session_id' => 'room_delete',
+                'user_id' => 123,
+                'pet_id' => 456,
+                'turn' => 2,
+                'routing' => 'video_consult',
+                'score' => 7,
+                'user_message' => 'He is also weak',
+                'assistant_message' => 'Please consult soon.',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'session_id' => 'room_delete',
+                'user_id' => 999,
+                'pet_id' => 888,
+                'turn' => 1,
+                'routing' => 'monitor',
+                'score' => 2,
+                'user_message' => 'Other user message',
+                'assistant_message' => 'Other user answer.',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $response = $this->deleteJson('/api/ask/chat-rooms/room_delete', [
+            'user_id' => 123,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('deleted.chat_room_token', 'room_delete')
+            ->assertJsonPath('deleted.rows_deleted', 2);
+
+        $this->assertDatabaseMissing('web_chat_campaign', [
+            'session_id' => 'room_delete',
+            'user_id' => 123,
+        ]);
+        $this->assertDatabaseHas('web_chat_campaign', [
+            'session_id' => 'room_delete',
+            'user_id' => 999,
+        ]);
+    }
 }
