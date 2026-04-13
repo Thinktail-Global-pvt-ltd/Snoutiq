@@ -64,6 +64,50 @@ class HomeVetBookingApiTest extends TestCase
         $this->assertSame('18:30:00', $booking->time_of_visit);
     }
 
+    public function test_from_pet_creates_home_service_booking(): void
+    {
+        DB::table('users')->insert([
+            'id' => 7,
+            'name' => 'Ananya',
+            'phone' => '9876543210',
+            'city' => 'Gurgaon',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 33,
+            'user_id' => 7,
+            'name' => 'Milo',
+            'breed' => 'Indie',
+            'pet_type' => 'Dog',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/home-vet-bookings/from-pet', [
+            'user_id' => 7,
+            'pet_id' => 33,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('data.user_id', 7)
+            ->assertJsonPath('data.pet_id', 33)
+            ->assertJsonPath('data.latest_completed_step', 1);
+
+        $booking = DB::table('home_service_required_by_pet')
+            ->where('user_id', 7)
+            ->where('pet_id', 33)
+            ->first();
+
+        $this->assertNotNull($booking);
+        $this->assertSame('Ananya', $booking->owner_name);
+        $this->assertSame('9876543210', $booking->owner_phone);
+        $this->assertSame('Dog', $booking->pet_type);
+        $this->assertSame('Gurgaon', $booking->area);
+    }
+
     private function resetSchema(): void
     {
         Schema::dropIfExists('home_service_required_by_pet');
@@ -76,6 +120,8 @@ class HomeVetBookingApiTest extends TestCase
         Schema::create('users', function (Blueprint $table) {
             $table->unsignedBigInteger('id')->primary();
             $table->string('name')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('city')->nullable();
             $table->timestamps();
         });
 
@@ -84,6 +130,7 @@ class HomeVetBookingApiTest extends TestCase
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('name')->nullable();
             $table->string('breed')->nullable();
+            $table->string('pet_type')->nullable();
             $table->date('pet_dob')->nullable();
             $table->string('pet_gender')->nullable();
             $table->text('reported_symptom')->nullable();
@@ -97,6 +144,11 @@ class HomeVetBookingApiTest extends TestCase
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('pet_id')->nullable();
             $table->unsignedTinyInteger('latest_completed_step')->default(1);
+            $table->string('owner_name')->nullable();
+            $table->string('owner_phone', 30)->nullable();
+            $table->string('pet_type', 50)->nullable();
+            $table->string('area')->nullable();
+            $table->string('reason_for_visit')->nullable();
             $table->date('date_of_visit')->nullable();
             $table->time('time_of_visit')->nullable();
             $table->text('concern_description')->nullable();
@@ -107,6 +159,7 @@ class HomeVetBookingApiTest extends TestCase
             $table->text('current_medications')->nullable();
             $table->text('known_allergies')->nullable();
             $table->text('vet_notes')->nullable();
+            $table->timestamp('step1_completed_at')->nullable();
             $table->timestamp('step2_completed_at')->nullable();
             $table->timestamps();
         });

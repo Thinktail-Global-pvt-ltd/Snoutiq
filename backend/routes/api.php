@@ -121,6 +121,7 @@ Route::prefix('socket')->group(function () {
 Route::post('/realtime/heartbeat', [RealtimeController::class, 'heartbeat']);
 
 Route::prefix('home-vet-bookings')->group(function () {
+    Route::post('/from-pet', [HomeVetBookingController::class, 'storeFromPet']);
     Route::post('/step-1', [HomeVetBookingController::class, 'stepOne']);
     Route::post('/step-2', [HomeVetBookingController::class, 'stepTwo']);
     Route::post('/step-3', [HomeVetBookingController::class, 'stepThree']);

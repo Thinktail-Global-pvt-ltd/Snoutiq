@@ -14,6 +14,54 @@ use Illuminate\Validation\Rule;
 
 class HomeVetBookingController extends Controller
 {
+    public function storeFromPet(Request $request)
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'pet_id' => ['required', 'integer', 'exists:pets,id'],
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = User::query()->findOrFail($data['user_id']);
+
+        /** @var \App\Models\Pet|null $pet */
+        $pet = Pet::query()
+            ->whereKey($data['pet_id'])
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $pet) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pet does not belong to this user.',
+            ], 422);
+        }
+
+        $petType = $pet->pet_type ?? $pet->type ?? null;
+
+        $booking = HomeServiceRequiredByPet::create([
+            'user_id' => $user->id,
+            'pet_id' => $pet->id,
+            'latest_completed_step' => 1,
+            'owner_name' => $user->name,
+            'owner_phone' => $user->phone ?? null,
+            'pet_type' => $petType,
+            'area' => $user->city ?? null,
+            'step1_completed_at' => now(),
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Home vet booking created.',
+            'data' => [
+                'booking_id' => $booking->id,
+                'user_id' => $booking->user_id,
+                'pet_id' => $booking->pet_id,
+                'latest_completed_step' => $booking->latest_completed_step,
+            ],
+        ], 201);
+    }
+
     public function stepOne(Request $request)
     {
         $data = $request->validate([
