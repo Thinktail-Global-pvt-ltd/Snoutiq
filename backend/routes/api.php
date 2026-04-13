@@ -2171,6 +2171,9 @@ Route::post('/invester-form', function (Request $request) {
 Route::post('/referrals/download', [ReferralController::class, 'sendDownloadLink'])->name('api.referrals.download');
 Route::get('/referrals/{code}', [ReferralController::class, 'showByCode'])->name('api.referrals.lookup');
 Route::post('/downloads/track', [ReferralController::class, 'trackDownload'])->name('api.downloads.track');
+Route::post('/ask/chat-rooms/new', [SnoutiqSymptomController::class, 'createWebChatRoom']);
+Route::get('/ask/chat/listRooms', [SnoutiqSymptomController::class, 'listWebChatRooms']);
+Route::get('/ask/chat-rooms/{session_id}/chats', [SnoutiqSymptomController::class, 'webChatHistory']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
 Route::post('/chat/send', [SnoutiqSymptomController::class, 'chatSend']);
 Route::post('/symptom-check', [SnoutiqSymptomController::class, 'check']);

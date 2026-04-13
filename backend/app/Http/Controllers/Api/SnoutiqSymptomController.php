@@ -609,6 +609,246 @@ class SnoutiqSymptomController extends Controller
         ]);
     }
 
+    /**
+     * POST /api/ask/chat-rooms/new
+     * Creates an empty Ask chat room backed by web_chat_campaign.
+     */
+    public function createWebChatRoom(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => 'required|integer',
+            'title' => 'nullable|string|max:120',
+            'pet_id' => 'nullable|integer',
+            'pet_name' => 'nullable|string|max:120',
+            'pet_breed' => 'nullable|string|max:120',
+            'pet_location' => 'nullable|string|max:120',
+            'species' => 'nullable|string|max:30',
+        ]);
+
+        if (!Schema::hasTable('web_chat_campaign')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'web_chat_campaign table is missing.',
+            ], 500);
+        }
+
+        $sessionId = 'room_' . Str::uuid()->toString();
+        $state = $this->defaultState();
+        $state['user_id'] = (int) $data['user_id'];
+        $state['pet_id'] = isset($data['pet_id']) ? (int) $data['pet_id'] : null;
+        $state['pet'] = array_filter([
+            'name' => $data['pet_name'] ?? null,
+            'species' => $data['species'] ?? null,
+            'breed' => $data['pet_breed'] ?? null,
+            'location' => $data['pet_location'] ?? null,
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        DB::table('web_chat_campaign')->insert([
+            'session_id' => $sessionId,
+            'user_id' => (int) $data['user_id'],
+            'pet_id' => isset($data['pet_id']) ? (int) $data['pet_id'] : null,
+            'turn' => 0,
+            'routing' => 'new_room',
+            'severity' => null,
+            'score' => 0,
+            'pet_name' => $data['pet_name'] ?? null,
+            'species' => $data['species'] ?? null,
+            'breed' => $data['pet_breed'] ?? null,
+            'location' => $data['pet_location'] ?? null,
+            'user_message' => null,
+            'assistant_message' => null,
+            'request_payload_json' => json_encode($this->sanitizePayloadForStorage($data), JSON_UNESCAPED_UNICODE),
+            'response_payload_json' => json_encode([
+                'event' => 'room_created',
+                'title' => $data['title'] ?? 'Symptom Check',
+            ], JSON_UNESCAPED_UNICODE),
+            'state_payload_json' => json_encode($state, JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Cache::put("snoutiq_symptom:{$sessionId}", $state, now()->addMinutes(self::SESSION_TTL_MINUTES));
+
+        return response()->json([
+            'status' => 'success',
+            'chat_room_token' => $sessionId,
+            'context_token' => $sessionId,
+            'session_id' => $sessionId,
+            'name' => $data['title'] ?? 'Symptom Check',
+        ], 201);
+    }
+
+    /**
+     * GET /api/ask/chat/listRooms?user_id=123
+     * Lists Ask rooms from web_chat_campaign grouped by session_id.
+     */
+    public function listWebChatRooms(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => 'required|integer',
+            'limit' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        if (!Schema::hasTable('web_chat_campaign')) {
+            return response()->json([
+                'status' => 'success',
+                'rooms' => [],
+            ]);
+        }
+
+        $rows = DB::table('web_chat_campaign')
+            ->where('user_id', (int) $data['user_id'])
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->limit(max(100, ((int) ($data['limit'] ?? 30)) * 10))
+            ->get();
+
+        $rooms = $rows
+            ->groupBy('session_id')
+            ->map(function ($sessionRows) {
+                $latest = $sessionRows->first();
+                $ordered = $sessionRows->sortBy('id')->values();
+                $firstMessage = $ordered->first(function ($row) {
+                    return trim((string) ($row->user_message ?? '')) !== '';
+                });
+                $latestMessage = $sessionRows->first(function ($row) {
+                    return trim((string) ($row->assistant_message ?? '')) !== ''
+                        || trim((string) ($row->user_message ?? '')) !== '';
+                });
+
+                $title = $this->webChatRoomTitle($ordered, $firstMessage);
+                $lastRouting = (string) ($latestMessage->routing ?? $latest->routing ?? '');
+
+                return [
+                    'id' => $latest->id,
+                    'chat_room_token' => $latest->session_id,
+                    'name' => $title,
+                    'summary' => mb_substr((string) ($latestMessage->assistant_message ?? ''), 0, 160),
+                    'last_emergency_status' => in_array($lastRouting, ['emergency', 'in_clinic'], true)
+                        ? strtoupper($lastRouting)
+                        : null,
+                    'turns' => $ordered->filter(function ($row) {
+                        return trim((string) ($row->user_message ?? '')) !== '';
+                    })->count(),
+                    'created_at' => $ordered->first()->created_at ?? null,
+                    'updated_at' => $latest->updated_at ?? $latest->created_at ?? null,
+                ];
+            })
+            ->values()
+            ->take((int) ($data['limit'] ?? 30));
+
+        return response()->json([
+            'status' => 'success',
+            'rooms' => $rooms,
+        ]);
+    }
+
+    /**
+     * GET /api/ask/chat-rooms/{session_id}/chats?user_id=123&sort=asc
+     * Returns Ask chat turns from web_chat_campaign.
+     */
+    public function webChatHistory(Request $request, string $session_id): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => 'required|integer',
+            'sort' => 'nullable|in:asc,desc',
+        ]);
+
+        if (!Schema::hasTable('web_chat_campaign')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'web_chat_campaign table is missing.',
+            ], 500);
+        }
+
+        $sort = $data['sort'] ?? 'asc';
+        $rows = DB::table('web_chat_campaign')
+            ->where('session_id', $session_id)
+            ->where('user_id', (int) $data['user_id'])
+            ->where(function ($query) {
+                $query->whereNotNull('user_message')
+                    ->orWhereNotNull('assistant_message');
+            })
+            ->orderBy('id', $sort)
+            ->get();
+
+        if ($rows->isEmpty()) {
+            $roomExists = DB::table('web_chat_campaign')
+                ->where('session_id', $session_id)
+                ->where('user_id', (int) $data['user_id'])
+                ->exists();
+
+            if (!$roomExists) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Room not found for this user',
+                ], 404);
+            }
+        }
+
+        $latest = $rows->last();
+
+        return response()->json([
+            'status' => 'success',
+            'room' => [
+                'id' => $latest->id ?? null,
+                'chat_room_token' => $session_id,
+                'name' => $this->webChatRoomTitle($rows, $rows->first()),
+            ],
+            'count' => $rows->count(),
+            'chats' => $rows->map(function ($row) {
+                return [
+                    'id' => $row->id,
+                    'user_id' => $row->user_id,
+                    'pet_id' => $row->pet_id,
+                    'chat_room_token' => $row->session_id,
+                    'context_token' => $row->session_id,
+                    'question' => $row->user_message,
+                    'answer' => $row->assistant_message,
+                    'response_tag' => $row->routing,
+                    'emergency_status' => in_array((string) $row->routing, ['emergency', 'in_clinic'], true)
+                        ? strtoupper((string) $row->routing)
+                        : null,
+                    'severity' => $row->severity,
+                    'score' => $row->score,
+                    'pet_name' => $row->pet_name,
+                    'pet_breed' => $row->breed,
+                    'pet_location' => $row->location,
+                    'created_at' => $row->created_at,
+                    'updated_at' => $row->updated_at,
+                ];
+            })->values(),
+        ]);
+    }
+
+    private function webChatRoomTitle($rows, $firstMessageRow = null): string
+    {
+        foreach ($rows as $row) {
+            $requestPayload = json_decode((string) ($row->request_payload_json ?? ''), true);
+            if (is_array($requestPayload)) {
+                $title = trim((string) ($requestPayload['title'] ?? ''));
+                if ($title !== '') {
+                    return mb_substr($title, 0, 80);
+                }
+            }
+
+            $responsePayload = json_decode((string) ($row->response_payload_json ?? ''), true);
+            if (is_array($responsePayload)) {
+                $title = trim((string) ($responsePayload['title'] ?? ''));
+                if ($title !== '') {
+                    return mb_substr($title, 0, 80);
+                }
+            }
+        }
+
+        $message = trim((string) ($firstMessageRow->user_message ?? ''));
+        if ($message !== '') {
+            return mb_substr($message, 0, 80);
+        }
+
+        return 'Symptom Check';
+    }
+
     // =========================================================================
     // PET PROFILE LOADER
     // =========================================================================
