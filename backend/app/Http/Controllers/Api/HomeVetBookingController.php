@@ -19,6 +19,8 @@ class HomeVetBookingController extends Controller
         $data = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'pet_id' => ['required', 'integer', 'exists:pets,id'],
+            'date_of_visit' => ['nullable', 'date'],
+            'time_of_visit' => ['nullable', 'date_format:H:i'],
         ]);
 
         /** @var \App\Models\User $user */
@@ -42,12 +44,15 @@ class HomeVetBookingController extends Controller
         $booking = HomeServiceRequiredByPet::create([
             'user_id' => $user->id,
             'pet_id' => $pet->id,
-            'latest_completed_step' => 1,
+            'latest_completed_step' => (! empty($data['date_of_visit']) || ! empty($data['time_of_visit'])) ? 2 : 1,
             'owner_name' => $user->name,
             'owner_phone' => $user->phone ?? null,
             'pet_type' => $petType,
             'area' => $user->city ?? null,
+            'date_of_visit' => $data['date_of_visit'] ?? null,
+            'time_of_visit' => ! empty($data['time_of_visit']) ? $data['time_of_visit'].':00' : null,
             'step1_completed_at' => now(),
+            'step2_completed_at' => (! empty($data['date_of_visit']) || ! empty($data['time_of_visit'])) ? now() : null,
         ]);
 
         return response()->json([

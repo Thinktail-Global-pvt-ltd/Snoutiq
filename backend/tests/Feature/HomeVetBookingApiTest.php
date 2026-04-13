@@ -88,13 +88,15 @@ class HomeVetBookingApiTest extends TestCase
         $response = $this->postJson('/api/home-vet-bookings/from-pet', [
             'user_id' => 7,
             'pet_id' => 33,
+            'date_of_visit' => '2026-04-20',
+            'time_of_visit' => '18:30',
         ]);
 
         $response->assertCreated()
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('data.user_id', 7)
             ->assertJsonPath('data.pet_id', 33)
-            ->assertJsonPath('data.latest_completed_step', 1);
+            ->assertJsonPath('data.latest_completed_step', 2);
 
         $booking = DB::table('home_service_required_by_pet')
             ->where('user_id', 7)
@@ -106,6 +108,9 @@ class HomeVetBookingApiTest extends TestCase
         $this->assertSame('9876543210', $booking->owner_phone);
         $this->assertSame('Dog', $booking->pet_type);
         $this->assertSame('Gurgaon', $booking->area);
+        $this->assertStringStartsWith('2026-04-20', (string) $booking->date_of_visit);
+        $this->assertSame('18:30:00', $booking->time_of_visit);
+        $this->assertNotNull($booking->step2_completed_at);
     }
 
     private function resetSchema(): void
