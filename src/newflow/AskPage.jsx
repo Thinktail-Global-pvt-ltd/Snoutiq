@@ -3330,7 +3330,7 @@ export default function AskPage() {
                 className="ask-reset-button"
                 onClick={handleReset}
               >
-                Start over
+                New Chat
               </button>
             ) : null}
           </div>
