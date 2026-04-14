@@ -60,6 +60,8 @@ class PetOverviewController extends Controller
         $dailyCare = $this->fetchDailyCare($petId, $request->query('care_date'));
         $latestInClinicAppointment = $this->fetchLatestInClinicAppointment($petId);
         $latestVideoCallingAppointment = $this->fetchLatestVideoCallingAppointment($petId);
+        $homeVisitAppointments = $this->fetchHomeVisitAppointments($petId);
+        $latestHomeVisitAppointment = $homeVisitAppointments[0] ?? null;
         $isNueteredRaw = property_exists($pet, 'is_nuetered')
             ? $pet->is_nuetered
             : (property_exists($pet, 'is_neutered') ? $pet->is_neutered : null);
@@ -119,9 +121,14 @@ class PetOverviewController extends Controller
                 'today_care' => $dailyCare,
                 'in_clinic_appointment' => $latestInClinicAppointment,
                 'video_call_appointment' => $latestVideoCallingAppointment,
+                'home_visit_appointment' => $latestHomeVisitAppointment,
+                'home_visit_appointments' => $homeVisitAppointments,
+                'web_home_visit' => $latestHomeVisitAppointment,
+                'web_home_visits' => $homeVisitAppointments,
                 'latest_appointments' => [
                     'in_clinic' => $latestInClinicAppointment,
                     'video_call' => $latestVideoCallingAppointment,
+                    'home_visit' => $latestHomeVisitAppointment,
                 ],
                 'deworming' => [
                     'deworming_yes_no' => $dewormingYesNo,
@@ -1189,6 +1196,320 @@ class PetOverviewController extends Controller
         }
 
         return ['care_roadmap' => $care];
+    }
+
+    private function fetchHomeVisitAppointments(int $petId): array
+    {
+        if (!Schema::hasTable('home_service_required_by_pet') || !Schema::hasColumn('home_service_required_by_pet', 'pet_id')) {
+            return [];
+        }
+
+        $query = DB::table('home_service_required_by_pet')
+            ->select('home_service_required_by_pet.*')
+            ->where('pet_id', $petId);
+
+        foreach (['confirmed_at', 'date_of_visit', 'created_at'] as $column) {
+            if (Schema::hasColumn('home_service_required_by_pet', $column)) {
+                $query->orderByDesc($column);
+            }
+        }
+        $query->orderByDesc('id');
+
+        $bookings = $query->get();
+        if ($bookings->isEmpty()) {
+            return [];
+        }
+
+        $bookingIds = $bookings
+            ->pluck('id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $bookingPaymentReferences = [];
+        foreach ($bookings as $booking) {
+            $paymentReference = trim((string) ($booking->payment_reference ?? ''));
+            if ($paymentReference !== '') {
+                $bookingPaymentReferences[(int) $booking->id] = $paymentReference;
+            }
+        }
+
+        $transactionsByBookingId = $this->fetchHomeVisitTransactionsByBooking($bookingIds, $petId, $bookingPaymentReferences);
+        $doctorIds = [];
+        foreach ($transactionsByBookingId as $transactions) {
+            foreach ($transactions as $transaction) {
+                if (!empty($transaction['doctor_id']) && is_numeric($transaction['doctor_id'])) {
+                    $doctorIds[] = (int) $transaction['doctor_id'];
+                }
+            }
+        }
+
+        $doctorsById = $this->fetchDoctorsByIds(array_values(array_unique($doctorIds)));
+
+        return $bookings->map(function ($booking) use ($transactionsByBookingId, $doctorsById) {
+            $bookingId = (int) $booking->id;
+            $row = $this->serializeHomeVisitRow($booking);
+            $transactions = $transactionsByBookingId[$bookingId] ?? [];
+
+            foreach ($transactions as &$transaction) {
+                $doctorId = isset($transaction['doctor_id']) && is_numeric($transaction['doctor_id'])
+                    ? (int) $transaction['doctor_id']
+                    : null;
+                $transaction['doctor'] = $doctorId ? ($doctorsById[$doctorId] ?? null) : null;
+            }
+            unset($transaction);
+
+            $assignedDoctors = [];
+            foreach ($transactions as $transaction) {
+                $doctorId = isset($transaction['doctor_id']) && is_numeric($transaction['doctor_id'])
+                    ? (int) $transaction['doctor_id']
+                    : null;
+                if ($doctorId && isset($doctorsById[$doctorId])) {
+                    $assignedDoctors[$doctorId] = $doctorsById[$doctorId];
+                }
+            }
+
+            $row['transactions'] = array_values($transactions);
+            $row['assigned_doctors'] = array_values($assignedDoctors);
+            $row['source'] = 'home_service_required_by_pet';
+            $row['appointment_mode'] = 'home_visit';
+
+            return $row;
+        })->values()->all();
+    }
+
+    private function fetchHomeVisitTransactionsByBooking(array $bookingIds, int $petId, array $bookingPaymentReferences = []): array
+    {
+        $grouped = [];
+        foreach ($bookingIds as $bookingId) {
+            $grouped[(int) $bookingId] = [];
+        }
+
+        if (empty($bookingIds) || !Schema::hasTable('transactions')) {
+            return $grouped;
+        }
+
+        $hasPetColumn = Schema::hasColumn('transactions', 'pet_id');
+        $hasTypeColumn = Schema::hasColumn('transactions', 'type');
+        $hasMetadataColumn = Schema::hasColumn('transactions', 'metadata');
+        $hasReferenceColumn = Schema::hasColumn('transactions', 'reference');
+        $referenceToBookingId = [];
+        foreach ($bookingPaymentReferences as $bookingId => $reference) {
+            $reference = trim((string) $reference);
+            if ($reference !== '') {
+                $referenceToBookingId[$reference] = (int) $bookingId;
+            }
+        }
+
+        if (!$hasPetColumn && !$hasTypeColumn && !$hasMetadataColumn && (!$hasReferenceColumn || empty($referenceToBookingId))) {
+            return $grouped;
+        }
+
+        $query = DB::table('transactions')->select('transactions.*');
+        $query->where(function ($q) use ($bookingIds, $petId, $hasPetColumn, $hasTypeColumn, $hasMetadataColumn, $hasReferenceColumn, $referenceToBookingId) {
+            $hasCondition = false;
+
+            if ($hasPetColumn) {
+                $q->where('pet_id', $petId);
+                $hasCondition = true;
+            }
+
+            if ($hasTypeColumn) {
+                $method = $hasCondition ? 'orWhere' : 'where';
+                $q->{$method}('type', 'home_service');
+                $hasCondition = true;
+            }
+
+            if ($hasReferenceColumn && !empty($referenceToBookingId)) {
+                $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                $q->{$method}('reference', array_keys($referenceToBookingId));
+                $hasCondition = true;
+            }
+
+            if ($hasMetadataColumn) {
+                foreach ($bookingIds as $bookingId) {
+                    $bookingId = (int) $bookingId;
+                    $method = $hasCondition ? 'orWhere' : 'where';
+                    $q->{$method}('metadata->home_service_booking_id', $bookingId)
+                        ->orWhere('metadata->home_service_booking_id', (string) $bookingId)
+                        ->orWhere('metadata->homeServiceBookingId', $bookingId)
+                        ->orWhere('metadata->homeServiceBookingId', (string) $bookingId)
+                        ->orWhere('metadata->booking_id', $bookingId)
+                        ->orWhere('metadata->booking_id', (string) $bookingId)
+                        ->orWhere('metadata->bookingId', $bookingId)
+                        ->orWhere('metadata->bookingId', (string) $bookingId)
+                        ->orWhere('metadata->notes->home_service_booking_id', $bookingId)
+                        ->orWhere('metadata->notes->home_service_booking_id', (string) $bookingId)
+                        ->orWhere('metadata->notes->homeServiceBookingId', $bookingId)
+                        ->orWhere('metadata->notes->homeServiceBookingId', (string) $bookingId)
+                        ->orWhere('metadata->notes->booking_id', $bookingId)
+                        ->orWhere('metadata->notes->booking_id', (string) $bookingId)
+                        ->orWhere('metadata->notes->bookingId', $bookingId)
+                        ->orWhere('metadata->notes->bookingId', (string) $bookingId);
+                    $hasCondition = true;
+                }
+            }
+        });
+
+        if (Schema::hasColumn('transactions', 'created_at')) {
+            $query->orderByDesc('created_at');
+        }
+        $query->orderByDesc('id');
+
+        $rows = $query->get();
+        $singleBookingId = count($bookingIds) === 1 ? (int) $bookingIds[0] : null;
+
+        foreach ($rows as $row) {
+            $transaction = $this->serializeTransactionRow($row);
+            $bookingId = $this->extractHomeVisitBookingIdFromTransaction($transaction);
+            $transactionReference = trim((string) ($transaction['reference'] ?? ''));
+
+            if ($bookingId && array_key_exists($bookingId, $grouped)) {
+                $grouped[$bookingId][] = $transaction;
+                continue;
+            }
+
+            if ($transactionReference !== '' && isset($referenceToBookingId[$transactionReference])) {
+                $grouped[$referenceToBookingId[$transactionReference]][] = $transaction;
+                continue;
+            }
+
+            if ($singleBookingId && $this->looksLikeHomeServiceTransaction($transaction, $petId)) {
+                $grouped[$singleBookingId][] = $transaction;
+            }
+        }
+
+        return $grouped;
+    }
+
+    private function fetchDoctorsByIds(array $doctorIds): array
+    {
+        $doctorIds = array_values(array_unique(array_filter($doctorIds, fn ($id) => is_numeric($id) && (int) $id > 0)));
+        if (empty($doctorIds) || !Schema::hasTable('doctors')) {
+            return [];
+        }
+
+        return DB::table('doctors')
+            ->whereIn('id', $doctorIds)
+            ->get()
+            ->mapWithKeys(function ($doctor) {
+                $row = (array) $doctor;
+                if (array_key_exists('doctor_image_blob', $row)) {
+                    $row['doctor_image_blob_present'] = !empty($row['doctor_image_blob']);
+                    unset($row['doctor_image_blob']);
+                }
+
+                return [(int) $doctor->id => $row];
+            })
+            ->all();
+    }
+
+    private function serializeHomeVisitRow(object $row): array
+    {
+        $data = (array) $row;
+        if (array_key_exists('symptoms', $data)) {
+            $data['symptoms'] = $this->decodeJsonMaybe($data['symptoms']);
+        }
+
+        return $data;
+    }
+
+    private function serializeTransactionRow(object $row): array
+    {
+        $data = (array) $row;
+        if (array_key_exists('metadata', $data)) {
+            $data['metadata'] = $this->decodeJsonMaybe($data['metadata']);
+        }
+
+        return $data;
+    }
+
+    private function extractHomeVisitBookingIdFromTransaction(array $transaction): ?int
+    {
+        $metadata = $transaction['metadata'] ?? null;
+        if (!is_array($metadata)) {
+            return null;
+        }
+
+        foreach (['home_service_booking_id', 'homeServiceBookingId', 'booking_id', 'bookingId'] as $key) {
+            $bookingId = $this->nullablePositiveInt($metadata[$key] ?? null);
+            if ($bookingId) {
+                return $bookingId;
+            }
+        }
+
+        $notes = $metadata['notes'] ?? null;
+        if (is_string($notes)) {
+            $decodedNotes = json_decode($notes, true);
+            $notes = json_last_error() === JSON_ERROR_NONE ? $decodedNotes : null;
+        }
+
+        if (is_array($notes)) {
+            foreach (['home_service_booking_id', 'homeServiceBookingId', 'booking_id', 'bookingId'] as $key) {
+                $bookingId = $this->nullablePositiveInt($notes[$key] ?? null);
+                if ($bookingId) {
+                    return $bookingId;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function looksLikeHomeServiceTransaction(array $transaction, int $petId): bool
+    {
+        if (isset($transaction['pet_id']) && is_numeric($transaction['pet_id']) && (int) $transaction['pet_id'] !== $petId) {
+            return false;
+        }
+
+        $metadata = is_array($transaction['metadata'] ?? null) ? $transaction['metadata'] : [];
+        $notes = $metadata['notes'] ?? null;
+        if (is_string($notes)) {
+            $decodedNotes = json_decode($notes, true);
+            $notes = json_last_error() === JSON_ERROR_NONE ? $decodedNotes : [];
+        }
+        if (!is_array($notes)) {
+            $notes = [];
+        }
+
+        foreach ([
+            $transaction['type'] ?? null,
+            $metadata['order_type'] ?? null,
+            $notes['order_type'] ?? null,
+        ] as $type) {
+            if ($this->normalizeHomeVisitOrderType($type) === 'home_service') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizeHomeVisitOrderType($value): ?string
+    {
+        $normalized = strtolower(trim((string) $value));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return match ($normalized) {
+            'home_visit', 'home_vet', 'at_home' => 'home_service',
+            default => $normalized,
+        };
+    }
+
+    private function nullablePositiveInt($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $intValue = (int) $value;
+        return $intValue > 0 ? $intValue : null;
     }
 
     private function fetchLatestObservation(?int $userId): ?array
