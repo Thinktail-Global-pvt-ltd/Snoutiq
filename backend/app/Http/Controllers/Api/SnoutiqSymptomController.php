@@ -827,10 +827,6 @@ class SnoutiqSymptomController extends Controller
      */
     public function deleteWebChatRoom(Request $request, string $session_id): \Illuminate\Http\JsonResponse
     {
-        $data = $request->validate([
-            'user_id' => 'required|integer',
-        ]);
-
         if (!Schema::hasTable('web_chat_campaign')) {
             return response()->json([
                 'status' => 'error',
@@ -840,19 +836,17 @@ class SnoutiqSymptomController extends Controller
 
         $exists = DB::table('web_chat_campaign')
             ->where('session_id', $session_id)
-            ->where('user_id', (int) $data['user_id'])
             ->exists();
 
         if (!$exists) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Room not found for this user',
+                'message' => 'Room not found',
             ], 404);
         }
 
         $deletedRows = DB::table('web_chat_campaign')
             ->where('session_id', $session_id)
-            ->where('user_id', (int) $data['user_id'])
             ->delete();
 
         Cache::forget("snoutiq_symptom:{$session_id}");

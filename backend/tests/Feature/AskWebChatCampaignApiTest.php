@@ -126,7 +126,7 @@ class AskWebChatCampaignApiTest extends TestCase
             ->assertJsonPath('chats.0.answer', 'A video consult is recommended.');
     }
 
-    public function test_delete_room_removes_only_matching_user_session_rows(): void
+    public function test_delete_room_removes_all_matching_session_rows(): void
     {
         DB::table('web_chat_campaign')->insert([
             [
@@ -167,20 +167,18 @@ class AskWebChatCampaignApiTest extends TestCase
             ],
         ]);
 
-        $response = $this->deleteJson('/api/ask/chat-rooms/room_delete', [
-            'user_id' => 123,
-        ]);
+        $response = $this->deleteJson('/api/ask/chat-rooms/room_delete');
 
         $response->assertOk()
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('deleted.chat_room_token', 'room_delete')
-            ->assertJsonPath('deleted.rows_deleted', 2);
+            ->assertJsonPath('deleted.rows_deleted', 3);
 
         $this->assertDatabaseMissing('web_chat_campaign', [
             'session_id' => 'room_delete',
             'user_id' => 123,
         ]);
-        $this->assertDatabaseHas('web_chat_campaign', [
+        $this->assertDatabaseMissing('web_chat_campaign', [
             'session_id' => 'room_delete',
             'user_id' => 999,
         ]);
