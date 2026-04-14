@@ -86,6 +86,7 @@ class VetRegisterationTemp extends Model
         'website_subtitle',
         'website_about',
         'website_gallery',
+        'google_review_url',
         'password',
         'hospital_profile',
         'clinic_profile',

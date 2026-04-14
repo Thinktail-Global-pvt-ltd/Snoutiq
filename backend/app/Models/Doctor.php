@@ -25,6 +25,7 @@ class Doctor extends Model
         'doctors_price',
         'video_day_rate',
         'video_night_rate',
+        'payout_preference',
     ];
 
     protected $hidden = [

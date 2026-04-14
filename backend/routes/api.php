@@ -1415,6 +1415,177 @@ Route::get('/excell-export/transactions', function (Request $request) {
     ]);
 })->name('excell_export.transactions');
 
+// Create vet + doctor from the lightweight onboarding form.
+Route::post('/excell-export/import-lite', function (Request $request) {
+    $payload = $request->validate([
+        'name' => ['nullable', 'string', 'max:255'],
+        'full_name' => ['nullable', 'string', 'max:255'],
+        'doctor_name' => ['nullable', 'string', 'max:255'],
+        'clinic_name' => ['nullable', 'string', 'max:255'],
+        'clinicName' => ['nullable', 'string', 'max:255'],
+        'doctor_mobile' => ['nullable', 'string', 'max:30'],
+        'phone' => ['nullable', 'string', 'max:30'],
+        'mobile' => ['nullable', 'string', 'max:30'],
+        'response_time' => ['nullable', 'string', 'max:255'],
+        'responseTime' => ['nullable', 'string', 'max:255'],
+        'payout_preference' => ['nullable', 'string', 'max:32'],
+        'payoutPreference' => ['nullable', 'string', 'max:32'],
+        'upi_id' => ['nullable', 'string', 'max:255'],
+        'upiId' => ['nullable', 'string', 'max:255'],
+        'google_review_url' => ['nullable', 'url', 'max:1000'],
+        'googleReviewUrl' => ['nullable', 'url', 'max:1000'],
+    ]);
+
+    $input = static function (array $keys) use ($payload) {
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $payload)) {
+                continue;
+            }
+
+            $value = is_string($payload[$key]) ? trim($payload[$key]) : $payload[$key];
+            if ($value !== null && $value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    };
+
+    $doctorName = (string) $input(['doctor_name', 'full_name', 'name']);
+    $clinicName = (string) $input(['clinic_name', 'clinicName']);
+    $phoneInput = (string) $input(['doctor_mobile', 'phone', 'mobile']);
+    $responseTime = (string) ($input(['response_time', 'responseTime']) ?: 'within 30 mins');
+    $payoutPreference = strtolower((string) ($input(['payout_preference', 'payoutPreference']) ?: 'weekly'));
+    $upiId = (string) $input(['upi_id', 'upiId']);
+    $googleReviewUrl = $input(['google_review_url', 'googleReviewUrl']);
+
+    $doctorMobile = (string) preg_replace('/\\D+/', '', $phoneInput);
+    if (strlen($doctorMobile) === 12 && str_starts_with($doctorMobile, '91')) {
+        $doctorMobile = substr($doctorMobile, -10);
+    } elseif (strlen($doctorMobile) === 11 && str_starts_with($doctorMobile, '0')) {
+        $doctorMobile = substr($doctorMobile, 1);
+    }
+
+    $errors = [];
+    if ($doctorName === '') {
+        $errors['name'] = ['The full name field is required.'];
+    }
+    if ($clinicName === '') {
+        $errors['clinic_name'] = ['The clinic name field is required.'];
+    }
+    if ($doctorMobile === '' || strlen($doctorMobile) < 10) {
+        $errors['doctor_mobile'] = ['The doctor mobile field must be a valid phone number.'];
+    }
+    if (!in_array($payoutPreference, ['weekly', 'monthly'], true)) {
+        $errors['payout_preference'] = ['The payout preference must be weekly or monthly.'];
+    }
+    if ($upiId === '') {
+        $errors['upi_id'] = ['The UPI ID field is required.'];
+    }
+
+    if (!empty($errors)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors' => $errors,
+        ], 422);
+    }
+
+    $result = DB::transaction(function () use (
+        $doctorName,
+        $clinicName,
+        $doctorMobile,
+        $responseTime,
+        $payoutPreference,
+        $upiId,
+        $googleReviewUrl
+    ) {
+        $vet = new VetRegisterationTemp();
+        $vet->name = $clinicName;
+
+        if (Schema::hasColumn('vet_registerations_temp', 'clinic_profile')) {
+            $vet->clinic_profile = $clinicName;
+        }
+        if (Schema::hasColumn('vet_registerations_temp', 'mobile')) {
+            $vet->mobile = $doctorMobile;
+        }
+        if (Schema::hasColumn('vet_registerations_temp', 'city')) {
+            $vet->city = 'Unknown';
+        }
+        if (Schema::hasColumn('vet_registerations_temp', 'pincode')) {
+            $vet->pincode = '000000';
+        }
+        if (Schema::hasColumn('vet_registerations_temp', 'google_review_url')) {
+            $vet->google_review_url = $googleReviewUrl;
+        }
+        if (Schema::hasColumn('vet_registerations_temp', 'password') && empty($vet->password)) {
+            $vet->password = '123456';
+        }
+        if (Schema::hasColumn('vet_registerations_temp', 'exported_from_excell')) {
+            $vet->exported_from_excell = 1;
+        }
+
+        $vet->save();
+
+        $doctor = new Doctor();
+        $doctor->vet_registeration_id = $vet->id;
+        $doctor->doctor_name = $doctorName;
+        $doctor->doctor_mobile = $doctorMobile;
+
+        if (Schema::hasColumn('doctors', 'response_time_for_online_consults_day')) {
+            $doctor->response_time_for_online_consults_day = $responseTime;
+        }
+        if (Schema::hasColumn('doctors', 'response_time_for_online_consults_night')) {
+            $doctor->response_time_for_online_consults_night = $responseTime;
+        }
+        if (Schema::hasColumn('doctors', 'preferred_payout_method_upi_number_to_receive_payment')) {
+            $doctor->preferred_payout_method_upi_number_to_receive_payment = $upiId;
+        }
+        if (Schema::hasColumn('doctors', 'payout_preference')) {
+            $doctor->payout_preference = $payoutPreference;
+        }
+        if (Schema::hasColumn('doctors', 'exported_from_excell')) {
+            $doctor->exported_from_excell = 1;
+        }
+        if (Schema::hasColumn('doctors', 'password') && empty($doctor->password)) {
+            $doctor->password = '123456';
+        }
+        if (Schema::hasColumn('doctors', 'doctor_password') && empty($doctor->doctor_password)) {
+            $doctor->doctor_password = '123456';
+        }
+
+        $doctor->save();
+
+        return [
+            'vet' => [
+                'id' => $vet->id,
+                'name' => $vet->name,
+                'clinic_profile' => $vet->clinic_profile ?? null,
+                'mobile' => $vet->mobile ?? null,
+                'google_review_url' => $vet->google_review_url ?? $googleReviewUrl,
+                'exported_from_excell' => $vet->exported_from_excell ?? null,
+            ],
+            'doctor' => [
+                'id' => $doctor->id,
+                'vet_registeration_id' => $doctor->vet_registeration_id,
+                'doctor_name' => $doctor->doctor_name,
+                'doctor_mobile' => $doctor->doctor_mobile,
+                'response_time_for_online_consults_day' => $doctor->response_time_for_online_consults_day ?? $responseTime,
+                'response_time_for_online_consults_night' => $doctor->response_time_for_online_consults_night ?? $responseTime,
+                'payout_preference' => $doctor->payout_preference ?? $payoutPreference,
+                'preferred_payout_method_upi_number_to_receive_payment' => $doctor->preferred_payout_method_upi_number_to_receive_payment ?? $upiId,
+                'exported_from_excell' => $doctor->exported_from_excell ?? null,
+            ],
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Lightweight doctor profile created',
+        'data' => $result,
+    ], 201);
+})->name('excell_export.import_lite');
+
 // Create vet + doctor for excel export campaign (standalone API)
 Route::post('/excell-export/import', function (Request $request) {
     $data = $request->validate([
