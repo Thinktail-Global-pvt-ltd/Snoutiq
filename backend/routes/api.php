@@ -952,6 +952,52 @@ Route::post('/doctor/otp/request', function (Request $request, WhatsAppService $
     ]);
 })->name('doctor.otp.request');
 
+// Doctor OTP: send without requiring the phone to already exist
+Route::post('/doctor/otp/request-any', function (Request $request, WhatsAppService $whatsApp) {
+    $payload = $request->validate([
+        'phone' => ['required', 'string'],
+    ]);
+
+    $phone = preg_replace('/\\D+/', '', $payload['phone']);
+    if (! $phone) {
+        return response()->json(['success' => false, 'message' => 'Invalid phone'], 422);
+    }
+
+    $doctor = Doctor::whereRaw("REGEXP_REPLACE(doctor_mobile, '[^0-9]', '') = ?", [$phone])->first()
+        ?: Doctor::where('doctor_mobile', $payload['phone'])->first();
+    $phoneExists = (bool) $doctor;
+
+    $otp = (string) random_int(100000, 999999);
+    $token = (string) \Illuminate\Support\Str::uuid();
+    $expiresAt = now()->addMinutes(10);
+
+    if ($whatsApp->isConfigured()) {
+        try {
+            $whatsApp->sendOtpTemplate($phone, $otp);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Unable to send OTP'], 503);
+        }
+    }
+
+    Otp::create([
+        'token' => $token,
+        'type' => 'doctor_phone_check',
+        'value' => $phone,
+        'otp' => $otp,
+        'expires_at' => $expiresAt,
+        'is_verified' => 0,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => $phoneExists ? 'number exists' : 'number does not exist',
+        'phone_exists' => $phoneExists,
+        'request_id' => $token,
+        'expires_in' => 600,
+        'otp' => config('app.debug') ? $otp : 'hidden',
+    ]);
+})->name('doctor.otp.request-any');
+
 // Doctor OTP: verify
 Route::post('/doctor/otp/verify', function (Request $request) {
     $payload = $request->validate([
@@ -1006,6 +1052,48 @@ Route::post('/doctor/otp/verify', function (Request $request) {
         'vet_registeration' => $vetData,
     ]);
 })->name('doctor.otp.verify');
+
+// Doctor OTP: verify phone without requiring the phone to already exist
+Route::post('/doctor/otp/verify-any', function (Request $request) {
+    $payload = $request->validate([
+        'phone' => ['required', 'string'],
+        'otp' => ['required', 'string'],
+        'request_id' => ['nullable', 'string'],
+    ]);
+
+    $phone = preg_replace('/\\D+/', '', $payload['phone']);
+    if (! $phone) {
+        return response()->json(['success' => false, 'message' => 'Invalid phone'], 422);
+    }
+
+    $otpQuery = Otp::query()
+        ->where('type', 'doctor_phone_check')
+        ->where('value', $phone)
+        ->where('otp', $payload['otp'])
+        ->where('expires_at', '>', now());
+
+    if (! empty($payload['request_id'])) {
+        $otpQuery->where('token', $payload['request_id']);
+    }
+
+    $otpEntry = $otpQuery->latest()->first();
+    if (! $otpEntry) {
+        return response()->json(['success' => false, 'message' => 'Invalid or expired OTP'], 401);
+    }
+
+    $otpEntry->update(['is_verified' => 1]);
+
+    $doctor = Doctor::whereRaw("REGEXP_REPLACE(doctor_mobile, '[^0-9]', '') = ?", [$phone])->first()
+        ?: Doctor::where('doctor_mobile', $payload['phone'])->first();
+    $phoneExists = (bool) $doctor;
+
+    return response()->json([
+        'success' => true,
+        'message' => 'phone verified',
+        'phone_verified' => true,
+        'phone_exists' => $phoneExists,
+    ]);
+})->name('doctor.otp.verify-any');
 
 // Transactions count for excell export campaign by doctor & clinic
 Route::get('/excell-export/transactions', function (Request $request) {
