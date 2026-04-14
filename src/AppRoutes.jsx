@@ -132,11 +132,13 @@ const DogVomitingPage = lazy(() => import("./newflow/DogVomitingPage"));
 const InvesterPage = lazy(() => import("./investerPage/Invester.jsx"));
 const OnlineVetConsultationApp = lazy(() => import("./newflow/OnlineVetConsultationApp"));
 const FindVetsNearYou = lazy(() => import("./pages/FindVetsNearYou"));
+const NewDoctorRoute = lazy(() => import("./newdoctordata/NewDoctorRoute.jsx"));
 
 export default function AppRoutes() {
   return (
     <HelmetProvider>
       <Routes>
+           <Route path="/doctor/*" element={<NewDoctorRoute />} />
         <Route path="/video-call-pet-details" element={<VideoCallPetDetails />} />
         <Route path="/video-call-payment" element={<VideoCallPayment />} />
        <Route path="/vet-near-me-pet-details" element={<VetNearMePetDetailsPage />} />

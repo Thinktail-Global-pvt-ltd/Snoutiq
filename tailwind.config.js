@@ -12,7 +12,11 @@ export default {
         "brand-light": "#e8f3ff",
         accent: "#f97316",
         "accent-hover": "#ea6c0a",
+           whatsapp: "#25D366",
+        "whatsapp-dark": "#128C7E",
+        "whatsapp-header": "#075E54",
       },
+   
       fontFamily: {
         sans: [
           "system-ui",

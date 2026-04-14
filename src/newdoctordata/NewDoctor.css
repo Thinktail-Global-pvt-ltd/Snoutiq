@@ -1,0 +1,181 @@
+:root {
+  --color-whatsapp: #25d366;
+  --color-whatsapp-dark: #128c7e;
+  --color-whatsapp-header: #075e54;
+  --doctor-ink: #14213d;
+  --doctor-ink-soft: #52607a;
+  --doctor-line: rgba(20, 33, 61, 0.1);
+  --doctor-shell: linear-gradient(180deg, #f1fbf5 0%, #f8f5ea 48%, #ffffff 100%);
+  --doctor-panel: rgba(255, 255, 255, 0.82);
+  --doctor-panel-strong: rgba(255, 255, 255, 0.92);
+  --doctor-glow: rgba(37, 211, 102, 0.16);
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 211, 102, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 24%),
+    linear-gradient(180deg, #eef8f2 0%, #f6f7fb 45%, #ffffff 100%);
+  color: var(--doctor-ink);
+  font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.mobile-container {
+  width: 100%;
+  min-height: 100dvh;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--doctor-shell);
+}
+
+.mobile-container::before {
+  content: "";
+  position: absolute;
+  inset: -6rem auto auto -5rem;
+  width: 16rem;
+  height: 16rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(37, 211, 102, 0.22) 0%, rgba(37, 211, 102, 0) 72%);
+  pointer-events: none;
+}
+
+.mobile-container::after {
+  content: "";
+  position: absolute;
+  inset: auto -5rem -7rem auto;
+  width: 17rem;
+  height: 17rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0) 72%);
+  pointer-events: none;
+}
+
+.doctor-safe-area {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+}
+
+.doctor-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  padding-bottom: 2rem;
+  overflow-y: auto;
+}
+
+.doctor-panel {
+  background: var(--doctor-panel);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 18px 50px rgba(20, 33, 61, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(18px);
+}
+
+.doctor-panel-strong {
+  background: var(--doctor-panel-strong);
+}
+
+.doctor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.45rem 0.8rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  color: var(--doctor-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.doctor-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--doctor-ink);
+  font-size: 0.79rem;
+  font-weight: 700;
+}
+
+.doctor-muted {
+  color: var(--doctor-ink-soft);
+}
+
+.doctor-input {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid rgba(20, 33, 61, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.95rem 1rem;
+  color: var(--doctor-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.doctor-input::placeholder {
+  color: rgba(82, 96, 122, 0.78);
+}
+
+.doctor-input:focus {
+  outline: none;
+  border-color: rgba(37, 211, 102, 0.52);
+  box-shadow:
+    0 0 0 4px rgba(37, 211, 102, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.doctor-button {
+  width: 100%;
+  border: 0;
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  background: linear-gradient(135deg, var(--color-whatsapp-header) 0%, var(--color-whatsapp) 100%);
+  color: white;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 16px 30px var(--doctor-glow);
+}
+
+.doctor-button-secondary {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid var(--doctor-line);
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0.95rem 1rem;
+  color: var(--doctor-ink);
+  font-weight: 700;
+}
+
+.doctor-section-title {
+  color: var(--doctor-ink);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 640px) {
+  .mobile-container {
+    max-width: 430px;
+    border-inline: 1px solid rgba(20, 33, 61, 0.08);
+    box-shadow:
+      0 28px 60px rgba(20, 33, 61, 0.08),
+      0 8px 24px rgba(20, 33, 61, 0.06);
+    border-radius: 32px;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
