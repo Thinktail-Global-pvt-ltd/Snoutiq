@@ -804,6 +804,7 @@ class ReceptionistBookingController extends Controller
             $paymentLink = $this->createRazorpayPaymentLink($user, $pet, $data, $clinicId, $amountPaise);
             $shortUrl = trim((string) ($paymentLink['short_url'] ?? ''));
             $shortCode = $this->extractRazorpayShortCode($shortUrl);
+            $buttonParameter = $this->buildRazorpayButtonParameter($shortCode);
             $buttonUrl = $shortCode !== '' ? 'https://rzp.io/rzp/'.$shortCode : '';
 
             if ($shortCode === '') {
@@ -836,7 +837,7 @@ class ReceptionistBookingController extends Controller
                     'sub_type' => 'url',
                     'index' => '0',
                     'parameters' => [
-                        ['type' => 'text', 'text' => $shortCode],
+                        ['type' => 'text', 'text' => $buttonParameter],
                     ],
                 ],
             ];
@@ -858,7 +859,7 @@ class ReceptionistBookingController extends Controller
                 'payment_link' => $shortUrl,
                 'payment_link_slug' => $shortCode,
                 'book_now_url' => $buttonUrl,
-                'button_parameter_sent' => $shortCode,
+                'button_parameter_sent' => $buttonParameter,
                 'payment_link_id' => $paymentLink['id'] ?? null,
                 'whatsapp' => $whatsAppResponse,
             ];
@@ -989,6 +990,17 @@ class ReceptionistBookingController extends Controller
         }
 
         return basename(trim($path, '/'));
+    }
+
+    private function buildRazorpayButtonParameter(string $shortCode): string
+    {
+        if ($shortCode === '') {
+            return '';
+        }
+
+        // Keeps older templates with a literal "{{1}}" URL segment working:
+        // /rzp/{{1}}_/../abc and /rzp/_/../abc both resolve to /rzp/abc.
+        return '_/../'.$shortCode;
     }
 
     private function formatRupeesForTemplate(int $amountPaise): string
