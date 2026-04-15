@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\RazorpayPaymentLink;
+use App\Models\Transaction;
 use App\Models\WebhookEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -78,6 +79,7 @@ class RazorpayPaymentLinkWebhookController extends Controller
 
             $paymentLink = $this->upsertPaymentLink($payload, $eventName);
             $payment = $this->upsertPayment($payload, $signature);
+            $transaction = $this->upsertTransaction($payload, $paymentLink);
 
             $webhookEvent->processed_at = now();
             $webhookEvent->save();
@@ -89,6 +91,8 @@ class RazorpayPaymentLinkWebhookController extends Controller
                 'payment_link_status' => $paymentLink?->status,
                 'payment_id' => $payment?->razorpay_payment_id,
                 'payment_status' => $payment?->status,
+                'transaction_id' => $transaction?->id,
+                'transaction_status' => $transaction?->status,
             ];
         });
 
@@ -218,6 +222,79 @@ class RazorpayPaymentLinkWebhookController extends Controller
         );
     }
 
+    private function upsertTransaction(array $payload, ?RazorpayPaymentLink $paymentLink): ?Transaction
+    {
+        if (!$paymentLink || !Schema::hasTable('transactions')) {
+            return null;
+        }
+
+        $paymentEntity = data_get($payload, 'payload.payment.entity');
+        $paymentLinkEntity = data_get($payload, 'payload.payment_link.entity');
+        $orderEntity = data_get($payload, 'payload.order.entity');
+        $paymentId = is_array($paymentEntity) ? trim((string) ($paymentEntity['id'] ?? '')) : '';
+        $orderId = is_array($orderEntity) ? trim((string) ($orderEntity['id'] ?? '')) : '';
+        $paymentStatus = is_array($paymentEntity) ? trim((string) ($paymentEntity['status'] ?? '')) : '';
+        $linkStatus = trim((string) ($paymentLink->status ?? data_get($paymentLinkEntity, 'status') ?? ''));
+        $amountPaise = (int) (
+            $paymentLink->amount_paise
+            ?: data_get($paymentLinkEntity, 'amount')
+            ?: data_get($paymentEntity, 'amount')
+            ?: 0
+        );
+        $transactionType = 'excell_export_campaign';
+        $transactionStatus = $this->normalizeTransactionStatus($paymentStatus ?: $linkStatus);
+        $metadata = [
+            'order_type' => $transactionType,
+            'payment_provider' => 'razorpay',
+            'payment_flow' => 'payment_link',
+            'payment_link_id' => $paymentLink->payment_link_id,
+            'payment_link_url' => $paymentLink->short_url,
+            'payment_link_status' => $linkStatus ?: null,
+            'reference_id' => $paymentLink->reference_id,
+            'payment_id' => $paymentId ?: null,
+            'order_id' => $orderId ?: null,
+            'gateway_status' => $paymentStatus ?: $linkStatus,
+            'currency' => $paymentLink->currency ?: 'INR',
+            'source' => $paymentLink->source ?: 'razorpay_webhook',
+            'clinic_id' => $paymentLink->clinic_id,
+            'doctor_id' => $paymentLink->doctor_id,
+            'user_id' => $paymentLink->user_id,
+            'pet_id' => $paymentLink->pet_id,
+        ];
+
+        $payloadForTransaction = [
+            'clinic_id' => $paymentLink->clinic_id,
+            'doctor_id' => $paymentLink->doctor_id,
+            'user_id' => $paymentLink->user_id,
+            'pet_id' => $paymentLink->pet_id,
+            'amount_paise' => $amountPaise,
+            'status' => $transactionStatus,
+            'type' => $transactionType,
+            'payment_method' => is_array($paymentEntity)
+                ? ($paymentEntity['method'] ?? 'razorpay_payment_link')
+                : 'razorpay_payment_link',
+            'reference' => $paymentLink->payment_link_id,
+            'metadata' => $metadata,
+        ];
+
+        $payoutBreakup = $this->buildExcelExportPayoutBreakup($amountPaise);
+        $payloadForTransaction['metadata']['payout_breakup'] = $payoutBreakup;
+        foreach ([
+            'actual_amount_paid_by_consumer_paise',
+            'payment_to_snoutiq_paise',
+            'payment_to_doctor_paise',
+        ] as $column) {
+            if (Schema::hasColumn('transactions', $column)) {
+                $payloadForTransaction[$column] = (int) $payoutBreakup[$column];
+            }
+        }
+
+        return Transaction::updateOrCreate(
+            ['reference' => $paymentLink->payment_link_id],
+            $payloadForTransaction
+        );
+    }
+
     private function statusFromEvent(string $eventName): string
     {
         return match ($eventName) {
@@ -227,6 +304,71 @@ class RazorpayPaymentLinkWebhookController extends Controller
             'payment_link.expired' => 'expired',
             default => 'received',
         };
+    }
+
+    private function normalizeTransactionStatus(?string $status): string
+    {
+        $normalized = strtolower(trim((string) $status));
+        if ($normalized === '') {
+            return 'pending';
+        }
+
+        if (in_array($normalized, ['captured', 'authorized', 'paid', 'success', 'verified'], true)) {
+            return 'captured';
+        }
+
+        if (in_array($normalized, ['created', 'issued'], true)) {
+            return 'pending';
+        }
+
+        return $normalized;
+    }
+
+    private function buildExcelExportPayoutBreakup(int $grossPaise): array
+    {
+        $grossPaise = max(0, $grossPaise);
+        $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
+        $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
+        $doctorSharePaise = $this->resolveExcelDoctorSharePaise($amountBeforeGstPaise, $grossPaise);
+        $snoutiqSharePaise = max(0, $amountBeforeGstPaise - $doctorSharePaise);
+
+        return [
+            'actual_amount_paid_by_consumer_paise' => $grossPaise,
+            'gst_paise' => $gstPaise,
+            'amount_after_gst_paise' => $amountBeforeGstPaise,
+            'amount_before_gst_paise' => $amountBeforeGstPaise,
+            'gst_deducted_from_amount' => true,
+            'payment_to_snoutiq_paise' => $snoutiqSharePaise,
+            'payment_to_doctor_paise' => $doctorSharePaise,
+        ];
+    }
+
+    private function resolveExcelDoctorSharePaise(int $amountBeforeGstPaise, int $grossPaise): int
+    {
+        $amountBeforeGstPaise = max(0, $amountBeforeGstPaise);
+        $grossPaise = max(0, $grossPaise);
+
+        if (
+            abs($amountBeforeGstPaise - 39900) <= 400
+            || abs($grossPaise - 47100) <= 500
+            || abs($grossPaise - 39900) <= 400
+            || abs($amountBeforeGstPaise - 50000) <= 400
+            || abs($grossPaise - 59000) <= 500
+        ) {
+            return min($amountBeforeGstPaise, 35000);
+        }
+
+        if (
+            abs($amountBeforeGstPaise - 54900) <= 400
+            || abs($grossPaise - 64800) <= 500
+            || abs($grossPaise - 54900) <= 400
+            || abs($amountBeforeGstPaise - 65000) <= 400
+            || abs($grossPaise - 76700) <= 500
+        ) {
+            return min($amountBeforeGstPaise, 45000);
+        }
+
+        return min($amountBeforeGstPaise, 45000);
     }
 
     private function isPaidStatus(?string $status): bool

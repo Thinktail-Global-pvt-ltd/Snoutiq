@@ -9,6 +9,7 @@ use App\Models\UserPet;
 use App\Models\Receptionist;
 use App\Models\Appointment;
 use App\Models\RazorpayPaymentLink;
+use App\Models\Transaction;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -1014,6 +1015,18 @@ class ReceptionistBookingController extends Controller
                     'raw_response' => $paymentLink,
                 ]
             );
+
+            $this->storePaymentLinkTransaction(
+                paymentLinkId: $paymentLinkId,
+                shortUrl: $shortUrl,
+                referenceId: (string) ($paymentLink['reference_id'] ?? $referenceId),
+                user: $user,
+                pet: $pet,
+                data: $data,
+                clinicId: $clinicId,
+                amountPaise: $amountPaise,
+                status: (string) ($paymentLink['status'] ?? 'created')
+            );
         } catch (\Throwable $e) {
             Log::warning('receptionist.patient.payment_link_store_failed', [
                 'payment_link_id' => $paymentLinkId,
@@ -1023,6 +1036,141 @@ class ReceptionistBookingController extends Controller
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function storePaymentLinkTransaction(
+        string $paymentLinkId,
+        string $shortUrl,
+        string $referenceId,
+        User $user,
+        ?object $pet,
+        array $data,
+        ?int $clinicId,
+        int $amountPaise,
+        string $status
+    ): void {
+        if (!Schema::hasTable('transactions')) {
+            return;
+        }
+
+        try {
+            $transactionType = 'excell_export_campaign';
+            $transactionStatus = $this->normalizePaymentLinkTransactionStatus($status);
+            $payload = [
+                'clinic_id' => $clinicId,
+                'doctor_id' => !empty($data['doctor_id']) ? (int) $data['doctor_id'] : null,
+                'user_id' => $user->id,
+                'pet_id' => $pet?->id,
+                'amount_paise' => $amountPaise,
+                'status' => $transactionStatus,
+                'type' => $transactionType,
+                'payment_method' => 'razorpay_payment_link',
+                'reference' => $paymentLinkId,
+                'metadata' => [
+                    'order_type' => $transactionType,
+                    'payment_provider' => 'razorpay',
+                    'payment_flow' => 'payment_link',
+                    'payment_link_id' => $paymentLinkId,
+                    'payment_link_url' => $shortUrl ?: null,
+                    'reference_id' => $referenceId ?: null,
+                    'source' => 'receptionist_patients',
+                    'clinic_id' => $clinicId,
+                    'doctor_id' => !empty($data['doctor_id']) ? (int) $data['doctor_id'] : null,
+                    'user_id' => $user->id,
+                    'pet_id' => $pet?->id,
+                    'gateway_status' => $status,
+                ],
+            ];
+
+            $payoutBreakup = $this->buildExcelExportPayoutBreakup($amountPaise);
+            if ($payoutBreakup) {
+                $payload['metadata']['payout_breakup'] = $payoutBreakup;
+                foreach ([
+                    'actual_amount_paid_by_consumer_paise',
+                    'payment_to_snoutiq_paise',
+                    'payment_to_doctor_paise',
+                ] as $column) {
+                    if (Schema::hasColumn('transactions', $column)) {
+                        $payload[$column] = (int) $payoutBreakup[$column];
+                    }
+                }
+            }
+
+            Transaction::updateOrCreate(['reference' => $paymentLinkId], $payload);
+        } catch (\Throwable $e) {
+            Log::warning('receptionist.patient.payment_link_transaction_store_failed', [
+                'payment_link_id' => $paymentLinkId,
+                'user_id' => $user->id,
+                'pet_id' => $pet?->id ?? null,
+                'clinic_id' => $clinicId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function normalizePaymentLinkTransactionStatus(string $status): string
+    {
+        $normalized = strtolower(trim($status));
+        if ($normalized === '') {
+            return 'pending';
+        }
+
+        if (in_array($normalized, ['paid', 'captured', 'success', 'successful'], true)) {
+            return 'captured';
+        }
+
+        if (in_array($normalized, ['created', 'issued'], true)) {
+            return 'pending';
+        }
+
+        return $normalized;
+    }
+
+    private function buildExcelExportPayoutBreakup(int $grossPaise): array
+    {
+        $grossPaise = max(0, $grossPaise);
+        $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
+        $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
+        $doctorSharePaise = $this->resolveExcelDoctorSharePaise($amountBeforeGstPaise, $grossPaise);
+        $snoutiqSharePaise = max(0, $amountBeforeGstPaise - $doctorSharePaise);
+
+        return [
+            'actual_amount_paid_by_consumer_paise' => $grossPaise,
+            'gst_paise' => $gstPaise,
+            'amount_after_gst_paise' => $amountBeforeGstPaise,
+            'amount_before_gst_paise' => $amountBeforeGstPaise,
+            'gst_deducted_from_amount' => true,
+            'payment_to_snoutiq_paise' => $snoutiqSharePaise,
+            'payment_to_doctor_paise' => $doctorSharePaise,
+        ];
+    }
+
+    private function resolveExcelDoctorSharePaise(int $amountBeforeGstPaise, int $grossPaise): int
+    {
+        $amountBeforeGstPaise = max(0, $amountBeforeGstPaise);
+        $grossPaise = max(0, $grossPaise);
+
+        if (
+            abs($amountBeforeGstPaise - 39900) <= 400
+            || abs($grossPaise - 47100) <= 500
+            || abs($grossPaise - 39900) <= 400
+            || abs($amountBeforeGstPaise - 50000) <= 400
+            || abs($grossPaise - 59000) <= 500
+        ) {
+            return min($amountBeforeGstPaise, 35000);
+        }
+
+        if (
+            abs($amountBeforeGstPaise - 54900) <= 400
+            || abs($grossPaise - 64800) <= 500
+            || abs($grossPaise - 54900) <= 400
+            || abs($amountBeforeGstPaise - 65000) <= 400
+            || abs($grossPaise - 76700) <= 500
+        ) {
+            return min($amountBeforeGstPaise, 45000);
+        }
+
+        return min($amountBeforeGstPaise, 45000);
     }
 
     private function resolveTemplateDoctorName(array $data, ?int $clinicId): string
