@@ -9,6 +9,7 @@ use App\Console\Commands\SendVetResponseReminders;
 use App\Console\Commands\SendMedicalRecordCreatedReminders;
 use App\Console\Commands\SendProfileCompletionReminders;
 use App\Console\Commands\SendUserCreatedReminders;
+use App\Console\Commands\SendProfileCreatedPaymentLinkReminders;
 use App\Console\Commands\SendUserContinuityReminders;
 use App\Console\Commands\LogTodayPrescriptionFollowUps;
 use App\Console\Commands\SendPetNeuteringReminders;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SendMedicalRecordCreatedReminders::class,
         SendProfileCompletionReminders::class,
         SendUserCreatedReminders::class,
+        SendProfileCreatedPaymentLinkReminders::class,
         SendUserContinuityReminders::class,
         LogTodayPrescriptionFollowUps::class,
         SendPetNeuteringReminders::class,
@@ -83,6 +85,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Pet parent user-created reminder (2h after user is created)
         $schedule->command('notifications:pp-user-created')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        // Pet parent payment-link reminder (20m after user is created)
+        $schedule->command('notifications:pp-profile-created-20m')
             ->everyMinute()
             ->withoutOverlapping();
 
