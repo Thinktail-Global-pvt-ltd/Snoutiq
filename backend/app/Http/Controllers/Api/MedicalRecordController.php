@@ -8,15 +8,21 @@ use App\Models\MedicalRecord;
 use App\Models\Pet;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 
 class MedicalRecordController extends Controller
 {
+    public function __construct(private readonly WhatsAppService $whatsApp)
+    {
+    }
+
     public function index(Request $request, int $userId)
     {
         return $this->recordsForUser($this->resolveUser((string) $userId), $request->query('clinic_id'));
@@ -518,6 +524,7 @@ class MedicalRecordController extends Controller
             $this->updatePetHealthState($user->id, $petId, ($validated['diagnosis_status'] ?? '') === 'chronic', $validated['disease_name'] ?? $validated['diagnosis'] ?? null);
         }
         $this->markCallSessionCompleted($validated['call_session'] ?? null);
+        $prescriptionWhatsApp = $this->sendPrescriptionSentWhatsApp($prescription, $record);
 
         return response()->json([
             'success' => true,
@@ -533,6 +540,7 @@ class MedicalRecordController extends Controller
                 'url' => $this->buildRecordUrl($record->file_path),
             ],
             'prescription' => $prescription,
+            'prescription_whatsapp' => $prescriptionWhatsApp,
         ], 201);
     }
 
@@ -884,6 +892,212 @@ class MedicalRecordController extends Controller
         DB::table('video_apointment')
             ->where('id', $videoApointmentId)
             ->update($updates);
+    }
+
+    private function sendPrescriptionSentWhatsApp(Prescription $prescription, MedicalRecord $record): array
+    {
+        if ($this->hasSentPrescriptionWhatsApp($prescription)) {
+            return ['sent' => false, 'skipped' => true, 'reason' => 'already_sent'];
+        }
+
+        $user = User::query()
+            ->select(['id', 'name', 'phone'])
+            ->find($prescription->user_id);
+        $pet = $prescription->pet_id ? Pet::query()->find($prescription->pet_id) : null;
+        $doctor = $prescription->doctor_id ? Doctor::query()->find($prescription->doctor_id) : null;
+
+        $to = $this->normalizeWhatsAppPhone($user?->phone);
+        if (!$to) {
+            $this->logPrescriptionWhatsApp($prescription, $record, 'skipped', null, null, null, 'missing_patient_phone');
+            return ['sent' => false, 'skipped' => true, 'reason' => 'missing_patient_phone'];
+        }
+
+        if (!$this->whatsApp->isConfigured()) {
+            $this->logPrescriptionWhatsApp($prescription, $record, 'skipped', $to, null, null, 'whatsapp_not_configured');
+            return ['sent' => false, 'skipped' => true, 'reason' => 'whatsapp_not_configured'];
+        }
+
+        $template = config('services.whatsapp.templates.cf_prescription_sent', 'cf_prescription_sent');
+        $language = config('services.whatsapp.templates.cf_prescription_sent_language', 'en');
+        $doctorName = $this->cleanDoctorName($doctor?->doctor_name);
+        $parentName = $this->cleanText($user?->name) ?: 'Pet Parent';
+        $petName = $this->cleanText($pet?->name) ?: 'your pet';
+        $diagnosis = $this->cleanText($prescription->diagnosis ?: $prescription->disease_name) ?: 'Not specified';
+        $downloadUrl = $this->buildPrescriptionDownloadUrl($prescription);
+        $reviewUrl = $this->resolveClinicReviewUrl($record->vet_registeration_id ?: $doctor?->vet_registeration_id);
+
+        $components = [
+            [
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $doctorName],
+                    ['type' => 'text', 'text' => $parentName],
+                    ['type' => 'text', 'text' => $petName],
+                    ['type' => 'text', 'text' => $diagnosis],
+                    ['type' => 'text', 'text' => $downloadUrl],
+                    ['type' => 'text', 'text' => $reviewUrl],
+                ],
+            ],
+        ];
+
+        try {
+            $response = $this->whatsApp->sendTemplateWithResult(
+                to: $to,
+                template: $template,
+                components: $components,
+                language: $language,
+                channelName: 'prescription_sent_pet_parent'
+            );
+
+            $this->logPrescriptionWhatsApp($prescription, $record, 'sent', $to, $template, $language, null, [
+                'download_url' => $downloadUrl,
+                'review_url' => $reviewUrl,
+                'whatsapp_response' => $response,
+            ]);
+
+            return [
+                'sent' => true,
+                'template' => $template,
+                'to' => $to,
+                'download_url' => $downloadUrl,
+                'review_url' => $reviewUrl,
+                'whatsapp' => $response,
+            ];
+        } catch (\Throwable $e) {
+            $this->logPrescriptionWhatsApp($prescription, $record, 'failed', $to, $template, $language, $e->getMessage(), [
+                'download_url' => $downloadUrl,
+                'review_url' => $reviewUrl,
+            ]);
+
+            Log::warning('medical_records.prescription_sent_whatsapp_failed', [
+                'medical_record_id' => $record->id,
+                'prescription_id' => $prescription->id,
+                'user_id' => $prescription->user_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'sent' => false,
+                'skipped' => false,
+                'reason' => $e->getMessage(),
+                'template' => $template,
+                'to' => $to,
+                'download_url' => $downloadUrl,
+                'review_url' => $reviewUrl,
+            ];
+        }
+    }
+
+    private function hasSentPrescriptionWhatsApp(Prescription $prescription): bool
+    {
+        if (!$prescription->id || !Schema::hasTable('vet_response_reminder_logs')) {
+            return false;
+        }
+
+        return DB::table('vet_response_reminder_logs')
+            ->whereJsonContains('meta->type', 'cf_prescription_sent')
+            ->whereJsonContains('meta->prescription_id', $prescription->id)
+            ->where('status', 'sent')
+            ->exists();
+    }
+
+    private function buildPrescriptionDownloadUrl(Prescription $prescription): string
+    {
+        return $this->buildBackendUrl('/api/consultation/prescription/pdf?prescription_id='.(int) $prescription->id);
+    }
+
+    private function resolveClinicReviewUrl(?int $clinicId): string
+    {
+        $reviewUrl = '';
+        if ($clinicId && Schema::hasTable('vet_registerations_temp') && Schema::hasColumn('vet_registerations_temp', 'google_review_url')) {
+            $reviewUrl = (string) DB::table('vet_registerations_temp')
+                ->where('id', $clinicId)
+                ->value('google_review_url');
+        }
+
+        return trim($reviewUrl) !== '' ? trim($reviewUrl) : 'https://snoutiq.com';
+    }
+
+    private function buildBackendUrl(string $path): string
+    {
+        $base = rtrim((string) config('app.url'), '/');
+        if (!str_ends_with($base, '/backend')) {
+            $base .= '/backend';
+        }
+
+        return $base.'/'.ltrim($path, '/');
+    }
+
+    private function normalizeWhatsAppPhone(?string $phone): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone) ?: '';
+
+        if (strlen($digits) === 10) {
+            return '91'.$digits;
+        }
+
+        if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+            return '91'.substr($digits, 1);
+        }
+
+        return strlen($digits) >= 11 ? $digits : null;
+    }
+
+    private function cleanDoctorName(?string $name): string
+    {
+        $clean = $this->cleanText($name);
+        $clean = preg_replace('/^dr\.?\s+/i', '', $clean) ?: $clean;
+
+        return trim($clean) !== '' ? trim($clean) : 'Snoutiq';
+    }
+
+    private function cleanText(?string $value): string
+    {
+        return trim(preg_replace('/\s+/', ' ', (string) $value) ?: '');
+    }
+
+    private function logPrescriptionWhatsApp(
+        Prescription $prescription,
+        MedicalRecord $record,
+        string $status,
+        ?string $phone,
+        ?string $template,
+        ?string $language,
+        ?string $error,
+        array $extraMeta = []
+    ): void {
+        if (!Schema::hasTable('vet_response_reminder_logs')) {
+            return;
+        }
+
+        try {
+            DB::table('vet_response_reminder_logs')->insert([
+                'transaction_id' => null,
+                'user_id' => $prescription->user_id,
+                'pet_id' => $prescription->pet_id,
+                'phone' => $phone,
+                'template' => $template,
+                'language' => $language,
+                'status' => $status,
+                'error' => $error,
+                'meta' => json_encode(array_merge([
+                    'type' => 'cf_prescription_sent',
+                    'record_id' => $record->id,
+                    'prescription_id' => $prescription->id,
+                    'medical_record_id' => $record->id,
+                    'clinic_id' => $record->vet_registeration_id,
+                    'doctor_id' => $prescription->doctor_id,
+                ], $extraMeta)),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('medical_records.prescription_sent_whatsapp_log_failed', [
+                'medical_record_id' => $record->id,
+                'prescription_id' => $prescription->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function maybeStructureMedicines(?string $raw, ?string $diagnosis, ?string $notes): ?array
