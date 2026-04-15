@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\RazorpayPaymentLink;
 use App\Models\Transaction;
 use App\Models\WebhookEvent;
+use App\Services\WhatsAppService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -16,6 +17,10 @@ use Illuminate\Support\Facades\Schema;
 
 class RazorpayPaymentLinkWebhookController extends Controller
 {
+    public function __construct(private readonly WhatsAppService $whatsApp)
+    {
+    }
+
     public function handle(Request $request): JsonResponse
     {
         $rawBody = $request->getContent();
@@ -93,8 +98,13 @@ class RazorpayPaymentLinkWebhookController extends Controller
                 'payment_status' => $payment?->status,
                 'transaction_id' => $transaction?->id,
                 'transaction_status' => $transaction?->status,
+                'send_vet_payment_alert' => $this->shouldSendVetPaymentAlert($paymentLink, $payment, $transaction),
             ];
         });
+
+        if (!($result['duplicate'] ?? false) && ($result['send_vet_payment_alert'] ?? false)) {
+            $result['vet_payment_alert'] = $this->sendVetPaymentConfirmedAlert($result['payment_link_id'] ?? null);
+        }
 
         return response()->json([
             'success' => true,
@@ -293,6 +303,275 @@ class RazorpayPaymentLinkWebhookController extends Controller
             ['reference' => $paymentLink->payment_link_id],
             $payloadForTransaction
         );
+    }
+
+    private function shouldSendVetPaymentAlert(?RazorpayPaymentLink $paymentLink, ?Payment $payment, ?Transaction $transaction): bool
+    {
+        if (!$paymentLink) {
+            return false;
+        }
+
+        return $this->isPaidStatus($paymentLink->status)
+            || $this->isPaidStatus($paymentLink->payment_status)
+            || $this->isPaidStatus($payment?->status)
+            || $this->isPaidStatus($transaction?->status);
+    }
+
+    private function sendVetPaymentConfirmedAlert(?string $paymentLinkId): array
+    {
+        $paymentLinkId = trim((string) $paymentLinkId);
+        if ($paymentLinkId === '') {
+            return ['sent' => false, 'skipped' => true, 'reason' => 'missing_payment_link_id'];
+        }
+
+        $paymentLink = RazorpayPaymentLink::where('payment_link_id', $paymentLinkId)->first();
+        if (!$paymentLink) {
+            return ['sent' => false, 'skipped' => true, 'reason' => 'payment_link_not_found'];
+        }
+
+        if ($this->hasSentVetPaymentAlert($paymentLink)) {
+            return ['sent' => false, 'skipped' => true, 'reason' => 'already_sent'];
+        }
+
+        if (!$this->whatsApp->isConfigured()) {
+            $this->logVetPaymentAlert($paymentLink, 'skipped', null, null, null, 'whatsapp_not_configured');
+            return ['sent' => false, 'skipped' => true, 'reason' => 'whatsapp_not_configured'];
+        }
+
+        $vet = $this->resolveVetRecipient($paymentLink);
+        $vetPhone = $this->normalizeWhatsAppPhone($vet['phone'] ?? null);
+        if (!$vetPhone) {
+            $this->logVetPaymentAlert($paymentLink, 'skipped', null, null, null, 'missing_vet_phone');
+            return ['sent' => false, 'skipped' => true, 'reason' => 'missing_vet_phone'];
+        }
+
+        $parent = $this->resolvePetParent($paymentLink);
+        $parentPhone = $this->formatIndianPhoneForTemplate($parent['phone'] ?? null);
+        $parentName = $this->cleanText($parent['name'] ?? null) ?: ($parentPhone ?: 'Pet Parent');
+        $amount = $this->formatRupeesForTemplate($this->resolvePaidAmountPaise($paymentLink));
+        $template = config('services.whatsapp.templates.cf_payment_confirmed_vet', 'cf_payment_confirmed_vet');
+        $language = config('services.whatsapp.templates.cf_payment_confirmed_vet_language', 'en');
+
+        $components = [
+            [
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $amount],
+                    ['type' => 'text', 'text' => $parentName],
+                    ['type' => 'text', 'text' => $parentPhone ?: ''],
+                ],
+            ],
+        ];
+
+        try {
+            $response = $this->whatsApp->sendTemplateWithResult(
+                to: $vetPhone,
+                template: $template,
+                components: $components,
+                language: $language,
+                channelName: 'payment_confirmed_vet_alert'
+            );
+
+            $this->logVetPaymentAlert($paymentLink, 'sent', $vetPhone, $template, $language, null, [
+                'vet_doctor_id' => $vet['doctor_id'] ?? null,
+                'vet_phone' => $vetPhone,
+                'parent_phone' => $parentPhone,
+                'amount' => $amount,
+                'whatsapp_response' => $response,
+            ]);
+
+            return [
+                'sent' => true,
+                'template' => $template,
+                'to' => $vetPhone,
+                'amount' => $amount,
+                'parent_name' => $parentName,
+                'parent_phone' => $parentPhone,
+            ];
+        } catch (\Throwable $e) {
+            $this->logVetPaymentAlert($paymentLink, 'failed', $vetPhone, $template, $language, $e->getMessage(), [
+                'vet_doctor_id' => $vet['doctor_id'] ?? null,
+                'parent_phone' => $parentPhone,
+                'amount' => $amount,
+            ]);
+
+            Log::warning('razorpay.payment_link_webhook.vet_payment_alert_failed', [
+                'payment_link_id' => $paymentLink->payment_link_id,
+                'vet_phone' => $vetPhone,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'sent' => false,
+                'skipped' => false,
+                'reason' => $e->getMessage(),
+                'template' => $template,
+                'to' => $vetPhone,
+            ];
+        }
+    }
+
+    private function hasSentVetPaymentAlert(RazorpayPaymentLink $paymentLink): bool
+    {
+        if (!Schema::hasTable('vet_response_reminder_logs')) {
+            return false;
+        }
+
+        return DB::table('vet_response_reminder_logs')
+            ->whereJsonContains('meta->type', 'cf_payment_confirmed_vet')
+            ->whereJsonContains('meta->payment_link_id', $paymentLink->payment_link_id)
+            ->where('status', 'sent')
+            ->exists();
+    }
+
+    private function resolveVetRecipient(RazorpayPaymentLink $paymentLink): array
+    {
+        $doctor = null;
+
+        if ($paymentLink->doctor_id) {
+            $doctor = DB::table('doctors')
+                ->select(['id', 'doctor_name', 'doctor_mobile'])
+                ->where('id', $paymentLink->doctor_id)
+                ->first();
+        }
+
+        if ((!$doctor || empty($doctor->doctor_mobile)) && $paymentLink->clinic_id) {
+            $doctor = DB::table('doctors')
+                ->select(['id', 'doctor_name', 'doctor_mobile'])
+                ->where('vet_registeration_id', $paymentLink->clinic_id)
+                ->whereNotNull('doctor_mobile')
+                ->where('doctor_mobile', '!=', '')
+                ->orderBy('id')
+                ->first();
+        }
+
+        $clinicPhone = null;
+        if ($paymentLink->clinic_id) {
+            $clinicPhone = DB::table('vet_registerations_temp')
+                ->where('id', $paymentLink->clinic_id)
+                ->value('mobile');
+        }
+
+        return [
+            'doctor_id' => $doctor->id ?? $paymentLink->doctor_id,
+            'name' => $doctor->doctor_name ?? null,
+            'phone' => $doctor->doctor_mobile ?? $clinicPhone,
+        ];
+    }
+
+    private function resolvePetParent(RazorpayPaymentLink $paymentLink): array
+    {
+        $user = $paymentLink->user_id
+            ? DB::table('users')->select(['name', 'phone'])->where('id', $paymentLink->user_id)->first()
+            : null;
+
+        return [
+            'name' => $user->name
+                ?? data_get($paymentLink->webhook_payload, 'payload.payment.entity.name')
+                ?? data_get($paymentLink->webhook_payload, 'payload.payment_link.entity.customer.name'),
+            'phone' => $user->phone
+                ?? data_get($paymentLink->webhook_payload, 'payload.payment.entity.contact')
+                ?? data_get($paymentLink->webhook_payload, 'payload.payment_link.entity.customer.contact'),
+        ];
+    }
+
+    private function resolvePaidAmountPaise(RazorpayPaymentLink $paymentLink): int
+    {
+        return (int) (
+            data_get($paymentLink->webhook_payload, 'payload.payment.entity.amount')
+            ?: data_get($paymentLink->webhook_payload, 'payload.payment_link.entity.amount_paid')
+            ?: $paymentLink->amount_paise
+            ?: 0
+        );
+    }
+
+    private function normalizeWhatsAppPhone(?string $phone): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone) ?: '';
+
+        if (strlen($digits) === 10) {
+            return '91'.$digits;
+        }
+
+        if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+            return '91'.substr($digits, 1);
+        }
+
+        return strlen($digits) >= 11 ? $digits : null;
+    }
+
+    private function formatIndianPhoneForTemplate(?string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone) ?: '';
+        if ($digits === '') {
+            return '';
+        }
+
+        if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+            return substr($digits, 1);
+        }
+
+        if (strlen($digits) >= 12 && str_starts_with($digits, '91')) {
+            return substr($digits, -10);
+        }
+
+        return strlen($digits) >= 10 ? substr($digits, -10) : $digits;
+    }
+
+    private function formatRupeesForTemplate(int $amountPaise): string
+    {
+        $formatted = number_format(max(0, $amountPaise) / 100, 2, '.', '');
+
+        return str_ends_with($formatted, '.00')
+            ? substr($formatted, 0, -3)
+            : rtrim(rtrim($formatted, '0'), '.');
+    }
+
+    private function cleanText(?string $value): string
+    {
+        return trim(preg_replace('/\s+/', ' ', (string) $value) ?: '');
+    }
+
+    private function logVetPaymentAlert(
+        RazorpayPaymentLink $paymentLink,
+        string $status,
+        ?string $phone,
+        ?string $template,
+        ?string $language,
+        ?string $error,
+        array $extraMeta = []
+    ): void {
+        if (!Schema::hasTable('vet_response_reminder_logs')) {
+            return;
+        }
+
+        try {
+            DB::table('vet_response_reminder_logs')->insert([
+                'transaction_id' => null,
+                'user_id' => $paymentLink->user_id,
+                'pet_id' => $paymentLink->pet_id,
+                'phone' => $phone,
+                'template' => $template,
+                'language' => $language,
+                'status' => $status,
+                'error' => $error,
+                'meta' => json_encode(array_merge([
+                    'type' => 'cf_payment_confirmed_vet',
+                    'payment_link_id' => $paymentLink->payment_link_id,
+                    'razorpay_payment_link_row_id' => $paymentLink->id,
+                    'payment_id' => $paymentLink->payment_id,
+                    'clinic_id' => $paymentLink->clinic_id,
+                    'doctor_id' => $paymentLink->doctor_id,
+                ], $extraMeta)),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('razorpay.payment_link_webhook.vet_payment_alert_log_failed', [
+                'payment_link_id' => $paymentLink->payment_link_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function statusFromEvent(string $eventName): string
