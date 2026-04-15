@@ -12,6 +12,7 @@ use App\Console\Commands\SendUserCreatedReminders;
 use App\Console\Commands\SendProfileCreatedPaymentLinkReminders;
 use App\Console\Commands\SendUserContinuityReminders;
 use App\Console\Commands\LogTodayPrescriptionFollowUps;
+use App\Console\Commands\SendPrescriptionMedicationReminders;
 use App\Console\Commands\SendPetNeuteringReminders;
 use App\Console\Commands\SendPetVaccinationUpcomingReminders;
 
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SendProfileCreatedPaymentLinkReminders::class,
         SendUserContinuityReminders::class,
         LogTodayPrescriptionFollowUps::class,
+        SendPrescriptionMedicationReminders::class,
         SendPetNeuteringReminders::class,
         SendPetVaccinationUpcomingReminders::class,
     ])
@@ -67,6 +69,10 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         $schedule->command('notifications:prescription-followups-today')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('notifications:prescription-medication-reminders')
             ->everyMinute()
             ->withoutOverlapping();
 
