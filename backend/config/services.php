@@ -67,6 +67,8 @@ return [
             'cf_payment_confirmed_vet_language' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_CONFIRMED_VET_LANGUAGE', 'en'),
             'cf_prescription_sent' => env('WHATSAPP_TEMPLATE_CF_PRESCRIPTION_SENT', 'cf_prescription_sent'),
             'cf_prescription_sent_language' => env('WHATSAPP_TEMPLATE_CF_PRESCRIPTION_SENT_LANGUAGE', 'en'),
+            'cf_medication_reminder' => env('WHATSAPP_TEMPLATE_CF_MEDICATION_REMINDER', 'cf_medication_reminder'),
+            'cf_medication_reminder_language' => env('WHATSAPP_TEMPLATE_CF_MEDICATION_REMINDER_LANGUAGE', 'en'),
             'cf_followup_reminder_video' => env('WHATSAPP_TEMPLATE_CF_FOLLOWUP_REMINDER_VIDEO', 'cf_followup_reminder_video'),
             'cf_followup_reminder_video_language' => env('WHATSAPP_TEMPLATE_CF_FOLLOWUP_REMINDER_VIDEO_LANGUAGE', 'en'),
             'cf_followup_reminder_clinic' => env('WHATSAPP_TEMPLATE_CF_FOLLOWUP_REMINDER_CLINIC', 'cf_followup_reminder_clinic'),

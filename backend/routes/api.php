@@ -2387,6 +2387,7 @@ Route::get('/users/pets-prescriptions', [PrescriptionController::class, 'userPet
 Route::get('/doctors/{doctor_id}/prescriptions', [PrescriptionController::class, 'forDoctor'])->whereNumber('doctor_id');
 Route::get('/pets/{pet_id}/prescriptions/medications-json', [PrescriptionController::class, 'medicationsByPet'])->whereNumber('pet_id');
 Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show'])->whereNumber('id');
+Route::post('/prescriptions/{id}/medication-reminder', [\App\Http\Controllers\Api\PrescriptionMedicationReminderController::class, 'send'])->whereNumber('id');
 Route::post('/prescriptions', [PrescriptionController::class, 'store']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
 Route::get('/test-dd', function () {
