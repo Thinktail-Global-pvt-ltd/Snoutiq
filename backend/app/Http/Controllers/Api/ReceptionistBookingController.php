@@ -8,11 +8,14 @@ use App\Models\User;
 use App\Models\UserPet;
 use App\Models\Receptionist;
 use App\Models\Appointment;
+use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -21,6 +24,10 @@ use Carbon\Carbon;
 class ReceptionistBookingController extends Controller
 {
     private const PATIENT_ROLES = ['pet', 'pet_owner', 'patient', 'user'];
+
+    public function __construct(private readonly WhatsAppService $whatsApp)
+    {
+    }
 
     private function resolveClinicId(Request $request): ?int
     {
@@ -586,6 +593,10 @@ class ReceptionistBookingController extends Controller
             'pet_pic' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
             'pet_doc2' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
             'last_vet_id' => 'nullable|integer|exists:vet_registerations_temp,id',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'amount' => 'nullable|numeric|min:1|max:1000000',
+            'amount_paise' => 'nullable|integer|min:100|max:100000000',
+            'response_time_minutes' => 'nullable|integer|min:1|max:1440',
         ], [
             'phone.unique' => 'A patient with this phone number already exists.',
         ]);
@@ -742,6 +753,13 @@ class ReceptionistBookingController extends Controller
             }
         }
 
+        $paymentMessage = $this->maybeSendPaymentLinkWhatsApp(
+            user: $user,
+            pet: $pet,
+            data: $data,
+            clinicId: $clinicId,
+        );
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -761,8 +779,221 @@ class ReceptionistBookingController extends Controller
                     'pet_doc2_blob_url' => $pet->pet_doc2_blob_url ?? null,
                     'pet_image_url' => $pet->pet_doc2_blob_url ?? $pet->pet_doc1 ?? $pet->pic_link ?? null,
                 ] : null,
+                'payment_link_whatsapp' => $paymentMessage,
             ],
         ], 201);
+    }
+
+    private function maybeSendPaymentLinkWhatsApp(User $user, ?object $pet, array $data, ?int $clinicId): array
+    {
+        $parentName = trim((string) ($user->name ?? $data['name'] ?? ''));
+        $phone = trim((string) ($user->phone ?? $data['phone'] ?? ''));
+        $petName = trim((string) ($pet->name ?? $data['pet_name'] ?? ''));
+        $petBreed = trim((string) ($pet->breed ?? $data['pet_breed'] ?? ''));
+
+        if ($parentName === '' || $phone === '' || $petName === '' || $petBreed === '') {
+            return [
+                'sent' => false,
+                'skipped' => true,
+                'reason' => 'parent name, phone, pet name, and pet breed are required',
+            ];
+        }
+
+        try {
+            $amountPaise = $this->resolveConsultationAmountPaise($data);
+            $paymentLink = $this->createRazorpayPaymentLink($user, $pet, $data, $clinicId, $amountPaise);
+            $shortUrl = trim((string) ($paymentLink['short_url'] ?? ''));
+            $shortCode = $this->extractRazorpayShortCode($shortUrl);
+
+            if ($shortCode === '') {
+                return [
+                    'sent' => false,
+                    'skipped' => false,
+                    'reason' => 'Razorpay payment link did not return a usable short URL',
+                    'payment_link' => $shortUrl ?: null,
+                ];
+            }
+
+            $doctorName = $this->resolveTemplateDoctorName($data, $clinicId);
+            $responseTime = (string) ((int) ($data['response_time_minutes'] ?? 10));
+            $amountRupees = $this->formatRupeesForTemplate($amountPaise);
+            $to = $this->normalizeWhatsAppPhone($phone);
+
+            $components = [
+                [
+                    'type' => 'body',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $doctorName],
+                        ['type' => 'text', 'text' => $parentName],
+                        ['type' => 'text', 'text' => $petName],
+                        ['type' => 'text', 'text' => $responseTime],
+                        ['type' => 'text', 'text' => $amountRupees],
+                    ],
+                ],
+                [
+                    'type' => 'button',
+                    'sub_type' => 'url',
+                    'index' => '0',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $shortCode],
+                    ],
+                ],
+            ];
+
+            $whatsAppResponse = $this->whatsApp->sendTemplateWithResult(
+                to: $to,
+                template: config('services.whatsapp.templates.cf_payment_link_full', 'cf_payment_link_full'),
+                components: $components,
+                language: config('services.whatsapp.templates.cf_payment_link_full_language', 'en'),
+                channelName: 'receptionist_patient_payment_link'
+            );
+
+            return [
+                'sent' => true,
+                'template' => 'cf_payment_link_full',
+                'to' => $to,
+                'amount' => $amountRupees,
+                'amount_paise' => $amountPaise,
+                'payment_link' => $shortUrl,
+                'payment_link_id' => $paymentLink['id'] ?? null,
+                'whatsapp' => $whatsAppResponse,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('receptionist.patient.payment_link_whatsapp_failed', [
+                'user_id' => $user->id ?? null,
+                'pet_id' => $pet->id ?? null,
+                'clinic_id' => $clinicId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'sent' => false,
+                'skipped' => false,
+                'reason' => $e->getMessage(),
+            ];
+        }
+    }
+
+    private function resolveConsultationAmountPaise(array $data): int
+    {
+        if (!empty($data['amount_paise'])) {
+            return (int) $data['amount_paise'];
+        }
+
+        $amountRupees = (float) ($data['amount'] ?? 499);
+
+        return (int) round($amountRupees * 100);
+    }
+
+    private function createRazorpayPaymentLink(User $user, object $pet, array $data, ?int $clinicId, int $amountPaise): array
+    {
+        $key = trim((string) (config('services.razorpay.key') ?? ''));
+        $secret = trim((string) (config('services.razorpay.secret') ?? ''));
+
+        if ($key === '' || $secret === '') {
+            throw new \RuntimeException('Razorpay credentials missing');
+        }
+
+        $referenceId = 'SNOUTIQ_CONSULT_'.$user->id.'_'.($pet->id ?? 'PET').'_'.Str::upper(Str::random(8));
+        $phone = $this->normalizeWhatsAppPhone((string) ($user->phone ?? $data['phone'] ?? ''));
+
+        $payload = [
+            'amount' => $amountPaise,
+            'currency' => 'INR',
+            'reference_id' => $referenceId,
+            'description' => 'Snoutiq - Veterinary Consultation',
+            'customer' => array_filter([
+                'name' => $user->name,
+                'contact' => $phone ? '+'.$phone : null,
+                'email' => $user->email,
+            ]),
+            'notify' => [
+                'sms' => true,
+                'email' => !empty($user->email),
+            ],
+            'reminder_enable' => true,
+            'notes' => array_filter([
+                'service' => 'Veterinary Consultation',
+                'source' => 'receptionist_patients',
+                'clinic_id' => $clinicId,
+                'patient_id' => $user->id,
+                'pet_id' => $pet->id ?? null,
+                'pet_name' => $pet->name ?? null,
+                'pet_breed' => $pet->breed ?? null,
+            ], fn ($value) => $value !== null && $value !== ''),
+        ];
+
+        $response = Http::withBasicAuth($key, $secret)
+            ->acceptJson()
+            ->asJson()
+            ->post('https://api.razorpay.com/v1/payment_links', $payload);
+
+        $body = $response->json();
+        if (!$response->successful()) {
+            $message = data_get($body, 'error.description')
+                ?? data_get($body, 'error.reason')
+                ?? $response->body()
+                ?? 'Unable to create Razorpay payment link';
+            throw new \RuntimeException('Razorpay payment link failed: '.$message);
+        }
+
+        return is_array($body) ? $body : [];
+    }
+
+    private function resolveTemplateDoctorName(array $data, ?int $clinicId): string
+    {
+        $doctorId = $data['doctor_id'] ?? null;
+        $doctor = null;
+
+        if ($doctorId) {
+            $doctor = Doctor::query()
+                ->when($clinicId, fn ($query) => $query->where('vet_registeration_id', $clinicId))
+                ->find((int) $doctorId);
+        }
+
+        if (!$doctor && $clinicId) {
+            $doctor = Doctor::query()
+                ->where('vet_registeration_id', $clinicId)
+                ->orderBy('id')
+                ->first();
+        }
+
+        $name = trim((string) ($doctor?->doctor_name ?? 'Snoutiq'));
+        $name = preg_replace('/^\s*dr\.?\s+/i', '', $name) ?: $name;
+
+        return $name ?: 'Snoutiq';
+    }
+
+    private function normalizeWhatsAppPhone(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', $phone) ?: '';
+        if (strlen($digits) === 10) {
+            return '91'.$digits;
+        }
+        if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+            return '91'.substr($digits, 1);
+        }
+
+        return $digits;
+    }
+
+    private function extractRazorpayShortCode(string $shortUrl): string
+    {
+        $path = parse_url($shortUrl, PHP_URL_PATH);
+        if (!is_string($path) || trim($path, '/') === '') {
+            return '';
+        }
+
+        return basename(trim($path, '/'));
+    }
+
+    private function formatRupeesForTemplate(int $amountPaise): string
+    {
+        $amount = $amountPaise / 100;
+
+        return floor($amount) === $amount
+            ? (string) (int) $amount
+            : number_format($amount, 2, '.', '');
     }
 
     private function resolvePetUploadFile(Request $request): ?UploadedFile

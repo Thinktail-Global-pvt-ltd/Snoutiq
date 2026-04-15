@@ -52,6 +52,8 @@ return [
             // Backward-compatible alias used in older flows/commands.
             'vet_response_reminder' => env('WHATSAPP_TEMPLATE_VET_RESPONSE_REMINDER', 'vet_sla_reminder'),
             'pp_booking_confirmed' => env('WHATSAPP_TEMPLATE_PP_BOOKING_CONFIRMED', 'pp_booking_confirmed'),
+            'cf_payment_link_full' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_FULL', 'cf_payment_link_full'),
+            'cf_payment_link_full_language' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_FULL_LANGUAGE', 'en'),
         ],
     ],
 
