@@ -577,7 +577,7 @@ class ReceptionistBookingController extends Controller
         }
 
         $data = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'nullable|string|max:255',
             'email' => 'nullable|email|unique:users,email',
             'phone' => $phoneRules,
             'pet_name' => 'nullable|string|max:120',
@@ -610,8 +610,10 @@ class ReceptionistBookingController extends Controller
             ], 422);
         }
 
+        $patientName = trim((string) ($data['name'] ?? ''));
+
         $userPayload = [
-            'name' => $data['name'],
+            'name' => $patientName !== '' ? $patientName : 'Pet Parent',
             'email' => $data['email'] ?? null,
             'phone' => $data['phone'] ?? null,
             'password' => Hash::make(Str::random(16)),
@@ -786,20 +788,21 @@ class ReceptionistBookingController extends Controller
 
     private function maybeSendPaymentLinkWhatsApp(User $user, ?object $pet, array $data, ?int $clinicId): array
     {
-        $parentName = trim((string) ($user->name ?? $data['name'] ?? ''));
+        $parentName = trim((string) ($data['name'] ?? ''));
         $phone = trim((string) ($user->phone ?? $data['phone'] ?? ''));
-        $petName = trim((string) ($pet->name ?? $data['pet_name'] ?? ''));
-        $petBreed = trim((string) ($pet->breed ?? $data['pet_breed'] ?? ''));
+        $petName = trim((string) ($data['pet_name'] ?? $pet->name ?? ''));
+        $petBreed = trim((string) ($data['pet_breed'] ?? $pet->breed ?? ''));
 
-        if ($parentName === '' || $phone === '' || $petName === '' || $petBreed === '') {
+        if ($phone === '') {
             return [
                 'sent' => false,
                 'skipped' => true,
-                'reason' => 'parent name, phone, pet name, and pet breed are required',
+                'reason' => 'phone is required',
             ];
         }
 
         try {
+            $useFullTemplate = $parentName !== '' && $petName !== '' && $petBreed !== '';
             $amountPaise = $this->resolveConsultationAmountPaise($data);
             $paymentLink = $this->createRazorpayPaymentLink($user, $pet, $data, $clinicId, $amountPaise);
             $shortUrl = trim((string) ($paymentLink['short_url'] ?? ''));
@@ -820,16 +823,30 @@ class ReceptionistBookingController extends Controller
             $amountRupees = $this->formatRupeesForTemplate($amountPaise);
             $to = $this->normalizeWhatsAppPhone($phone);
 
+            if ($useFullTemplate) {
+                $template = config('services.whatsapp.templates.cf_payment_link_full', 'cf_payment_link_full');
+                $language = config('services.whatsapp.templates.cf_payment_link_full_language', 'en');
+                $bodyParameters = [
+                    ['type' => 'text', 'text' => $doctorName],
+                    ['type' => 'text', 'text' => $parentName],
+                    ['type' => 'text', 'text' => $petName],
+                    ['type' => 'text', 'text' => $responseTime],
+                    ['type' => 'text', 'text' => $amountRupees],
+                ];
+            } else {
+                $template = config('services.whatsapp.templates.cf_payment_link_mini', 'cf_payment_link_mini');
+                $language = config('services.whatsapp.templates.cf_payment_link_mini_language', 'en');
+                $bodyParameters = [
+                    ['type' => 'text', 'text' => $doctorName],
+                    ['type' => 'text', 'text' => $responseTime],
+                    ['type' => 'text', 'text' => $amountRupees],
+                ];
+            }
+
             $components = [
                 [
                     'type' => 'body',
-                    'parameters' => [
-                        ['type' => 'text', 'text' => $doctorName],
-                        ['type' => 'text', 'text' => $parentName],
-                        ['type' => 'text', 'text' => $petName],
-                        ['type' => 'text', 'text' => $responseTime],
-                        ['type' => 'text', 'text' => $amountRupees],
-                    ],
+                    'parameters' => $bodyParameters,
                 ],
                 [
                     'type' => 'button',
@@ -843,15 +860,16 @@ class ReceptionistBookingController extends Controller
 
             $whatsAppResponse = $this->whatsApp->sendTemplateWithResult(
                 to: $to,
-                template: config('services.whatsapp.templates.cf_payment_link_full', 'cf_payment_link_full'),
+                template: $template,
                 components: $components,
-                language: config('services.whatsapp.templates.cf_payment_link_full_language', 'en'),
+                language: $language,
                 channelName: 'receptionist_patient_payment_link'
             );
 
             return [
                 'sent' => true,
-                'template' => 'cf_payment_link_full',
+                'template' => $template,
+                'template_variant' => $useFullTemplate ? 'full' : 'mini',
                 'to' => $to,
                 'amount' => $amountRupees,
                 'amount_paise' => $amountPaise,
@@ -889,7 +907,7 @@ class ReceptionistBookingController extends Controller
         return (int) round($amountRupees * 100);
     }
 
-    private function createRazorpayPaymentLink(User $user, object $pet, array $data, ?int $clinicId, int $amountPaise): array
+    private function createRazorpayPaymentLink(User $user, ?object $pet, array $data, ?int $clinicId, int $amountPaise): array
     {
         $key = trim((string) (config('services.razorpay.key') ?? ''));
         $secret = trim((string) (config('services.razorpay.secret') ?? ''));
@@ -898,7 +916,7 @@ class ReceptionistBookingController extends Controller
             throw new \RuntimeException('Razorpay credentials missing');
         }
 
-        $referenceId = 'SNOUTIQ_CONSULT_'.$user->id.'_'.($pet->id ?? 'PET').'_'.Str::upper(Str::random(8));
+        $referenceId = 'SNOUTIQ_CONSULT_'.$user->id.'_'.($pet?->id ?? 'PET').'_'.Str::upper(Str::random(8));
         $phone = $this->normalizeWhatsAppPhone((string) ($user->phone ?? $data['phone'] ?? ''));
 
         $payload = [
@@ -921,9 +939,9 @@ class ReceptionistBookingController extends Controller
                 'source' => 'receptionist_patients',
                 'clinic_id' => $clinicId,
                 'patient_id' => $user->id,
-                'pet_id' => $pet->id ?? null,
-                'pet_name' => $pet->name ?? null,
-                'pet_breed' => $pet->breed ?? null,
+                'pet_id' => $pet?->id,
+                'pet_name' => $pet?->name,
+                'pet_breed' => $pet?->breed,
             ], fn ($value) => $value !== null && $value !== ''),
         ];
 

@@ -54,6 +54,8 @@ return [
             'pp_booking_confirmed' => env('WHATSAPP_TEMPLATE_PP_BOOKING_CONFIRMED', 'pp_booking_confirmed'),
             'cf_payment_link_full' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_FULL', 'cf_payment_link_full'),
             'cf_payment_link_full_language' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_FULL_LANGUAGE', 'en'),
+            'cf_payment_link_mini' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_MINI', 'cf_payment_link_mini'),
+            'cf_payment_link_mini_language' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_MINI_LANGUAGE', 'en'),
         ],
     ],
 
