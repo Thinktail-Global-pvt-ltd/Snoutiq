@@ -9,6 +9,7 @@ import NewDoctorOnBoarding from "./NewDoctorOnBoarding";
 import NewDoctorSearchView from "./NewDoctorSearchView";
 import NewDoctorWhatsAppPopup from "./NewDoctorWhatsAppPopup";
 import NewDoctorDigitalPrescription from "./NewDoctorDigitalPrescription";
+import DoctorPendingPrescriptionGate from "./DoctorPendingPrescriptionGate";
 import {
   NewDoctorAuthProvider,
   useNewDoctorAuth,
@@ -60,6 +61,7 @@ const NewDoctorRouteContent = () => {
   return (
     <div className="mobile-container">
       <div className="doctor-safe-area">
+        <DoctorPendingPrescriptionGate />
         <Routes>
           <Route index element={<DoctorEntryRedirect />} />
           <Route path="login" element={<NewDoctorLogin />} />

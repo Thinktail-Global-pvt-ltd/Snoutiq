@@ -13,6 +13,8 @@ import {
   PawPrint,
   Search,
 } from "lucide-react";
+import { useNewDoctorAuth } from "./NewDoctorAuth";
+import { startDoctorPendingPrescription } from "./doctorPendingPrescriptionService";
 
 const TOTAL_STEPS = 2;
 const DOG_BREEDS_URL = "https://snoutiq.com/backend/api/dog-breeds/all";
@@ -112,6 +114,9 @@ function normalizeBreedOptions(payload) {
 export default function NewDoctorNewRequestView() {
   const navigate = useNavigate();
   const breedMenuRef = useRef(null);
+  const { auth } = useNewDoctorAuth();
+
+  const doctorId = auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id;
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
@@ -182,22 +187,31 @@ export default function NewDoctorNewRequestView() {
   };
 
   const handlePaymentReceived = () => {
+    const patientData = {
+      phone: form.phone,
+      amount: form.amount,
+      parentName: form.parentName,
+      petName: form.petName,
+      petType: form.petType,
+      breed: form.breed,
+      gender: form.gender,
+      age: form.age,
+      weight: "",
+    };
+
+    startDoctorPendingPrescription(doctorId, {
+      consultationId: null,
+      lockUntilSubmit: true,
+      patientData,
+    });
+
     navigate("/counsltflow/digital-prescription", {
       state: {
         consultationId: null,
         paymentCompleted: true,
         lockUntilSubmit: true,
         fromNewRequest: true,
-        patientData: {
-          phone: form.phone,
-          amount: form.amount,
-          parentName: form.parentName,
-          petName: form.petName,
-          petType: form.petType,
-          breed: form.breed,
-          gender: form.gender,
-          age: form.age,
-        },
+        patientData,
       },
     });
   };

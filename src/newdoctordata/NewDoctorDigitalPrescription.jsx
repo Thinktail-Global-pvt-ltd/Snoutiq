@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   FileText,
   X,
@@ -12,6 +13,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
+import { clearDoctorPendingPrescription } from "./doctorPendingPrescriptionService";
+import { useDoctorPendingPrescription } from "./useDoctorPendingPrescription";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -302,6 +305,52 @@ const normalizeId = (value) => {
   return String(num);
 };
 
+const createMockPendingTransaction = ({
+  pendingPrescription,
+  doctorId,
+  clinicId,
+  doctorLicenseLabel,
+  clinicNameLabel,
+}) => {
+  const patientData = pendingPrescription?.patientData || {};
+
+  return {
+    id: pendingPrescription?.consultationId || "",
+    status: "paid",
+    created_at: new Date().toISOString(),
+    reference: pendingPrescription?.consultationId
+      ? `Consultation #${pendingPrescription.consultationId}`
+      : "Pending prescription",
+    user: {
+      id: "",
+      name: patientData.parentName || "",
+      phone: patientData.phone || "",
+      city: "",
+    },
+    pet: {
+      id: "",
+      name: patientData.petName || "",
+      pet_type: patientData.petType || "",
+      breed: patientData.breed || "",
+      pet_gender: patientData.gender || "",
+      age: patientData.age || "",
+      weight_kg: patientData.weight || "",
+    },
+    doctor: {
+      id: doctorId || "",
+      doctor_license: doctorLicenseLabel,
+    },
+    clinic: {
+      id: clinicId || "",
+      name: clinicNameLabel,
+      city: "",
+    },
+    metadata: {
+      notes: {},
+    },
+  };
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 /**
@@ -312,10 +361,13 @@ const normalizeId = (value) => {
  *  - onSuccess    {fn}      – called after successful prescription submit
  */
 const NewDoctorDigitalPrescription = ({
-  transaction: activeTransaction = null,
+  transaction: providedTransaction = null,
   onClose = () => {},
   onSuccess = () => {},
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // ── Derived auth values ──
   const { auth } = useNewDoctorAuth();
   const authToken = auth?.token || auth?.access_token || "";
@@ -332,16 +384,46 @@ const NewDoctorDigitalPrescription = ({
     auth?.doctor_name ||
     auth?.doctor?.name ||
     "Doctor";
-  const doctorLicenseLabel =
+  const fallbackDoctorLicenseLabel =
     auth?.extras?.license_number ||
-    activeTransaction?.doctor?.doctor_license ||
+    auth?.doctor?.doctor_license ||
     "Not available";
-  const clinicNameLabel =
-    auth?.extras?.clinic_name ||
-    activeTransaction?.clinic?.name ||
-    "Not available";
+  const fallbackClinicNameLabel =
+    auth?.extras?.clinic_name || auth?.doctor?.clinic_name || "Not available";
   const assignedDoctorName =
     auth?.doctor?.doctor_name || doctorName || "Assigned Veterinarian";
+  const { pendingPrescription, refresh } = useDoctorPendingPrescription({
+    doctorId,
+    enabled: true,
+  });
+  const isMockSubmitMode =
+    !providedTransaction &&
+    pendingPrescription.hasPending &&
+    pendingPrescription.lockUntilSubmit;
+  const activeTransaction = useMemo(() => {
+    if (providedTransaction) return providedTransaction;
+    if (!isMockSubmitMode) return null;
+
+    return createMockPendingTransaction({
+      pendingPrescription,
+      doctorId,
+      clinicId: clinicIdFromAuth,
+      doctorLicenseLabel: fallbackDoctorLicenseLabel,
+      clinicNameLabel: fallbackClinicNameLabel,
+    });
+  }, [
+    clinicIdFromAuth,
+    doctorId,
+    fallbackClinicNameLabel,
+    fallbackDoctorLicenseLabel,
+    isMockSubmitMode,
+    pendingPrescription,
+    providedTransaction,
+  ]);
+  const doctorLicenseLabel =
+    activeTransaction?.doctor?.doctor_license || fallbackDoctorLicenseLabel;
+  const clinicNameLabel =
+    activeTransaction?.clinic?.name || fallbackClinicNameLabel;
 
   // ── Resolve IDs from transaction ──
   const resolveIds = () => {
@@ -730,7 +812,7 @@ const NewDoctorDigitalPrescription = ({
       doctorId: resolvedDoctorId,
       clinicId,
     } = resolveIds();
-    if (!userId || !clinicId) {
+    if (!isMockSubmitMode && (!userId || !clinicId)) {
       setPrescriptionError(
         "Missing patient or clinic data. Please refresh and try again.",
       );
@@ -827,6 +909,14 @@ const NewDoctorDigitalPrescription = ({
       fd.append("record_file", prescriptionForm.recordFile);
 
     try {
+      if (isMockSubmitMode) {
+        await new Promise((resolve) => window.setTimeout(resolve, 350));
+        clearDoctorPendingPrescription(doctorId);
+        refresh();
+        setShowSuccessModal(true);
+        return;
+      }
+
       const headers = authToken
         ? { Authorization: `Bearer ${authToken}`, Accept: "application/json" }
         : { Accept: "application/json" };
@@ -841,6 +931,8 @@ const NewDoctorDigitalPrescription = ({
           buildValidationMessage(data, "Failed to save prescription."),
         );
       }
+      clearDoctorPendingPrescription(doctorId);
+      refresh();
       setShowSuccessModal(true);
     } catch (err) {
       setPrescriptionError(err?.message || "Failed to save prescription.");
@@ -853,6 +945,9 @@ const NewDoctorDigitalPrescription = ({
     setShowSuccessModal(false);
     onSuccess();
     onClose();
+    if (location.pathname === "/counsltflow/digital-prescription") {
+      navigate("/counsltflow/dashboard", { replace: true });
+    }
   };
 
   // ══════════════════════════════════════════════════════════════════════════
