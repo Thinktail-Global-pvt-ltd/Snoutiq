@@ -70,6 +70,7 @@ use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\Api\DocumentUploadController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\ReceptionistBookingController;
+use App\Http\Controllers\Api\RazorpayPaymentLinkWebhookController;
 use App\Http\Controllers\Api\PetVaccinationRecordController;
 use App\Http\Controllers\Api\ErrorLogController;
 use App\Http\Controllers\Api\SocketServerController;
@@ -2761,6 +2762,8 @@ Route::get('/razorpay-ping', function () {
         return response(['auth' => 'fail', 'msg' => $e->getMessage()], 401);
     }
 });
+
+  Route::post('/razorpay/payment-link-webhook', [RazorpayPaymentLinkWebhookController::class, 'handle']);
 
   Route::post('/rzp/verify', [PaymentController::class, 'verifyPayment']);
 

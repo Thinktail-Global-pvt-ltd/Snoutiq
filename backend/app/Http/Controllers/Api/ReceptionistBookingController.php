@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\UserPet;
 use App\Models\Receptionist;
 use App\Models\Appointment;
+use App\Models\RazorpayPaymentLink;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -940,6 +941,7 @@ class ReceptionistBookingController extends Controller
                 'clinic_id' => $clinicId,
                 'patient_id' => $user->id,
                 'pet_id' => $pet?->id,
+                'doctor_id' => !empty($data['doctor_id']) ? (int) $data['doctor_id'] : null,
                 'pet_name' => $pet?->name,
                 'pet_breed' => $pet?->breed,
             ], fn ($value) => $value !== null && $value !== ''),
@@ -959,7 +961,68 @@ class ReceptionistBookingController extends Controller
             throw new \RuntimeException('Razorpay payment link failed: '.$message);
         }
 
+        if (is_array($body)) {
+            $this->storeRazorpayPaymentLink(
+                paymentLink: $body,
+                user: $user,
+                pet: $pet,
+                data: $data,
+                clinicId: $clinicId,
+                amountPaise: $amountPaise,
+                referenceId: $referenceId
+            );
+        }
+
         return is_array($body) ? $body : [];
+    }
+
+    private function storeRazorpayPaymentLink(
+        array $paymentLink,
+        User $user,
+        ?object $pet,
+        array $data,
+        ?int $clinicId,
+        int $amountPaise,
+        string $referenceId
+    ): void {
+        if (!Schema::hasTable('razorpay_payment_links')) {
+            return;
+        }
+
+        $paymentLinkId = trim((string) ($paymentLink['id'] ?? ''));
+        if ($paymentLinkId === '') {
+            return;
+        }
+
+        try {
+            $shortUrl = trim((string) ($paymentLink['short_url'] ?? ''));
+
+            RazorpayPaymentLink::updateOrCreate(
+                ['payment_link_id' => $paymentLinkId],
+                [
+                    'short_url' => $shortUrl ?: null,
+                    'short_code' => $this->extractRazorpayShortCode($shortUrl) ?: null,
+                    'reference_id' => $paymentLink['reference_id'] ?? $referenceId,
+                    'source' => 'receptionist_patients',
+                    'user_id' => $user->id,
+                    'pet_id' => $pet?->id,
+                    'clinic_id' => $clinicId,
+                    'doctor_id' => !empty($data['doctor_id']) ? (int) $data['doctor_id'] : null,
+                    'amount_paise' => $amountPaise,
+                    'currency' => $paymentLink['currency'] ?? 'INR',
+                    'status' => $paymentLink['status'] ?? 'created',
+                    'raw_response' => $paymentLink,
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('receptionist.patient.payment_link_store_failed', [
+                'payment_link_id' => $paymentLinkId,
+                'user_id' => $user->id,
+                'pet_id' => $pet?->id ?? null,
+                'clinic_id' => $clinicId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function resolveTemplateDoctorName(array $data, ?int $clinicId): string
