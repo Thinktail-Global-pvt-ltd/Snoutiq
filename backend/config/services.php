@@ -61,6 +61,8 @@ return [
             'cf_payment_link_reminder_minimal_language' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_REMINDER_MINIMAL_LANGUAGE', 'en'),
             'cf_payment_link_reminder_full' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_REMINDER_FULL', 'cf_payment_link_reminder_full'),
             'cf_payment_link_reminder_full_language' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_LINK_REMINDER_FULL_LANGUAGE', 'en'),
+            'cf_payment_confirmed_parent' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_CONFIRMED_PARENT', 'cf_payment_confirmed_parent'),
+            'cf_payment_confirmed_parent_language' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_CONFIRMED_PARENT_LANGUAGE', 'en'),
             'cf_payment_confirmed_vet' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_CONFIRMED_VET', 'cf_payment_confirmed_vet'),
             'cf_payment_confirmed_vet_language' => env('WHATSAPP_TEMPLATE_CF_PAYMENT_CONFIRMED_VET_LANGUAGE', 'en'),
             'cf_prescription_sent' => env('WHATSAPP_TEMPLATE_CF_PRESCRIPTION_SENT', 'cf_prescription_sent'),
