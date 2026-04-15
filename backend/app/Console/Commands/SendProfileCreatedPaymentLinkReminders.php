@@ -96,17 +96,16 @@ class SendProfileCreatedPaymentLinkReminders extends Command
 
             $context = $this->buildReminderContext($user, $paymentLink);
             $useFullTemplate = $context['parent_name'] !== ''
-                && $context['pet_name'] !== ''
-                && $context['pet_breed'] !== '';
+                && $context['pet_name'] !== '';
 
             $template = $useFullTemplate
-                ? config('services.whatsapp.templates.cf_payment_link_full', 'cf_payment_link_full')
-                : config('services.whatsapp.templates.cf_payment_link_mini', 'cf_payment_link_mini');
+                ? config('services.whatsapp.templates.cf_payment_link_reminder_full', 'cf_payment_link_reminder_full')
+                : config('services.whatsapp.templates.cf_payment_link_reminder_minimal', 'cf_payment_link_reminder_minimal');
             $language = $useFullTemplate
-                ? config('services.whatsapp.templates.cf_payment_link_full_language', 'en')
-                : config('services.whatsapp.templates.cf_payment_link_mini_language', 'en');
-            $variant = $useFullTemplate ? 'full' : 'half';
-            $components = $this->buildTemplateComponents($context, $paymentLink, $shortCode, $useFullTemplate);
+                ? config('services.whatsapp.templates.cf_payment_link_reminder_full_language', 'en')
+                : config('services.whatsapp.templates.cf_payment_link_reminder_minimal_language', 'en');
+            $variant = $useFullTemplate ? 'full' : 'minimal';
+            $components = $this->buildTemplateComponents($context, $shortCode, $useFullTemplate);
 
             if ($dryRun) {
                 $skipped++;
@@ -182,21 +181,21 @@ class SendProfileCreatedPaymentLinkReminders extends Command
         ];
     }
 
-    private function buildTemplateComponents(array $context, RazorpayPaymentLink $paymentLink, string $shortCode, bool $useFullTemplate): array
+    private function buildTemplateComponents(array $context, string $shortCode, bool $useFullTemplate): array
     {
         if ($useFullTemplate) {
             $bodyParameters = [
-                ['type' => 'text', 'text' => $context['doctor_name']],
-                ['type' => 'text', 'text' => $context['parent_name']],
-                ['type' => 'text', 'text' => $context['pet_name']],
-                ['type' => 'text', 'text' => $context['response_time']],
-                ['type' => 'text', 'text' => $context['amount']],
+                ['type' => 'text', 'text' => $context['doctor_name']], // {{1}}
+                ['type' => 'text', 'text' => $context['parent_name']], // {{2}}
+                ['type' => 'text', 'text' => $context['pet_name']],    // {{3}}
+                ['type' => 'text', 'text' => $context['amount']],      // {{4}}
+                ['type' => 'text', 'text' => $context['response_time']], // {{5}}
             ];
         } else {
             $bodyParameters = [
-                ['type' => 'text', 'text' => $context['doctor_name']],
-                ['type' => 'text', 'text' => $context['response_time']],
-                ['type' => 'text', 'text' => $context['amount']],
+                ['type' => 'text', 'text' => $context['doctor_name']], // {{1}}
+                ['type' => 'text', 'text' => $context['amount']],      // {{2}}
+                ['type' => 'text', 'text' => $context['response_time']], // {{3}}
             ];
         }
 
