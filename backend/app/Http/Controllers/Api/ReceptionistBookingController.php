@@ -804,6 +804,7 @@ class ReceptionistBookingController extends Controller
             $paymentLink = $this->createRazorpayPaymentLink($user, $pet, $data, $clinicId, $amountPaise);
             $shortUrl = trim((string) ($paymentLink['short_url'] ?? ''));
             $shortCode = $this->extractRazorpayShortCode($shortUrl);
+            $buttonUrl = $shortCode !== '' ? 'https://rzp.io/rzp/'.$shortCode : '';
 
             if ($shortCode === '') {
                 return [
@@ -856,6 +857,8 @@ class ReceptionistBookingController extends Controller
                 'amount_paise' => $amountPaise,
                 'payment_link' => $shortUrl,
                 'payment_link_slug' => $shortCode,
+                'book_now_url' => $buttonUrl,
+                'button_parameter_sent' => $shortCode,
                 'payment_link_id' => $paymentLink['id'] ?? null,
                 'whatsapp' => $whatsAppResponse,
             ];
