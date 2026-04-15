@@ -25,11 +25,11 @@ export default function NewDoctorSearchView() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
       {/* HEADER */}
-      <div className="flex items-center gap-3 px-4 py-4 bg-green-600 text-white">
+    <div className="flex items-center gap-3 px-5 h-[68px] bg-[#16a34a] text-white shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
         <button onClick={() => navigate(-1)}>
-          <ArrowLeft size={20} />
+          <ArrowLeft size={22} />
         </button>
-        <h1 className="text-base font-semibold">
+        <h1 className="text-[18px] font-bold">
           Search Pet Parent
         </h1>
       </div>

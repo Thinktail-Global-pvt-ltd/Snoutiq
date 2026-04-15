@@ -8,26 +8,128 @@ import NewDoctorNotificationsView from "./NewDoctorNotificationsView";
 import NewDoctorOnBoarding from "./NewDoctorOnBoarding";
 import NewDoctorSearchView from "./NewDoctorSearchView";
 import NewDoctorWhatsAppPopup from "./NewDoctorWhatsAppPopup";
+import NewDoctorDigitalPrescription from "./NewDoctorDigitalPrescription";
+import {
+  NewDoctorAuthProvider,
+  useNewDoctorAuth,
+} from "./NewDoctorAuth";
 
-const NewDoctorRoute = () => {
+function DoctorEntryRedirect() {
+  const { auth, hydrated } = useNewDoctorAuth();
+
+  if (!hydrated) return null;
+
+  if (auth.onboarding_completed) {
+    return <Navigate replace to="dashboard" />;
+  }
+
+  if (auth.phone_verified && !auth.phone_exists) {
+    return <Navigate replace to="onboarding" />;
+  }
+
+  if (auth.phone_verified && auth.phone_exists) {
+    return <Navigate replace to="dashboard" />;
+  }
+
+  return <Navigate replace to="login" />;
+}
+
+function RequireVerifiedPhone({ children }) {
+  const { auth, hydrated } = useNewDoctorAuth();
+
+  if (!hydrated) return null;
+  if (!auth.phone_verified) {
+    return <Navigate replace to="/counsltflow/login" />;
+  }
+
+  return children;
+}
+
+function RequireDoctorSession({ children }) {
+  const { auth, hydrated } = useNewDoctorAuth();
+
+  if (!hydrated) return null;
+
+  if (auth.onboarding_completed) return children;
+  if (auth.phone_verified && auth.phone_exists) return children;
+
+  return <Navigate replace to="/counsltflow/login" />;
+}
+
+const NewDoctorRouteContent = () => {
   return (
     <div className="mobile-container">
       <div className="doctor-safe-area">
         <Routes>
-          <Route index element={<Navigate replace to="login" />} />
+          <Route index element={<DoctorEntryRedirect />} />
           <Route path="login" element={<NewDoctorLogin />} />
-          <Route path="onboarding" element={<NewDoctorOnBoarding />} />
-          <Route path="dashboard" element={<NewDoctorDashboardView />} />
-          <Route path="new-request" element={<NewDoctorNewRequestView />} />
-          <Route path="search" element={<NewDoctorSearchView />} />
-          <Route path="whatsapp" element={<NewDoctorWhatsAppPopup />} />
+          <Route
+            path="onboarding"
+            element={
+              <RequireVerifiedPhone>
+                <NewDoctorOnBoarding />
+              </RequireVerifiedPhone>
+            }
+          />
+          <Route
+            path="dashboard"
+            element={
+              <RequireDoctorSession>
+                <NewDoctorDashboardView />
+              </RequireDoctorSession>
+            }
+          />
+          <Route
+            path="new-request"
+            element={
+              <RequireDoctorSession>
+                <NewDoctorNewRequestView />
+              </RequireDoctorSession>
+            }
+          />
+          <Route
+            path="search"
+            element={
+              <RequireDoctorSession>
+                <NewDoctorSearchView />
+              </RequireDoctorSession>
+            }
+          />
+          <Route
+            path="whatsapp"
+            element={
+              <RequireDoctorSession>
+                <NewDoctorWhatsAppPopup />
+              </RequireDoctorSession>
+            }
+          />
           <Route
             path="notifications"
-            element={<NewDoctorNotificationsView />}
+            element={
+              <RequireDoctorSession>
+                <NewDoctorNotificationsView />
+              </RequireDoctorSession>
+            }
+          />
+          <Route
+            path="digital-prescription"
+            element={
+              <RequireDoctorSession>
+                <NewDoctorDigitalPrescription />
+              </RequireDoctorSession>
+            }
           />
         </Routes>
       </div>
     </div>
+  );
+};
+
+const NewDoctorRoute = () => {
+  return (
+    <NewDoctorAuthProvider>
+      <NewDoctorRouteContent />
+    </NewDoctorAuthProvider>
   );
 };
 

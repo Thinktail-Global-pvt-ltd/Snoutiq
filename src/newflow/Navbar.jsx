@@ -14,6 +14,7 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
     { name: "For Vets", href: "/vets" },
     { name: "For Clinics", href: "/clinics" },
     { name: "About Us", href: "/about" },
+     { name: "ConsultFlow", href: "/counsltflow" },
   ];
 
   const go = (to) => {

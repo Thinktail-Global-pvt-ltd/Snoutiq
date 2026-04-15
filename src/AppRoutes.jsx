@@ -138,7 +138,8 @@ export default function AppRoutes() {
   return (
     <HelmetProvider>
       <Routes>
-           <Route path="/doctor/*" element={<NewDoctorRoute />} />
+           <Route path="/counsltflow/*" element={<NewDoctorRoute />} />
+<Route path="/doctor/*" element={<Navigate to="/counsltflow" replace />} />
         <Route path="/video-call-pet-details" element={<VideoCallPetDetails />} />
         <Route path="/video-call-payment" element={<VideoCallPayment />} />
        <Route path="/vet-near-me-pet-details" element={<VetNearMePetDetailsPage />} />
