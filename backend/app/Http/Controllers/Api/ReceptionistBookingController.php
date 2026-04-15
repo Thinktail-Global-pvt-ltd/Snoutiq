@@ -998,9 +998,9 @@ class ReceptionistBookingController extends Controller
             return '';
         }
 
-        // Keeps older templates with a literal "{{1}}" URL segment working:
-        // /rzp/{{1}}_/../abc and /rzp/_/../abc both resolve to /rzp/abc.
-        return '_/../'.$shortCode;
+        // Keeps the current template with a literal "{{1}}" URL segment working:
+        // /rzp/{{1}}/../abc resolves to /rzp/abc.
+        return '/../'.$shortCode;
     }
 
     private function formatRupeesForTemplate(int $amountPaise): string
