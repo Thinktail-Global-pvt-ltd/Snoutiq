@@ -855,6 +855,7 @@ class ReceptionistBookingController extends Controller
                 'amount' => $amountRupees,
                 'amount_paise' => $amountPaise,
                 'payment_link' => $shortUrl,
+                'payment_link_slug' => $shortCode,
                 'payment_link_id' => $paymentLink['id'] ?? null,
                 'whatsapp' => $whatsAppResponse,
             ];
