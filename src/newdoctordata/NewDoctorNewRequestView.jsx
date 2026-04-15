@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,9 +19,11 @@ const DOG_BREEDS_URL = "https://snoutiq.com/backend/api/dog-breeds/all";
 const CAT_BREEDS_URL = "https://snoutiq.com/backend/api/cat-breeds/with-indian";
 
 const fieldBase =
-  "h-[50px] w-full rounded-2xl border border-[#e8eaee] bg-[#f4f5f7] px-4 text-[15px] text-slate-700 outline-none placeholder:text-[#8a94a6] focus:border-[#16a34a] focus:ring-0";
+  "h-[50px] w-full rounded-2xl border border-[#d7dee8] bg-white px-4 text-[15px] text-[#1e293b] outline-none placeholder:text-[#94a3b8] shadow-sm focus:border-[#16a34a] focus:bg-[#fcfffd] focus:ring-0";
+
 const sectionLabel =
-  "text-[12px] font-bold uppercase tracking-[0.08em] text-[#98a2b3] mb-3";
+  "mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#475467]";
+
 const primaryBtn =
   "flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[#2fd161] px-4 text-[17px] font-bold text-white shadow-[0_10px_22px_rgba(47,209,97,0.24)] active:scale-[0.99] transition-transform";
 
@@ -103,7 +105,7 @@ function normalizeBreedOptions(payload) {
   });
 
   return Array.from(uniqueMap.values()).sort((a, b) =>
-    a.label.localeCompare(b.label)
+    a.label.localeCompare(b.label),
   );
 }
 
@@ -137,7 +139,7 @@ export default function NewDoctorNewRequestView() {
     if (!query) return breedOptions;
 
     return breedOptions.filter((item) =>
-      item.label.toLowerCase().includes(query)
+      item.label.toLowerCase().includes(query),
     );
   }, [breedOptions, breedQuery]);
 
@@ -257,8 +259,8 @@ export default function NewDoctorNewRequestView() {
   }, [form.petType]);
 
   return (
-    <div className="min-h-screen bg-[#f5f6f8]">
-      <div className="mx-auto w-full max-w-[430px] min-h-screen bg-[#f5f6f8]">
+    <div className="min-h-screen bg-[#F8F8F8] flex flex-col">
+      <div className="mx-auto w-full min-h-screen bg-[#FCFCFC]">
         {step === 0 && (
           <div className="flex flex-col min-h-screen">
             <Header title="New Consultation" onBack={handleBack} />
@@ -303,133 +305,147 @@ export default function NewDoctorNewRequestView() {
                   <p className={sectionLabel}>Pet & Parent (Optional)</p>
 
                   <div className="space-y-4">
-                    <div className="relative">
-                      <User
-                        size={18}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-[#98a2b3]"
-                      />
-                      <input
-                        type="text"
-                        value={form.parentName}
-                        onChange={(e) => updateField("parentName", e.target.value)}
-                        placeholder="Pet Parent Name"
-                        className={`${fieldBase} pl-11`}
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="relative">
+                        <User
+                          size={18}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-[#98a2b3]"
+                        />
+                        <input
+                          type="text"
+                          value={form.parentName}
+                          onChange={(e) =>
+                            updateField("parentName", e.target.value)
+                          }
+                          placeholder="Pet Parent Name"
+                          className={`${fieldBase} pl-11`}
+                        />
+                      </div>
+
+                      <div className="relative">
+                        <PawPrint
+                          size={18}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-[#98a2b3]"
+                        />
+                        <input
+                          type="text"
+                          value={form.petName}
+                          onChange={(e) =>
+                            updateField("petName", e.target.value)
+                          }
+                          placeholder="Pet Name"
+                          className={`${fieldBase} pl-11`}
+                        />
+                      </div>
                     </div>
-
-                    <div className="relative">
-                      <PawPrint
-                        size={18}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-[#98a2b3]"
-                      />
-                      <input
-                        type="text"
-                        value={form.petName}
-                        onChange={(e) => updateField("petName", e.target.value)}
-                        placeholder="Pet Name"
-                        className={`${fieldBase} pl-11`}
-                      />
-                    </div>
-
-                    {/* Pet Type full width for better UX */}
-                    <div className="relative">
-                      <select
-                        value={form.petType}
-                        onChange={(e) => handlePetTypeChange(e.target.value)}
-                        className={`${fieldBase} appearance-none pr-9`}
-                      >
-                        <option value="">Select Pet Type</option>
-                        <option value="dog">Dog</option>
-                        <option value="cat">Cat</option>
-                      </select>
-
-                      <ChevronDown
-                        size={16}
-                        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-700"
-                      />
-                    </div>
-
-                    {/* Breed full width for cleaner dropdown UX */}
-                    <div className="relative" ref={breedMenuRef}>
-                      <button
-                        type="button"
-                        disabled={!form.petType}
-                        onClick={() => {
-                          if (!form.petType) return;
-                          setIsBreedMenuOpen((prev) => !prev);
-                        }}
-                        className={`${fieldBase} flex items-center justify-between text-left ${
-                          !form.petType ? "text-[#8a94a6]" : "text-slate-700"
-                        }`}
-                      >
-                        <span className="truncate">
-                          {form.breed
-                            ? form.breed
-                            : !form.petType
-                            ? "Select Pet Type First"
-                            : breedsLoading
-                            ? "Loading breeds..."
-                            : "Select Breed"}
-                        </span>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Pet Type full width for better UX */}
+                      <div className="relative">
+                        <select
+                          value={form.petType}
+                          onChange={(e) => handlePetTypeChange(e.target.value)}
+                          className={`${fieldBase} appearance-none pr-9`}
+                        >
+                          <option value="">Select Pet Type</option>
+                          <option value="dog">Dog</option>
+                          <option value="cat">Cat</option>
+                        </select>
 
                         <ChevronDown
                           size={16}
-                          className={`shrink-0 text-slate-700 transition-transform ${
-                            isBreedMenuOpen ? "rotate-180" : ""
-                          }`}
+                          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-700"
                         />
-                      </button>
+                      </div>
 
-                      {isBreedMenuOpen && form.petType ? (
-                        <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-30 overflow-hidden rounded-2xl border border-[#e8eaee] bg-white shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
-                          <div className="border-b border-slate-100 p-3">
-                            <div className="relative">
-                              <Search
-                                size={16}
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#98a2b3]"
-                              />
-                              <input
-                                type="text"
-                                value={breedQuery}
-                                onChange={(e) => setBreedQuery(e.target.value)}
-                                placeholder="Search breed"
-                                autoFocus
-                                className="h-[42px] w-full rounded-xl border border-[#e8eaee] bg-[#f4f5f7] pl-10 pr-3 text-[14px] text-slate-700 outline-none"
-                              />
+                      {/* Breed full width for cleaner dropdown UX */}
+                      <div className="relative" ref={breedMenuRef}>
+                        <button
+                          type="button"
+                          disabled={!form.petType}
+                          onClick={() => {
+                            if (!form.petType) return;
+                            setIsBreedMenuOpen((prev) => !prev);
+                          }}
+                          className={`${fieldBase} flex items-center justify-between text-left ${
+                            !form.petType ? "text-[#8a94a6]" : "text-slate-700"
+                          }`}
+                        >
+                          <span className="truncate">
+                            {form.breed
+                              ? form.breed
+                              : !form.petType
+                                ? "Select Pet Type First"
+                                : breedsLoading
+                                  ? "Loading breeds..."
+                                  : "Select Breed"}
+                          </span>
+
+                          <ChevronDown
+                            size={16}
+                            className={`shrink-0 text-slate-700 transition-transform ${
+                              isBreedMenuOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+
+                        {isBreedMenuOpen && form.petType ? (
+                          <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-30 overflow-hidden rounded-2xl border border-[#e8eaee] bg-white shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
+                            <div className="border-b border-slate-100 p-3">
+                              <div className="relative">
+                                <Search
+                                  size={16}
+                                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#98a2b3]"
+                                />
+                                <input
+                                  type="text"
+                                  value={breedQuery}
+                                  onChange={(e) =>
+                                    setBreedQuery(e.target.value)
+                                  }
+                                  placeholder="Search breed"
+                                  autoFocus
+                                  className="h-[42px] w-full rounded-xl border border-[#e8eaee] bg-[#f4f5f7] pl-10 pr-3 text-[14px] text-slate-700 outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="max-h-52 overflow-y-auto p-2">
+                              {filteredBreedOptions.length > 0 ? (
+                                filteredBreedOptions.map((item) => (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() =>
+                                      handleBreedSelect(item.label)
+                                    }
+                                    className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[14px] transition ${
+                                      form.breed === item.label
+                                        ? "bg-green-50 text-green-700"
+                                        : "text-slate-700 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {item.label}
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="px-3 py-3 text-sm text-[#98a2b3]">
+                                  {breedsLoading
+                                    ? "Loading breeds..."
+                                    : "No breeds found"}
+                                </div>
+                              )}
                             </div>
                           </div>
-
-                          <div className="max-h-52 overflow-y-auto p-2">
-                            {filteredBreedOptions.length > 0 ? (
-                              filteredBreedOptions.map((item) => (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  onClick={() => handleBreedSelect(item.label)}
-                                  className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[14px] transition ${
-                                    form.breed === item.label
-                                      ? "bg-green-50 text-green-700"
-                                      : "text-slate-700 hover:bg-slate-50"
-                                  }`}
-                                >
-                                  {item.label}
-                                </button>
-                              ))
-                            ) : (
-                              <div className="px-3 py-3 text-sm text-[#98a2b3]">
-                                {breedsLoading ? "Loading breeds..." : "No breeds found"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
+                        ) : null}
+                      </div>
                     </div>
-
                     <div className="grid grid-cols-2 gap-3">
                       <div className="relative">
                         <select
                           value={form.gender}
-                          onChange={(e) => updateField("gender", e.target.value)}
+                          onChange={(e) =>
+                            updateField("gender", e.target.value)
+                          }
                           className={`${fieldBase} appearance-none pr-9`}
                         >
                           <option>Male</option>
@@ -454,7 +470,7 @@ export default function NewDoctorNewRequestView() {
                 </div>
               </div>
 
-              <div className="pt-6">
+              <div className="mt-auto pt-[5rem]">
                 <button type="button" onClick={goNext} className={primaryBtn}>
                   Send Payment Link
                   <CreditCard size={18} />

@@ -7,7 +7,7 @@ export default function NewDoctorNotificationsView() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-[#FCFCFC] flex flex-col">
 
       {/* HEADER */}
          <div className="flex items-center gap-3 px-5 h-[68px] bg-[#16a34a] text-white shadow-[0_2px_12px_rgba(0,0,0,0.08)]">

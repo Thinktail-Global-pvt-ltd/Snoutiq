@@ -160,7 +160,7 @@ export default function NewDoctorLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#FCFCFC] flex flex-col">
       <div className="absolute top-5 left-6 flex items-center gap-2">
         <img src={logo} alt="logo" className="h-5" />
       </div>

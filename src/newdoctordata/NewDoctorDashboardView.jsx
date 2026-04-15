@@ -24,7 +24,7 @@ export default function NewDoctorDashboardView() {
   const followUps = Array.isArray(authFollowUps) ? authFollowUps : [];
 
   return (
-    <div className="min-h-screen w-full bg-[#f3f5f7]">
+    <div className="min-h-screen w-full bg-[#FCFCFC]">
       {/* FULL WIDTH HEADER */}
       <div className="sticky top-0 z-20 w-full bg-white border-b border-gray-100">
         <div className="flex items-center justify-between px-4 py-4">
@@ -95,7 +95,7 @@ export default function NewDoctorDashboardView() {
         </div>
 
         {/* CSV UPLOAD */}
-        <div className="mb-5">
+        {/* <div className="mb-5">
           <h2 className="mb-3 text-sm font-semibold text-gray-700">
             Import Data
           </h2>
@@ -123,7 +123,7 @@ export default function NewDoctorDashboardView() {
               Choose File
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* FOLLOW UPS */}
         <div>
@@ -169,6 +169,7 @@ export default function NewDoctorDashboardView() {
             </div>
           )}
         </div>
+        <div className="h-16"></div>
       </div>
     </div>
   );

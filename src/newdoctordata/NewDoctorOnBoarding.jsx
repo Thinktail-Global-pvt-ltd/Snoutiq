@@ -137,7 +137,7 @@ export default function NewDoctorOnBoarding() {
   };
 
   return (
-    <div className="min-h-screen px-6 py-6 bg-gray-50">
+    <div className="min-h-screen px-6 py-6 bg-[#FCFCFC]">
       <div className="mb-8">
         <div className="flex items-center gap-3">
           <img src={logo} alt="logo" className="w-16 h-6 object-contain" />
