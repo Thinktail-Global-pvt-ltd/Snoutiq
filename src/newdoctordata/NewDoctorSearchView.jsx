@@ -48,7 +48,6 @@ export default function NewDoctorSearchView() {
 
       {/* LIST */}
       <div className="flex-1 px-4 py-2">
-
         {parents.map((item, index) => (
           <div
             key={index}
