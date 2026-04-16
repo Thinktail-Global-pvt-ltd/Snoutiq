@@ -967,6 +967,17 @@ Route::post('/doctor/otp/request-any', function (Request $request, WhatsAppServi
     $doctor = Doctor::whereRaw("REGEXP_REPLACE(doctor_mobile, '[^0-9]', '') = ?", [$phone])->first()
         ?: Doctor::where('doctor_mobile', $payload['phone'])->first();
     $phoneExists = (bool) $doctor;
+    $doctorData = $doctor ? $doctor->toArray() : null;
+    if ($doctorData) {
+        unset(
+            $doctorData['password'],
+            $doctorData['doctor_password'],
+            $doctorData['api_token_hash'],
+            $doctorData['api_token_expires_at'],
+            $doctorData['remember_token'],
+            $doctorData['doctor_image_blob']
+        );
+    }
 
     $otp = (string) random_int(100000, 999999);
     $token = (string) \Illuminate\Support\Str::uuid();
@@ -993,6 +1004,8 @@ Route::post('/doctor/otp/request-any', function (Request $request, WhatsAppServi
         'success' => true,
         'message' => $phoneExists ? 'number exists' : 'number does not exist',
         'phone_exists' => $phoneExists,
+        'doctor_id' => $doctor?->id,
+        'doctor' => $doctorData,
         'request_id' => $token,
         'expires_in' => 600,
         'otp' => config('app.debug') ? $otp : 'hidden',
@@ -1087,12 +1100,25 @@ Route::post('/doctor/otp/verify-any', function (Request $request) {
     $doctor = Doctor::whereRaw("REGEXP_REPLACE(doctor_mobile, '[^0-9]', '') = ?", [$phone])->first()
         ?: Doctor::where('doctor_mobile', $payload['phone'])->first();
     $phoneExists = (bool) $doctor;
+    $doctorData = $doctor ? $doctor->toArray() : null;
+    if ($doctorData) {
+        unset(
+            $doctorData['password'],
+            $doctorData['doctor_password'],
+            $doctorData['api_token_hash'],
+            $doctorData['api_token_expires_at'],
+            $doctorData['remember_token'],
+            $doctorData['doctor_image_blob']
+        );
+    }
 
     return response()->json([
         'success' => true,
         'message' => 'phone verified',
         'phone_verified' => true,
         'phone_exists' => $phoneExists,
+        'doctor_id' => $doctor?->id,
+        'doctor' => $doctorData,
     ]);
 })->name('doctor.otp.verify-any');
 
