@@ -2857,6 +2857,7 @@ Route::prefix('receptionist')->group(function () {
     Route::post('/bookings', [ReceptionistBookingController::class, 'storeBooking']);
     Route::get('/patients', [ReceptionistBookingController::class, 'patients']);
     Route::post('/patients', [ReceptionistBookingController::class, 'storePatient']);
+    Route::post('/patients/existing-payment-link', [ReceptionistBookingController::class, 'sendExistingPatientPaymentLink']);
     Route::get('/patients/{user}/pets', [ReceptionistBookingController::class, 'patientPets']);
     Route::get('/doctors', [ReceptionistBookingController::class, 'doctors']);
     Route::get('/doctors/available', [ReceptionistBookingController::class, 'availableDoctors']);

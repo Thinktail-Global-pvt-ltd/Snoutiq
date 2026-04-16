@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
+use App\Models\Pet;
 use App\Models\User;
 use App\Models\UserPet;
 use App\Models\Receptionist;
@@ -788,12 +789,190 @@ class ReceptionistBookingController extends Controller
         ], 201);
     }
 
+    public function sendExistingPatientPaymentLink(Request $request)
+    {
+        $data = $request->validate([
+            'clinic_id' => 'nullable|integer|exists:vet_registerations_temp,id',
+            'user_id' => 'required|integer|exists:users,id',
+            'pet_id' => 'required|integer|min:1',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'amount' => 'nullable|numeric|min:1|max:1000000',
+            'amount_paise' => 'nullable|integer|min:100|max:100000000',
+            'response_time_minutes' => 'nullable|integer|min:1|max:1440',
+        ]);
+
+        $clinicId = $this->resolveClinicId($request);
+        $user = User::query()->find((int) $data['user_id']);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+            ], 404);
+        }
+
+        $pet = $this->resolveExistingPatientPet($user, (int) $data['pet_id']);
+        if (!$pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found for this user.',
+            ], 404);
+        }
+
+        if (trim((string) $user->phone) === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'User phone is required to send payment link.',
+            ], 422);
+        }
+
+        $paymentData = array_merge($data, [
+            'name' => $user->name,
+            'phone' => $user->phone,
+            'email' => $user->email,
+            'pet_name' => $pet->name ?? null,
+            'pet_type' => $pet->type ?? $pet->pet_type ?? null,
+            'pet_breed' => $pet->breed ?? null,
+        ]);
+
+        $paymentMessage = $this->maybeSendPaymentLinkWhatsApp(
+            user: $user,
+            pet: $pet,
+            data: $paymentData,
+            clinicId: $clinicId,
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role ?? null,
+                    'last_vet_id' => Schema::hasColumn('users', 'last_vet_id') ? $user->last_vet_id : null,
+                ],
+                'pet' => $this->formatExistingPatientPet($pet),
+                'payment_link_whatsapp' => $paymentMessage,
+            ],
+        ], 201);
+    }
+
+    private function resolveExistingPatientPet(User $user, int $petId): ?object
+    {
+        if ($petId <= 0) {
+            return null;
+        }
+
+        if (Schema::hasTable('pets')) {
+            $query = Pet::query()
+                ->select($this->existingPetSelectColumns('pets'))
+                ->where('id', $petId);
+
+            if (Schema::hasColumn('pets', 'user_id')) {
+                $query->where('user_id', $user->id);
+            } elseif (Schema::hasColumn('pets', 'owner_id')) {
+                $query->where('owner_id', $user->id);
+            }
+
+            $pet = $query->first();
+            if ($pet) {
+                $payload = (object) $pet->toArray();
+                $payload->source_table = 'pets';
+                $payload->type = data_get($payload, 'type') ?: data_get($payload, 'pet_type');
+                $payload->gender = data_get($payload, 'pet_gender') ?: data_get($payload, 'gender');
+                if ($this->existingPetHasBlob('pets', $petId)) {
+                    $payload->pet_doc2_blob_url = route('api.pets.pet-doc2-blob', ['pet' => $petId], true);
+                }
+
+                return $payload;
+            }
+        }
+
+        if (Schema::hasTable('user_pets')) {
+            $query = UserPet::query()
+                ->select($this->existingPetSelectColumns('user_pets'))
+                ->where('id', $petId);
+
+            if (Schema::hasColumn('user_pets', 'user_id')) {
+                $query->where('user_id', $user->id);
+            }
+
+            $pet = $query->first();
+            if ($pet) {
+                $payload = (object) $pet->toArray();
+                $payload->source_table = 'user_pets';
+                $payload->type = data_get($payload, 'type') ?: data_get($payload, 'pet_type');
+                $payload->gender = data_get($payload, 'pet_gender') ?: data_get($payload, 'gender');
+
+                return $payload;
+            }
+        }
+
+        return null;
+    }
+
+    private function existingPetSelectColumns(string $table): array
+    {
+        $columns = [];
+        foreach ([
+            'id',
+            'user_id',
+            'owner_id',
+            'name',
+            'type',
+            'pet_type',
+            'breed',
+            'pet_gender',
+            'gender',
+            'pet_doc1',
+            'pet_doc2',
+            'pic_link',
+            'weight',
+        ] as $column) {
+            if (Schema::hasColumn($table, $column)) {
+                $columns[] = $column;
+            }
+        }
+
+        return $columns ?: ['id'];
+    }
+
+    private function existingPetHasBlob(string $table, int $petId): bool
+    {
+        return Schema::hasColumn($table, 'pet_doc2_blob')
+            && DB::table($table)
+                ->where('id', $petId)
+                ->whereNotNull('pet_doc2_blob')
+                ->exists();
+    }
+
+    private function formatExistingPatientPet(object $pet): array
+    {
+        $petDoc2BlobUrl = data_get($pet, 'pet_doc2_blob_url');
+        $petDoc1 = data_get($pet, 'pet_doc1');
+        $petDoc2 = data_get($pet, 'pet_doc2');
+        $picLink = data_get($pet, 'pic_link');
+
+        return [
+            'id' => data_get($pet, 'id'),
+            'source_table' => data_get($pet, 'source_table'),
+            'name' => data_get($pet, 'name'),
+            'type' => data_get($pet, 'type') ?: data_get($pet, 'pet_type'),
+            'breed' => data_get($pet, 'breed'),
+            'gender' => data_get($pet, 'gender') ?: data_get($pet, 'pet_gender'),
+            'weight' => data_get($pet, 'weight'),
+            'pet_doc2_blob_url' => $petDoc2BlobUrl,
+            'pet_image_url' => $petDoc2BlobUrl ?: $petDoc1 ?: $petDoc2 ?: $picLink,
+        ];
+    }
+
     private function maybeSendPaymentLinkWhatsApp(User $user, ?object $pet, array $data, ?int $clinicId): array
     {
-        $parentName = trim((string) ($data['name'] ?? ''));
+        $parentName = trim((string) ($data['name'] ?? $user->name ?? ''));
         $phone = trim((string) ($user->phone ?? $data['phone'] ?? ''));
-        $petName = trim((string) ($data['pet_name'] ?? $pet->name ?? ''));
-        $petBreed = trim((string) ($data['pet_breed'] ?? $pet->breed ?? ''));
+        $petName = trim((string) ($data['pet_name'] ?? data_get($pet, 'name') ?? ''));
+        $petBreed = trim((string) ($data['pet_breed'] ?? data_get($pet, 'breed') ?? ''));
 
         if ($phone === '') {
             return [
