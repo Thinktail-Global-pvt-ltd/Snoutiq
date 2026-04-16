@@ -2971,6 +2971,7 @@ Route::get('/video-schedule/doctors/{id}/availability', [\App\Http\Controllers\A
 Route::get('/video-schedule/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorVideoScheduleController::class, 'freeSlots']);
 // Pets
 Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
+Route::middleware('auth.api_token')->get('/doctor/pending-prescription', [\App\Http\Controllers\Api\DoctorPendingPrescriptionController::class, 'show']);
 Route::get('/users/{user}/medical-records', [MedicalRecordController::class, 'index']);
 Route::get('/medical-records/user/{user}', [MedicalRecordController::class, 'userRecords']);
 Route::post('/medical-records', [MedicalRecordController::class, 'store']);
