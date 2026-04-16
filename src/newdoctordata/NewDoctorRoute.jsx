@@ -10,10 +10,8 @@ import NewDoctorSearchView from "./NewDoctorSearchView";
 import NewDoctorWhatsAppPopup from "./NewDoctorWhatsAppPopup";
 import NewDoctorDigitalPrescription from "./NewDoctorDigitalPrescription";
 import DoctorPendingPrescriptionGate from "./DoctorPendingPrescriptionGate";
-import {
-  NewDoctorAuthProvider,
-  useNewDoctorAuth,
-} from "./NewDoctorAuth";
+import NewDoctorParentProfileView from "./NewDoctorParentProfileView";
+import { NewDoctorAuthProvider, useNewDoctorAuth } from "./NewDoctorAuth";
 
 function DoctorEntryRedirect() {
   const { auth, hydrated } = useNewDoctorAuth();
@@ -118,6 +116,14 @@ const NewDoctorRouteContent = () => {
             element={
               <RequireDoctorSession>
                 <NewDoctorDigitalPrescription />
+              </RequireDoctorSession>
+            }
+          />
+          <Route
+            path="parent-profile/:id"
+            element={
+              <RequireDoctorSession>
+                <NewDoctorParentProfileView />
               </RequireDoctorSession>
             }
           />

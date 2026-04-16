@@ -84,6 +84,7 @@ export default function NewDoctorLogin() {
         otp_requested_at: Date.now(),
         phone_verified: false,
         phone_exists: Boolean(data.phone_exists),
+         doctor: data.doctor || null, 
       });
 
       setStep(2);
@@ -130,6 +131,7 @@ export default function NewDoctorLogin() {
         phone,
         phone_verified: Boolean(data.phone_verified),
         phone_exists: Boolean(data.phone_exists),
+         doctor: data.doctor || null, 
       });
 
       if (data.phone_exists) {
@@ -156,6 +158,7 @@ export default function NewDoctorLogin() {
       otp_requested_at: null,
       phone_verified: false,
       phone_exists: false,
+       doctor: null,
     });
   };
 

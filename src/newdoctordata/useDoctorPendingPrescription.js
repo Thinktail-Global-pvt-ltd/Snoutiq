@@ -1,52 +1,194 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   EMPTY_PENDING_PRESCRIPTION,
+  clearDoctorPendingPrescription,
   getDoctorPendingPrescription,
+  setDoctorPendingPrescription,
   subscribeToDoctorPendingPrescription,
 } from "./doctorPendingPrescriptionService";
+import { useNewDoctorAuth } from "./NewDoctorAuth";
 
-const DEFAULT_POLL_INTERVAL = 3000;
+const PENDING_PRESCRIPTION_STATUS_URL =
+  "https://snoutiq.com/backend/api/doctor/pending-prescription";
+
+const normalizeStatusText = (value) => String(value ?? "").trim().toLowerCase();
+
+const isTruthyFlag = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+
+  const normalized = normalizeStatusText(value);
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+};
 
 export function useDoctorPendingPrescription({
   doctorId,
   enabled = true,
-  pollInterval = DEFAULT_POLL_INTERVAL,
 } = {}) {
+  const { auth } = useNewDoctorAuth();
   const [pendingPrescription, setPendingPrescription] = useState(
     EMPTY_PENDING_PRESCRIPTION,
   );
+  const canTrackPendingPrescription = enabled && Boolean(doctorId);
+  const authToken = auth?.token || auth?.access_token || "";
+  const refreshSequenceRef = useRef(0);
+  const isMountedRef = useRef(true);
 
-  const refresh = useCallback(() => {
-    if (!enabled) {
-      setPendingPrescription(EMPTY_PENDING_PRESCRIPTION);
-      return;
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      refreshSequenceRef.current += 1;
+    };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    const refreshSequence = refreshSequenceRef.current + 1;
+    refreshSequenceRef.current = refreshSequence;
+
+    if (!canTrackPendingPrescription) {
+      if (isMountedRef.current) {
+        setPendingPrescription(EMPTY_PENDING_PRESCRIPTION);
+      }
+      return EMPTY_PENDING_PRESCRIPTION;
     }
 
-    setPendingPrescription(getDoctorPendingPrescription(doctorId));
-  }, [doctorId, enabled]);
+    const localPendingPrescription = getDoctorPendingPrescription(doctorId);
+
+    if (
+      !localPendingPrescription.hasPending ||
+      !localPendingPrescription.userId
+    ) {
+      if (
+        isMountedRef.current &&
+        refreshSequence === refreshSequenceRef.current
+      ) {
+        setPendingPrescription(localPendingPrescription);
+      }
+      return localPendingPrescription;
+    }
+
+    try {
+      const url = new URL(PENDING_PRESCRIPTION_STATUS_URL);
+      url.searchParams.set("user_id", localPendingPrescription.userId);
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          Accept: "application/json",
+          ...(authToken
+            ? {
+                Authorization: `Bearer ${authToken}`,
+              }
+            : {}),
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch pending prescription status.");
+      }
+
+      const responseData = await response.json().catch(() => ({}));
+      const statusPayload =
+        responseData?.data && typeof responseData.data === "object"
+          ? responseData.data
+          : responseData;
+      const hasStatusPayload =
+        statusPayload &&
+        typeof statusPayload === "object" &&
+        ("payment_status" in statusPayload ||
+          "prescription_status" in statusPayload ||
+          "prescription_required" in statusPayload ||
+          "lock_until_submit" in statusPayload);
+
+      if (
+        refreshSequence !== refreshSequenceRef.current ||
+        !isMountedRef.current
+      ) {
+        return localPendingPrescription;
+      }
+
+      if (!hasStatusPayload) {
+        setPendingPrescription(localPendingPrescription);
+        return localPendingPrescription;
+      }
+
+      const latestLocalPendingPrescription =
+        getDoctorPendingPrescription(doctorId);
+      if (
+        !latestLocalPendingPrescription.hasPending ||
+        latestLocalPendingPrescription.userId !== localPendingPrescription.userId
+      ) {
+        setPendingPrescription(latestLocalPendingPrescription);
+        return latestLocalPendingPrescription;
+      }
+
+      const paymentStatus = String(statusPayload.payment_status ?? "").trim();
+      const prescriptionStatus = String(
+        statusPayload.prescription_status ?? "",
+      ).trim();
+      const prescriptionRequired = isTruthyFlag(
+        statusPayload.prescription_required,
+      );
+      const lockUntilSubmit = isTruthyFlag(statusPayload.lock_until_submit);
+      const isLocked =
+        normalizeStatusText(paymentStatus) === "paid" &&
+        prescriptionRequired &&
+        normalizeStatusText(prescriptionStatus) === "pending" &&
+        lockUntilSubmit;
+
+      if (isLocked) {
+        const nextPendingPrescription = setDoctorPendingPrescription(doctorId, {
+          ...latestLocalPendingPrescription,
+          paymentStatus,
+          prescriptionRequired,
+          prescriptionStatus,
+          lockUntilSubmit: true,
+          hasPending: true,
+        });
+
+        if (
+          isMountedRef.current &&
+          refreshSequence === refreshSequenceRef.current
+        ) {
+          setPendingPrescription(nextPendingPrescription);
+        }
+
+        return nextPendingPrescription;
+      }
+
+      clearDoctorPendingPrescription(doctorId);
+
+      if (
+        isMountedRef.current &&
+        refreshSequence === refreshSequenceRef.current
+      ) {
+        setPendingPrescription(EMPTY_PENDING_PRESCRIPTION);
+      }
+
+      return EMPTY_PENDING_PRESCRIPTION;
+    } catch {
+      if (
+        isMountedRef.current &&
+        refreshSequence === refreshSequenceRef.current
+      ) {
+        setPendingPrescription(localPendingPrescription);
+      }
+
+      return localPendingPrescription;
+    }
+  }, [authToken, canTrackPendingPrescription, doctorId]);
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    if (!enabled) {
+    if (!canTrackPendingPrescription) {
       return undefined;
     }
 
-    refresh();
-
-    const intervalId = window.setInterval(refresh, pollInterval);
-    const unsubscribe = subscribeToDoctorPendingPrescription(
-      doctorId,
-      refresh,
-    );
+    const unsubscribe = subscribeToDoctorPendingPrescription(doctorId, refresh);
 
     return () => {
-      window.clearInterval(intervalId);
       unsubscribe();
     };
-  }, [doctorId, enabled, pollInterval, refresh]);
+  }, [canTrackPendingPrescription, doctorId, refresh]);
 
   return {
     pendingPrescription,

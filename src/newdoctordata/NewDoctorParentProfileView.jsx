@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Check,
@@ -23,6 +23,8 @@ const DOG_BREEDS_URL = "https://snoutiq.com/backend/api/dog-breeds/all";
 const CAT_BREEDS_URL = "https://snoutiq.com/backend/api/cat-breeds/with-indian";
 const RECEPTIONIST_PATIENTS_URL =
   "https://snoutiq.com/backend/api/receptionist/patients";
+const EXISTING_PAYMENT_LINK_URL =
+  "https://snoutiq.com/backend/api/receptionist/patients/existing-payment-link";
 const DEFAULT_CLINIC_ID = 115;
 
 const fieldBase =
@@ -48,11 +50,16 @@ const normalizeOptionalId = (value) => {
 };
 
 const getPendingPrescriptionMeta = (requestResponse = {}) => {
-  const payload = requestResponse?.data;
+  const payload =
+    requestResponse?.data && typeof requestResponse.data === "object"
+      ? requestResponse.data
+      : requestResponse;
+
   const userPayload =
     payload?.user && typeof payload.user === "object"
       ? payload.user
       : requestResponse?.user;
+
   const petPayload =
     payload?.pet && typeof payload.pet === "object"
       ? payload.pet
@@ -70,14 +77,14 @@ const getPendingPrescriptionMeta = (requestResponse = {}) => {
         requestResponse?.userId ??
         payload?.user_id ??
         payload?.userId ??
-        userPayload?.id,
+        userPayload?.id
     ),
     petId: normalizeOptionalId(
       requestResponse?.pet_id ??
         requestResponse?.petId ??
         payload?.pet_id ??
         payload?.petId ??
-        petPayload?.id,
+        petPayload?.id
     ),
   };
 };
@@ -90,13 +97,14 @@ const formatPetTypeForRequest = (value) => {
 
 const buildRequestErrorMessage = (
   responsePayload,
-  fallback = "Failed to send payment link.",
+  fallback = "Failed to send payment link."
 ) => {
   const primary = String(responsePayload?.message || fallback).trim();
   const errorEntries =
     responsePayload?.errors && typeof responsePayload.errors === "object"
       ? Object.values(responsePayload.errors).flat()
       : [];
+
   const details = errorEntries
     .map((item) => String(item || "").trim())
     .filter(Boolean);
@@ -106,7 +114,7 @@ const buildRequestErrorMessage = (
   }
 
   const uniqueDetails = Array.from(
-    new Set(details.filter((item) => item !== primary)),
+    new Set(details.filter((item) => item !== primary))
   );
 
   return uniqueDetails.length ? [primary, ...uniqueDetails].join("\n") : primary;
@@ -115,7 +123,6 @@ const buildRequestErrorMessage = (
 function normalizeBreedOptions(payload) {
   const collected = [];
 
-  // DOG API special shape: { status: "success", breeds: { "affenpinscher": [], ... } }
   if (
     payload?.breeds &&
     typeof payload.breeds === "object" &&
@@ -132,7 +139,6 @@ function normalizeBreedOptions(payload) {
     });
   }
 
-  // Generic walker for other possible shapes, including cat API
   const walk = (node) => {
     if (!node) return;
 
@@ -184,16 +190,28 @@ function normalizeBreedOptions(payload) {
   });
 
   return Array.from(uniqueMap.values()).sort((a, b) =>
-    a.label.localeCompare(b.label),
+    a.label.localeCompare(b.label)
   );
 }
 
 export default function NewDoctorNewRequestView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const breedMenuRef = useRef(null);
   const { auth } = useNewDoctorAuth();
 
-  const doctorId = auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id;
+  const doctorId = normalizeOptionalId(
+    auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id
+  );
+
+  const selectedParent = location.state?.parent || null;
+  const existingUserId = normalizeOptionalId(selectedParent?.userId);
+  const existingPetId =
+    normalizeOptionalId(selectedParent?.petId) ||
+    normalizeOptionalId(selectedParent?.selectedPet?.id) ||
+    normalizeOptionalId(selectedParent?.pets?.[0]?.id);
+
+  const isExistingParentFlow = Boolean(existingUserId && existingPetId);
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
@@ -216,6 +234,42 @@ export default function NewDoctorNewRequestView() {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [requestError, setRequestError] = useState("");
 
+  useEffect(() => {
+    if (!selectedParent) return;
+
+    setForm((prev) => ({
+      ...prev,
+      phone: selectedParent.phone || prev.phone,
+      email: selectedParent.email || prev.email,
+      parentName: selectedParent.name || prev.parentName,
+      petName:
+        selectedParent.petName ||
+        selectedParent.selectedPet?.name ||
+        prev.petName,
+      petType:
+        String(
+          selectedParent.petType ||
+            selectedParent.selectedPet?.pet_type ||
+            prev.petType
+        ).toLowerCase() || prev.petType,
+      breed:
+        selectedParent.breed ||
+        selectedParent.selectedPet?.breed ||
+        prev.breed,
+      gender:
+        selectedParent.petGender ||
+        selectedParent.selectedPet?.pet_gender ||
+        prev.gender,
+      age:
+        String(
+          selectedParent.petAge ??
+            selectedParent.selectedPet?.pet_age ??
+            selectedParent.selectedPet?.pet_age_months ??
+            prev.age
+        ) || prev.age,
+    }));
+  }, [selectedParent]);
+
   const parentPhonePreview = useMemo(() => {
     return form.phone?.trim() || "2342342342";
   }, [form.phone]);
@@ -225,7 +279,7 @@ export default function NewDoctorNewRequestView() {
     if (!query) return breedOptions;
 
     return breedOptions.filter((item) =>
-      item.label.toLowerCase().includes(query),
+      item.label.toLowerCase().includes(query)
     );
   }, [breedOptions, breedQuery]);
 
@@ -268,25 +322,38 @@ export default function NewDoctorNewRequestView() {
   };
 
   const handleSendPaymentLink = async () => {
-    if (isSubmittingRequest) {
-      return;
-    }
+    if (isSubmittingRequest) return;
 
     setRequestError("");
 
     if (!form.phone.trim()) {
-      setRequestError("Parent WhatsApp Number is required.");
+      await Swal.fire({
+        icon: "error",
+        title: "Missing number",
+        text: "Parent WhatsApp Number is required.",
+        confirmButtonColor: "#16a34a",
+      });
       return;
     }
 
     if (!form.amount.trim()) {
-      setRequestError("Amount is required.");
+      await Swal.fire({
+        icon: "error",
+        title: "Missing amount",
+        text: "Amount is required.",
+        confirmButtonColor: "#16a34a",
+      });
       return;
     }
 
     const amountRupees = Number(form.amount);
     if (!Number.isFinite(amountRupees) || amountRupees <= 0) {
-      setRequestError("Amount must be greater than 0.");
+      await Swal.fire({
+        icon: "error",
+        title: "Invalid amount",
+        text: "Amount must be greater than 0.",
+        confirmButtonColor: "#16a34a",
+      });
       return;
     }
 
@@ -298,41 +365,52 @@ export default function NewDoctorNewRequestView() {
         auth?.doctor?.clinic_id ||
         auth?.doctor?.vet_registeration_id ||
         DEFAULT_CLINIC_ID;
-      const amountPaise = String(Math.round(amountRupees * 100));
-      const requestBody = new FormData();
 
-      requestBody.append("clinic_id", String(clinicId));
-      requestBody.append("name", form.parentName.trim() || "Pet Parent");
-      requestBody.append("phone", form.phone.trim());
-      if (form.email.trim()) {
-        requestBody.append("email", form.email.trim());
-      }
-      requestBody.append("pet_name", form.petName.trim() || "Pet");
-      requestBody.append(
-        "pet_type",
-        formatPetTypeForRequest(form.petType) || "Dog",
-      );
-      requestBody.append("pet_breed", form.breed.trim() || "Unknown");
-      requestBody.append("pet_gender", form.gender.trim() || "Male");
-      requestBody.append("amount_paise", amountPaise);
-      requestBody.append("response_time_minutes", "10");
-      if (doctorId) {
-        requestBody.append("doctor_id", String(doctorId));
-      }
+      const amountPaise = String(Math.round(amountRupees * 100));
 
       const headers = {
         Accept: "application/json",
       };
+
       const authToken = auth?.token || auth?.access_token;
       if (authToken) {
         headers.Authorization = `Bearer ${authToken}`;
       }
 
-      const response = await fetch(RECEPTIONIST_PATIENTS_URL, {
+      let url = RECEPTIONIST_PATIENTS_URL;
+      const requestBody = new FormData();
+
+      if (isExistingParentFlow) {
+        url = EXISTING_PAYMENT_LINK_URL;
+        requestBody.append("clinic_id", String(clinicId));
+        requestBody.append("user_id", existingUserId);
+        requestBody.append("pet_id", existingPetId);
+        requestBody.append("amount_paise", amountPaise);
+        requestBody.append("response_time_minutes", "10");
+      } else {
+        requestBody.append("clinic_id", String(clinicId));
+        requestBody.append("name", form.parentName.trim() || "Pet Parent");
+        requestBody.append("phone", form.phone.trim());
+        if (form.email.trim()) {
+          requestBody.append("email", form.email.trim());
+        }
+        requestBody.append("pet_name", form.petName.trim() || "Pet");
+        requestBody.append(
+          "pet_type",
+          formatPetTypeForRequest(form.petType) || "Dog"
+        );
+        requestBody.append("pet_breed", form.breed.trim() || "Unknown");
+        requestBody.append("pet_gender", form.gender.trim() || "Male");
+        requestBody.append("amount_paise", amountPaise);
+        requestBody.append("response_time_minutes", "10");
+      }
+
+      const response = await fetch(url, {
         method: "POST",
         headers,
         body: requestBody,
       });
+
       const responsePayload = await response.json().catch(() => ({}));
 
       if (!response.ok || responsePayload?.success === false) {
@@ -342,9 +420,11 @@ export default function NewDoctorNewRequestView() {
       setRequestResponse(responsePayload);
       goNext();
     } catch (error) {
-      setRequestResponse(null);
       const message = error?.message || "Failed to send payment link.";
       const normalizedMessage = message.toLowerCase();
+
+      setRequestResponse(null);
+      setRequestError(message);
 
       if (
         normalizedMessage.includes("already") ||
@@ -356,35 +436,32 @@ export default function NewDoctorNewRequestView() {
           icon: "error",
           title: "Number has been register",
           text: "This phone number is already registered. Please use another number.",
-          confirmButtonText: "OK",
           confirmButtonColor: "#16a34a",
         });
-        setRequestError("");
-        return;
+      } else {
+        await Swal.fire({
+          icon: "error",
+          title: "Failed",
+          text: message,
+          confirmButtonColor: "#16a34a",
+        });
       }
-
-      await Swal.fire({
-        icon: "error",
-        title: "Failed",
-        text: message,
-        confirmButtonText: "OK",
-        confirmButtonColor: "#16a34a",
-      });
-      setRequestError(message);
     } finally {
       setIsSubmittingRequest(false);
     }
   };
 
-  const handlePaymentReceived = async (requestResponse = {}) => {
-    const pendingPrescriptionMeta = getPendingPrescriptionMeta(requestResponse);
+  const handlePaymentReceived = async (responsePayload = {}) => {
+    const pendingPrescriptionMeta = getPendingPrescriptionMeta(responsePayload);
 
-    if (!pendingPrescriptionMeta.userId || !pendingPrescriptionMeta.petId) {
+    const resolvedUserId = pendingPrescriptionMeta.userId || existingUserId;
+    const resolvedPetId = pendingPrescriptionMeta.petId || existingPetId;
+
+    if (!resolvedUserId || !resolvedPetId) {
       await Swal.fire({
         icon: "error",
         title: "Missing patient details",
-        text: "Patient and pet details were not created correctly. Please send the payment link again.",
-        confirmButtonText: "OK",
+        text: "User ID or Pet ID is missing. Please send payment link again.",
         confirmButtonColor: "#16a34a",
       });
       return;
@@ -404,8 +481,8 @@ export default function NewDoctorNewRequestView() {
 
     startDoctorPendingPrescription(doctorId, {
       consultationId: pendingPrescriptionMeta.consultationId,
-      userId: pendingPrescriptionMeta.userId,
-      petId: pendingPrescriptionMeta.petId,
+      userId: resolvedUserId,
+      petId: resolvedPetId,
       lockUntilSubmit: true,
       patientData,
       paymentStatus: "paid",
@@ -416,8 +493,8 @@ export default function NewDoctorNewRequestView() {
     navigate("/counsltflow/digital-prescription", {
       state: {
         consultationId: pendingPrescriptionMeta.consultationId,
-        userId: pendingPrescriptionMeta.userId,
-        petId: pendingPrescriptionMeta.petId,
+        userId: resolvedUserId,
+        petId: resolvedPetId,
         paymentCompleted: true,
         lockUntilSubmit: true,
         fromNewRequest: true,
@@ -512,8 +589,6 @@ export default function NewDoctorNewRequestView() {
                       />
                     </div>
 
-              
-
                     <div className="relative">
                       <IndianRupee
                         size={18}
@@ -531,7 +606,9 @@ export default function NewDoctorNewRequestView() {
                 </div>
 
                 <div>
-                  <p className={sectionLabel}>Pet & Parent (Optional)</p>
+                  <p className={sectionLabel}>
+                    Pet & Parent {isExistingParentFlow ? "(Prefilled)" : "(Optional)"}
+                  </p>
 
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
@@ -543,9 +620,7 @@ export default function NewDoctorNewRequestView() {
                         <input
                           type="text"
                           value={form.parentName}
-                          onChange={(e) =>
-                            updateField("parentName", e.target.value)
-                          }
+                          onChange={(e) => updateField("parentName", e.target.value)}
                           placeholder="Pet Parent Name"
                           className={`${fieldBase} pl-11`}
                         />
@@ -559,15 +634,14 @@ export default function NewDoctorNewRequestView() {
                         <input
                           type="text"
                           value={form.petName}
-                          onChange={(e) =>
-                            updateField("petName", e.target.value)
-                          }
+                          onChange={(e) => updateField("petName", e.target.value)}
                           placeholder="Pet Name"
                           className={`${fieldBase} pl-11`}
                         />
                       </div>
                     </div>
-                          <div className="relative">
+
+                    <div className="relative">
                       <Mail
                         size={18}
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-[#98a2b3]"
@@ -580,8 +654,8 @@ export default function NewDoctorNewRequestView() {
                         className={`${fieldBase} pl-11`}
                       />
                     </div>
+
                     <div className="grid grid-cols-2 gap-3">
-                      {/* Pet Type full width for better UX */}
                       <div className="relative">
                         <select
                           value={form.petType}
@@ -599,7 +673,6 @@ export default function NewDoctorNewRequestView() {
                         />
                       </div>
 
-                      {/* Breed full width for cleaner dropdown UX */}
                       <div className="relative" ref={breedMenuRef}>
                         <button
                           type="button"
@@ -641,9 +714,7 @@ export default function NewDoctorNewRequestView() {
                                 <input
                                   type="text"
                                   value={breedQuery}
-                                  onChange={(e) =>
-                                    setBreedQuery(e.target.value)
-                                  }
+                                  onChange={(e) => setBreedQuery(e.target.value)}
                                   placeholder="Search breed"
                                   autoFocus
                                   className="h-[42px] w-full rounded-xl border border-[#e8eaee] bg-[#f4f5f7] pl-10 pr-3 text-[14px] text-slate-700 outline-none"
@@ -657,9 +728,7 @@ export default function NewDoctorNewRequestView() {
                                   <button
                                     key={item.id}
                                     type="button"
-                                    onClick={() =>
-                                      handleBreedSelect(item.label)
-                                    }
+                                    onClick={() => handleBreedSelect(item.label)}
                                     className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[14px] transition ${
                                       form.breed === item.label
                                         ? "bg-green-50 text-green-700"
@@ -681,13 +750,12 @@ export default function NewDoctorNewRequestView() {
                         ) : null}
                       </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div className="relative">
                         <select
                           value={form.gender}
-                          onChange={(e) =>
-                            updateField("gender", e.target.value)
-                          }
+                          onChange={(e) => updateField("gender", e.target.value)}
                           className={`${fieldBase} appearance-none pr-9`}
                         >
                           <option>Male</option>

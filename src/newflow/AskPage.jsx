@@ -3288,19 +3288,34 @@ export default function AskPage() {
             />
           </a>
         </div>
-        <div className="ask-nav-actions">
-          <div className="ask-badge">{navBadgeText}</div>
-          <button
-            type="button"
-            className="ask-nav-button"
-            onClick={() => {
-              if (openAskFlowModal("/video-call-pet-details")) return;
-              navigateToAskTarget(navigate, "/video-call-pet-details");
-            }}
-          >
-            Consult ₹499
-          </button>
-        </div>
+       <div className="ask-nav-actions">
+  <div className="ask-badge ask-badge-desktop">{navBadgeText}</div>
+
+  <button
+    type="button"
+    className="ask-nav-button ask-nav-button-desktop"
+    onClick={() => {
+      if (openAskFlowModal("/video-call-pet-details")) return;
+      navigateToAskTarget(navigate, "/video-call-pet-details");
+    }}
+  >
+    Consult ₹499
+  </button>
+
+  <button
+    type="button"
+    className="ask-nav-button ask-nav-button-mobile"
+    onClick={() => {
+      textareaRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      textareaRef.current?.focus();
+    }}
+  >
+    {navBadgeText}
+  </button>
+</div>
       </div>
 
       <div className="ask-page-shell">

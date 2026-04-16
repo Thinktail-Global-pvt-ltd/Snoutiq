@@ -37,15 +37,22 @@ export const EMPTY_PENDING_PATIENT_DATA = {
 export const EMPTY_PENDING_PRESCRIPTION = {
   hasPending: false,
   consultationId: null,
+  userId: "",
+  petId: "",
   lockUntilSubmit: false,
   patientData: EMPTY_PENDING_PATIENT_DATA,
   missingFields: [],
+  paymentStatus: "",
+  prescriptionRequired: false,
+  prescriptionStatus: "",
 };
 
 const canUseBrowserStorage = () =>
   typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 
 const normalizeText = (value) => String(value ?? "").trim();
+const normalizeDoctorId = (doctorId) => normalizeText(doctorId);
+const hasDoctorId = (doctorId) => Boolean(normalizeDoctorId(doctorId));
 
 const normalizePatientData = (patientData = {}) => ({
   parentName: normalizeText(patientData.parentName),
@@ -59,7 +66,32 @@ const normalizePatientData = (patientData = {}) => ({
 });
 
 export const getPendingPrescriptionStorageKey = (doctorId) =>
-  `${STORAGE_PREFIX}:${normalizeText(doctorId) || "default"}`;
+  hasDoctorId(doctorId)
+    ? `${STORAGE_PREFIX}:${normalizeDoctorId(doctorId)}`
+    : "";
+
+export const hasDoctorPendingPrescriptionRouteState = (routeState) =>
+  Boolean(routeState?.paymentCompleted && routeState?.lockUntilSubmit);
+
+export const stripDoctorPendingPrescriptionRouteState = (routeState) => {
+  if (!routeState || typeof routeState !== "object") {
+    return null;
+  }
+
+  const nextRouteState = { ...routeState };
+  delete nextRouteState.consultationId;
+  delete nextRouteState.fromNewRequest;
+  delete nextRouteState.lockUntilSubmit;
+  delete nextRouteState.patientData;
+  delete nextRouteState.paymentCompleted;
+  delete nextRouteState.userId;
+  delete nextRouteState.petId;
+  delete nextRouteState.paymentStatus;
+  delete nextRouteState.prescriptionRequired;
+  delete nextRouteState.prescriptionStatus;
+
+  return Object.keys(nextRouteState).length > 0 ? nextRouteState : null;
+};
 
 export const getPendingPrescriptionMissingFields = (patientData = {}) => {
   const normalized = normalizePatientData(patientData);
@@ -75,28 +107,33 @@ const normalizePendingPrescription = (value = {}) => {
   return {
     hasPending,
     consultationId: value.consultationId ?? null,
+    userId: normalizeText(value.userId),
+    petId: normalizeText(value.petId),
     lockUntilSubmit: Boolean(value.lockUntilSubmit),
     patientData,
     missingFields: hasPending
       ? getPendingPrescriptionMissingFields(patientData)
       : [],
+    paymentStatus: normalizeText(value.paymentStatus),
+    prescriptionRequired: Boolean(value.prescriptionRequired),
+    prescriptionStatus: normalizeText(value.prescriptionStatus),
   };
 };
 
 const emitPendingPrescriptionUpdate = (doctorId) => {
-  if (!canUseBrowserStorage()) return;
+  if (!canUseBrowserStorage() || !hasDoctorId(doctorId)) return;
 
   window.dispatchEvent(
     new CustomEvent(UPDATE_EVENT_NAME, {
       detail: {
-        doctorId: normalizeText(doctorId) || "default",
+        doctorId: normalizeDoctorId(doctorId),
       },
     }),
   );
 };
 
 export function getDoctorPendingPrescription(doctorId) {
-  if (!canUseBrowserStorage()) {
+  if (!canUseBrowserStorage() || !hasDoctorId(doctorId)) {
     return EMPTY_PENDING_PRESCRIPTION;
   }
 
@@ -116,20 +153,30 @@ export function getDoctorPendingPrescription(doctorId) {
 }
 
 export function setDoctorPendingPrescription(doctorId, value) {
-  if (!canUseBrowserStorage()) {
+  if (!canUseBrowserStorage() || !hasDoctorId(doctorId)) {
     return EMPTY_PENDING_PRESCRIPTION;
   }
 
   const storageKey = getPendingPrescriptionStorageKey(doctorId);
+  const currentStoredValue = window.localStorage.getItem(storageKey);
   const normalizedValue = normalizePendingPrescription(value);
 
   if (!normalizedValue.hasPending) {
+    if (!currentStoredValue) {
+      return EMPTY_PENDING_PRESCRIPTION;
+    }
+
     window.localStorage.removeItem(storageKey);
     emitPendingPrescriptionUpdate(doctorId);
     return EMPTY_PENDING_PRESCRIPTION;
   }
 
-  window.localStorage.setItem(storageKey, JSON.stringify(normalizedValue));
+  const serializedValue = JSON.stringify(normalizedValue);
+  if (currentStoredValue === serializedValue) {
+    return normalizedValue;
+  }
+
+  window.localStorage.setItem(storageKey, serializedValue);
   emitPendingPrescriptionUpdate(doctorId);
   return normalizedValue;
 }
@@ -137,8 +184,13 @@ export function setDoctorPendingPrescription(doctorId, value) {
 export function startDoctorPendingPrescription(doctorId, value = {}) {
   return setDoctorPendingPrescription(doctorId, {
     consultationId: value.consultationId ?? null,
+    userId: value.userId ?? "",
+    petId: value.petId ?? "",
     lockUntilSubmit: value.lockUntilSubmit ?? true,
     patientData: value.patientData ?? {},
+    paymentStatus: value.paymentStatus ?? "",
+    prescriptionRequired: value.prescriptionRequired ?? false,
+    prescriptionStatus: value.prescriptionStatus ?? "",
     hasPending: true,
   });
 }
@@ -171,23 +223,37 @@ export function syncDoctorPendingPrescriptionFromRouteState(
   doctorId,
   routeState,
 ) {
-  if (!routeState?.paymentCompleted || !routeState?.lockUntilSubmit) {
-    return getDoctorPendingPrescription(doctorId);
+  const existingPendingPrescription = getDoctorPendingPrescription(doctorId);
+
+  if (
+    existingPendingPrescription.hasPending ||
+    !hasDoctorPendingPrescriptionRouteState(routeState)
+  ) {
+    return existingPendingPrescription;
   }
 
   return startDoctorPendingPrescription(doctorId, {
     consultationId: routeState.consultationId ?? null,
+    userId: routeState.userId ?? "",
+    petId: routeState.petId ?? "",
     lockUntilSubmit: true,
     patientData: routeState.patientData ?? {},
+    paymentStatus: routeState.paymentStatus ?? "",
+    prescriptionRequired: routeState.prescriptionRequired ?? false,
+    prescriptionStatus: routeState.prescriptionStatus ?? "",
   });
 }
 
 export function subscribeToDoctorPendingPrescription(doctorId, listener) {
-  if (!canUseBrowserStorage() || typeof listener !== "function") {
+  if (
+    !canUseBrowserStorage() ||
+    !hasDoctorId(doctorId) ||
+    typeof listener !== "function"
+  ) {
     return () => {};
   }
 
-  const normalizedDoctorId = normalizeText(doctorId) || "default";
+  const normalizedDoctorId = normalizeDoctorId(doctorId);
   const storageKey = getPendingPrescriptionStorageKey(doctorId);
 
   const handleStorage = (event) => {
@@ -197,7 +263,7 @@ export function subscribeToDoctorPendingPrescription(doctorId, listener) {
   };
 
   const handleCustomEvent = (event) => {
-    if (!event?.detail?.doctorId || event.detail.doctorId === normalizedDoctorId) {
+    if (event?.detail?.doctorId === normalizedDoctorId) {
       listener();
     }
   };

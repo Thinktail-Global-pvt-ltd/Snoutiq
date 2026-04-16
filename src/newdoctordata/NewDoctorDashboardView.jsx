@@ -5,23 +5,353 @@ import {
   Plus,
   Search,
   Calendar,
-  Upload,
+  X,
+  Phone,
+  Mail,
+  MapPin,
+  PawPrint,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
+
+const FOLLOW_UP_USERS_URL =
+  "https://snoutiq.com/backend/api/doctor/follow-up-users";
+
+const normalizeId = (value) => {
+  const next = String(value ?? "").trim();
+  return next && next !== "null" && next !== "undefined" ? next : "";
+};
+
+const formatValue = (value, fallback = "Not available") => {
+  const next = String(value ?? "").trim();
+  return next ? next : fallback;
+};
+
+const formatFollowUpDate = (item) => {
+  const raw =
+    item?.follow_up_prescription?.follow_up_date ||
+    item?.follow_up_at ||
+    item?.date_time ||
+    item?.date ||
+    "";
+
+  if (!raw) return "Upcoming";
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const formatFollowUpType = (item) => {
+  const raw = String(
+    item?.follow_up_prescription?.follow_up_type || ""
+  ).trim();
+
+  if (!raw) return "Not available";
+  if (raw.toLowerCase() === "clinic") return "In-Clinic";
+  if (raw.toLowerCase() === "online") return "Online";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+};
+
+function FollowUpDetailsModal({ item, onClose }) {
+  if (!item) return null;
+
+  const prescription = item.follow_up_prescription || {};
+
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-[2px]">
+      <div className="flex min-h-full items-end justify-center md:items-center md:p-4">
+        <div className="w-full max-w-[430px] overflow-hidden rounded-t-[28px] bg-[#FCFCFC] shadow-[0_-10px_40px_rgba(15,23,42,0.18)] md:rounded-[28px] md:shadow-[0_24px_70px_rgba(15,23,42,0.22)]">
+          <div className="flex justify-center pt-3">
+            <div className="h-1.5 w-12 rounded-full bg-[rgba(20,33,61,0.18)]" />
+          </div>
+
+          <div className="relative border-b border-gray-100 px-5 pb-4 pt-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-4 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#f3f4f6] text-[#667085] active:scale-95"
+            >
+              <X size={18} />
+            </button>
+
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#16a34a]">
+              Follow-up details
+            </p>
+
+            <h2 className="mt-2 text-[22px] font-bold leading-tight text-[#0f172a]">
+              {formatValue(item.pet_name || item.name, "Pet")}
+            </h2>
+
+            <p className="mt-1 text-[14px] text-[#667085]">
+              Review pet parent and prescription follow-up details
+            </p>
+          </div>
+
+          <div className="max-h-[70vh] overflow-y-auto px-5 py-4 space-y-4">
+            <div className="rounded-[20px] border border-[#e5e7eb] bg-white p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#98a2b3]">
+                Pet Parent
+              </p>
+
+              <div className="mt-3 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-[#eefbf2] p-2 text-[#22c55e]">
+                    <PawPrint size={14} />
+                  </div>
+                  <div>
+                    <p className="text-[15px] font-semibold text-[#0f172a]">
+                      {formatValue(item.name, "Pet Parent")}
+                    </p>
+                    <p className="mt-1 text-[13px] text-[#667085]">
+                      Parent name
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-[#f8fafc] p-2 text-[#667085]">
+                    <Phone size={14} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-medium text-[#0f172a]">
+                      {formatValue(item.phone)}
+                    </p>
+                    <p className="mt-1 text-[13px] text-[#667085]">Phone</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-[#f8fafc] p-2 text-[#667085]">
+                    <Mail size={14} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-medium text-[#0f172a] break-all">
+                      {formatValue(item.email)}
+                    </p>
+                    <p className="mt-1 text-[13px] text-[#667085]">Email</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-[#f8fafc] p-2 text-[#667085]">
+                    <MapPin size={14} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-medium text-[#0f172a]">
+                      {formatValue(item.city)}
+                    </p>
+                    <p className="mt-1 text-[13px] text-[#667085]">City</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[20px] border border-[#e5e7eb] bg-white p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#98a2b3]">
+                Pet Details
+              </p>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Pet name</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(item.pet_name)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Breed</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(item.breed)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Gender</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(item.pet_gender)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Age</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(item.pet_age)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[20px] border border-[#e5e7eb] bg-white p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#98a2b3]">
+                Follow-up Prescription
+              </p>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Follow-up date</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatFollowUpDate(item)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Follow-up type</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatFollowUpType(item)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Medical record ID</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(prescription.medical_record_id)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Pet ID</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(prescription.pet_id)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                <p className="text-[11px] text-[#98a2b3]">Follow-up notes</p>
+                <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                  {formatValue(prescription.follow_up_notes)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 px-5 py-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-[50px] w-full items-center justify-center rounded-[16px] bg-[#16a34a] px-4 text-[15px] font-bold text-white shadow-[0_10px_22px_rgba(22,163,74,0.22)] active:scale-[0.99] transition-transform"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function NewDoctorDashboardView() {
   const navigate = useNavigate();
   const { auth } = useNewDoctorAuth();
 
-  const authFollowUps =
-    auth?.follow_ups ||
-    auth?.followUps ||
-    auth?.doctor?.follow_ups ||
-    auth?.raw_profile?.follow_ups ||
-    [];
+  const doctorId = normalizeId(
+    auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id
+  );
 
-  const followUps = Array.isArray(authFollowUps) ? authFollowUps : [];
+  const [followUps, setFollowUps] = useState([]);
+  const [followUpsCount, setFollowUpsCount] = useState(0);
+  const [followUpsRevenue, setFollowUpsRevenue] = useState(0);
+  const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(false);
+  const [followUpsError, setFollowUpsError] = useState("");
+  const [selectedFollowUp, setSelectedFollowUp] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    const fetchFollowUps = async () => {
+      if (!doctorId) {
+        if (active) {
+          setFollowUps([]);
+          setFollowUpsCount(0);
+          setFollowUpsRevenue(0);
+        }
+        return;
+      }
+
+      try {
+        setIsLoadingFollowUps(true);
+        setFollowUpsError("");
+
+        const url = new URL(FOLLOW_UP_USERS_URL);
+        url.searchParams.set("doctor_id", doctorId);
+
+        const headers = {
+          Accept: "application/json",
+        };
+
+        const authToken = auth?.token || auth?.access_token;
+        if (authToken) {
+          headers.Authorization = `Bearer ${authToken}`;
+        }
+
+        const response = await fetch(url.toString(), {
+          method: "GET",
+          headers,
+          signal: controller.signal,
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || payload?.success === false) {
+          throw new Error(
+            payload?.message || "Failed to fetch follow-up users."
+          );
+        }
+
+        if (!active) return;
+
+        const nextData = Array.isArray(payload?.data) ? payload.data : [];
+        setFollowUps(nextData);
+        setFollowUpsCount(
+          Number.isFinite(Number(payload?.count))
+            ? Number(payload.count)
+            : nextData.length
+        );
+        setFollowUpsRevenue(
+          Number.isFinite(Number(payload?.total_earnings_sum))
+            ? Number(payload.total_earnings_sum)
+            : 0
+        );
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        if (!active) return;
+
+        setFollowUps([]);
+        setFollowUpsCount(0);
+        setFollowUpsRevenue(0);
+        setFollowUpsError(
+          error?.message || "Unable to load follow-up users right now."
+        );
+      } finally {
+        if (active) {
+          setIsLoadingFollowUps(false);
+        }
+      }
+    };
+
+    fetchFollowUps();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [auth?.access_token, auth?.token, doctorId]);
+
+  const revenueLabel = useMemo(() => {
+    if (Number.isFinite(followUpsRevenue) && followUpsRevenue > 0) {
+      return String(followUpsRevenue);
+    }
+    return String(auth?.revenue || auth?.dashboard?.revenue || "0");
+  }, [auth?.dashboard?.revenue, auth?.revenue, followUpsRevenue]);
 
   return (
     <div className="min-h-screen w-full bg-[#FCFCFC]">
@@ -59,14 +389,14 @@ export default function NewDoctorDashboardView() {
             <p className="text-xs font-medium text-gray-600">Revenue</p>
             <h2 className="mt-2 flex items-center gap-1 text-xl font-bold text-green-700">
               <IndianRupee size={16} />
-              {auth?.revenue || auth?.dashboard?.revenue || "0"}
+              {revenueLabel}
             </h2>
           </div>
 
           <div className="rounded-2xl bg-blue-100 p-4">
             <p className="text-xs font-medium text-gray-600">Follow-ups</p>
             <h2 className="mt-2 text-xl font-bold text-blue-700">
-              {followUps.length} Active
+              {followUpsCount} Active
             </h2>
           </div>
         </div>
@@ -94,37 +424,6 @@ export default function NewDoctorDashboardView() {
           </button>
         </div>
 
-        {/* CSV UPLOAD */}
-        {/* <div className="mb-5">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">
-            Import Data
-          </h2>
-
-          <div className="flex items-center justify-between rounded-2xl border border-dashed border-gray-200 bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-gray-100 p-2">
-                <Upload size={18} className="text-gray-600" />
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold text-gray-800">
-                  Upload CSV
-                </p>
-                <p className="text-xs text-gray-500">
-                  Import clients & history
-                </p>
-              </div>
-            </div>
-
-            <button
-              className="text-sm font-semibold text-green-600"
-              type="button"
-            >
-              Choose File
-            </button>
-          </div>
-        </div> */}
-
         {/* FOLLOW UPS */}
         <div>
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
@@ -132,30 +431,39 @@ export default function NewDoctorDashboardView() {
             Upcoming Follow-ups
           </h2>
 
-          {followUps.length > 0 ? (
+          {isLoadingFollowUps ? (
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 text-center">
+              <p className="text-sm font-semibold text-gray-800">
+                Loading follow-ups...
+              </p>
+            </div>
+          ) : followUpsError ? (
+            <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
+              <p className="text-sm font-semibold text-red-700">
+                {followUpsError}
+              </p>
+            </div>
+          ) : followUps.length > 0 ? (
             <div className="space-y-3">
               {followUps.map((item, index) => (
-                <div
-                  key={item.id || index}
-                  className="rounded-2xl border border-gray-100 bg-white p-4"
+                <button
+                  key={item.id || item.follow_up_prescription?.id || index}
+                  type="button"
+                  onClick={() => setSelectedFollowUp(item)}
+                  className="w-full rounded-2xl border border-gray-100 bg-white p-4 text-left active:scale-[0.99] transition"
                 >
                   <p className="font-semibold text-gray-900">
-                    {item.pet_name || item.petName || "Pet"}
+                    {item.pet_name || item.name || "Pet"}
                   </p>
+
                   <p className="mt-1 text-xs text-gray-500">
-                    {item.parent_name ||
-                      item.parentName ||
-                      item.owner_name ||
-                      "Pet Parent"}
+                    {item.name || "Pet Parent"}
                   </p>
+
                   <p className="mt-2 text-sm text-gray-600">
-                    {item.schedule_label ||
-                      item.follow_up_at ||
-                      item.date_time ||
-                      item.date ||
-                      "Upcoming"}
+                    {formatFollowUpDate(item)}
                   </p>
-                </div>
+                </button>
               ))}
             </div>
           ) : (
@@ -169,8 +477,14 @@ export default function NewDoctorDashboardView() {
             </div>
           )}
         </div>
+
         <div className="h-16"></div>
       </div>
+
+      <FollowUpDetailsModal
+        item={selectedFollowUp}
+        onClose={() => setSelectedFollowUp(null)}
+      />
     </div>
   );
 }

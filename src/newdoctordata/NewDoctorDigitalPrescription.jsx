@@ -322,13 +322,13 @@ const createMockPendingTransaction = ({
       ? `Consultation #${pendingPrescription.consultationId}`
       : "Pending prescription",
     user: {
-      id: "",
+      id: pendingPrescription?.userId || "",
       name: patientData.parentName || "",
       phone: patientData.phone || "",
       city: "",
     },
     pet: {
-      id: "",
+      id: pendingPrescription?.petId || "",
       name: patientData.petName || "",
       pet_type: patientData.petType || "",
       breed: patientData.breed || "",
@@ -346,7 +346,12 @@ const createMockPendingTransaction = ({
       city: "",
     },
     metadata: {
-      notes: {},
+      user_id: pendingPrescription?.userId || "",
+      pet_id: pendingPrescription?.petId || "",
+      notes: {
+        user_id: pendingPrescription?.userId || "",
+        pet_id: pendingPrescription?.petId || "",
+      },
     },
   };
 };

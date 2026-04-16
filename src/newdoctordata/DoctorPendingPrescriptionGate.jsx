@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
 import CompletePetProfileModal from "./CompletePetProfileModal";
 import {
+  hasDoctorPendingPrescriptionRouteState,
+  stripDoctorPendingPrescriptionRouteState,
   syncDoctorPendingPrescriptionFromRouteState,
   updateDoctorPendingPrescriptionPatientData,
 } from "./doctorPendingPrescriptionService";
@@ -27,6 +29,7 @@ export default function DoctorPendingPrescriptionGate() {
   const doctorId = getDoctorStorageId(auth);
   const shouldRun =
     hydrated &&
+    Boolean(doctorId) &&
     hasDoctorSession(auth) &&
     !SKIPPED_PATHS.includes(location.pathname);
 
@@ -40,6 +43,7 @@ export default function DoctorPendingPrescriptionGate() {
     shouldRun &&
     pendingPrescription.hasPending &&
     pendingPrescription.lockUntilSubmit;
+  const shouldRedirectToPrescription = isLocked && !isPrescriptionPage;
   const showProfileModal =
     isLocked &&
     isPrescriptionPage &&
@@ -50,16 +54,40 @@ export default function DoctorPendingPrescriptionGate() {
       return;
     }
 
+    if (!hasDoctorPendingPrescriptionRouteState(location.state)) {
+      return;
+    }
+
     syncDoctorPendingPrescriptionFromRouteState(doctorId, location.state);
-  }, [doctorId, isPrescriptionPage, location.key, location.state, shouldRun]);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: location.search,
+        hash: location.hash,
+      },
+      {
+        replace: true,
+        state: stripDoctorPendingPrescriptionRouteState(location.state),
+      },
+    );
+  }, [
+    doctorId,
+    isPrescriptionPage,
+    location.hash,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+    shouldRun,
+  ]);
 
   useEffect(() => {
-    if (!isLocked || isPrescriptionPage) {
+    if (!shouldRedirectToPrescription) {
       return;
     }
 
     navigate(DIGITAL_PRESCRIPTION_PATH, { replace: true });
-  }, [isLocked, isPrescriptionPage, navigate]);
+  }, [navigate, shouldRedirectToPrescription]);
 
   const handleProfileSave = async (patientData) => {
     updateDoctorPendingPrescriptionPatientData(doctorId, patientData);
@@ -68,10 +96,6 @@ export default function DoctorPendingPrescriptionGate() {
 
   return (
     <>
-      {isLocked && !isPrescriptionPage && (
-        <div className="fixed inset-0 z-[70] bg-white/75 backdrop-blur-[1px]" />
-      )}
-
       <CompletePetProfileModal
         isOpen={showProfileModal}
         patientData={pendingPrescription.patientData}

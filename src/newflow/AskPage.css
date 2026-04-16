@@ -115,6 +115,20 @@
   cursor: pointer;
 }
 
+.ask-badge-desktop {
+  display: inline-flex;
+}
+
+.ask-nav-button-desktop {
+  display: inline-flex;
+}
+
+.ask-nav-button-mobile {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
 .ask-page-shell {
   flex: 1;
   display: flex;
@@ -1710,7 +1724,14 @@
   .ask-badge {
     display: none;
   }
+  .ask-badge-desktop,
+  .ask-nav-button-desktop {
+    display: none;
+  }
 
+  .ask-nav-button-mobile {
+    display: inline-flex;
+  }
   .ask-page-shell {
     padding: 0;
   }
