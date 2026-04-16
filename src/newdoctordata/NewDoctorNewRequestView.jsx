@@ -56,6 +56,10 @@ const normalizePetTypeValue = (value) =>
   normalizeText(value).toLowerCase().replace(/\s+/g, " ");
 const normalizeStatusText = (value) =>
   String(value ?? "").trim().toLowerCase();
+const isPlaceholderBreedValue = (value) =>
+  ["unknown", "na", "n/a", "not available"].includes(
+    normalizeText(value).toLowerCase(),
+  );
 
 const isTruthyFlag = (value) => {
   if (typeof value === "boolean") return value;
@@ -111,6 +115,12 @@ const buildPendingPrescriptionPatientData = (form, requestResponse = {}) => {
     payload?.user && typeof payload.user === "object" ? payload.user : {};
   const petPayload =
     payload?.pet && typeof payload.pet === "object" ? payload.pet : {};
+  const formPetType = normalizePetTypeValue(form.petType);
+  const responsePetType =
+    normalizePetTypeValue(petPayload?.type) ||
+    normalizePetTypeValue(petPayload?.pet_type);
+  const formBreed = normalizeText(form.breed);
+  const responseBreed = normalizeText(petPayload?.breed);
 
   return {
     parentName: normalizeText(form.parentName) || normalizeText(userPayload?.name),
@@ -119,11 +129,9 @@ const buildPendingPrescriptionPatientData = (form, requestResponse = {}) => {
       normalizeText(form.petName) ||
       normalizeText(petPayload?.name) ||
       normalizeText(petPayload?.pet_name),
-    petType:
-      normalizePetTypeValue(form.petType) ||
-      normalizePetTypeValue(petPayload?.type) ||
-      normalizePetTypeValue(petPayload?.pet_type),
-    breed: normalizeText(form.breed) || normalizeText(petPayload?.breed),
+    petType: formPetType || (responsePetType === "dog" ? "" : responsePetType),
+    breed:
+      formBreed || (isPlaceholderBreedValue(responseBreed) ? "" : responseBreed),
     gender:
       normalizeText(form.gender) ||
       normalizeText(petPayload?.pet_gender) ||

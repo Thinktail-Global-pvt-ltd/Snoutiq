@@ -15,6 +15,7 @@ import {
 import { useNewDoctorAuth } from "./NewDoctorAuth";
 import {
   clearDoctorPendingPrescription,
+  getDoctorPendingPrescription,
   setDoctorPendingPrescription,
 } from "./doctorPendingPrescriptionService";
 import { useDoctorPendingPrescription } from "./useDoctorPendingPrescription";
@@ -188,11 +189,15 @@ const formatWeightLabel = (value) => {
 };
 
 const getPetAgeLabel = (pet) => {
-  const direct = Number(pet?.age ?? pet?.age_years);
-  if (Number.isFinite(direct) && direct > 0) {
+  const rawAge = normalizeOptionalText(
+    pet?.age ?? pet?.pet_age ?? pet?.age_years,
+  );
+  const direct = Number(rawAge);
+  if (rawAge && Number.isFinite(direct) && direct > 0) {
     const y = Math.floor(direct);
     return `${y} year${y > 1 ? "s" : ""}`;
   }
+  if (rawAge) return rawAge;
   const dobRaw = pet?.pet_dob || pet?.dob || pet?.date_of_birth;
   if (!dobRaw) return "Age NA";
   const dob = new Date(dobRaw);
@@ -419,16 +424,24 @@ const NewDoctorDigitalPrescription = ({
     doctorId,
     enabled: true,
   });
+  const storagePendingPrescription = doctorId
+    ? getDoctorPendingPrescription(doctorId)
+    : pendingPrescription;
+  const effectivePendingPrescription = pendingPrescription.hasPending
+    ? pendingPrescription
+    : storagePendingPrescription?.hasPending
+      ? storagePendingPrescription
+      : pendingPrescription;
   const isMockSubmitMode =
     !providedTransaction &&
-    pendingPrescription.hasPending &&
-    pendingPrescription.lockUntilSubmit;
+    effectivePendingPrescription.hasPending &&
+    effectivePendingPrescription.lockUntilSubmit;
   const activeTransaction = useMemo(() => {
     if (providedTransaction) return providedTransaction;
     if (!isMockSubmitMode) return null;
 
     return createMockPendingTransaction({
-      pendingPrescription,
+      pendingPrescription: effectivePendingPrescription,
       doctorId,
       clinicId: clinicIdFromAuth,
       doctorLicenseLabel: fallbackDoctorLicenseLabel,
@@ -437,10 +450,10 @@ const NewDoctorDigitalPrescription = ({
   }, [
     clinicIdFromAuth,
     doctorId,
+    effectivePendingPrescription,
     fallbackClinicNameLabel,
     fallbackDoctorLicenseLabel,
     isMockSubmitMode,
-    pendingPrescription,
     providedTransaction,
   ]);
   const doctorLicenseLabel =
@@ -562,9 +575,14 @@ const NewDoctorDigitalPrescription = ({
   const [prescriptionSubmitting, setPrescriptionSubmitting] = useState(false);
   const [prescriptionError, setPrescriptionError] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const syncedPrefillRef = useRef({
+    notes: getTransactionReportedSymptoms(activeTransaction),
+    historySnapshot: getTransactionReportedSymptoms(activeTransaction),
+    weight: getTransactionWeightInput(activeTransaction),
+  });
 
   const finalizePrescriptionSuccess = async () => {
-    markPendingPrescriptionAsSubmitted(doctorId, pendingPrescription);
+    markPendingPrescriptionAsSubmitted(doctorId, effectivePendingPrescription);
     clearDoctorPendingPrescription(doctorId);
     await refresh();
     setShowSuccessModal(true);
@@ -642,6 +660,53 @@ const NewDoctorDigitalPrescription = ({
   useEffect(() => {
     autoResizeTextarea(adviceTextareaRef.current);
   }, [prescriptionForm.homeCare]);
+
+  useEffect(() => {
+    const nextNotes = getTransactionReportedSymptoms(activeTransaction);
+    const nextHistorySnapshot = nextNotes;
+    const nextWeight = getTransactionWeightInput(activeTransaction);
+    const previousPrefill = syncedPrefillRef.current;
+
+    setPrescriptionForm((prev) => {
+      let didChange = false;
+      const nextForm = { ...prev };
+
+      if (!prev.notes.trim() || prev.notes === previousPrefill.notes) {
+        if (prev.notes !== nextNotes) {
+          nextForm.notes = nextNotes;
+          didChange = true;
+        }
+      }
+
+      if (
+        !prev.historySnapshot.trim() ||
+        prev.historySnapshot === previousPrefill.historySnapshot
+      ) {
+        if (prev.historySnapshot !== nextHistorySnapshot) {
+          nextForm.historySnapshot = nextHistorySnapshot;
+          didChange = true;
+        }
+      }
+
+      if (
+        !String(prev.weight || "").trim() ||
+        prev.weight === previousPrefill.weight
+      ) {
+        if (prev.weight !== nextWeight) {
+          nextForm.weight = nextWeight;
+          didChange = true;
+        }
+      }
+
+      return didChange ? nextForm : prev;
+    });
+
+    syncedPrefillRef.current = {
+      notes: nextNotes,
+      historySnapshot: nextHistorySnapshot,
+      weight: nextWeight,
+    };
+  }, [activeTransaction]);
 
   // ── Derived ──
   const isGeneralConsultation =
@@ -850,6 +915,21 @@ const NewDoctorDigitalPrescription = ({
       return;
     }
 
+    const submitDebugPayload = {
+      userId,
+      petId,
+      doctorId: resolvedDoctorId,
+      clinicId,
+      isMockSubmitMode,
+      patientData: effectivePendingPrescription?.patientData || {},
+      consultationCategory: prescriptionForm.consultationCategory,
+      consultMode: prescriptionForm.consultMode,
+      diagnosis: prescriptionForm.diagnosis.trim(),
+      prognosis: prescriptionForm.prognosis,
+      followUpRequired,
+    };
+    console.log("Submitting digital prescription:", submitDebugPayload);
+
     const medsPayload = prescriptionForm.medications
       .map((med) => ({
         timing: Array.isArray(med.timing) ? med.timing : [],
@@ -942,6 +1022,7 @@ const NewDoctorDigitalPrescription = ({
       if (isMockSubmitMode) {
         await new Promise((resolve) => window.setTimeout(resolve, 350));
         await finalizePrescriptionSuccess();
+        console.log("Digital prescription submitted:", submitDebugPayload);
         return;
       }
 
@@ -959,8 +1040,13 @@ const NewDoctorDigitalPrescription = ({
           buildValidationMessage(data, "Failed to save prescription."),
         );
       }
+      console.log("Digital prescription submitted:", {
+        ...submitDebugPayload,
+        response: data,
+      });
       await finalizePrescriptionSuccess();
     } catch (err) {
+      console.log("Digital prescription submit failed:", err);
       setPrescriptionError(err?.message || "Failed to save prescription.");
     } finally {
       setPrescriptionSubmitting(false);
