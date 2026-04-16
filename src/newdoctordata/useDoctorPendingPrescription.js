@@ -67,6 +67,13 @@ export function useDoctorPendingPrescription({
       return localPendingPrescription;
     }
 
+    if (
+      isMountedRef.current &&
+      refreshSequence === refreshSequenceRef.current
+    ) {
+      setPendingPrescription(localPendingPrescription);
+    }
+
     try {
       const url = new URL(PENDING_PRESCRIPTION_STATUS_URL);
       url.searchParams.set("user_id", localPendingPrescription.userId);
@@ -134,6 +141,11 @@ export function useDoctorPendingPrescription({
         prescriptionRequired &&
         normalizeStatusText(prescriptionStatus) === "pending" &&
         lockUntilSubmit;
+      const isSubmittedAndUnlocked =
+        normalizeStatusText(paymentStatus) === "paid" &&
+        prescriptionRequired &&
+        normalizeStatusText(prescriptionStatus) === "submitted" &&
+        !lockUntilSubmit;
 
       if (isLocked) {
         const nextPendingPrescription = setDoctorPendingPrescription(doctorId, {
@@ -155,16 +167,36 @@ export function useDoctorPendingPrescription({
         return nextPendingPrescription;
       }
 
-      clearDoctorPendingPrescription(doctorId);
+      if (isSubmittedAndUnlocked) {
+        clearDoctorPendingPrescription(doctorId);
+
+        if (
+          isMountedRef.current &&
+          refreshSequence === refreshSequenceRef.current
+        ) {
+          setPendingPrescription(EMPTY_PENDING_PRESCRIPTION);
+        }
+
+        return EMPTY_PENDING_PRESCRIPTION;
+      }
+
+      const nextPendingPrescription = setDoctorPendingPrescription(doctorId, {
+        ...latestLocalPendingPrescription,
+        paymentStatus,
+        prescriptionRequired,
+        prescriptionStatus,
+        lockUntilSubmit: false,
+        hasPending: true,
+      });
 
       if (
         isMountedRef.current &&
         refreshSequence === refreshSequenceRef.current
       ) {
-        setPendingPrescription(EMPTY_PENDING_PRESCRIPTION);
+        setPendingPrescription(nextPendingPrescription);
       }
 
-      return EMPTY_PENDING_PRESCRIPTION;
+      return nextPendingPrescription;
     } catch {
       if (
         isMountedRef.current &&

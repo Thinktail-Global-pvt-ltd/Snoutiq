@@ -13,7 +13,10 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
-import { clearDoctorPendingPrescription } from "./doctorPendingPrescriptionService";
+import {
+  clearDoctorPendingPrescription,
+  setDoctorPendingPrescription,
+} from "./doctorPendingPrescriptionService";
 import { useDoctorPendingPrescription } from "./useDoctorPendingPrescription";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -356,6 +359,21 @@ const createMockPendingTransaction = ({
   };
 };
 
+const markPendingPrescriptionAsSubmitted = (doctorId, pendingPrescription) => {
+  if (!doctorId || !pendingPrescription?.hasPending) {
+    return;
+  }
+
+  setDoctorPendingPrescription(doctorId, {
+    ...pendingPrescription,
+    paymentStatus: "paid",
+    prescriptionRequired: true,
+    prescriptionStatus: "submitted",
+    lockUntilSubmit: false,
+    hasPending: true,
+  });
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 /**
@@ -544,6 +562,13 @@ const NewDoctorDigitalPrescription = ({
   const [prescriptionSubmitting, setPrescriptionSubmitting] = useState(false);
   const [prescriptionError, setPrescriptionError] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  const finalizePrescriptionSuccess = async () => {
+    markPendingPrescriptionAsSubmitted(doctorId, pendingPrescription);
+    clearDoctorPendingPrescription(doctorId);
+    await refresh();
+    setShowSuccessModal(true);
+  };
 
   // affected systems
   const [affectedSystems, setAffectedSystems] = useState(
@@ -916,9 +941,7 @@ const NewDoctorDigitalPrescription = ({
     try {
       if (isMockSubmitMode) {
         await new Promise((resolve) => window.setTimeout(resolve, 350));
-        clearDoctorPendingPrescription(doctorId);
-        refresh();
-        setShowSuccessModal(true);
+        await finalizePrescriptionSuccess();
         return;
       }
 
@@ -936,9 +959,7 @@ const NewDoctorDigitalPrescription = ({
           buildValidationMessage(data, "Failed to save prescription."),
         );
       }
-      clearDoctorPendingPrescription(doctorId);
-      refresh();
-      setShowSuccessModal(true);
+      await finalizePrescriptionSuccess();
     } catch (err) {
       setPrescriptionError(err?.message || "Failed to save prescription.");
     } finally {
@@ -1744,75 +1765,6 @@ const NewDoctorDigitalPrescription = ({
             {/* RIGHT: sidebar */}
             <aside className="space-y-3">
               {/* Consult Summary */}
-              <div className="rounded-xl border border-stone-100 bg-white p-3.5 shadow-sm">
-                <div className="text-xs uppercase text-stone-400">
-                  Consult Summary
-                </div>
-                <div className="mt-3 space-y-2 text-sm text-stone-700">
-                  {[
-                    [
-                      "Reference",
-                      activeTransaction?.reference ||
-                        activeTransaction?.metadata?.order_id ||
-                        "NA",
-                    ],
-                    [
-                      "Current Payment",
-                      formatAmount(
-                        activeTransaction?.payment_to_doctor_inr ??
-                          (activeTransaction?.payment_to_doctor_paise
-                            ? activeTransaction.payment_to_doctor_paise / 100
-                            : 0),
-                      ),
-                    ],
-                    [
-                      "GST (18%)",
-                      formatAmount(
-                        activeTransaction?.gst_deduction_inr ??
-                          (activeTransaction?.gst_deduction_paise
-                            ? activeTransaction.gst_deduction_paise / 100
-                            : 0),
-                      ),
-                    ],
-                    [
-                      "Flat Deduction",
-                      formatAmount(
-                        activeTransaction?.flat_deduction_inr ??
-                          (activeTransaction?.flat_deduction_paise
-                            ? activeTransaction.flat_deduction_paise / 100
-                            : 0),
-                      ),
-                    ],
-                    [
-                      "Actual Earnings",
-                      formatAmount(
-                        activeTransaction?.actual_earnings_inr ??
-                          activeTransaction?.amount_after_deduction_inr ??
-                          activeTransaction?.amount_inr ??
-                          0,
-                      ),
-                    ],
-                    [
-                      "Gross",
-                      formatAmount(
-                        activeTransaction?.gross_amount_inr ??
-                          (activeTransaction?.amount_paise
-                            ? activeTransaction.amount_paise / 100
-                            : 0),
-                      ),
-                    ],
-                    ["Date", formatDate(activeTransaction?.created_at)],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between">
-                      <span>{k}</span>
-                      <span className="max-w-[140px] truncate font-semibold text-stone-900">
-                        {v}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Final check */}
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 shadow-sm">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800">

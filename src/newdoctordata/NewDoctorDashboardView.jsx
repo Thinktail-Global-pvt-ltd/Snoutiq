@@ -10,7 +10,9 @@ import {
   Mail,
   MapPin,
   PawPrint,
+  Power,
 } from "lucide-react";
+import Swal from "sweetalert2";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
@@ -49,9 +51,7 @@ const formatFollowUpDate = (item) => {
 };
 
 const formatFollowUpType = (item) => {
-  const raw = String(
-    item?.follow_up_prescription?.follow_up_type || ""
-  ).trim();
+  const raw = String(item?.follow_up_prescription?.follow_up_type || "").trim();
 
   if (!raw) return "Not available";
   if (raw.toLowerCase() === "clinic") return "In-Clinic";
@@ -210,7 +210,9 @@ function FollowUpDetailsModal({ item, onClose }) {
                 </div>
 
                 <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
-                  <p className="text-[11px] text-[#98a2b3]">Medical record ID</p>
+                  <p className="text-[11px] text-[#98a2b3]">
+                    Medical record ID
+                  </p>
                   <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
                     {formatValue(prescription.medical_record_id)}
                   </p>
@@ -250,10 +252,10 @@ function FollowUpDetailsModal({ item, onClose }) {
 
 export default function NewDoctorDashboardView() {
   const navigate = useNavigate();
-  const { auth } = useNewDoctorAuth();
+  const { auth, clearAuth } = useNewDoctorAuth();
 
   const doctorId = normalizeId(
-    auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id
+    auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id,
   );
 
   const [followUps, setFollowUps] = useState([]);
@@ -303,7 +305,7 @@ export default function NewDoctorDashboardView() {
 
         if (!response.ok || payload?.success === false) {
           throw new Error(
-            payload?.message || "Failed to fetch follow-up users."
+            payload?.message || "Failed to fetch follow-up users.",
           );
         }
 
@@ -314,12 +316,12 @@ export default function NewDoctorDashboardView() {
         setFollowUpsCount(
           Number.isFinite(Number(payload?.count))
             ? Number(payload.count)
-            : nextData.length
+            : nextData.length,
         );
         setFollowUpsRevenue(
           Number.isFinite(Number(payload?.total_earnings_sum))
             ? Number(payload.total_earnings_sum)
-            : 0
+            : 0,
         );
       } catch (error) {
         if (error?.name === "AbortError") return;
@@ -329,7 +331,7 @@ export default function NewDoctorDashboardView() {
         setFollowUpsCount(0);
         setFollowUpsRevenue(0);
         setFollowUpsError(
-          error?.message || "Unable to load follow-up users right now."
+          error?.message || "Unable to load follow-up users right now.",
         );
       } finally {
         if (active) {
@@ -353,24 +355,54 @@ export default function NewDoctorDashboardView() {
     return String(auth?.revenue || auth?.dashboard?.revenue || "0");
   }, [auth?.dashboard?.revenue, auth?.revenue, followUpsRevenue]);
 
+  const handleLogout = async () => {
+    const result = await Swal.fire({
+      title: "Logout?",
+      text: "Are you sure you want to logout?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Logout",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#16a34a",
+      reverseButtons: true,
+    });
+
+    if (!result.isConfirmed) return;
+
+    clearAuth();
+    navigate("/counsltflow/login", { replace: true });
+  };
+
   return (
     <div className="min-h-screen w-full bg-[#FCFCFC]">
       {/* FULL WIDTH HEADER */}
-      <div className="sticky top-0 z-20 w-full bg-white border-b border-gray-100">
-        <div className="flex items-center justify-between px-4 py-4">
-          <img src={logo} alt="logo" className="h-4 w-auto object-contain" />
+      <div className="flex items-center justify-between px-4 py-4">
+        <img src={logo} alt="logo" className="h-4 w-auto object-contain" />
+
+        <div className="flex items-center gap-2">
+          <button
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 active:scale-95 transition"
+            onClick={handleLogout}
+            type="button"
+            aria-label="Logout"
+            title="Logout"
+          >
+            <Power size={20} className="text-red-600" />
+          </button>
 
           <button
             className="relative flex h-10 w-10 items-center justify-center rounded-full active:scale-95 transition"
             onClick={() => navigate("/counsltflow/notifications")}
             type="button"
+            aria-label="Notifications"
+            title="Notifications"
           >
             <Bell size={20} className="text-gray-700" />
             <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
         </div>
       </div>
-
       {/* FULL SCREEN CONTENT */}
       <div className="w-full px-4 pt-4 pb-6">
         {/* WELCOME */}

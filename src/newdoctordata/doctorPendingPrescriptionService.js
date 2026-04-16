@@ -3,7 +3,6 @@ const UPDATE_EVENT_NAME = "doctor-pending-prescription:updated";
 
 export const PENDING_PRESCRIPTION_PATIENT_FIELDS = [
   "parentName",
-  "phone",
   "petName",
   "petType",
   "breed",
@@ -14,7 +13,6 @@ export const PENDING_PRESCRIPTION_PATIENT_FIELDS = [
 
 export const PENDING_PRESCRIPTION_FIELD_LABELS = {
   parentName: "Parent name",
-  phone: "Phone",
   petName: "Pet name",
   petType: "Pet type",
   breed: "Breed",
