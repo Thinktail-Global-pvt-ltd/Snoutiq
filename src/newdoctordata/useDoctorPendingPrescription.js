@@ -114,8 +114,10 @@ export function useDoctorPendingPrescription({
       }
 
       if (!hasStatusPayload) {
-        setPendingPrescription(localPendingPrescription);
-        return localPendingPrescription;
+        const latestLocalPendingPrescription =
+          getDoctorPendingPrescription(doctorId);
+        setPendingPrescription(latestLocalPendingPrescription);
+        return latestLocalPendingPrescription;
       }
 
       const latestLocalPendingPrescription =
@@ -198,14 +200,22 @@ export function useDoctorPendingPrescription({
 
       return nextPendingPrescription;
     } catch {
+      const latestLocalPendingPrescription = canTrackPendingPrescription
+        ? getDoctorPendingPrescription(doctorId)
+        : EMPTY_PENDING_PRESCRIPTION;
+      const fallbackPendingPrescription =
+        latestLocalPendingPrescription.hasPending
+          ? latestLocalPendingPrescription
+          : localPendingPrescription;
+
       if (
         isMountedRef.current &&
         refreshSequence === refreshSequenceRef.current
       ) {
-        setPendingPrescription(localPendingPrescription);
+        setPendingPrescription(fallbackPendingPrescription);
       }
 
-      return localPendingPrescription;
+      return fallbackPendingPrescription;
     }
   }, [authToken, canTrackPendingPrescription, doctorId]);
 

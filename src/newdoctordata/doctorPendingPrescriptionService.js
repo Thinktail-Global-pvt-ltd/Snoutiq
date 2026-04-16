@@ -213,6 +213,29 @@ export function updateDoctorPendingPrescriptionPatientData(
   });
 }
 
+export function updateDoctorPendingPrescriptionData(doctorId, patch = {}) {
+  const currentValue = getDoctorPendingPrescription(doctorId);
+
+  if (!currentValue.hasPending) {
+    return currentValue;
+  }
+
+  const hasPatientDataPatch =
+    patch?.patientData && typeof patch.patientData === "object";
+
+  return setDoctorPendingPrescription(doctorId, {
+    ...currentValue,
+    ...patch,
+    patientData: hasPatientDataPatch
+      ? {
+          ...currentValue.patientData,
+          ...patch.patientData,
+        }
+      : currentValue.patientData,
+    hasPending: true,
+  });
+}
+
 export function clearDoctorPendingPrescription(doctorId) {
   return setDoctorPendingPrescription(doctorId, EMPTY_PENDING_PRESCRIPTION);
 }

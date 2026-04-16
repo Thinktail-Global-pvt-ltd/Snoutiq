@@ -52,6 +52,12 @@ const normalizeOptionalId = (value) => {
 };
 
 const normalizeText = (value) => String(value ?? "").trim();
+const appendFormDataIfPresent = (formData, key, value) => {
+  const normalizedValue = normalizeText(value);
+  if (normalizedValue) {
+    formData.append(key, normalizedValue);
+  }
+};
 const normalizePetTypeValue = (value) =>
   normalizeText(value).toLowerCase().replace(/\s+/g, " ");
 const normalizeStatusText = (value) =>
@@ -407,18 +413,6 @@ export default function NewDoctorNewRequestView() {
       return;
     }
 
-    if (!isExistingParentFlow) {
-      if (!form.parentName.trim()) {
-        setRequestError("Pet Parent Name is required.");
-        return;
-      }
-
-      if (!form.petName.trim()) {
-        setRequestError("Pet Name is required.");
-        return;
-      }
-    }
-
     try {
       setIsSubmittingRequest(true);
 
@@ -437,19 +431,19 @@ export default function NewDoctorNewRequestView() {
         requestBody.append("user_id", existingUserId);
         requestBody.append("pet_id", existingPetId);
       } else {
-        requestBody.append("name", form.parentName.trim());
+        appendFormDataIfPresent(requestBody, "name", form.parentName);
         requestBody.append("phone", form.phone.trim());
         if (form.email.trim()) {
           requestBody.append("email", form.email.trim());
         }
-        requestBody.append("pet_name", form.petName.trim());
+        appendFormDataIfPresent(requestBody, "pet_name", form.petName);
         if (form.petType.trim()) {
   requestBody.append("pet_type", formatPetTypeForRequest(form.petType));
 }
 if (form.breed.trim()) {
   requestBody.append("pet_breed", form.breed.trim());
 }
-        requestBody.append("pet_gender", form.gender.trim());
+        appendFormDataIfPresent(requestBody, "pet_gender", form.gender);
       }
       requestBody.append("amount_paise", amountPaise);
       requestBody.append("response_time_minutes", "10");
@@ -524,12 +518,12 @@ if (form.breed.trim()) {
       const resolvedUserId = pendingPrescriptionMeta.userId || existingUserId;
       const resolvedPetId = pendingPrescriptionMeta.petId || existingPetId;
 
-      if (!resolvedUserId || !resolvedPetId) {
+      if (!resolvedUserId) {
         hasHandledPaymentRef.current = false;
         await Swal.fire({
           icon: "error",
-          title: "Missing patient details",
-          text: "Patient and pet details were not created correctly. Please send the payment link again.",
+          title: "Missing parent details",
+          text: "Parent details were not created correctly. Please send the payment link again.",
           confirmButtonText: "OK",
           confirmButtonColor: "#16a34a",
         });
@@ -544,7 +538,7 @@ if (form.breed.trim()) {
       startDoctorPendingPrescription(doctorId, {
         consultationId: pendingPrescriptionMeta.consultationId,
         userId: resolvedUserId,
-        petId: resolvedPetId,
+        petId: resolvedPetId || "",
         lockUntilSubmit: true,
         patientData,
         paymentStatus: "paid",
@@ -557,7 +551,7 @@ if (form.breed.trim()) {
         state: {
           consultationId: pendingPrescriptionMeta.consultationId,
           userId: resolvedUserId,
-          petId: resolvedPetId,
+          petId: resolvedPetId || "",
           paymentCompleted: true,
           lockUntilSubmit: true,
           fromNewRequest: true,
@@ -747,7 +741,22 @@ if (form.breed.trim()) {
                         className={`${fieldBase} pl-11`}
                       />
                     </div>
-                    {/* <div className="grid grid-cols-2 gap-3 space-y-4"> */}
+                   
+                    </div>
+
+
+                   
+                </div>
+
+                <div>
+                  <p className={sectionLabel}>
+                    {isExistingParentFlow
+                      ? "Pet & Parent (Prefilled)"
+                      : "Pet & Parent"}
+                  </p>
+
+                  <div className="space-y-4">
+                     <div className="grid grid-cols-2 gap-3">
                       <div className="relative">
                         <User
                           size={18}
@@ -779,21 +788,7 @@ if (form.breed.trim()) {
                           className={`${fieldBase} pl-11`}
                         />
                       </div>
-                    </div>
-                  {/* </div> */}
-
-                   
-                </div>
-
-                <div>
-                  <p className={sectionLabel}>
-                    {isExistingParentFlow
-                      ? "Pet & Parent (Prefilled)"
-                      : "Pet & Parent"}
-                  </p>
-
-                  <div className="space-y-4">
-                   
+                   </div>
                           <div className="relative">
                       <Mail
                         size={18}

@@ -427,10 +427,10 @@ const NewDoctorDigitalPrescription = ({
   const storagePendingPrescription = doctorId
     ? getDoctorPendingPrescription(doctorId)
     : pendingPrescription;
-  const effectivePendingPrescription = pendingPrescription.hasPending
-    ? pendingPrescription
-    : storagePendingPrescription?.hasPending
-      ? storagePendingPrescription
+  const effectivePendingPrescription = storagePendingPrescription?.hasPending
+    ? storagePendingPrescription
+    : pendingPrescription.hasPending
+      ? pendingPrescription
       : pendingPrescription;
   const isMockSubmitMode =
     !providedTransaction &&
@@ -460,6 +460,41 @@ const NewDoctorDigitalPrescription = ({
     activeTransaction?.doctor?.doctor_license || fallbackDoctorLicenseLabel;
   const clinicNameLabel =
     activeTransaction?.clinic?.name || fallbackClinicNameLabel;
+  const pendingPatientData =
+    effectivePendingPrescription?.patientData &&
+    typeof effectivePendingPrescription.patientData === "object"
+      ? effectivePendingPrescription.patientData
+      : {};
+  const resolvedSnapshotParentName =
+    (isMockSubmitMode && normalizeOptionalText(pendingPatientData.parentName)) ||
+    normalizeOptionalText(activeTransaction?.user?.name) ||
+    "Pet Parent";
+  const resolvedSnapshotPetName =
+    (isMockSubmitMode && normalizeOptionalText(pendingPatientData.petName)) ||
+    resolvePetName(activeTransaction);
+  const resolvedSnapshotBreed =
+    (isMockSubmitMode && normalizeOptionalText(pendingPatientData.breed)) ||
+    normalizeOptionalText(activeTransaction?.pet?.breed) ||
+    "Not available";
+  const resolvedSnapshotPetType =
+    (isMockSubmitMode && normalizeOptionalText(pendingPatientData.petType)) ||
+    normalizeOptionalText(activeTransaction?.pet?.pet_type);
+  const resolvedSnapshotGender =
+    (isMockSubmitMode && normalizeOptionalText(pendingPatientData.gender)) ||
+    normalizeOptionalText(activeTransaction?.pet?.pet_gender) ||
+    normalizeOptionalText(activeTransaction?.gender);
+  const resolvedSnapshotAge =
+    (isMockSubmitMode && normalizeOptionalText(pendingPatientData.age)) ||
+    normalizeOptionalText(activeTransaction?.pet?.age) ||
+    normalizeOptionalText(activeTransaction?.pet?.pet_age) ||
+    normalizeOptionalText(activeTransaction?.pet?.age_years);
+  const resolvedSnapshotWeight =
+    (isMockSubmitMode && normalizeOptionalText(pendingPatientData.weight)) ||
+    normalizeOptionalText(
+      activeTransaction?.pet?.weight_kg ??
+        activeTransaction?.pet?.weight ??
+        activeTransaction?.weight,
+    );
 
   // ── Resolve IDs from transaction ──
   const resolveIds = () => {
@@ -467,11 +502,15 @@ const NewDoctorDigitalPrescription = ({
     const notes = metadata?.notes || {};
     return {
       userId:
+        (isMockSubmitMode &&
+          normalizeOptionalText(effectivePendingPrescription?.userId)) ||
         activeTransaction?.user?.id ||
         metadata?.user_id ||
         notes?.user_id ||
         "",
       petId:
+        (isMockSubmitMode &&
+          normalizeOptionalText(effectivePendingPrescription?.petId)) ||
         activeTransaction?.pet?.id || metadata?.pet_id || notes?.pet_id || "",
       doctorId:
         doctorId ||
@@ -496,11 +535,13 @@ const NewDoctorDigitalPrescription = ({
     );
 
   // ── Derived pet labels ──
-  const petAgeLabel = getPetAgeLabel(activeTransaction?.pet);
+  const petAgeLabel = getPetAgeLabel(
+    resolvedSnapshotAge
+      ? { age: resolvedSnapshotAge }
+      : activeTransaction?.pet || {},
+  );
   const petWeightLabel = formatWeightLabel(
-    activeTransaction?.pet?.weight_kg ??
-      activeTransaction?.pet?.weight ??
-      activeTransaction?.weight,
+    resolvedSnapshotWeight,
   );
   const vaccinationLabel = formatYesNoUnknown(
     activeTransaction?.pet?.is_vaccinated ??
@@ -518,11 +559,9 @@ const NewDoctorDigitalPrescription = ({
       activeTransaction?.metadata?.notes?.deworming_yes_no,
   );
   const petTypeLabel =
-    formatPetText(activeTransaction?.pet?.pet_type) || "Not available";
+    formatPetText(resolvedSnapshotPetType) || "Not available";
   const petGenderLabel =
-    formatPetText(
-      activeTransaction?.pet?.pet_gender || activeTransaction?.gender,
-    ) || "Not available";
+    formatPetText(resolvedSnapshotGender) || "Not available";
   const consultationLocationLabel =
     activeTransaction?.user?.city ||
     activeTransaction?.clinic?.city ||
@@ -1126,8 +1165,7 @@ const NewDoctorDigitalPrescription = ({
                       Pet Information
                     </p>
                     <p className="mt-1 text-sm font-semibold text-gray-800">
-                      {resolvePetName(activeTransaction)} /{" "}
-                      {activeTransaction?.pet?.breed || "Not available"} /{" "}
+                      {resolvedSnapshotPetName} / {resolvedSnapshotBreed} /{" "}
                       {petAgeLabel} / {petWeightLabel}
                     </p>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-gray-600">
@@ -1158,7 +1196,7 @@ const NewDoctorDigitalPrescription = ({
                         Owner Name
                       </p>
                       <p className="mt-1 text-sm font-semibold text-gray-800">
-                        {activeTransaction?.user?.name || "Pet Parent"}
+                        {resolvedSnapshotParentName}
                       </p>
                     </div>
                     <div className="rounded-xl border border-gray-200 bg-white p-3">
@@ -1955,8 +1993,7 @@ const NewDoctorDigitalPrescription = ({
                         <span className="font-semibold text-slate-900">
                           Pet:
                         </span>{" "}
-                        {resolvePetName(activeTransaction)} /{" "}
-                        {activeTransaction?.pet?.breed || "Not available"} /{" "}
+                        {resolvedSnapshotPetName} / {resolvedSnapshotBreed} /{" "}
                         {petAgeLabel} / {petWeightLabel}
                       </p>
                       <p>
@@ -1969,7 +2006,7 @@ const NewDoctorDigitalPrescription = ({
                         <span className="font-semibold text-slate-900">
                           Owner:
                         </span>{" "}
-                        {activeTransaction?.user?.name || "Pet Parent"}
+                        {resolvedSnapshotParentName}
                       </p>
                     </div>
                     {/* <div className="mt-3 flex flex-wrap gap-2">
