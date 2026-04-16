@@ -12,6 +12,32 @@ use Illuminate\Support\Facades\Schema;
 
 class DoctorFollowUpUserController extends Controller
 {
+    public function users(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'doctor_id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        if (!Schema::hasTable('users') || !Schema::hasColumn('users', 'last_vet_id')) {
+            return response()->json([
+                'success' => true,
+                'count' => 0,
+                'data' => [],
+            ]);
+        }
+
+        $users = User::query()
+            ->where('last_vet_id', (int) $validated['doctor_id'])
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'count' => $users->count(),
+            'data' => $users,
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
