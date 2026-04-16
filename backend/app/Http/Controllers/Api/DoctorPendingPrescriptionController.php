@@ -13,14 +13,9 @@ class DoctorPendingPrescriptionController extends Controller
 {
     public function show(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'channel_name' => ['nullable', 'string', 'max:255'],
-            'call_session' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $channelName = trim((string) ($validated['channel_name'] ?? $validated['call_session'] ?? ''));
-        $transaction = $channelName !== '' ? $this->findTransaction($channelName) : null;
-        $prescription = $channelName !== '' ? $this->findPrescription($channelName) : null;
+        $userId = $this->positiveInt($request->query('user_id') ?? $request->query('id'));
+        $transaction = $userId ? $this->findTransaction($userId) : null;
+        $prescription = $userId ? $this->findPrescription($userId) : null;
         $transactionDone = $transaction !== null && $this->isSuccessfulTransactionStatus($transaction->status ?? null);
         $prescriptionSubmitted = $prescription !== null;
 
@@ -32,34 +27,43 @@ class DoctorPendingPrescriptionController extends Controller
         ]);
     }
 
-    private function findTransaction(string $channelName): ?Transaction
+    private function findTransaction(int $userId): ?Transaction
     {
         if (
             !Schema::hasTable('transactions')
-            || !Schema::hasColumn('transactions', 'channel_name')
+            || !Schema::hasColumn('transactions', 'user_id')
         ) {
             return null;
         }
 
         return Transaction::query()
-            ->where('channel_name', $channelName)
+            ->where('user_id', $userId)
             ->orderByDesc('id')
             ->first();
     }
 
-    private function findPrescription(string $channelName): ?Prescription
+    private function findPrescription(int $userId): ?Prescription
     {
         if (
             !Schema::hasTable('prescriptions')
-            || !Schema::hasColumn('prescriptions', 'call_session')
+            || !Schema::hasColumn('prescriptions', 'user_id')
         ) {
             return null;
         }
 
         return Prescription::query()
-            ->where('call_session', $channelName)
+            ->where('user_id', $userId)
             ->orderByDesc('id')
             ->first();
+    }
+
+    private function positiveInt($value): ?int
+    {
+        if (!is_numeric($value) || (int) $value <= 0) {
+            return null;
+        }
+
+        return (int) $value;
     }
 
     private function isSuccessfulTransactionStatus(?string $status): bool
