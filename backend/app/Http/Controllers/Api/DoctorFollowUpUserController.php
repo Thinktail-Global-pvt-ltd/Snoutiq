@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Prescription;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,6 +48,7 @@ class DoctorFollowUpUserController extends Controller
         return response()->json([
             'success' => true,
             'count' => $data->count(),
+            'total_earnings_sum' => $this->totalEarningsSum((int) $validated['doctor_id']),
             'data' => $data,
         ]);
     }
@@ -82,6 +84,28 @@ class DoctorFollowUpUserController extends Controller
         }
 
         return $columns;
+    }
+
+    private function totalEarningsSum(int $doctorId): float|int
+    {
+        if (
+            !Schema::hasTable('transactions')
+            || !Schema::hasColumn('transactions', 'doctor_id')
+        ) {
+            return 0;
+        }
+
+        $query = Transaction::query()->where('doctor_id', $doctorId);
+
+        if (Schema::hasColumn('transactions', 'amount')) {
+            return (float) $query->sum('amount');
+        }
+
+        if (Schema::hasColumn('transactions', 'amount_paise')) {
+            return round(((int) $query->sum('amount_paise')) / 100, 2);
+        }
+
+        return 0;
     }
 
     private function formatRow(User $user): array
