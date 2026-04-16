@@ -178,6 +178,8 @@ class MedicalRecordController extends Controller
             'history_snapshot' => ['nullable', 'string'],
             'video_inclinic' => ['nullable', 'string', 'max:255'],
             'call_session' => ['nullable', 'string', 'max:255'],
+            'channel_name' => ['nullable', 'string', 'max:255'],
+            'transaction_channel_name' => ['nullable', 'string', 'max:255'],
             'medicines' => ['nullable', 'string', 'max:2000'],
             'medications_json' => ['nullable'],
             'follow_up_required' => ['nullable', 'boolean'],
@@ -263,6 +265,7 @@ class MedicalRecordController extends Controller
         $record->save();
 
         $prescription = Prescription::firstOrNew(['medical_record_id' => $record->id]);
+        $callSessionInput = $this->resolveCallSessionInput($validated);
         $structuredMedications = $this->decodeMedicationsInput($request->input('medications_json'));
         $medsJson = $structuredMedications ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null);
         $diseaseName = $validated['disease_name'] ?? $validated['diagnosis'] ?? null;
@@ -296,7 +299,7 @@ class MedicalRecordController extends Controller
             'home_care' => $validated['home_care'] ?? $prescription->home_care,
             'history_snapshot' => $validated['history_snapshot'] ?? $prescription->history_snapshot,
             'video_inclinic' => $validated['video_inclinic'] ?? $prescription->video_inclinic,
-            'call_session' => $validated['call_session'] ?? $prescription->call_session,
+            'call_session' => $callSessionInput ?? $prescription->call_session,
             'follow_up_required' => $validated['follow_up_required'] ?? $prescription->follow_up_required,
             'follow_up_date' => $validated['follow_up_date'] ?? $prescription->follow_up_date,
             'follow_up_type' => $validated['follow_up_type'] ?? $prescription->follow_up_type,
@@ -322,7 +325,7 @@ class MedicalRecordController extends Controller
         }
         $prescription->save();
         $this->markVideoApointmentCompleted($validated['video_appointment_id'] ?? $prescription->video_appointment_id ?? null);
-        $this->markCallSessionCompleted($validated['call_session'] ?? null);
+        $this->markCallSessionCompleted($callSessionInput);
 
         if ($petId) {
             $this->updatePetHealthState($record->user_id, $petId, $isChronic, $diseaseName);
@@ -368,6 +371,8 @@ class MedicalRecordController extends Controller
             'history_snapshot' => ['nullable', 'string'],
             'video_inclinic' => ['nullable', 'string', 'max:255'],
             'call_session' => ['nullable', 'string', 'max:255'],
+            'channel_name' => ['nullable', 'string', 'max:255'],
+            'transaction_channel_name' => ['nullable', 'string', 'max:255'],
             'medicines' => ['nullable', 'string', 'max:2000'],
             'medications_json' => ['nullable'],
             'follow_up_required' => ['nullable', 'boolean'],
@@ -454,6 +459,7 @@ class MedicalRecordController extends Controller
             $validated['system_affected_id'] ?? null,
             $validated['system_affected'] ?? null
         );
+        $callSessionInput = $this->resolveCallSessionInput($validated);
 
         $record = MedicalRecord::create([
             'user_id' => $user->id,
@@ -487,7 +493,7 @@ class MedicalRecordController extends Controller
             'home_care' => $validated['home_care'] ?? null,
             'history_snapshot' => $validated['history_snapshot'] ?? null,
             'video_inclinic' => $validated['video_inclinic'] ?? null,
-            'call_session' => $validated['call_session'] ?? null,
+            'call_session' => $callSessionInput,
             'follow_up_required' => $validated['follow_up_required'] ?? null,
             'follow_up_date' => $validated['follow_up_date'] ?? null,
             'follow_up_type' => $validated['follow_up_type'] ?? null,
@@ -523,7 +529,7 @@ class MedicalRecordController extends Controller
         if ($petId) {
             $this->updatePetHealthState($user->id, $petId, ($validated['diagnosis_status'] ?? '') === 'chronic', $validated['disease_name'] ?? $validated['diagnosis'] ?? null);
         }
-        $this->markCallSessionCompleted($validated['call_session'] ?? null);
+        $this->markCallSessionCompleted($callSessionInput);
         $prescriptionWhatsApp = $this->sendPrescriptionSentWhatsApp($prescription, $record);
 
         return response()->json([
@@ -852,6 +858,18 @@ class MedicalRecordController extends Controller
             ->value('id');
 
         return is_numeric($matchedId) ? (int) $matchedId : null;
+    }
+
+    private function resolveCallSessionInput(array $validated): ?string
+    {
+        foreach (['call_session', 'channel_name', 'transaction_channel_name'] as $key) {
+            $value = trim((string) ($validated[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function markCallSessionCompleted(?string $channelName): void

@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class RazorpayPaymentLinkWebhookController extends Controller
 {
@@ -259,6 +260,18 @@ class RazorpayPaymentLinkWebhookController extends Controller
         );
         $transactionType = 'excell_export_campaign';
         $transactionStatus = $this->normalizeTransactionStatus($paymentStatus ?: $linkStatus);
+        $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
+        $existingTransaction = $hasChannelNameColumn
+            ? Transaction::query()
+                ->select('id', 'channel_name')
+                ->where('reference', $paymentLink->payment_link_id)
+                ->first()
+            : null;
+        $channelName = trim((string) ($existingTransaction?->channel_name ?? ''));
+        if ($hasChannelNameColumn && $transactionStatus === 'captured') {
+            $channelName = $this->resolveTransactionChannelName($channelName);
+        }
+
         $metadata = [
             'order_type' => $transactionType,
             'payment_provider' => 'razorpay',
@@ -293,6 +306,11 @@ class RazorpayPaymentLinkWebhookController extends Controller
             'metadata' => $metadata,
         ];
 
+        if ($hasChannelNameColumn && $channelName !== '') {
+            $payloadForTransaction['channel_name'] = $channelName;
+            $payloadForTransaction['metadata']['channel_name'] = $channelName;
+        }
+
         $payoutBreakup = $this->buildExcelExportPayoutBreakup($amountPaise);
         $payloadForTransaction['metadata']['payout_breakup'] = $payoutBreakup;
         foreach ([
@@ -309,6 +327,23 @@ class RazorpayPaymentLinkWebhookController extends Controller
             ['reference' => $paymentLink->payment_link_id],
             $payloadForTransaction
         );
+    }
+
+    private function resolveTransactionChannelName(?string $currentValue): string
+    {
+        $currentValue = trim((string) $currentValue);
+        if ($currentValue !== '') {
+            return $currentValue;
+        }
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $channelName = 'cf_'.strtolower(Str::random(16));
+            if (!Transaction::query()->where('channel_name', $channelName)->exists()) {
+                return $channelName;
+            }
+        }
+
+        return 'cf_'.strtolower(Str::random(24));
     }
 
     private function shouldSendPaymentConfirmedAlerts(?RazorpayPaymentLink $paymentLink, ?Payment $payment, ?Transaction $transaction): bool
