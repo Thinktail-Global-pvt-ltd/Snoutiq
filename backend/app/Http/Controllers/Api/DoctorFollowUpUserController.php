@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Pet;
 use App\Models\Prescription;
 use App\Models\Transaction;
 use App\Models\User;
@@ -30,11 +31,18 @@ class DoctorFollowUpUserController extends Controller
             ->where('last_vet_id', (int) $validated['doctor_id'])
             ->orderByDesc('id')
             ->get();
+        $petsByUserId = $this->petsByUserId($users->pluck('id')->all());
+        $data = $users->map(function (User $user) use ($petsByUserId): array {
+            $row = $user->toArray();
+            $row['pets'] = $petsByUserId[(int) $user->id] ?? [];
+
+            return $row;
+        })->values();
 
         return response()->json([
             'success' => true,
-            'count' => $users->count(),
-            'data' => $users,
+            'count' => $data->count(),
+            'data' => $data,
         ]);
     }
 
@@ -110,6 +118,30 @@ class DoctorFollowUpUserController extends Controller
         }
 
         return $columns;
+    }
+
+    private function petsByUserId(array $userIds): array
+    {
+        $userIds = array_values(array_unique(array_filter(
+            array_map('intval', $userIds),
+            fn (int $id) => $id > 0
+        )));
+
+        if (
+            empty($userIds)
+            || !Schema::hasTable('pets')
+            || !Schema::hasColumn('pets', 'user_id')
+        ) {
+            return [];
+        }
+
+        return Pet::query()
+            ->whereIn('user_id', $userIds)
+            ->orderBy('name')
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn ($pets) => $pets->map(fn (Pet $pet) => $pet->toArray())->values()->all())
+            ->all();
     }
 
     private function totalEarningsSum(int $doctorId): float|int
