@@ -30,6 +30,71 @@ const formatValue = (value, fallback = "Not available") => {
   return next ? next : fallback;
 };
 
+const pickDisplayValue = (...values) => {
+  for (const value of values) {
+    if (value === 0) return "0";
+
+    const next = String(value ?? "").trim();
+    if (next && next !== "null" && next !== "undefined") {
+      return next;
+    }
+  }
+
+  return "";
+};
+
+const formatPetType = (value) => {
+  const next = pickDisplayValue(value);
+  if (!next) return "";
+
+  return next
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getPrimaryPet = (item = {}) => {
+  if (item?.selectedPet && typeof item.selectedPet === "object") {
+    return item.selectedPet;
+  }
+
+  const pets = Array.isArray(item?.pets) ? item.pets : [];
+  return pets.find((pet) => pet && typeof pet === "object") || null;
+};
+
+const getPetDetails = (item = {}) => {
+  const pet = getPrimaryPet(item);
+
+  return {
+    name: pickDisplayValue(pet?.name, item?.pet_name),
+    breed: pickDisplayValue(pet?.breed, item?.breed),
+    gender: pickDisplayValue(pet?.pet_gender, pet?.gender, item?.pet_gender),
+    age: pickDisplayValue(pet?.pet_age, pet?.pet_age_months, item?.pet_age),
+    type: formatPetType(pet?.pet_type || pet?.species || item?.pet_type),
+    weight: pickDisplayValue(
+      pet?.weight,
+      pet?.pet_weight,
+      pet?.weight_kg,
+      item?.pet_weight,
+      item?.weight,
+    ),
+    symptom: pickDisplayValue(
+      pet?.reported_symptom,
+      pet?.suggested_disease,
+      item?.reported_symptom,
+      item?.suggested_disease,
+    ),
+    petCount: Array.isArray(item?.pets) ? item.pets.length : 0,
+  };
+};
+
+const formatWeight = (item) => {
+  const petDetails = getPetDetails(item);
+  if (!petDetails.weight) return "Not available";
+  if (/[a-zA-Z]/.test(petDetails.weight)) return petDetails.weight;
+  return `${petDetails.weight} kg`;
+};
+
 const formatFollowUpDate = (item) => {
   const raw =
     item?.follow_up_prescription?.follow_up_date ||
@@ -62,9 +127,8 @@ const formatFollowUpType = (item) => {
 };
 
 const formatAgeGender = (item) => {
-  const values = [item?.pet_age, item?.pet_gender]
-    .map((value) => String(value ?? "").trim())
-    .filter(Boolean);
+  const petDetails = getPetDetails(item);
+  const values = [petDetails.age, petDetails.gender].filter(Boolean);
 
   return values.length ? values.join(" / ") : "Not available";
 };
@@ -73,6 +137,7 @@ function FollowUpDetailsModal({ item, onClose }) {
   if (!item) return null;
 
   const prescription = item.follow_up_prescription || {};
+  const petDetails = getPetDetails(item);
 
   return (
     <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-[2px]">
@@ -96,11 +161,11 @@ function FollowUpDetailsModal({ item, onClose }) {
             </p>
 
             <h2 className="mt-2 text-[22px] font-bold leading-tight text-[#0f172a]">
-              {formatValue(item.pet_name, "Pet")}
+              {formatValue(petDetails.name, "Pet")}
             </h2>
 
-            <p className="mt-1 text-[14px] text-[#667085]">
-              Review pet parent and prescription follow-up details
+            <p className="mt-1 text-[12px] text-[#667085]">
+              Review pet parent details, pet profile, and follow-up notes
             </p>
           </div>
 
@@ -167,6 +232,17 @@ function FollowUpDetailsModal({ item, onClose }) {
                   </div>
                 </div>
 
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-[#f8fafc] p-2 text-[#667085]">
+                    <MapPin size={14} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-medium text-[#0f172a]">
+                      {formatValue(item.city)}
+                    </p>
+                    <p className="mt-1 text-[13px] text-[#667085]">City</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -179,14 +255,14 @@ function FollowUpDetailsModal({ item, onClose }) {
                 <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
                   <p className="text-[11px] text-[#98a2b3]">Pet name</p>
                   <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
-                    {formatValue(item.pet_name)}
+                    {formatValue(petDetails.name)}
                   </p>
                 </div>
 
                 <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
                   <p className="text-[11px] text-[#98a2b3]">Breed</p>
                   <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
-                    {formatValue(item.breed)}
+                    {formatValue(petDetails.breed)}
                   </p>
                 </div>
 
@@ -194,6 +270,27 @@ function FollowUpDetailsModal({ item, onClose }) {
                   <p className="text-[11px] text-[#98a2b3]">Age / Gender</p>
                   <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
                     {formatAgeGender(item)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Pet type</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(petDetails.type)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Weight</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatWeight(item)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Pets linked</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {petDetails.petCount || 1}
                   </p>
                 </div>
               </div>
@@ -204,11 +301,20 @@ function FollowUpDetailsModal({ item, onClose }) {
                 Follow-up Prescription
               </p>
 
-              <div className="mt-3 rounded-[16px] bg-[#f8fafc] px-3 py-3">
-                <p className="text-[11px] text-[#98a2b3]">Follow-up notes</p>
-                <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
-                  {formatValue(prescription.follow_up_notes)}
-                </p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Follow-up notes</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(prescription.follow_up_notes)}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#f8fafc] px-3 py-3">
+                  <p className="text-[11px] text-[#98a2b3]">Reported symptom</p>
+                  <p className="mt-1 text-[14px] font-semibold text-[#0f172a]">
+                    {formatValue(petDetails.symptom)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -395,19 +501,29 @@ export default function NewDoctorDashboardView() {
 
         {/* STATS */}
         <div className="grid grid-cols-2 gap-3 mb-5">
-          <div className="rounded-2xl bg-green-100 p-4">
-            <p className="text-xs font-medium text-gray-600">Revenue</p>
-            <h2 className="mt-2 flex items-center gap-1 text-xl font-bold text-green-700">
-              <IndianRupee size={16} />
+          <div className="rounded-[22px] border border-[#dbeadf] bg-[linear-gradient(180deg,#f7fff8_0%,#ebfdf0_100%)] p-4 shadow-[0_8px_20px_rgba(34,197,94,0.08)]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#5f6f65]">
+              Revenue
+            </p>
+            <h2 className="mt-2 flex items-center gap-1 text-[18px] font-bold text-green-700">
+              <IndianRupee size={15} />
               {revenueLabel}
             </h2>
+            <p className="mt-1 text-[10px] text-[#6b7280]">
+              Razorpay payout summary
+            </p>
           </div>
 
-          <div className="rounded-2xl bg-blue-100 p-4">
-            <p className="text-xs font-medium text-gray-600">Follow-ups</p>
-            <h2 className="mt-2 text-xl font-bold text-blue-700">
+          <div className="rounded-[22px] border border-[#d7e6ff] bg-[linear-gradient(180deg,#f8fbff_0%,#edf5ff_100%)] p-4 shadow-[0_8px_20px_rgba(59,130,246,0.08)]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#5f6f65]">
+              Follow-ups
+            </p>
+            <h2 className="mt-2 text-[18px] font-bold text-blue-700">
               {followUpsCount} Active
             </h2>
+            <p className="mt-1 text-[10px] text-[#6b7280]">
+              Live cases waiting for review
+            </p>
           </div>
         </div>
 
@@ -455,63 +571,94 @@ export default function NewDoctorDashboardView() {
             </div>
           ) : followUps.length > 0 ? (
             <div className="space-y-3">
-              {followUps.map((item, index) => (
-                <button
-                  key={item.id || item.follow_up_prescription?.id || index}
-                  type="button"
-                  onClick={() => setSelectedFollowUp(item)}
-                  className="w-full rounded-[22px] border border-[#e5e7eb] bg-white px-4 py-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.06)] active:scale-[0.99] transition"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-[15px] font-bold text-[#0f172a]">
-                        {formatValue(item.pet_name, "Pet")}
-                      </p>
-                      <p className="mt-1 text-[12px] text-[#667085]">
-                        {formatValue(item.name, "Pet Parent")}
-                      </p>
+              {followUps.map((item, index) => {
+                const petDetails = getPetDetails(item);
+
+                return (
+                  <button
+                    key={item.id || item.follow_up_prescription?.id || index}
+                    type="button"
+                    onClick={() => setSelectedFollowUp(item)}
+                    className="w-full rounded-[24px] border border-[#e3ebe5] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbf9_100%)] px-4 py-4 text-left shadow-[0_10px_26px_rgba(15,23,42,0.06)] active:scale-[0.99] transition"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[#ecfdf3] text-[#16a34a] shadow-[inset_0_0_0_1px_rgba(22,163,74,0.08)]">
+                          <PawPrint size={18} />
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-[15px] font-bold text-[#0f172a]">
+                            {formatValue(petDetails.name, "Pet")}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-[#667085]">
+                            {formatValue(item.name, "Pet Parent")}
+                          </p>
+                          <p className="mt-1 text-[10px] text-[#8a94a6]">
+                            {formatValue(item.phone, "No number")}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 rounded-full bg-[#eefbf2] px-2.5 py-1 text-[10px] font-semibold text-[#16a34a]">
+                        {formatFollowUpType(item)}
+                      </div>
                     </div>
 
-                    <div className="shrink-0 rounded-full bg-[#eefbf2] px-2.5 py-1 text-[11px] font-semibold text-[#16a34a]">
-                      {formatFollowUpType(item)}
-                    </div>
-                  </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="rounded-[15px] bg-[#f4f7f6] px-3 py-2.5">
+                        <p className="text-[9px] uppercase tracking-[0.08em] text-[#98a2b3]">
+                          Follow-up
+                        </p>
+                        <p className="mt-1 text-[12px] font-semibold text-[#0f172a]">
+                          {formatFollowUpDate(item)}
+                        </p>
+                      </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="rounded-[14px] bg-[#f8fafc] px-3 py-2.5">
-                      <p className="text-[10px] text-[#98a2b3]">Follow-up date</p>
-                      <p className="mt-1 text-[13px] font-semibold text-[#0f172a]">
-                        {formatFollowUpDate(item)}
+                      <div className="rounded-[15px] bg-[#f4f7f6] px-3 py-2.5">
+                        <p className="text-[9px] uppercase tracking-[0.08em] text-[#98a2b3]">
+                          Breed
+                        </p>
+                        <p className="mt-1 truncate text-[12px] font-semibold text-[#0f172a]">
+                          {formatValue(petDetails.breed)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-[15px] bg-[#f4f7f6] px-3 py-2.5">
+                        <p className="text-[9px] uppercase tracking-[0.08em] text-[#98a2b3]">
+                          Type / Weight
+                        </p>
+                        <p className="mt-1 truncate text-[12px] font-semibold text-[#0f172a]">
+                          {formatValue(
+                            [petDetails.type, formatWeight(item)]
+                              .filter((value) => value && value !== "Not available")
+                              .join(" / "),
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-[15px] bg-[#f4f7f6] px-3 py-2.5">
+                        <p className="text-[9px] uppercase tracking-[0.08em] text-[#98a2b3]">
+                          Age / Gender
+                        </p>
+                        <p className="mt-1 truncate text-[12px] font-semibold text-[#0f172a]">
+                          {formatAgeGender(item)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="truncate text-[10px] text-[#8a94a6]">
+                        {formatValue(petDetails.symptom, "No symptom added")}
+                      </p>
+
+                      <p className="shrink-0 text-[10px] font-semibold text-[#16a34a]">
+                        Open details
                       </p>
                     </div>
-
-                    <div className="rounded-[14px] bg-[#f8fafc] px-3 py-2.5">
-                      <p className="text-[10px] text-[#98a2b3]">Breed</p>
-                      <p className="mt-1 truncate text-[13px] font-semibold text-[#0f172a]">
-                        {formatValue(item.breed)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-[14px] bg-[#f8fafc] px-3 py-2.5">
-                      <p className="text-[10px] text-[#98a2b3]">Phone</p>
-                      <p className="mt-1 text-[13px] font-semibold text-[#0f172a]">
-                        {formatValue(item.phone)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-[14px] bg-[#f8fafc] px-3 py-2.5">
-                      <p className="text-[10px] text-[#98a2b3]">Age / Gender</p>
-                      <p className="mt-1 truncate text-[13px] font-semibold text-[#0f172a]">
-                        {formatAgeGender(item)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="mt-3 text-[11px] font-semibold text-[#16a34a]">
-                    Tap to view full details
-                  </p>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-2xl border border-gray-100 bg-white p-6 text-center">

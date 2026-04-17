@@ -29,6 +29,37 @@ const PENDING_PRESCRIPTION_STATUS_URL =
   "https://snoutiq.com/backend/api/doctor/pending-prescription";
 const PAYMENT_STATUS_POLL_INTERVAL_MS = 5000;
 const DEFAULT_CLINIC_ID = 115;
+const POLL_STATE_KEY = "newDoctor.pendingPaymentPoll";
+
+const writePollingState = (doctorId, data) => {
+  try {
+    localStorage.setItem(
+      `${POLL_STATE_KEY}:${doctorId}`,
+      JSON.stringify({ ...data, savedAt: Date.now() }),
+    );
+  } catch {}
+};
+
+const readPollingState = (doctorId) => {
+  try {
+    const raw = localStorage.getItem(`${POLL_STATE_KEY}:${doctorId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - (parsed.savedAt || 0) > 5 * 60 * 1000) {
+      localStorage.removeItem(`${POLL_STATE_KEY}:${doctorId}`);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const clearPollingState = (doctorId) => {
+  try {
+    localStorage.removeItem(`${POLL_STATE_KEY}:${doctorId}`);
+  } catch {}
+};
 
 const fieldBase =
   "h-[50px] w-full rounded-2xl border border-[#d7dee8] bg-white px-4 text-[15px] text-[#1e293b] outline-none placeholder:text-[#94a3b8] shadow-sm focus:border-[#16a34a] focus:bg-[#fcfffd] focus:ring-0";
@@ -305,6 +336,29 @@ export default function NewDoctorNewRequestView() {
   const [requestResponse, setRequestResponse] = useState(null);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [requestError, setRequestError] = useState("");
+  const [restoredPollingDoctorId, setRestoredPollingDoctorId] = useState("");
+
+  useEffect(() => {
+    if (!doctorId || restoredPollingDoctorId !== doctorId) return;
+    if (step === 1 && requestResponse) {
+      writePollingState(doctorId, { step, requestResponse });
+    } else {
+      clearPollingState(doctorId);
+    }
+  }, [doctorId, requestResponse, restoredPollingDoctorId, step]);
+
+  useEffect(() => {
+    if (!doctorId) return;
+    const saved = readPollingState(doctorId);
+    if (saved?.step === 1 && saved.requestResponse) {
+      setStep(saved.step);
+      setRequestResponse(saved.requestResponse);
+    } else {
+      setStep(0);
+      setRequestResponse(null);
+    }
+    setRestoredPollingDoctorId(doctorId);
+  }, [doctorId]);
 
   useEffect(() => {
     hasHandledPaymentRef.current = false;
@@ -359,8 +413,25 @@ export default function NewDoctorNewRequestView() {
 
   const goNext = () => setStep((prev) => Math.min(prev + 1, TOTAL_STEPS - 1));
 
-  const handleBack = () => {
+  const handleBack = async () => {
     if (step > 0) {
+      const result = await Swal.fire({
+        icon: "warning",
+        title: "Go back to the form?",
+        text: "If you go back now, the payment waiting screen will close.",
+        showCancelButton: true,
+        confirmButtonText: "Yes, go back",
+        cancelButtonText: "Stay here",
+        confirmButtonColor: "#16a34a",
+        cancelButtonColor: "#94a3b8",
+        reverseButtons: true,
+      });
+
+      if (!result.isConfirmed) {
+        return;
+      }
+
+      clearPollingState(doctorId);
       setStep((prev) => Math.max(prev - 1, 0));
       return;
     }
@@ -433,6 +504,7 @@ export default function NewDoctorNewRequestView() {
 
     try {
       setIsSubmittingRequest(true);
+      clearPollingState(doctorId);
 
       const clinicId =
         auth?.clinic_id ||
@@ -559,6 +631,7 @@ export default function NewDoctorNewRequestView() {
         prescriptionStatus: "pending",
       });
 
+      clearPollingState(doctorId);
       navigate("/counsltflow/digital-prescription", {
         replace: true,
         state: {

@@ -541,7 +541,6 @@ export default function CompletePetProfileModal({
                                   <option value="">Select gender</option>
                                   <option value="Male">Male</option>
                                   <option value="Female">Female</option>
-                                  <option value="Unknown">Unknown</option>
                                 </select>
 
                                 <ChevronDown
