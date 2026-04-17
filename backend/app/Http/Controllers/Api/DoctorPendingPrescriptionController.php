@@ -19,11 +19,16 @@ class DoctorPendingPrescriptionController extends Controller
         $prescription = $transactionChannelName !== ''
             ? $this->findPrescriptionByCallSession($transactionChannelName)
             : null;
+        $resolvedUserId = $this->positiveInt($transaction?->user_id ?? null) ?? $userId;
+        $resolvedPetId = $this->positiveInt($transaction?->pet_id ?? null);
         $transactionDone = $transaction !== null && $this->isSuccessfulTransactionStatus($transaction->status ?? null);
         $prescriptionSubmitted = $prescription !== null;
 
         return response()->json([
             'payment_status' => $transactionDone ? 'paid' : ($transaction ? 'pending' : 'not_found'),
+            'transaction_id' => $transaction?->id,
+            'user_id' => $resolvedUserId,
+            'pet_id' => $resolvedPetId,
             'channel_name' => $transactionChannelName !== '' ? $transactionChannelName : null,
             'prescription_required' => $transactionDone,
             'prescription_status' => $prescriptionSubmitted ? 'submitted' : 'pending',
