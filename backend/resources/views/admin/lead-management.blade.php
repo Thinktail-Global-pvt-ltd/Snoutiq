@@ -2656,49 +2656,6 @@
             });
         }
 
-        (lead.manual_activity || []).forEach((activity) => {
-            const eventType = String(activity.event_type || 'log_action').toLowerCase();
-            const eventAt = String(activity.event_at || activity.timestamp || '');
-
-            if (eventType === 'next_action') {
-                const actionLabel = String(activity.action_type || activity.action || 'Follow-up').trim();
-                const dueDate = String(activity.due_date || '').trim();
-                const assignedTo = String(activity.assigned_to || activity.done_by || '').trim();
-                const details = String(activity.notes || '').trim();
-                const blocker = String(activity.blocker || '').trim();
-
-                const summaryParts = [
-                    details !== '' ? details : null,
-                    dueDate !== '' ? `Due: ${formatDate(dueDate)}` : null,
-                    assignedTo !== '' ? `Assigned: ${assignedTo}` : null,
-                    blocker !== '' ? `Blocker: ${blocker}` : null,
-                ].filter(Boolean);
-
-                items.push({
-                    title: `Next action set - ${actionLabel || 'Follow-up'}`,
-                    text: summaryParts.length ? summaryParts.join(' · ') : 'Next action saved from CRM panel.',
-                    badge: '<span class="crm-pill crm-pill-amber">Next action</span>',
-                    timestamp: eventAt,
-                    icon: '<i class="bi bi-calendar-check"></i>',
-                });
-
-                return;
-            }
-
-            const actionLabel = String(activity.action_type || activity.action || 'Manual action').trim();
-            const outcome = String(activity.outcome || '').trim();
-            const notes = String(activity.notes || '').trim();
-            const actor = String(activity.done_by || activity.by || activity.created_by || 'Admin').trim();
-
-            items.push({
-                title: outcome !== '' ? `${actionLabel} - ${outcome}` : actionLabel || 'Manual action',
-                text: notes || outcome || 'Action logged from CRM panel.',
-                badge: `<span class="crm-pill crm-pill-purple">${escapeHtml(actor || 'Admin')}</span>`,
-                timestamp: eventAt,
-                icon: '<i class="bi bi-journal-text"></i>',
-            });
-        });
-
         (lead.related_transactions || []).forEach((txn) => {
             const transactionId = Number(txn.id || 0);
             if (!Number.isFinite(transactionId) || transactionId <= 0) return;
@@ -2752,32 +2709,6 @@
                 icon: '<i class="bi bi-file-earmark-medical"></i>',
             });
         });
-
-        (lead.notifications || []).forEach((notif) => {
-            const clicked = notif.clicked === true;
-            const badgeClass = clicked ? 'crm-pill-green' : 'crm-pill-red';
-            const clickLabel = clicked ? 'Clicked' : 'Not clicked';
-            items.push({
-                title: notif.title || notif.type || 'Notification sent',
-                text: notif.text || `${notif.bucket_label || 'Notification'} sent to user.`,
-                badge: `<span class="crm-pill ${badgeClass}">${clickLabel}</span>`,
-                timestamp: notif.timestamp || '',
-                icon: '<i class="bi bi-bell"></i>',
-            });
-        });
-
-        const hasNextActionActivity = (lead.manual_activity || [])
-            .some((activity) => String(activity.event_type || '').toLowerCase() === 'next_action');
-        const next = resolveNextAction(lead);
-        if (next.date && !hasNextActionActivity) {
-            items.push({
-                title: `${next.type} ${next.state.key === 'overdue' ? 'overdue' : 'scheduled'}`,
-                text: next.details || `Action date: ${next.label}`,
-                badge: `<span class="crm-pill ${next.state.key === 'overdue' ? 'crm-pill-red' : (next.state.key === 'today' ? 'crm-pill-amber' : 'crm-pill-green')}">${next.state.label}</span>`,
-                timestamp: next.date,
-                icon: '<i class="bi bi-calendar-event"></i>',
-            });
-        }
 
         return items
             .sort((left, right) => {

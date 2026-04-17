@@ -190,6 +190,9 @@ class LeadManagementTimelineTest extends TestCase
         $response->assertSee('"title":"Custom Admin Test"', false);
         $response->assertSee('(lead.related_transactions || []).forEach', false);
         $response->assertSee('(lead.related_prescriptions || []).forEach', false);
+        $response->assertDontSee('Notification sent', false);
+        $response->assertDontSee('Action logged from CRM panel.', false);
+        $response->assertDontSee('Next action saved from CRM panel.', false);
         $response->assertSee('Prescription added', false);
         $response->assertSee((string) $notification->id);
     }
