@@ -320,7 +320,7 @@ export default function NewDoctorNewRequestView() {
   const [form, setForm] = useState({
     phone: "",
     email: "",
-    amount: "499",
+    amount: "",
     parentName: "",
     petName: "",
     petType: "",

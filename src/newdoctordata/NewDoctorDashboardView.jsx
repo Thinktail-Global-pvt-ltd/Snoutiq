@@ -483,7 +483,7 @@ export default function NewDoctorDashboardView() {
             title="Notifications"
           >
             <Bell size={20} className="text-gray-700" />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full"></span>
           </button>
         </div>
       </div>
