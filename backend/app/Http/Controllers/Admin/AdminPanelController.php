@@ -63,6 +63,105 @@ class AdminPanelController extends Controller
         return view('admin.users', compact('users'));
     }
 
+    public function usersBulkDelete(Request $request): View
+    {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $searchTerm = trim((string) ($validated['q'] ?? ''));
+
+        $usersQuery = User::query()
+            ->select(['id', 'name', 'email', 'phone', 'role', 'city', 'created_at'])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+
+        if ($searchTerm !== '') {
+            $usersQuery->where(function (Builder $query) use ($searchTerm): void {
+                $searchLike = '%'.$searchTerm.'%';
+
+                $query->where('name', 'like', $searchLike)
+                    ->orWhere('email', 'like', $searchLike)
+                    ->orWhere('phone', 'like', $searchLike)
+                    ->orWhere('role', 'like', $searchLike)
+                    ->orWhere('city', 'like', $searchLike);
+
+                if (is_numeric($searchTerm)) {
+                    $query->orWhere('id', (int) $searchTerm);
+                }
+            });
+        }
+
+        $users = $usersQuery->get();
+        $totalUsers = User::query()->count();
+
+        return view('admin.users-bulk-delete', [
+            'users' => $users,
+            'searchQuery' => $searchTerm,
+            'totalUsers' => $totalUsers,
+        ]);
+    }
+
+    public function deleteUsersBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'user_ids' => ['required', 'array', 'min:1'],
+            'user_ids.*' => ['integer', 'distinct', 'exists:users,id'],
+        ]);
+
+        $searchTerm = trim((string) ($validated['q'] ?? ''));
+        $filters = array_filter([
+            'q' => $searchTerm,
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        $userIds = collect($validated['user_ids'] ?? [])
+            ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+            ->map(fn ($userId) => (int) $userId)
+            ->unique()
+            ->values();
+
+        if ($userIds->isEmpty()) {
+            return redirect()
+                ->route('admin.users.bulk-delete', $filters)
+                ->with('error', 'Select at least one user to delete.');
+        }
+
+        $users = User::query()
+            ->whereIn('id', $userIds->all())
+            ->orderBy('id')
+            ->get();
+
+        $deletedUserIds = [];
+        $failedDeletes = [];
+
+        foreach ($users as $user) {
+            $userId = (int) $user->id;
+
+            try {
+                $this->deleteLeadManagementUserAndRelatedData($user);
+                $deletedUserIds[] = $userId;
+            } catch (\Throwable $e) {
+                $failedDeletes[] = '#'.$userId.' - '.$e->getMessage();
+            }
+        }
+
+        if (empty($deletedUserIds)) {
+            return redirect()
+                ->route('admin.users.bulk-delete', $filters)
+                ->with('error', 'No users were deleted. '.implode(' | ', $failedDeletes));
+        }
+
+        $statusMessage = count($deletedUserIds).' user(s) deleted successfully.';
+        if (!empty($failedDeletes)) {
+            $statusMessage .= ' Failed: '.implode(' | ', $failedDeletes);
+        }
+
+        return redirect()
+            ->route('admin.users.bulk-delete', $filters)
+            ->with('status', $statusMessage);
+    }
+
     public function usersDataHub(Request $request): View
     {
         $validated = $request->validate([

@@ -219,6 +219,8 @@ Route::prefix('admin')->group(function () {
     Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
         Route::get('/dashboard', [AdminPanelController::class, 'index'])->name('admin.dashboard');
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
+        Route::get('/users/bulk-delete', [AdminPanelController::class, 'usersBulkDelete'])->name('admin.users.bulk-delete');
+        Route::post('/users/bulk-delete', [AdminPanelController::class, 'deleteUsersBulk'])->name('admin.users.bulk-delete.destroy');
         Route::get('/users/data-hub', [AdminPanelController::class, 'usersDataHub'])->name('admin.users.data-hub');
         Route::get('/users/data-hub/export-csv', [AdminPanelController::class, 'usersDataHubExportCsv'])->name('admin.users.data-hub.export-csv');
         Route::delete('/users/data-hub/{user}', [AdminPanelController::class, 'deleteUsersDataHubUser'])->name('admin.users.data-hub.delete');
