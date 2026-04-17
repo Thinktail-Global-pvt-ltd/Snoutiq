@@ -1581,11 +1581,34 @@
                         'type' => trim((string) ($row['type'] ?? '')),
                         'status' => trim((string) ($row['status'] ?? '')),
                         'amount_paise' => is_numeric($row['amount_paise'] ?? null) ? (int) $row['amount_paise'] : null,
+                        'pet_id' => is_numeric($row['pet_id'] ?? null) ? (int) $row['pet_id'] : null,
+                        'pet_name' => trim((string) ($row['pet_name'] ?? '')),
                         'doctor_id' => is_numeric($row['doctor_id'] ?? null) ? (int) $row['doctor_id'] : null,
                         'doctor_name' => trim((string) ($row['doctor_name'] ?? '')),
                         'clinic_id' => is_numeric($row['clinic_id'] ?? null) ? (int) $row['clinic_id'] : null,
                         'clinic_name' => trim((string) ($row['clinic_name'] ?? '')),
                         'can_reassign_doctor' => is_numeric($row['id'] ?? null) && (int) ($row['id'] ?? 0) > 0,
+                    ];
+                })
+                ->filter(fn (array $row): bool => (int) ($row['id'] ?? 0) > 0)
+                ->values()
+                ->all();
+            $relatedPrescriptions = collect($leadUser['related_prescriptions'] ?? [])
+                ->map(function ($item): array {
+                    $row = is_array($item) ? $item : [];
+
+                    return [
+                        'id' => is_numeric($row['id'] ?? null) ? (int) $row['id'] : 0,
+                        'created_at' => trim((string) ($row['created_at'] ?? '')),
+                        'doctor_id' => is_numeric($row['doctor_id'] ?? null) ? (int) $row['doctor_id'] : null,
+                        'doctor_name' => trim((string) ($row['doctor_name'] ?? '')),
+                        'pet_id' => is_numeric($row['pet_id'] ?? null) ? (int) $row['pet_id'] : null,
+                        'pet_name' => trim((string) ($row['pet_name'] ?? '')),
+                        'diagnosis' => trim((string) ($row['diagnosis'] ?? '')),
+                        'disease_name' => trim((string) ($row['disease_name'] ?? '')),
+                        'video_inclinic' => trim((string) ($row['video_inclinic'] ?? '')),
+                        'follow_up_date' => trim((string) ($row['follow_up_date'] ?? '')),
+                        'follow_up_type' => trim((string) ($row['follow_up_type'] ?? '')),
                     ];
                 })
                 ->filter(fn (array $row): bool => (int) ($row['id'] ?? 0) > 0)
@@ -1655,6 +1678,7 @@
                     true
                 ),
                 'related_transactions' => $relatedTransactions,
+                'related_prescriptions' => $relatedPrescriptions,
                 'conversion_lag_minutes' => is_numeric($leadUser['conversion_lag_minutes'] ?? null)
                     ? (int) $leadUser['conversion_lag_minutes']
                     : null,
@@ -2307,6 +2331,23 @@
         })}`;
     }
 
+    function humanizeLabel(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+
+        return raw
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    function isSuccessfulTransactionStatus(value) {
+        return ['completed', 'captured', 'paid', 'success', 'successful', 'settled']
+            .includes(String(value || '').trim().toLowerCase());
+    }
+
     function formatDateForInput(value) {
         if (!value) return '';
         const date = parseDateValue(value);
@@ -2426,8 +2467,13 @@
             .pop() || '';
 
         const transactionTs = getLatestTransactionTimestamp(lead);
+        const prescriptionTs = (lead.related_prescriptions || [])
+            .map((item) => String(item.created_at || ''))
+            .filter(Boolean)
+            .sort()
+            .pop() || '';
 
-        return [notificationTs, manualTs, transactionTs, String(lead.created_at || '')]
+        return [notificationTs, manualTs, transactionTs, prescriptionTs, String(lead.created_at || '')]
             .filter(Boolean)
             .sort()
             .pop() || '';
@@ -2650,6 +2696,60 @@
                 badge: `<span class="crm-pill crm-pill-purple">${escapeHtml(actor || 'Admin')}</span>`,
                 timestamp: eventAt,
                 icon: '<i class="bi bi-journal-text"></i>',
+            });
+        });
+
+        (lead.related_transactions || []).forEach((txn) => {
+            const transactionId = Number(txn.id || 0);
+            if (!Number.isFinite(transactionId) || transactionId <= 0) return;
+
+            const typeLabel = humanizeLabel(txn.type) || 'Transaction';
+            const statusLabel = humanizeLabel(txn.status) || 'Recorded';
+            const parts = [
+                `Transaction #${transactionId}`,
+                typeLabel,
+                statusLabel,
+                formatInrFromPaise(txn.amount_paise),
+                txn.pet_name ? `Pet: ${txn.pet_name}` : (Number(txn.pet_id || 0) > 0 ? `Pet #${Number(txn.pet_id)}` : ''),
+                txn.doctor_name ? `Doctor: ${txn.doctor_name}` : '',
+                txn.clinic_name ? `Clinic: ${txn.clinic_name}` : '',
+                Number(lead.conversion_transaction_id || 0) === transactionId ? 'Attributed conversion' : '',
+            ].filter(Boolean);
+
+            items.push({
+                title: `${typeLabel} recorded`,
+                text: parts.join(' · ') || `Transaction #${transactionId} linked to this lead.`,
+                badge: `<span class="crm-pill ${isSuccessfulTransactionStatus(txn.status) ? 'crm-pill-green' : 'crm-pill-blue'}">${escapeHtml(statusLabel)}</span>`,
+                timestamp: txn.created_at || '',
+                icon: '<i class="bi bi-credit-card"></i>',
+            });
+        });
+
+        (lead.related_prescriptions || []).forEach((prescription) => {
+            const prescriptionId = Number(prescription.id || 0);
+            if (!Number.isFinite(prescriptionId) || prescriptionId <= 0) return;
+
+            const diagnosisLabel = String(prescription.diagnosis || prescription.disease_name || '').trim();
+            const modeLabel = humanizeLabel(prescription.video_inclinic);
+            const followUpTypeLabel = humanizeLabel(prescription.follow_up_type);
+            const followUpLabel = prescription.follow_up_date
+                ? `Follow-up: ${formatDate(prescription.follow_up_date)}${followUpTypeLabel ? ` (${followUpTypeLabel})` : ''}`
+                : (followUpTypeLabel ? `Follow-up: ${followUpTypeLabel}` : '');
+            const parts = [
+                `Prescription #${prescriptionId}`,
+                prescription.pet_name ? `Pet: ${prescription.pet_name}` : (Number(prescription.pet_id || 0) > 0 ? `Pet #${Number(prescription.pet_id)}` : ''),
+                prescription.doctor_name ? `Doctor: ${prescription.doctor_name}` : (Number(prescription.doctor_id || 0) > 0 ? `Doctor #${Number(prescription.doctor_id)}` : ''),
+                diagnosisLabel ? `Diagnosis: ${diagnosisLabel}` : '',
+                modeLabel ? `Mode: ${modeLabel}` : '',
+                followUpLabel,
+            ].filter(Boolean);
+
+            items.push({
+                title: diagnosisLabel ? `Prescription added - ${diagnosisLabel}` : 'Prescription added',
+                text: parts.join(' · ') || `Prescription #${prescriptionId} linked to this lead.`,
+                badge: `<span class="crm-pill ${modeLabel ? 'crm-pill-amber' : 'crm-pill-blue'}">${escapeHtml(modeLabel || 'Prescription')}</span>`,
+                timestamp: prescription.created_at || '',
+                icon: '<i class="bi bi-file-earmark-medical"></i>',
             });
         });
 

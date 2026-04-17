@@ -747,6 +747,11 @@ class AdminPanelController extends Controller
         $hasTransactionType = $hasTransactionsTable && Schema::hasColumn('transactions', 'type');
         $hasTransactionMetadata = $hasTransactionsTable && Schema::hasColumn('transactions', 'metadata');
         $hasPrescriptionCallSession = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'call_session');
+        $hasPrescriptionCreatedAt = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'created_at');
+        $hasPrescriptionDoctorId = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'doctor_id');
+        $hasPrescriptionPetId = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'pet_id');
+        $hasPrescriptionDiagnosis = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'diagnosis');
+        $hasPrescriptionDiseaseName = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'disease_name');
         $hasPrescriptionFollowUpDate = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'follow_up_date');
         $hasPrescriptionFollowUpType = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'follow_up_type');
         $hasPrescriptionVideoInclinic = $hasPrescriptionsTable && Schema::hasColumn('prescriptions', 'video_inclinic');
@@ -892,6 +897,7 @@ class AdminPanelController extends Controller
                 'conversion_transaction_clinic_id' => null,
                 'conversion_transaction_clinic_name' => null,
                 'related_transactions' => [],
+                'related_prescriptions' => [],
                 'conversion_lag_minutes' => null,
                 'crm_activity_logs' => [],
                 'crm_next_action' => null,
@@ -1824,6 +1830,165 @@ class AdminPanelController extends Controller
             }
         }
 
+        if ($hasPrescriptionUserId && $targetUsers->isNotEmpty()) {
+            try {
+                $leadUserIds = $targetUsers
+                    ->keys()
+                    ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                    ->map(fn ($userId) => (int) $userId)
+                    ->values()
+                    ->all();
+
+                if (!empty($leadUserIds)) {
+                    $prescriptionColumns = ['id', 'user_id'];
+                    if ($hasPrescriptionCreatedAt) {
+                        $prescriptionColumns[] = 'created_at';
+                    }
+                    if ($hasPrescriptionDoctorId) {
+                        $prescriptionColumns[] = 'doctor_id';
+                    }
+                    if ($hasPrescriptionPetId) {
+                        $prescriptionColumns[] = 'pet_id';
+                    }
+                    if ($hasPrescriptionDiagnosis) {
+                        $prescriptionColumns[] = 'diagnosis';
+                    }
+                    if ($hasPrescriptionDiseaseName) {
+                        $prescriptionColumns[] = 'disease_name';
+                    }
+                    if ($hasPrescriptionVideoInclinic) {
+                        $prescriptionColumns[] = 'video_inclinic';
+                    }
+                    if ($hasPrescriptionFollowUpDate) {
+                        $prescriptionColumns[] = 'follow_up_date';
+                    }
+                    if ($hasPrescriptionFollowUpType) {
+                        $prescriptionColumns[] = 'follow_up_type';
+                    }
+
+                    $maxPrescriptionRows = min(max($limit * 20, 3000), 12000);
+                    $prescriptionRows = Prescription::query()
+                        ->select(array_unique($prescriptionColumns))
+                        ->whereIn('user_id', $leadUserIds)
+                        ->orderByDesc($hasPrescriptionCreatedAt ? 'created_at' : 'id')
+                        ->orderByDesc('id')
+                        ->limit($maxPrescriptionRows)
+                        ->get();
+
+                    $doctorNameLookup = [];
+                    if ($hasPrescriptionDoctorId) {
+                        $doctorIds = $prescriptionRows
+                            ->pluck('doctor_id')
+                            ->filter(fn ($doctorId) => is_numeric($doctorId) && (int) $doctorId > 0)
+                            ->map(fn ($doctorId) => (int) $doctorId)
+                            ->unique()
+                            ->values();
+
+                        if ($doctorIds->isNotEmpty()) {
+                            $doctorNameLookup = Doctor::query()
+                                ->whereIn('id', $doctorIds->all())
+                                ->pluck('doctor_name', 'id')
+                                ->mapWithKeys(fn ($doctorName, $doctorId) => [(int) $doctorId => (string) $doctorName])
+                                ->all();
+                        }
+                    }
+
+                    $petNameLookup = [];
+                    if ($hasPrescriptionPetId && $hasPetsTable) {
+                        $petIds = $prescriptionRows
+                            ->pluck('pet_id')
+                            ->filter(fn ($petId) => is_numeric($petId) && (int) $petId > 0)
+                            ->map(fn ($petId) => (int) $petId)
+                            ->unique()
+                            ->values();
+
+                        if ($petIds->isNotEmpty()) {
+                            $petNameLookup = Pet::query()
+                                ->whereIn('id', $petIds->all())
+                                ->pluck('name', 'id')
+                                ->mapWithKeys(fn ($petName, $petId) => [(int) $petId => (string) $petName])
+                                ->all();
+                        }
+                    }
+
+                    $relatedPrescriptionsByUser = [];
+
+                    foreach ($prescriptionRows as $prescriptionRow) {
+                        $userId = is_numeric($prescriptionRow->user_id ?? null) ? (int) $prescriptionRow->user_id : 0;
+                        if ($userId <= 0 || !$targetUsers->has($userId)) {
+                            continue;
+                        }
+
+                        if (!isset($relatedPrescriptionsByUser[$userId])) {
+                            $relatedPrescriptionsByUser[$userId] = [];
+                        }
+
+                        if (count($relatedPrescriptionsByUser[$userId]) >= 25) {
+                            continue;
+                        }
+
+                        $createdAt = $hasPrescriptionCreatedAt
+                            ? $normalizeDateTime($prescriptionRow->created_at ?? null)
+                            : null;
+
+                        $followUpDate = null;
+                        if ($hasPrescriptionFollowUpDate && !empty($prescriptionRow->follow_up_date)) {
+                            try {
+                                $followUpDate = \Illuminate\Support\Carbon::parse($prescriptionRow->follow_up_date)->toDateString();
+                            } catch (\Throwable $e) {
+                                $followUpDate = (string) $prescriptionRow->follow_up_date;
+                            }
+                        }
+
+                        $doctorId = $hasPrescriptionDoctorId && is_numeric($prescriptionRow->doctor_id ?? null)
+                            ? (int) $prescriptionRow->doctor_id
+                            : null;
+                        $petId = $hasPrescriptionPetId && is_numeric($prescriptionRow->pet_id ?? null)
+                            ? (int) $prescriptionRow->pet_id
+                            : null;
+
+                        $relatedPrescriptionsByUser[$userId][] = [
+                            'id' => (int) ($prescriptionRow->id ?? 0),
+                            'created_at' => $createdAt,
+                            'doctor_id' => $doctorId,
+                            'doctor_name' => $doctorId ? ($doctorNameLookup[$doctorId] ?? null) : null,
+                            'pet_id' => $petId,
+                            'pet_name' => $petId ? ($petNameLookup[$petId] ?? null) : null,
+                            'diagnosis' => $hasPrescriptionDiagnosis
+                                ? trim((string) ($prescriptionRow->diagnosis ?? ''))
+                                : '',
+                            'disease_name' => $hasPrescriptionDiseaseName
+                                ? trim((string) ($prescriptionRow->disease_name ?? ''))
+                                : '',
+                            'video_inclinic' => $hasPrescriptionVideoInclinic
+                                ? trim((string) ($prescriptionRow->video_inclinic ?? ''))
+                                : '',
+                            'follow_up_date' => $followUpDate,
+                            'follow_up_type' => $hasPrescriptionFollowUpType
+                                ? trim((string) ($prescriptionRow->follow_up_type ?? ''))
+                                : '',
+                        ];
+                    }
+
+                    $targetUsers = $targetUsers->map(function (array $leadUser) use ($relatedPrescriptionsByUser): array {
+                        $userId = is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0;
+                        if ($userId <= 0) {
+                            return $leadUser;
+                        }
+
+                        $leadUser['related_prescriptions'] = collect($relatedPrescriptionsByUser[$userId] ?? [])
+                            ->sortByDesc('created_at')
+                            ->values()
+                            ->all();
+
+                        return $leadUser;
+                    });
+                }
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('related_prescriptions', $e);
+            }
+        }
+
         $hasTransactionUserId = $hasTransactionsTable && Schema::hasColumn('transactions', 'user_id');
         $hasTransactionCreatedAt = $hasTransactionsTable && Schema::hasColumn('transactions', 'created_at');
         $hasTransactionStatus = $hasTransactionsTable && Schema::hasColumn('transactions', 'status');
@@ -1900,6 +2065,7 @@ class AdminPanelController extends Controller
 
                 $doctorNameLookup = [];
                 $clinicNameLookup = [];
+                $petNameLookup = [];
 
                 if ($hasTransactionDoctorId) {
                     $doctorIds = $leadTransactions
@@ -1931,6 +2097,23 @@ class AdminPanelController extends Controller
                             ->whereIn('id', $clinicIds->all())
                             ->pluck('name', 'id')
                             ->mapWithKeys(fn ($clinicName, $clinicId) => [(int) $clinicId => (string) $clinicName])
+                            ->all();
+                    }
+                }
+
+                if ($hasTransactionPetId && $hasPetsTable) {
+                    $petIds = $leadTransactions
+                        ->pluck('pet_id')
+                        ->filter(fn ($petId) => is_numeric($petId) && (int) $petId > 0)
+                        ->map(fn ($petId) => (int) $petId)
+                        ->unique()
+                        ->values();
+
+                    if ($petIds->isNotEmpty()) {
+                        $petNameLookup = Pet::query()
+                            ->whereIn('id', $petIds->all())
+                            ->pluck('name', 'id')
+                            ->mapWithKeys(fn ($petName, $petId) => [(int) $petId => (string) $petName])
                             ->all();
                     }
                 }
@@ -2005,6 +2188,9 @@ class AdminPanelController extends Controller
                             ? (int) $leadTransaction->amount_paise
                             : null,
                         'pet_id' => $hasTransactionPetId && is_numeric($leadTransaction->pet_id) ? (int) $leadTransaction->pet_id : null,
+                        'pet_name' => $hasTransactionPetId && is_numeric($leadTransaction->pet_id)
+                            ? ($petNameLookup[(int) $leadTransaction->pet_id] ?? null)
+                            : null,
                         'fcm_notification_id' => $transactionFcmNotificationId,
                         'doctor_id' => $hasTransactionDoctorId && is_numeric($leadTransaction->doctor_id) ? (int) $leadTransaction->doctor_id : null,
                         'doctor_name' => $hasTransactionDoctorId && is_numeric($leadTransaction->doctor_id)
