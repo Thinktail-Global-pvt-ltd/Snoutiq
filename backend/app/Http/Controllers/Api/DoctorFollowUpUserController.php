@@ -106,7 +106,8 @@ class DoctorFollowUpUserController extends Controller
             ->orderByDesc('p.id')
             ->get();
 
-        $data = $rows->map(fn (User $user) => $this->formatRow($user))->values();
+        $petsByUserId = $this->petsByUserId($rows->pluck('id')->all());
+        $data = $rows->map(fn (User $user) => $this->formatRow($user, $petsByUserId))->values();
 
         return response()->json([
             'success' => true,
@@ -219,7 +220,7 @@ class DoctorFollowUpUserController extends Controller
         return 0;
     }
 
-    private function formatRow(User $user): array
+    private function formatRow(User $user, array $petsByUserId = []): array
     {
         $row = $user->toArray();
         $prescriptionKeys = array_filter(
@@ -240,6 +241,7 @@ class DoctorFollowUpUserController extends Controller
         }
 
         $row['follow_up_prescription'] = $prescription;
+        $row['pets'] = $petsByUserId[(int) $user->id] ?? [];
 
         return $row;
     }
