@@ -43,6 +43,7 @@ export const EMPTY_PENDING_PRESCRIPTION = {
   paymentStatus: "",
   prescriptionRequired: false,
   prescriptionStatus: "",
+  channelName: "",
 };
 
 const canUseBrowserStorage = () =>
@@ -87,6 +88,7 @@ export const stripDoctorPendingPrescriptionRouteState = (routeState) => {
   delete nextRouteState.paymentStatus;
   delete nextRouteState.prescriptionRequired;
   delete nextRouteState.prescriptionStatus;
+  delete nextRouteState.channelName;
 
   return Object.keys(nextRouteState).length > 0 ? nextRouteState : null;
 };
@@ -115,6 +117,7 @@ const normalizePendingPrescription = (value = {}) => {
     paymentStatus: normalizeText(value.paymentStatus),
     prescriptionRequired: Boolean(value.prescriptionRequired),
     prescriptionStatus: normalizeText(value.prescriptionStatus),
+    channelName: normalizeText(value.channelName),
   };
 };
 
@@ -190,6 +193,7 @@ export function startDoctorPendingPrescription(doctorId, value = {}) {
     prescriptionRequired: value.prescriptionRequired ?? false,
     prescriptionStatus: value.prescriptionStatus ?? "",
     hasPending: true,
+    channelName: value.channelName ?? "",
   });
 }
 
@@ -262,6 +266,7 @@ export function syncDoctorPendingPrescriptionFromRouteState(
     paymentStatus: routeState.paymentStatus ?? "",
     prescriptionRequired: routeState.prescriptionRequired ?? false,
     prescriptionStatus: routeState.prescriptionStatus ?? "",
+    channelName: routeState.channelName ?? "",
   });
 }
 

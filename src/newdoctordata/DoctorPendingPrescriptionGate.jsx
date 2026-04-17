@@ -15,7 +15,9 @@ import { useDoctorPendingPrescription } from "./useDoctorPendingPrescription";
 
 const DIGITAL_PRESCRIPTION_PATH = "/counsltflow/digital-prescription";
 const SKIPPED_PATHS = ["/counsltflow/login", "/counsltflow/onboarding"];
-const PETS_URL = "https://snoutiq.com/backend/api/pets";
+
+const PATIENT_CREATE_URL = "https://snoutiq.com/backend/api/users/pets";
+const PETS_UPDATE_BASE_URL = "https://snoutiq.com/backend/api/pets";
 
 const hasDoctorSession = (auth) =>
   Boolean(
@@ -45,18 +47,18 @@ const appendFormDataIfPresent = (requestBody, key, value) => {
   }
 };
 
-const buildPetProfileRequestBody = ({
-  userId,
-  patientData,
-  isUpdate = false,
-}) => {
+const formatPetTypeForCreate = (value) => {
+  const normalized = normalizeText(value).toLowerCase();
+  if (!normalized) return "";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const buildPetUpdateRequestBody = ({ userId, patientData }) => {
   const requestBody = new FormData();
 
-  if (isUpdate) {
-    requestBody.append("_method", "PUT");
-  }
-
+  requestBody.append("_method", "PUT");
   requestBody.append("user_id", String(userId));
+
   appendFormDataIfPresent(requestBody, "pet_owner_name", patientData.parentName);
   appendFormDataIfPresent(requestBody, "pet_name", patientData.petName);
   appendFormDataIfPresent(requestBody, "name", patientData.petName);
@@ -70,22 +72,80 @@ const buildPetProfileRequestBody = ({
   return requestBody;
 };
 
+const buildPatientCreateRequestBody = ({ userId, patientData }) => {
+  const requestBody = new FormData();
+
+  requestBody.append("user_id", String(userId));
+  appendFormDataIfPresent(requestBody, "name", patientData.parentName);
+  appendFormDataIfPresent(requestBody, "pet_name", patientData.petName);
+  appendFormDataIfPresent(
+    requestBody,
+    "pet_type",
+    formatPetTypeForCreate(patientData.petType),
+  );
+  appendFormDataIfPresent(requestBody, "pet_breed", patientData.breed);
+  appendFormDataIfPresent(requestBody, "pet_gender", patientData.gender);
+  appendFormDataIfPresent(requestBody, "pet_age", patientData.age);
+  appendFormDataIfPresent(requestBody, "weight", patientData.weight);
+
+  return requestBody;
+};
+
 const resolveSavedPetId = (responsePayload = {}) => {
   const payload =
     responsePayload?.data && typeof responsePayload.data === "object"
       ? responsePayload.data
       : responsePayload;
+
   const nestedPayload =
     payload?.data && typeof payload.data === "object" ? payload.data : {};
+
   const candidates = [
     responsePayload?.pet?.id,
     responsePayload?.data?.pet?.id,
     responsePayload?.data?.id,
+    responsePayload?.pet_id,
+    responsePayload?.petId,
     payload?.pet?.id,
+    payload?.pet_id,
+    payload?.petId,
     nestedPayload?.pet?.id,
+    nestedPayload?.pet_id,
+    nestedPayload?.petId,
     payload?.id,
     nestedPayload?.id,
     responsePayload?.id,
+  ];
+
+  return candidates.map(normalizeText).find(Boolean) || "";
+};
+
+const resolveSavedUserId = (responsePayload = {}) => {
+  const payload =
+    responsePayload?.data && typeof responsePayload.data === "object"
+      ? responsePayload.data
+      : responsePayload;
+
+  const nestedPayload =
+    payload?.data && typeof payload.data === "object" ? payload.data : {};
+
+  const userPayload =
+    payload?.user && typeof payload.user === "object"
+      ? payload.user
+      : nestedPayload?.user && typeof nestedPayload.user === "object"
+        ? nestedPayload.user
+        : {};
+
+  const candidates = [
+    responsePayload?.user?.id,
+    responsePayload?.data?.user?.id,
+    responsePayload?.user_id,
+    responsePayload?.userId,
+    payload?.user_id,
+    payload?.userId,
+    nestedPayload?.user_id,
+    nestedPayload?.userId,
+    userPayload?.id,
   ];
 
   return candidates.map(normalizeText).find(Boolean) || "";
@@ -96,10 +156,12 @@ const buildValidationMessage = (
   fallback = "Unable to save pet profile.",
 ) => {
   const primary = normalizeText(responsePayload?.message || fallback) || fallback;
+
   const errorEntries =
     responsePayload?.errors && typeof responsePayload.errors === "object"
       ? Object.values(responsePayload.errors).flat()
       : [];
+
   const details = errorEntries.map(normalizeText).filter(Boolean);
 
   if (!details.length) {
@@ -122,8 +184,10 @@ const mergeSavedPatientData = (
     responsePayload?.data && typeof responsePayload.data === "object"
       ? responsePayload.data
       : responsePayload;
+
   const userPayload =
     payload?.user && typeof payload.user === "object" ? payload.user : {};
+
   const petPayload =
     payload?.pet && typeof payload.pet === "object" ? payload.pet : payload;
 
@@ -177,6 +241,7 @@ export default function DoctorPendingPrescriptionGate() {
 
   const doctorId = getDoctorStorageId(auth);
   const authToken = auth?.token || auth?.access_token || "";
+
   const shouldRun =
     hydrated &&
     Boolean(doctorId) &&
@@ -187,23 +252,28 @@ export default function DoctorPendingPrescriptionGate() {
     doctorId,
     enabled: shouldRun,
   });
+
   const storagePendingPrescription =
     shouldRun && doctorId
       ? getDoctorPendingPrescription(doctorId)
       : pendingPrescription;
 
   const isPrescriptionPage = location.pathname === DIGITAL_PRESCRIPTION_PATH;
+
   const hasPendingRouteState =
     shouldRun &&
     isPrescriptionPage &&
     hasDoctorPendingPrescriptionRouteState(location.state);
+
   const routeStatePatientData =
     location.state?.patientData && typeof location.state.patientData === "object"
       ? location.state.patientData
       : null;
+
   const routeStateMissingFields = routeStatePatientData
     ? getPendingPrescriptionMissingFields(routeStatePatientData)
     : [];
+
   const effectivePendingPrescription = storagePendingPrescription?.hasPending
     ? storagePendingPrescription
     : pendingPrescription.hasPending
@@ -232,18 +302,22 @@ export default function DoctorPendingPrescriptionGate() {
               pendingPrescription.prescriptionStatus,
           }
         : pendingPrescription;
+
   const isLocked =
     shouldRun &&
     effectivePendingPrescription.hasPending &&
     effectivePendingPrescription.lockUntilSubmit;
+
   const shouldRedirectToPrescription = isLocked && !isPrescriptionPage;
   const needsPetCreate = !normalizeText(effectivePendingPrescription.petId);
+
   const profileModalFields =
     effectivePendingPrescription.missingFields.length > 0
       ? effectivePendingPrescription.missingFields
       : needsPetCreate
         ? PENDING_PRESCRIPTION_PATIENT_FIELDS
         : [];
+
   const showProfileModal =
     isLocked &&
     isPrescriptionPage &&
@@ -260,6 +334,7 @@ export default function DoctorPendingPrescriptionGate() {
 
     syncDoctorPendingPrescriptionFromRouteState(doctorId, location.state);
     refresh();
+
     navigate(
       {
         pathname: location.pathname,
@@ -295,45 +370,89 @@ export default function DoctorPendingPrescriptionGate() {
     const latestPendingPrescription = doctorId
       ? getDoctorPendingPrescription(doctorId)
       : effectivePendingPrescription;
+
     const pendingPrescriptionForSave = latestPendingPrescription?.hasPending
       ? latestPendingPrescription
       : effectivePendingPrescription;
-    const resolvedUserId = normalizeText(pendingPrescriptionForSave.userId);
+
+    const existingUserId = normalizeText(pendingPrescriptionForSave.userId);
     const existingPetId = normalizeText(pendingPrescriptionForSave.petId);
 
-    if (!resolvedUserId) {
+    if (!existingUserId) {
       throw new Error("Parent details are missing. Please restart the request.");
     }
 
-    const normalizedPatientData = normalizePatientDataInput(patientData);
-    const requestBody = buildPetProfileRequestBody({
-      userId: resolvedUserId,
-      patientData: normalizedPatientData,
-      isUpdate: Boolean(existingPetId),
+    const normalizedPatientData = normalizePatientDataInput({
+      ...pendingPrescriptionForSave.patientData,
+      ...patientData,
     });
 
     const headers = {
       Accept: "application/json",
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     };
-    const requestUrl = existingPetId
-      ? `${PETS_URL}/${encodeURIComponent(existingPetId)}`
-      : PETS_URL;
 
-    const response = await fetch(requestUrl, {
-      method: "POST",
-      headers,
-      body: requestBody,
-    });
-    const responsePayload = await response.json().catch(() => ({}));
+    let response;
+    let responsePayload = {};
+    let resolvedUserId = existingUserId;
+    let resolvedPetId = existingPetId;
 
-    if (!response.ok || responsePayload?.success === false) {
-      throw new Error(buildValidationMessage(responsePayload));
-    }
+    if (existingPetId) {
+      const requestBody = buildPetUpdateRequestBody({
+        userId: existingUserId,
+        patientData: normalizedPatientData,
+      });
 
-    const resolvedPetId = existingPetId || resolveSavedPetId(responsePayload);
-    if (!resolvedPetId) {
-      throw new Error("Pet was saved but no pet ID was returned. Please try again.");
+      response = await fetch(
+        `${PETS_UPDATE_BASE_URL}/${encodeURIComponent(existingPetId)}`,
+        {
+          method: "POST",
+          headers,
+          body: requestBody,
+        },
+      );
+
+      responsePayload = await response.json().catch(() => ({}));
+
+      if (!response.ok || responsePayload?.success === false) {
+        throw new Error(buildValidationMessage(responsePayload));
+      }
+
+      resolvedPetId = existingPetId;
+    } else {
+      if (!normalizedPatientData.parentName) {
+        throw new Error("Pet parent name is required.");
+      }
+
+      if (!normalizedPatientData.petName) {
+        throw new Error("Pet name is required.");
+      }
+
+      const requestBody = buildPatientCreateRequestBody({
+        userId: existingUserId,
+        patientData: normalizedPatientData,
+      });
+
+      response = await fetch(PATIENT_CREATE_URL, {
+        method: "POST",
+        headers,
+        body: requestBody,
+      });
+
+      responsePayload = await response.json().catch(() => ({}));
+
+      if (!response.ok || responsePayload?.success === false) {
+        throw new Error(buildValidationMessage(responsePayload));
+      }
+
+      resolvedUserId = resolveSavedUserId(responsePayload) || existingUserId;
+      resolvedPetId = resolveSavedPetId(responsePayload);
+
+      if (!resolvedPetId) {
+        throw new Error(
+          "Pet profile was created but no pet ID was returned. Please try again.",
+        );
+      }
     }
 
     const nextPatientData = mergeSavedPatientData(
@@ -343,14 +462,15 @@ export default function DoctorPendingPrescriptionGate() {
     );
 
     updateDoctorPendingPrescriptionData(doctorId, {
-      ...pendingPrescriptionForSave,
-      lockUntilSubmit: true,
       userId: resolvedUserId,
       petId: resolvedPetId,
       patientData: nextPatientData,
+      lockUntilSubmit: true,
+      hasPending: true,
     });
 
     await refresh();
+
     navigate(
       {
         pathname: location.pathname,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -25,6 +25,9 @@ const RECEPTIONIST_PATIENTS_URL =
   "https://snoutiq.com/backend/api/receptionist/patients";
 const EXISTING_PAYMENT_LINK_URL =
   "https://snoutiq.com/backend/api/receptionist/patients/existing-payment-link";
+const PENDING_PRESCRIPTION_STATUS_URL =
+  "https://snoutiq.com/backend/api/doctor/pending-prescription";
+const PAYMENT_STATUS_POLL_INTERVAL_MS = 5000;
 const DEFAULT_CLINIC_ID = 115;
 
 const fieldBase =
@@ -49,17 +52,45 @@ const normalizeOptionalId = (value) => {
     : "";
 };
 
-const getPendingPrescriptionMeta = (requestResponse = {}) => {
-  const payload =
-    requestResponse?.data && typeof requestResponse.data === "object"
-      ? requestResponse.data
-      : requestResponse;
+const normalizeText = (value) => String(value ?? "").trim();
 
+const appendFormDataIfPresent = (formData, key, value) => {
+  const normalizedValue = normalizeText(value);
+  if (normalizedValue) {
+    formData.append(key, normalizedValue);
+  }
+};
+
+const normalizePetTypeValue = (value) =>
+  normalizeText(value).toLowerCase().replace(/\s+/g, " ");
+
+const normalizeStatusText = (value) =>
+  String(value ?? "").trim().toLowerCase();
+
+const isPlaceholderBreedValue = (value) =>
+  ["unknown", "na", "n/a", "not available"].includes(
+    normalizeText(value).toLowerCase(),
+  );
+
+const isTruthyFlag = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+
+  const normalized = normalizeStatusText(value);
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+};
+
+const getRequestResponsePayload = (requestResponse = {}) =>
+  requestResponse?.data && typeof requestResponse.data === "object"
+    ? requestResponse.data
+    : requestResponse;
+
+const getPendingPrescriptionMeta = (requestResponse = {}) => {
+  const payload = getRequestResponsePayload(requestResponse);
   const userPayload =
     payload?.user && typeof payload.user === "object"
       ? payload.user
       : requestResponse?.user;
-
   const petPayload =
     payload?.pet && typeof payload.pet === "object"
       ? payload.pet
@@ -77,17 +108,56 @@ const getPendingPrescriptionMeta = (requestResponse = {}) => {
         requestResponse?.userId ??
         payload?.user_id ??
         payload?.userId ??
-        userPayload?.id
+        userPayload?.id,
     ),
     petId: normalizeOptionalId(
       requestResponse?.pet_id ??
         requestResponse?.petId ??
         payload?.pet_id ??
         payload?.petId ??
-        petPayload?.id
+        petPayload?.id,
     ),
   };
 };
+
+const buildPendingPrescriptionPatientData = (form, requestResponse = {}) => {
+  const payload = getRequestResponsePayload(requestResponse);
+  const userPayload =
+    payload?.user && typeof payload.user === "object" ? payload.user : {};
+  const petPayload =
+    payload?.pet && typeof payload.pet === "object" ? payload.pet : {};
+  const formPetType = normalizePetTypeValue(form.petType);
+  const responsePetType =
+    normalizePetTypeValue(petPayload?.type) ||
+    normalizePetTypeValue(petPayload?.pet_type);
+  const formBreed = normalizeText(form.breed);
+  const responseBreed = normalizeText(petPayload?.breed);
+
+  return {
+    parentName:
+      normalizeText(form.parentName) || normalizeText(userPayload?.name),
+    phone: normalizeText(form.phone) || normalizeText(userPayload?.phone),
+    petName:
+      normalizeText(form.petName) ||
+      normalizeText(petPayload?.name) ||
+      normalizeText(petPayload?.pet_name),
+    petType: formPetType || (responsePetType === "dog" ? "" : responsePetType),
+    breed:
+      formBreed || (isPlaceholderBreedValue(responseBreed) ? "" : responseBreed),
+    gender:
+      normalizeText(form.gender) ||
+      normalizeText(petPayload?.pet_gender) ||
+      normalizeText(petPayload?.gender),
+    age: normalizeText(form.age),
+    weight: "",
+  };
+};
+
+const isPendingPrescriptionLockedStatus = (statusPayload = {}) =>
+  normalizeStatusText(statusPayload?.payment_status) === "paid" &&
+  isTruthyFlag(statusPayload?.prescription_required) &&
+  normalizeStatusText(statusPayload?.prescription_status) === "pending" &&
+  isTruthyFlag(statusPayload?.lock_until_submit);
 
 const formatPetTypeForRequest = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
@@ -198,12 +268,14 @@ export default function NewDoctorNewRequestView() {
   const navigate = useNavigate();
   const location = useLocation();
   const breedMenuRef = useRef(null);
+  const hasHandledPaymentRef = useRef(false);
+  const isPaymentPollingRef = useRef(false);
   const { auth } = useNewDoctorAuth();
 
   const doctorId = normalizeOptionalId(
-    auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id
+    auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id,
   );
-
+  const authToken = auth?.token || auth?.access_token || "";
   const selectedParent = location.state?.parent || null;
   const existingUserId = normalizeOptionalId(selectedParent?.userId);
   const existingPetId =
@@ -222,7 +294,7 @@ export default function NewDoctorNewRequestView() {
     petName: "",
     petType: "",
     breed: "",
-    gender: "Male",
+    gender: "",
     age: "",
   });
 
@@ -235,37 +307,39 @@ export default function NewDoctorNewRequestView() {
   const [requestError, setRequestError] = useState("");
 
   useEffect(() => {
+    hasHandledPaymentRef.current = false;
+    isPaymentPollingRef.current = false;
+  }, [requestResponse, step]);
+
+  useEffect(() => {
     if (!selectedParent) return;
 
     setForm((prev) => ({
       ...prev,
-      phone: selectedParent.phone || prev.phone,
-      email: selectedParent.email || prev.email,
-      parentName: selectedParent.name || prev.parentName,
+      phone: normalizeText(selectedParent.phone) || prev.phone,
+      email: normalizeText(selectedParent.email) || prev.email,
+      parentName: normalizeText(selectedParent.name) || prev.parentName,
       petName:
-        selectedParent.petName ||
-        selectedParent.selectedPet?.name ||
+        normalizeText(selectedParent.petName) ||
+        normalizeText(selectedParent.selectedPet?.name) ||
         prev.petName,
       petType:
-        String(
-          selectedParent.petType ||
-            selectedParent.selectedPet?.pet_type ||
-            prev.petType
-        ).toLowerCase() || prev.petType,
+        normalizePetTypeValue(selectedParent.petType) ||
+        normalizePetTypeValue(selectedParent.selectedPet?.pet_type) ||
+        prev.petType,
       breed:
-        selectedParent.breed ||
-        selectedParent.selectedPet?.breed ||
+        normalizeText(selectedParent.breed) ||
+        normalizeText(selectedParent.selectedPet?.breed) ||
         prev.breed,
       gender:
-        selectedParent.petGender ||
-        selectedParent.selectedPet?.pet_gender ||
+        normalizeText(selectedParent.petGender) ||
+        normalizeText(selectedParent.selectedPet?.pet_gender) ||
         prev.gender,
       age:
-        String(
+        normalizeText(
           selectedParent.petAge ??
             selectedParent.selectedPet?.pet_age ??
-            selectedParent.selectedPet?.pet_age_months ??
-            prev.age
+            selectedParent.selectedPet?.pet_age_months,
         ) || prev.age,
     }));
   }, [selectedParent]);
@@ -367,42 +441,37 @@ export default function NewDoctorNewRequestView() {
         DEFAULT_CLINIC_ID;
 
       const amountPaise = String(Math.round(amountRupees * 100));
-
       const headers = {
         Accept: "application/json",
       };
-
-      const authToken = auth?.token || auth?.access_token;
       if (authToken) {
         headers.Authorization = `Bearer ${authToken}`;
       }
 
       let url = RECEPTIONIST_PATIENTS_URL;
       const requestBody = new FormData();
+      requestBody.append("clinic_id", String(clinicId));
 
       if (isExistingParentFlow) {
         url = EXISTING_PAYMENT_LINK_URL;
-        requestBody.append("clinic_id", String(clinicId));
         requestBody.append("user_id", existingUserId);
         requestBody.append("pet_id", existingPetId);
-        requestBody.append("amount_paise", amountPaise);
-        requestBody.append("response_time_minutes", "10");
       } else {
-        requestBody.append("clinic_id", String(clinicId));
-        requestBody.append("name", form.parentName.trim() || "Pet Parent");
         requestBody.append("phone", form.phone.trim());
-        if (form.email.trim()) {
-          requestBody.append("email", form.email.trim());
+        appendFormDataIfPresent(requestBody, "name", form.parentName);
+        appendFormDataIfPresent(requestBody, "email", form.email);
+        appendFormDataIfPresent(requestBody, "pet_name", form.petName);
+        if (form.petType.trim()) {
+          requestBody.append("pet_type", formatPetTypeForRequest(form.petType));
         }
-        requestBody.append("pet_name", form.petName.trim() || "Pet");
-        requestBody.append(
-          "pet_type",
-          formatPetTypeForRequest(form.petType) || "Dog"
-        );
-        requestBody.append("pet_breed", form.breed.trim() || "Unknown");
-        requestBody.append("pet_gender", form.gender.trim() || "Male");
-        requestBody.append("amount_paise", amountPaise);
-        requestBody.append("response_time_minutes", "10");
+        appendFormDataIfPresent(requestBody, "pet_breed", form.breed);
+        appendFormDataIfPresent(requestBody, "pet_gender", form.gender);
+      }
+
+      requestBody.append("amount_paise", amountPaise);
+      requestBody.append("response_time_minutes", "10");
+      if (doctorId) {
+        requestBody.append("doctor_id", String(doctorId));
       }
 
       const response = await fetch(url, {
@@ -451,60 +520,139 @@ export default function NewDoctorNewRequestView() {
     }
   };
 
-  const handlePaymentReceived = async (responsePayload = {}) => {
-    const pendingPrescriptionMeta = getPendingPrescriptionMeta(responsePayload);
+  const handlePaymentReceived = useCallback(
+    async (responsePayload = {}) => {
+      if (hasHandledPaymentRef.current) {
+        return;
+      }
 
-    const resolvedUserId = pendingPrescriptionMeta.userId || existingUserId;
-    const resolvedPetId = pendingPrescriptionMeta.petId || existingPetId;
+      hasHandledPaymentRef.current = true;
+      const pendingPrescriptionMeta = getPendingPrescriptionMeta(responsePayload);
+      const resolvedUserId = pendingPrescriptionMeta.userId || existingUserId;
+      const resolvedPetId = pendingPrescriptionMeta.petId || existingPetId;
 
-    if (!resolvedUserId || !resolvedPetId) {
-      await Swal.fire({
-        icon: "error",
-        title: "Missing patient details",
-        text: "User ID or Pet ID is missing. Please send payment link again.",
-        confirmButtonColor: "#16a34a",
-      });
-      return;
-    }
+      if (!resolvedUserId) {
+        hasHandledPaymentRef.current = false;
+        await Swal.fire({
+          icon: "error",
+          title: "Missing parent details",
+          text: "Parent details were not created correctly. Please send the payment link again.",
+          confirmButtonText: "OK",
+          confirmButtonColor: "#16a34a",
+        });
+        return;
+      }
 
-    const patientData = {
-      phone: form.phone,
-      amount: form.amount,
-      parentName: form.parentName,
-      petName: form.petName,
-      petType: form.petType,
-      breed: form.breed,
-      gender: form.gender,
-      age: form.age,
-      weight: "",
-    };
+      const patientData = buildPendingPrescriptionPatientData(
+        form,
+        responsePayload,
+      );
 
-    startDoctorPendingPrescription(doctorId, {
-      consultationId: pendingPrescriptionMeta.consultationId,
-      userId: resolvedUserId,
-      petId: resolvedPetId,
-      lockUntilSubmit: true,
-      patientData,
-      paymentStatus: "paid",
-      prescriptionRequired: true,
-      prescriptionStatus: "pending",
-    });
-
-    navigate("/counsltflow/digital-prescription", {
-      state: {
+      startDoctorPendingPrescription(doctorId, {
         consultationId: pendingPrescriptionMeta.consultationId,
         userId: resolvedUserId,
-        petId: resolvedPetId,
-        paymentCompleted: true,
+        petId: resolvedPetId || "",
         lockUntilSubmit: true,
-        fromNewRequest: true,
         patientData,
         paymentStatus: "paid",
         prescriptionRequired: true,
         prescriptionStatus: "pending",
-      },
-    });
-  };
+      });
+
+      navigate("/counsltflow/digital-prescription", {
+        replace: true,
+        state: {
+          consultationId: pendingPrescriptionMeta.consultationId,
+          userId: resolvedUserId,
+          petId: resolvedPetId || "",
+          paymentCompleted: true,
+          lockUntilSubmit: true,
+          fromNewRequest: true,
+          patientData,
+          paymentStatus: "paid",
+          prescriptionRequired: true,
+          prescriptionStatus: "pending",
+        },
+      });
+    },
+    [doctorId, existingPetId, existingUserId, form, navigate],
+  );
+
+  useEffect(() => {
+    const pendingPrescriptionMeta = getPendingPrescriptionMeta(requestResponse);
+    const trackedUserId = pendingPrescriptionMeta.userId || existingUserId;
+
+    if (
+      step !== 1 ||
+      !trackedUserId ||
+      !requestResponse ||
+      hasHandledPaymentRef.current
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const pollPaymentStatus = async () => {
+      if (
+        cancelled ||
+        hasHandledPaymentRef.current ||
+        isPaymentPollingRef.current
+      ) {
+        return;
+      }
+
+      isPaymentPollingRef.current = true;
+
+      try {
+        const url = new URL(PENDING_PRESCRIPTION_STATUS_URL);
+        url.searchParams.set("user_id", trackedUserId);
+
+        const response = await fetch(url.toString(), {
+          headers: {
+            Accept: "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const responseData = await response.json().catch(() => ({}));
+        const statusPayload =
+          responseData?.data && typeof responseData.data === "object"
+            ? responseData.data
+            : responseData;
+
+        if (!cancelled && isPendingPrescriptionLockedStatus(statusPayload)) {
+          await handlePaymentReceived(requestResponse);
+        }
+      } catch {
+        // Keep awaiting-payment UI silent and retry on the next tick.
+      } finally {
+        isPaymentPollingRef.current = false;
+      }
+    };
+
+    pollPaymentStatus();
+    const intervalId = window.setInterval(
+      pollPaymentStatus,
+      PAYMENT_STATUS_POLL_INTERVAL_MS,
+    );
+
+    return () => {
+      cancelled = true;
+      isPaymentPollingRef.current = false;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    authToken,
+    existingUserId,
+    handlePaymentReceived,
+    requestResponse,
+    step,
+  ]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {

@@ -17,6 +17,12 @@ import {
 import Swal from "sweetalert2";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
 import { startDoctorPendingPrescription } from "./doctorPendingPrescriptionService";
+import {
+  clearStoredDoctorSelectedParent,
+  isExistingParentFlowSearch,
+  readStoredDoctorSelectedParent,
+  writeStoredDoctorSelectedParent,
+} from "./selectedParentStorage";
 
 const TOTAL_STEPS = 2;
 const DOG_BREEDS_URL = "https://snoutiq.com/backend/api/dog-breeds/all";
@@ -61,7 +67,9 @@ const appendFormDataIfPresent = (formData, key, value) => {
 const normalizePetTypeValue = (value) =>
   normalizeText(value).toLowerCase().replace(/\s+/g, " ");
 const normalizeStatusText = (value) =>
-  String(value ?? "").trim().toLowerCase();
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
 const isPlaceholderBreedValue = (value) =>
   ["unknown", "na", "n/a", "not available"].includes(
     normalizeText(value).toLowerCase(),
@@ -112,6 +120,13 @@ const getPendingPrescriptionMeta = (requestResponse = {}) => {
         payload?.petId ??
         petPayload?.id,
     ),
+    channelName: normalizeText(
+      requestResponse?.channel_name ??
+        payload?.channel_name ??
+        payload?.call_session ??
+        payload?.channel ??
+        "",
+    ),
   };
 };
 
@@ -129,7 +144,8 @@ const buildPendingPrescriptionPatientData = (form, requestResponse = {}) => {
   const responseBreed = normalizeText(petPayload?.breed);
 
   return {
-    parentName: normalizeText(form.parentName) || normalizeText(userPayload?.name),
+    parentName:
+      normalizeText(form.parentName) || normalizeText(userPayload?.name),
     phone: normalizeText(form.phone) || normalizeText(userPayload?.phone),
     petName:
       normalizeText(form.petName) ||
@@ -137,13 +153,18 @@ const buildPendingPrescriptionPatientData = (form, requestResponse = {}) => {
       normalizeText(petPayload?.pet_name),
     petType: formPetType || (responsePetType === "dog" ? "" : responsePetType),
     breed:
-      formBreed || (isPlaceholderBreedValue(responseBreed) ? "" : responseBreed),
+      formBreed ||
+      (isPlaceholderBreedValue(responseBreed) ? "" : responseBreed),
     gender:
       normalizeText(form.gender) ||
       normalizeText(petPayload?.pet_gender) ||
       normalizeText(petPayload?.gender),
     age: normalizeText(form.age),
-    weight: "",
+    weight:
+      normalizeText(form.weight) ||
+      normalizeText(petPayload?.weight) ||
+      normalizeText(petPayload?.pet_weight) ||
+      normalizeText(petPayload?.weight_kg),
   };
 };
 
@@ -154,7 +175,9 @@ const isPendingPrescriptionLockedStatus = (statusPayload = {}) =>
   isTruthyFlag(statusPayload?.lock_until_submit);
 
 const formatPetTypeForRequest = (value) => {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
   if (!normalized) return "";
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
@@ -180,7 +203,9 @@ const buildRequestErrorMessage = (
     new Set(details.filter((item) => item !== primary)),
   );
 
-  return uniqueDetails.length ? [primary, ...uniqueDetails].join("\n") : primary;
+  return uniqueDetails.length
+    ? [primary, ...uniqueDetails].join("\n")
+    : primary;
 };
 
 function normalizeBreedOptions(payload) {
@@ -270,7 +295,19 @@ export default function NewDoctorNewRequestView() {
   const doctorId =
     auth?.doctor_id || auth?.doctor?.id || auth?.doctor?.doctor_id;
   const authToken = auth?.token || auth?.access_token || "";
-  const selectedParent = location.state?.parent || null;
+  const hasExistingParentQuery = isExistingParentFlowSearch(location.search);
+  const selectedParentFromState = location.state?.parent || null;
+  const selectedParent = useMemo(() => {
+    if (selectedParentFromState) {
+      return selectedParentFromState;
+    }
+
+    if (!hasExistingParentQuery) {
+      return null;
+    }
+
+    return readStoredDoctorSelectedParent();
+  }, [hasExistingParentQuery, selectedParentFromState]);
   const existingUserId = normalizeOptionalId(selectedParent?.userId);
   const existingPetId =
     normalizeOptionalId(selectedParent?.petId) ||
@@ -289,6 +326,7 @@ export default function NewDoctorNewRequestView() {
     breed: "",
     gender: "",
     age: "",
+    weight: "",
   });
 
   const [breedOptions, setBreedOptions] = useState([]);
@@ -303,6 +341,17 @@ export default function NewDoctorNewRequestView() {
     hasHandledPaymentRef.current = false;
     isPaymentPollingRef.current = false;
   }, [requestResponse, step]);
+
+  useEffect(() => {
+    if (selectedParent) {
+      writeStoredDoctorSelectedParent(selectedParent);
+      return;
+    }
+
+    if (!hasExistingParentQuery && !selectedParentFromState) {
+      clearStoredDoctorSelectedParent();
+    }
+  }, [hasExistingParentQuery, selectedParent, selectedParentFromState]);
 
   useEffect(() => {
     if (!selectedParent) {
@@ -336,12 +385,36 @@ export default function NewDoctorNewRequestView() {
             selectedParent.selectedPet?.pet_age ??
             selectedParent.selectedPet?.pet_age_months,
         ) || prev.age,
+      weight:
+        normalizeText(
+          selectedParent.petWeight ??
+            selectedParent.selectedPet?.weight ??
+            selectedParent.selectedPet?.pet_weight ??
+            selectedParent.selectedPet?.weight_kg,
+        ) || prev.weight,
     }));
   }, [selectedParent]);
 
   const parentPhonePreview = useMemo(() => {
     return form.phone?.trim() || "2342342342";
   }, [form.phone]);
+
+  const isPhoneLocked =
+    isExistingParentFlow && Boolean(normalizeText(form.phone));
+  const isEmailLocked =
+    isExistingParentFlow && Boolean(normalizeText(form.email));
+  const isParentNameLocked =
+    isExistingParentFlow && Boolean(normalizeText(form.parentName));
+  const isPetNameLocked =
+    isExistingParentFlow && Boolean(normalizeText(form.petName));
+  const isPetTypeLocked =
+    isExistingParentFlow && Boolean(normalizeText(form.petType));
+  const isBreedLocked =
+    isExistingParentFlow && Boolean(normalizeText(form.breed));
+  const isGenderLocked =
+    isExistingParentFlow && Boolean(normalizeText(form.gender));
+  const isAgeLocked = isExistingParentFlow && Boolean(normalizeText(form.age));
+  const lockedFieldClassName = "bg-[#f8fafc] text-[#475467]";
 
   const filteredBreedOptions = useMemo(() => {
     const query = breedQuery.trim().toLowerCase();
@@ -419,7 +492,7 @@ export default function NewDoctorNewRequestView() {
       const clinicId =
         auth?.clinic_id ||
         auth?.doctor?.clinic_id ||
-        auth?.doctor?.vet_registeration_id 
+        auth?.doctor?.vet_registeration_id;
       const amountPaise = String(Math.round(amountRupees * 100));
       const requestBody = new FormData();
 
@@ -438,11 +511,11 @@ export default function NewDoctorNewRequestView() {
         }
         appendFormDataIfPresent(requestBody, "pet_name", form.petName);
         if (form.petType.trim()) {
-  requestBody.append("pet_type", formatPetTypeForRequest(form.petType));
-}
-if (form.breed.trim()) {
-  requestBody.append("pet_breed", form.breed.trim());
-}
+          requestBody.append("pet_type", formatPetTypeForRequest(form.petType));
+        }
+        if (form.breed.trim()) {
+          requestBody.append("pet_breed", form.breed.trim());
+        }
         appendFormDataIfPresent(requestBody, "pet_gender", form.gender);
       }
       requestBody.append("amount_paise", amountPaise);
@@ -507,14 +580,19 @@ if (form.breed.trim()) {
   };
 
   const handlePaymentReceived = useCallback(
-    async (requestResponse = {}) => {
+    async (requestResponse = {}, statusPayload = {}) => {
       if (hasHandledPaymentRef.current) {
         return;
       }
+      const pendingPrescriptionMeta = getPendingPrescriptionMeta(requestResponse);
+      const resolvedChannelName =
+        normalizeText(
+          statusPayload?.channel_name ?? statusPayload?.call_session ?? "",
+        ) ||
+        normalizeText(pendingPrescriptionMeta.channelName) ||
+        normalizeText(requestResponse?.channel_name);
 
       hasHandledPaymentRef.current = true;
-      const pendingPrescriptionMeta =
-        getPendingPrescriptionMeta(requestResponse);
       const resolvedUserId = pendingPrescriptionMeta.userId || existingUserId;
       const resolvedPetId = pendingPrescriptionMeta.petId || existingPetId;
 
@@ -544,6 +622,7 @@ if (form.breed.trim()) {
         paymentStatus: "paid",
         prescriptionRequired: true,
         prescriptionStatus: "pending",
+        channelName: resolvedChannelName,
       });
 
       navigate("/counsltflow/digital-prescription", {
@@ -559,6 +638,7 @@ if (form.breed.trim()) {
           paymentStatus: "paid",
           prescriptionRequired: true,
           prescriptionStatus: "pending",
+          channelName: resolvedChannelName,
         },
       });
     },
@@ -613,7 +693,7 @@ if (form.breed.trim()) {
             : responseData;
 
         if (!cancelled && isPendingPrescriptionLockedStatus(statusPayload)) {
-          await handlePaymentReceived(requestResponse);
+          await handlePaymentReceived(requestResponse, statusPayload);
         }
       } catch {
         // Keep awaiting-payment UI silent and retry on the next tick.
@@ -633,13 +713,7 @@ if (form.breed.trim()) {
       isPaymentPollingRef.current = false;
       window.clearInterval(intervalId);
     };
-  }, [
-    authToken,
-    existingUserId,
-    handlePaymentReceived,
-    requestResponse,
-    step,
-  ]);
+  }, [authToken, existingUserId, handlePaymentReceived, requestResponse, step]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -658,6 +732,12 @@ if (form.breed.trim()) {
 
     const fetchBreeds = async () => {
       if (!form.petType) {
+        setBreedOptions([]);
+        setBreedsLoading(false);
+        return;
+      }
+
+      if (isExistingParentFlow && form.breed.trim()) {
         setBreedOptions([]);
         setBreedsLoading(false);
         return;
@@ -695,7 +775,7 @@ if (form.breed.trim()) {
       active = false;
       controller.abort();
     };
-  }, [form.petType]);
+  }, [form.breed, form.petType, isExistingParentFlow]);
 
   return (
     <div className="min-h-screen bg-[#F8F8F8] flex flex-col">
@@ -707,7 +787,11 @@ if (form.breed.trim()) {
             <div className="flex-1 px-5 pt-6 pb-7">
               <div className="space-y-5">
                 <div>
-                  <p className={sectionLabel}>Mandatory Info</p>
+                  <p className={sectionLabel}>
+                    {isExistingParentFlow
+                      ? "Repeat Appointment"
+                      : "Mandatory Info"}
+                  </p>
 
                   <div className="space-y-4">
                     <div className="relative">
@@ -720,12 +804,13 @@ if (form.breed.trim()) {
                         value={form.phone}
                         onChange={(e) => updateField("phone", e.target.value)}
                         placeholder="Parent WhatsApp Number"
-                         maxLength={10}   // ← add karo
-                        className={`${fieldBase} pl-11`}
+                        maxLength={10}
+                        readOnly={isPhoneLocked}
+                        className={`${fieldBase} pl-11 ${
+                          isPhoneLocked ? lockedFieldClassName : ""
+                        }`}
                       />
                     </div>
-
-              
 
                     <div className="relative">
                       <IndianRupee
@@ -736,27 +821,21 @@ if (form.breed.trim()) {
                         type="number"
                         value={form.amount}
                         onChange={(e) => updateField("amount", e.target.value)}
-                        placeholder="Enter Amount (₹)"
-                         min="1"  
+                        placeholder="Enter Amount (INR)"
+                        min="1"
                         className={`${fieldBase} pl-11`}
                       />
                     </div>
-                   
-                    </div>
-
-
-                   
+                  </div>
                 </div>
 
                 <div>
                   <p className={sectionLabel}>
-                    {isExistingParentFlow
-                      ? "Pet & Parent (Prefilled)"
-                      : "Pet & Parent"}
+                    {isExistingParentFlow ? "Patient Summary" : "Pet & Parent"}
                   </p>
 
                   <div className="space-y-4">
-                     <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="relative">
                         <User
                           size={18}
@@ -769,7 +848,10 @@ if (form.breed.trim()) {
                             updateField("parentName", e.target.value)
                           }
                           placeholder="Pet Parent Name"
-                          className={`${fieldBase} pl-11`}
+                          readOnly={isParentNameLocked}
+                          className={`${fieldBase} pl-11 ${
+                            isParentNameLocked ? lockedFieldClassName : ""
+                          }`}
                         />
                       </div>
 
@@ -785,11 +867,14 @@ if (form.breed.trim()) {
                             updateField("petName", e.target.value)
                           }
                           placeholder="Pet Name"
-                          className={`${fieldBase} pl-11`}
+                          readOnly={isPetNameLocked}
+                          className={`${fieldBase} pl-11 ${
+                            isPetNameLocked ? lockedFieldClassName : ""
+                          }`}
                         />
                       </div>
-                   </div>
-                          <div className="relative">
+                    </div>
+                    <div className="relative">
                       <Mail
                         size={18}
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-[#98a2b3]"
@@ -799,7 +884,10 @@ if (form.breed.trim()) {
                         value={form.email}
                         onChange={(e) => updateField("email", e.target.value)}
                         placeholder="Parent Email"
-                        className={`${fieldBase} pl-11`}
+                        readOnly={isEmailLocked}
+                        className={`${fieldBase} pl-11 ${
+                          isEmailLocked ? lockedFieldClassName : ""
+                        }`}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -808,7 +896,10 @@ if (form.breed.trim()) {
                         <select
                           value={form.petType}
                           onChange={(e) => handlePetTypeChange(e.target.value)}
-                          className={`${fieldBase} appearance-none pr-9`}
+                          disabled={isPetTypeLocked}
+                          className={`${fieldBase} appearance-none pr-9 ${
+                            isPetTypeLocked ? lockedFieldClassName : ""
+                          }`}
                         >
                           <option value="">Select Pet Type</option>
                           <option value="dog">Dog</option>
@@ -825,13 +916,17 @@ if (form.breed.trim()) {
                       <div className="relative" ref={breedMenuRef}>
                         <button
                           type="button"
-                          disabled={!form.petType}
+                          disabled={!form.petType || isBreedLocked}
                           onClick={() => {
-                            if (!form.petType) return;
+                            if (!form.petType || isBreedLocked) return;
                             setIsBreedMenuOpen((prev) => !prev);
                           }}
                           className={`${fieldBase} flex items-center justify-between text-left ${
-                            !form.petType ? "text-[#8a94a6]" : "text-slate-700"
+                            !form.petType
+                              ? "text-[#8a94a6]"
+                              : isBreedLocked
+                                ? lockedFieldClassName
+                                : "text-slate-700"
                           }`}
                         >
                           <span className="truncate">
@@ -852,7 +947,7 @@ if (form.breed.trim()) {
                           />
                         </button>
 
-                        {isBreedMenuOpen && form.petType ? (
+                        {isBreedMenuOpen && form.petType && !isBreedLocked ? (
                           <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-30 overflow-hidden rounded-2xl border border-[#e8eaee] bg-white shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
                             <div className="border-b border-slate-100 p-3">
                               <div className="relative">
@@ -910,7 +1005,10 @@ if (form.breed.trim()) {
                           onChange={(e) =>
                             updateField("gender", e.target.value)
                           }
-                          className={`${fieldBase} appearance-none pr-9`}
+                          disabled={isGenderLocked}
+                          className={`${fieldBase} appearance-none pr-9 ${
+                            isGenderLocked ? lockedFieldClassName : ""
+                          }`}
                         >
                           <option value="">Select Gender</option>
                           <option value="Male">Male</option>
@@ -928,7 +1026,10 @@ if (form.breed.trim()) {
                         value={form.age}
                         onChange={(e) => updateField("age", e.target.value)}
                         placeholder="Age (e.g. 2 years)"
-                        className={fieldBase}
+                        readOnly={isAgeLocked}
+                        className={`${fieldBase} ${
+                          isAgeLocked ? lockedFieldClassName : ""
+                        }`}
                       />
                     </div>
                   </div>

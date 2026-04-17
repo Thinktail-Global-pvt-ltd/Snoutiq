@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
+import {
+  buildExistingParentFlowSearch,
+  writeStoredDoctorSelectedParent,
+} from "./selectedParentStorage";
 
 const DOCTOR_USERS_URL = "https://snoutiq.com/backend/api/doctor/users";
 
@@ -58,6 +62,7 @@ const normalizeDoctorUsers = (payload = []) => {
           breed: user?.breed || "",
           petGender: user?.pet_gender || "",
           petAge: user?.pet_age || "",
+          petWeight: user?.pet_weight || user?.weight || "",
           petType: "",
           pets: [],
           lastDate: user?.updated_at || user?.created_at || "",
@@ -81,10 +86,13 @@ const normalizeDoctorUsers = (payload = []) => {
       petName: pet?.name || user?.pet_name || "",
       breed: pet?.breed || user?.breed || "",
       petGender: pet?.pet_gender || user?.pet_gender || "",
-      petAge:
-        pet?.pet_age ??
-        pet?.pet_age_months ??
-        user?.pet_age ??
+      petAge: pet?.pet_age ?? pet?.pet_age_months ?? user?.pet_age ?? "",
+      petWeight:
+        pet?.weight ??
+        pet?.pet_weight ??
+        pet?.weight_kg ??
+        user?.pet_weight ??
+        user?.weight ??
         "",
       petType: pet?.pet_type || "",
       pets,
@@ -102,7 +110,9 @@ export default function NewDoctorSearchView() {
   const { auth } = useNewDoctorAuth();
 
   const doctorId = normalizeId(
-    auth?.vet_registeration_id || auth?.vet_registeration?.id || auth?.doctor?.vet_registeration_id
+    auth?.vet_registeration_id ||
+      auth?.vet_registeration?.id ||
+      auth?.doctor?.vet_registeration_id,
   );
 
   const [query, setQuery] = useState("");
@@ -160,7 +170,7 @@ export default function NewDoctorSearchView() {
 
         setParents([]);
         setSearchError(
-          error?.message || "Unable to load pet parent list right now."
+          error?.message || "Unable to load pet parent list right now.",
         );
       } finally {
         if (active) {
@@ -198,8 +208,13 @@ export default function NewDoctorSearchView() {
   }, [parents, query]);
 
   const handleOpenProfile = (parent) => {
-    navigate(`/counsltflow/parent-profile/${parent.routeId}`, {
-      state: { parent },
+    writeStoredDoctorSelectedParent(parent);
+
+    navigate(`/counsltflow/new-request${buildExistingParentFlowSearch()}`, {
+      state: {
+        parent,
+        existingParentFlow: true,
+      },
     });
   };
 
@@ -244,7 +259,7 @@ export default function NewDoctorSearchView() {
             >
               <div className="flex items-center gap-4">
                 <div className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full bg-[#dff2e6] text-[24px] font-bold text-[#22c55e]">
-                 {getInitialLetter(item.name)}
+                  {getInitialLetter(item.name)}
                 </div>
 
                 <div className="min-w-0 flex-1">

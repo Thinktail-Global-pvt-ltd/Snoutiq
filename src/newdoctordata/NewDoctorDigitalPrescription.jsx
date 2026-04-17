@@ -323,6 +323,7 @@ const createMockPendingTransaction = ({
   const patientData = pendingPrescription?.patientData || {};
 
   return {
+    channel_name: pendingPrescription?.channelName || "",
     id: pendingPrescription?.consultationId || "",
     status: "paid",
     created_at: new Date().toISOString(),
@@ -354,6 +355,7 @@ const createMockPendingTransaction = ({
       city: "",
     },
     metadata: {
+      channel_name: pendingPrescription?.channelName || "",
       user_id: pendingPrescription?.userId || "",
       pet_id: pendingPrescription?.petId || "",
       notes: {
@@ -466,7 +468,8 @@ const NewDoctorDigitalPrescription = ({
       ? effectivePendingPrescription.patientData
       : {};
   const resolvedSnapshotParentName =
-    (isMockSubmitMode && normalizeOptionalText(pendingPatientData.parentName)) ||
+    (isMockSubmitMode &&
+      normalizeOptionalText(pendingPatientData.parentName)) ||
     normalizeOptionalText(activeTransaction?.user?.name) ||
     "Pet Parent";
   const resolvedSnapshotPetName =
@@ -511,7 +514,10 @@ const NewDoctorDigitalPrescription = ({
       petId:
         (isMockSubmitMode &&
           normalizeOptionalText(effectivePendingPrescription?.petId)) ||
-        activeTransaction?.pet?.id || metadata?.pet_id || notes?.pet_id || "",
+        activeTransaction?.pet?.id ||
+        metadata?.pet_id ||
+        notes?.pet_id ||
+        "",
       doctorId:
         doctorId ||
         normalizeId(
@@ -540,9 +546,7 @@ const NewDoctorDigitalPrescription = ({
       ? { age: resolvedSnapshotAge }
       : activeTransaction?.pet || {},
   );
-  const petWeightLabel = formatWeightLabel(
-    resolvedSnapshotWeight,
-  );
+  const petWeightLabel = formatWeightLabel(resolvedSnapshotWeight);
   const vaccinationLabel = formatYesNoUnknown(
     activeTransaction?.pet?.is_vaccinated ??
       activeTransaction?.metadata?.is_vaccinated ??
@@ -770,6 +774,13 @@ const NewDoctorDigitalPrescription = ({
   }, [affectedSystemQuery, affectedSystems]);
 
   const followUpRequired = prescriptionForm.followUpRequired === "yes";
+  const todayDateInput = useMemo(() => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}, []);
   const followUpDisplayLabel = !followUpRequired
     ? "Not required"
     : prescriptionForm.followUpDate
@@ -915,6 +926,13 @@ const NewDoctorDigitalPrescription = ({
       missingFields.push("System affected");
     if (followUpRequired && !prescriptionForm.followUpDate)
       missingFields.push("Follow-up date");
+if (
+  followUpRequired &&
+  prescriptionForm.followUpDate &&
+  prescriptionForm.followUpDate < todayDateInput
+) {
+  missingFields.push("Valid follow-up date");
+}
     if (isGeneralConsultation) {
       if (!String(prescriptionForm.temperature || "").trim())
         missingFields.push("Temperature");
@@ -930,6 +948,7 @@ const NewDoctorDigitalPrescription = ({
       if (!prescriptionForm.physicalExamOther.trim())
         missingFields.push("Physical exam notes");
     }
+
     if (missingFields.length) {
       setPrescriptionError(
         `Please complete these required fields:\n• ${missingFields.join("\n• ")}`,
@@ -946,7 +965,8 @@ const NewDoctorDigitalPrescription = ({
       doctorId: resolvedDoctorId,
       clinicId,
     } = resolveIds();
-    if (!isMockSubmitMode && (!userId || !clinicId)) {
+
+    if (!userId || !clinicId) {
       setPrescriptionError(
         "Missing patient or clinic data. Please refresh and try again.",
       );
@@ -1032,6 +1052,7 @@ const NewDoctorDigitalPrescription = ({
       "system_affected",
       selectedAffectedSystem?.code || selectedAffectedSystem?.name || "",
     );
+
     if (isGeneralConsultation) {
       append("temperature", prescriptionForm.temperature);
       append("weight", prescriptionForm.weight);
@@ -1041,48 +1062,67 @@ const NewDoctorDigitalPrescription = ({
       append("auscultation", prescriptionForm.auscultation);
       append("physical_exam_other", prescriptionForm.physicalExamOther);
     }
+
     append("doctor_treatment", prescriptionForm.doctorTreatment);
     append("diagnosis", prescriptionForm.diagnosis);
     append("diagnosis_status", prescriptionForm.diagnosisStatus);
     append("treatment_plan", prescriptionForm.treatmentPlan);
     append("home_care", prescriptionForm.homeCare);
-    if (followUpRequired && prescriptionForm.followUpDate)
+
+    if (followUpRequired && prescriptionForm.followUpDate) {
       fd.append("follow_up_date", prescriptionForm.followUpDate);
+    }
+
     if (followUpRequired) {
       fd.append("follow_up_type", prescriptionForm.followUpMode);
       append("follow_up_notes", prescriptionForm.followUpNotes);
     }
+
     fd.append("follow_up_required", followUpRequired ? "1" : "0");
     fd.append("medications_json", JSON.stringify(medsPayload));
-    if (prescriptionForm.recordFile)
+
+    if (prescriptionForm.recordFile) {
       fd.append("record_file", prescriptionForm.recordFile);
+    }
+
+    console.log("Submitting /api/medical-records with:", {
+      userId,
+      petId,
+      clinicId,
+      doctorId: resolvedDoctorId,
+      isMockSubmitMode,
+      consultationCategory: prescriptionForm.consultationCategory,
+      consultMode: prescriptionForm.consultMode,
+    });
+
+    for (const [key, value] of fd.entries()) {
+      console.log("medical-records payload:", key, value);
+    }
 
     try {
-      if (isMockSubmitMode) {
-        await new Promise((resolve) => window.setTimeout(resolve, 350));
-        await finalizePrescriptionSuccess();
-        console.log("Digital prescription submitted:", submitDebugPayload);
-        return;
-      }
-
       const headers = authToken
         ? { Authorization: `Bearer ${authToken}`, Accept: "application/json" }
         : { Accept: "application/json" };
+
       const res = await fetch(`${API_BASE_URL}/api/medical-records`, {
         method: "POST",
         headers,
         body: fd,
       });
+
       const data = await res.json().catch(() => ({}));
+
       if (!res.ok || data?.success === false) {
         throw new Error(
           buildValidationMessage(data, "Failed to save prescription."),
         );
       }
+
       console.log("Digital prescription submitted:", {
         ...submitDebugPayload,
         response: data,
       });
+
       await finalizePrescriptionSuccess();
     } catch (err) {
       console.log("Digital prescription submit failed:", err);
@@ -1197,14 +1237,6 @@ const NewDoctorDigitalPrescription = ({
                       </p>
                       <p className="mt-1 text-sm font-semibold text-gray-800">
                         {resolvedSnapshotParentName}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-gray-200 bg-white p-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                        Location
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-800">
-                        {consultationLocationLabel}
                       </p>
                     </div>
                   </div>
@@ -1739,9 +1771,11 @@ const NewDoctorDigitalPrescription = ({
                       <span className="text-rose-500">*</span>
                     )}
                   </label>
+
                   <input
                     type="date"
                     value={prescriptionForm.followUpDate}
+                    min={todayDateInput}
                     onChange={updatePrescriptionField("followUpDate")}
                     disabled={!followUpRequired}
                     className={`${INPUT_BASE_CLASS} ${!followUpRequired ? "cursor-not-allowed bg-gray-100 text-gray-400" : ""}`}
