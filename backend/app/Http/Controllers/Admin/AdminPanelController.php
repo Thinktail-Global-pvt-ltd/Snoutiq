@@ -9,6 +9,7 @@ use App\Models\Doctor;
 use App\Models\FcmNotification;
 use App\Models\GroomerBooking;
 use App\Models\GroomerProfile;
+use App\Models\Notification;
 use App\Models\Appointment;
 use App\Models\Pet;
 use App\Models\Prescription;
@@ -1076,7 +1077,19 @@ class AdminPanelController extends Controller
         $supportsVaccinationNotificationJoin = $supportsFcmNotifications
             && ($fcmHasNotificationType || $supportsNeuteringNotificationJoin);
         $vaccinationReminderType = 'pet_vaccination_upcoming_reminder';
+        $vaccinationNotificationTypes = [$vaccinationReminderType, 'vaccination_milestone'];
         $maxFcmScanRows = min(max($limit * 20, 2000), 10000);
+        $supportsNotificationRecords = Schema::hasTable('notifications')
+            && Schema::hasColumn('notifications', 'user_id');
+        $notificationHasPetId = $supportsNotificationRecords && Schema::hasColumn('notifications', 'pet_id');
+        $notificationHasType = $supportsNotificationRecords && Schema::hasColumn('notifications', 'type');
+        $notificationHasTitle = $supportsNotificationRecords && Schema::hasColumn('notifications', 'title');
+        $notificationHasBody = $supportsNotificationRecords && Schema::hasColumn('notifications', 'body');
+        $notificationHasPayload = $supportsNotificationRecords && Schema::hasColumn('notifications', 'payload');
+        $notificationHasStatus = $supportsNotificationRecords && Schema::hasColumn('notifications', 'status');
+        $notificationHasChannel = $supportsNotificationRecords && Schema::hasColumn('notifications', 'channel');
+        $notificationHasSentAt = $supportsNotificationRecords && Schema::hasColumn('notifications', 'sent_at');
+        $notificationHasCreatedAt = $supportsNotificationRecords && Schema::hasColumn('notifications', 'created_at');
 
         $resolveNotificationTitle = static function ($fcmRow, array $dataPayload = []) use ($fcmHasTitle): ?string {
             $titleRaw = trim((string) (
@@ -1105,6 +1118,48 @@ class AdminPanelController extends Controller
             ));
 
             return $notificationTypeRaw !== '' ? $notificationTypeRaw : 'unknown';
+        };
+
+        $resolveNotificationBucket = static function (string $notificationType, array $dataPayload = []) use ($vaccinationNotificationTypes): ?string {
+            $type = strtolower(trim($notificationType));
+            if ($type === '' || $type === 'unknown') {
+                $type = strtolower(trim((string) data_get($dataPayload, 'type')));
+            }
+
+            if ($type === 'pet_neutering_reminder') {
+                return 'neutering';
+            }
+
+            if (in_array($type, $vaccinationNotificationTypes, true)) {
+                return 'vaccination';
+            }
+
+            if ($type === 'pp_user_created') {
+                return 'onboarding';
+            }
+
+            if ($type === 'profile_completion') {
+                return 'profile_completion';
+            }
+
+            if (
+                str_contains($type, 'follow_up')
+                || str_contains($type, 'follow-up')
+                || str_contains($type, 'followup')
+            ) {
+                return 'follow_up';
+            }
+
+            return null;
+        };
+
+        $resolveOriginNotificationId = static function (array $dataPayload = []): ?int {
+            $notificationId = data_get($dataPayload, 'notification_id');
+            if (is_numeric($notificationId) && (int) $notificationId > 0) {
+                return (int) $notificationId;
+            }
+
+            return null;
         };
 
         $resolveNotificationTimestamp = static function ($fcmRow) use ($fcmHasSentAt, $fcmHasCreatedAt, $normalizeDateTime): ?string {
@@ -1258,6 +1313,7 @@ class AdminPanelController extends Controller
 
                         $leadUser['all_notifications'][] = [
                             'id' => (int) ($fcmRow->id ?? 0),
+                            'origin_notification_id' => $resolveOriginNotificationId($dataPayload),
                             'notification_title' => $notificationTitle,
                             'notification_text' => $notificationText,
                             'notification_type' => $notificationType,
@@ -1268,6 +1324,7 @@ class AdminPanelController extends Controller
                             'bucket' => 'neutering',
                             'pet_id' => $petId,
                             'call_session' => null,
+                            'source' => 'fcm_notifications',
                         ];
 
                         $targetUsers->put($userId, $leadUser);
@@ -1421,6 +1478,7 @@ class AdminPanelController extends Controller
 
                             $leadUser['all_notifications'][] = [
                                 'id' => (int) ($fcmRow->id ?? 0),
+                                'origin_notification_id' => $resolveOriginNotificationId($dataPayload),
                                 'notification_title' => $notificationTitle,
                                 'notification_text' => $notificationText,
                                 'notification_type' => $notificationType,
@@ -1431,6 +1489,7 @@ class AdminPanelController extends Controller
                                 'bucket' => 'follow_up',
                                 'pet_id' => null,
                                 'call_session' => $fcmCallSession !== '' ? $fcmCallSession : trim((string) data_get($dataPayload, 'call_session')),
+                                'source' => 'fcm_notifications',
                             ];
 
                             $targetUsers->put($userId, $leadUser);
@@ -1483,7 +1542,7 @@ class AdminPanelController extends Controller
 
                 $fcmVaccinationRows = $fcmVaccinationQuery
                     ->orderByDesc('id')
-                    ->limit($limit)
+                    ->limit($maxFcmScanRows)
                     ->get();
 
                 $vaccinationUsers = User::query()
@@ -1512,7 +1571,7 @@ class AdminPanelController extends Controller
                     $notificationText = $resolveNotificationText($fcmRow, $dataPayload);
                     $payloadType = strtolower(trim((string) data_get($dataPayload, 'type')));
 
-                    if (strtolower($notificationType) !== $vaccinationReminderType && $payloadType !== $vaccinationReminderType) {
+                    if (!in_array(strtolower($notificationType), $vaccinationNotificationTypes, true) && !in_array($payloadType, $vaccinationNotificationTypes, true)) {
                         continue;
                     }
 
@@ -1562,9 +1621,10 @@ class AdminPanelController extends Controller
 
                     $leadUser['all_notifications'][] = [
                         'id' => (int) ($fcmRow->id ?? 0),
+                        'origin_notification_id' => $resolveOriginNotificationId($dataPayload),
                         'notification_title' => $notificationTitle,
                         'notification_text' => $notificationText,
-                        'notification_type' => $vaccinationReminderType,
+                        'notification_type' => strtolower($notificationType) !== 'unknown' ? $notificationType : $payloadType,
                         'timestamp' => $timestamp,
                         'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
                         'clicked' => $fcmHasClicked ? (bool) ($fcmRow->clicked ?? false) : null,
@@ -1572,6 +1632,7 @@ class AdminPanelController extends Controller
                         'bucket' => 'vaccination',
                         'pet_id' => is_numeric($petIdRaw ?? null) ? (int) $petIdRaw : null,
                         'call_session' => null,
+                        'source' => 'fcm_notifications',
                     ];
 
                     $targetUsers->put($userId, $leadUser);
@@ -1632,7 +1693,7 @@ class AdminPanelController extends Controller
 
                     $fcmProfileRows = $fcmProfileQuery
                         ->orderByDesc('id')
-                        ->limit($limit)
+                        ->limit($maxFcmScanRows)
                         ->get();
 
                     foreach ($fcmProfileRows as $fcmRow) {
@@ -1680,6 +1741,7 @@ class AdminPanelController extends Controller
 
                         $leadUser['all_notifications'][] = [
                             'id' => (int) ($fcmRow->id ?? 0),
+                            'origin_notification_id' => $resolveOriginNotificationId($dataPayload),
                             'notification_title' => $notificationTitle,
                             'notification_text' => $notificationText,
                             'notification_type' => $effectiveType,
@@ -1690,6 +1752,7 @@ class AdminPanelController extends Controller
                             'bucket' => $bucket,
                             'pet_id' => null,
                             'call_session' => null,
+                            'source' => 'fcm_notifications',
                         ];
 
                         $targetUsers->put($userId, $leadUser);
@@ -1701,11 +1764,148 @@ class AdminPanelController extends Controller
             }
         }
 
+        if ($supportsNotificationRecords && $targetUsers->isNotEmpty()) {
+            try {
+                $leadUserIds = $targetUsers
+                    ->keys()
+                    ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                    ->map(fn ($userId) => (int) $userId)
+                    ->values()
+                    ->all();
+
+                if (!empty($leadUserIds)) {
+                    $notificationColumns = ['id', 'user_id'];
+                    if ($notificationHasPetId) {
+                        $notificationColumns[] = 'pet_id';
+                    }
+                    if ($notificationHasType) {
+                        $notificationColumns[] = 'type';
+                    }
+                    if ($notificationHasTitle) {
+                        $notificationColumns[] = 'title';
+                    }
+                    if ($notificationHasBody) {
+                        $notificationColumns[] = 'body';
+                    }
+                    if ($notificationHasPayload) {
+                        $notificationColumns[] = 'payload';
+                    }
+                    if ($notificationHasStatus) {
+                        $notificationColumns[] = 'status';
+                    }
+                    if ($notificationHasChannel) {
+                        $notificationColumns[] = 'channel';
+                    }
+                    if ($notificationHasSentAt) {
+                        $notificationColumns[] = 'sent_at';
+                    }
+                    if ($notificationHasCreatedAt) {
+                        $notificationColumns[] = 'created_at';
+                    }
+
+                    $notificationRows = Notification::query()
+                        ->select(array_unique($notificationColumns))
+                        ->whereIn('user_id', $leadUserIds)
+                        ->where(function (Builder $query) use ($notificationHasStatus, $notificationHasSentAt): void {
+                            if ($notificationHasStatus) {
+                                $query->whereIn('status', [Notification::STATUS_SENT, Notification::STATUS_DELIVERED]);
+                                if ($notificationHasSentAt) {
+                                    $query->orWhereNotNull('sent_at');
+                                }
+
+                                return;
+                            }
+
+                            if ($notificationHasSentAt) {
+                                $query->whereNotNull('sent_at');
+                            }
+                        })
+                        ->orderByDesc($notificationHasSentAt ? 'sent_at' : ($notificationHasCreatedAt ? 'created_at' : 'id'))
+                        ->orderByDesc('id')
+                        ->limit($maxFcmScanRows)
+                        ->get();
+
+                    foreach ($notificationRows as $notificationRow) {
+                        $userId = is_numeric($notificationRow->user_id ?? null) ? (int) $notificationRow->user_id : 0;
+                        if ($userId <= 0 || !$targetUsers->has($userId)) {
+                            continue;
+                        }
+
+                        $payload = ($notificationHasPayload && is_array($notificationRow->payload ?? null))
+                            ? $notificationRow->payload
+                            : [];
+                        $notificationType = trim((string) (
+                            ($notificationHasType ? ($notificationRow->type ?? '') : '')
+                            ?: data_get($payload, 'type')
+                        ));
+                        $bucket = $resolveNotificationBucket($notificationType, $payload);
+                        if ($bucket === null) {
+                            continue;
+                        }
+
+                        $timestamp = $notificationHasSentAt
+                            ? $normalizeDateTime($notificationRow->sent_at ?? null)
+                            : null;
+                        if ($timestamp === null && $notificationHasCreatedAt) {
+                            $timestamp = $normalizeDateTime($notificationRow->created_at ?? null);
+                        }
+
+                        $petIdRaw = $notificationHasPetId
+                            ? ($notificationRow->pet_id ?? null)
+                            : data_get($payload, 'pet_id');
+
+                        $leadUser = $targetUsers->get($userId);
+                        if (!is_array($leadUser)) {
+                            continue;
+                        }
+
+                        $leadUser['all_notifications'][] = [
+                            'id' => (int) ($notificationRow->id ?? 0),
+                            'origin_notification_id' => (int) ($notificationRow->id ?? 0),
+                            'notification_title' => trim((string) (
+                                ($notificationHasTitle ? ($notificationRow->title ?? '') : '')
+                                ?: data_get($payload, 'title')
+                            )),
+                            'notification_text' => trim((string) (
+                                ($notificationHasBody ? ($notificationRow->body ?? '') : '')
+                                ?: data_get($payload, 'body')
+                                ?: data_get($payload, 'message')
+                            )),
+                            'notification_type' => $notificationType !== '' ? $notificationType : 'unknown',
+                            'timestamp' => $timestamp,
+                            'status' => $notificationHasStatus ? strtolower(trim((string) ($notificationRow->status ?? ''))) : null,
+                            'clicked' => null,
+                            'clicked_at' => null,
+                            'bucket' => $bucket,
+                            'pet_id' => is_numeric($petIdRaw) ? (int) $petIdRaw : null,
+                            'call_session' => trim((string) (data_get($payload, 'call_session') ?: data_get($payload, 'channel_name'))),
+                            'source' => 'notifications',
+                        ];
+
+                        $targetUsers->put($userId, $leadUser);
+                    }
+                }
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('notification_records', $e);
+            }
+        }
+
         $targetUsers = $targetUsers->map(function (array $leadUser): array {
             $notifications = collect($leadUser['all_notifications'] ?? [])
                 ->unique(function (array $item): string {
+                    $bucket = trim((string) ($item['bucket'] ?? ''));
+                    $originNotificationId = is_numeric($item['origin_notification_id'] ?? null)
+                        ? (int) $item['origin_notification_id']
+                        : 0;
+
+                    if ($originNotificationId > 0) {
+                        return 'origin:'.$originNotificationId.'|'.$bucket;
+                    }
+
                     return (string) ((int) ($item['id'] ?? 0))
-                        .'|'.trim((string) ($item['bucket'] ?? ''))
+                        .'|'.$bucket
+                        .'|'.trim((string) ($item['notification_type'] ?? ''))
+                        .'|'.trim((string) ($item['notification_title'] ?? ''))
                         .'|'.trim((string) ($item['timestamp'] ?? ''));
                 })
                 ->sort(function (array $left, array $right): int {
