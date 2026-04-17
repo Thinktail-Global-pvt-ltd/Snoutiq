@@ -15,12 +15,16 @@ class DoctorPendingPrescriptionController extends Controller
     {
         $userId = $this->positiveInt($request->query('user_id') ?? $request->query('id'));
         $transaction = $userId ? $this->findTransaction($userId) : null;
-        $prescription = $userId ? $this->findPrescription($userId) : null;
+        $transactionChannelName = $this->normalizeString($transaction?->channel_name ?? null);
+        $prescription = $transactionChannelName !== ''
+            ? $this->findPrescriptionByCallSession($transactionChannelName)
+            : null;
         $transactionDone = $transaction !== null && $this->isSuccessfulTransactionStatus($transaction->status ?? null);
         $prescriptionSubmitted = $prescription !== null;
 
         return response()->json([
             'payment_status' => $transactionDone ? 'paid' : ($transaction ? 'pending' : 'not_found'),
+            'channel_name' => $transactionChannelName !== '' ? $transactionChannelName : null,
             'prescription_required' => $transactionDone,
             'prescription_status' => $prescriptionSubmitted ? 'submitted' : 'pending',
             'lock_until_submit' => $transactionDone && !$prescriptionSubmitted,
@@ -42,17 +46,17 @@ class DoctorPendingPrescriptionController extends Controller
             ->first();
     }
 
-    private function findPrescription(int $userId): ?Prescription
+    private function findPrescriptionByCallSession(string $channelName): ?Prescription
     {
         if (
             !Schema::hasTable('prescriptions')
-            || !Schema::hasColumn('prescriptions', 'user_id')
+            || !Schema::hasColumn('prescriptions', 'call_session')
         ) {
             return null;
         }
 
         return Prescription::query()
-            ->where('user_id', $userId)
+            ->where('call_session', $channelName)
             ->orderByDesc('id')
             ->first();
     }
@@ -77,5 +81,10 @@ class DoctorPendingPrescriptionController extends Controller
             'settled',
             'verified',
         ], true);
+    }
+
+    private function normalizeString(?string $value): string
+    {
+        return trim((string) $value);
     }
 }
