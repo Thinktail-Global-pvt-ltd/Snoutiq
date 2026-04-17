@@ -2887,6 +2887,8 @@ Route::delete('/backend/groomer/reel/{id}',     [ClinicReelController::class, 'd
 
 
 Route::get('/users',            [AdminController::class, 'getUsers']);
+Route::delete('/users',         [AdminController::class, 'deleteUserByInput']);
+Route::post('/users/delete',    [AdminController::class, 'deleteUserByInput']);
 Route::delete('/users/by-phone', [AdminController::class, 'deleteUserByPhone']);
 Route::get('/users/{id}',       [AdminController::class, 'getUser']);
 Route::put('/users/{id}',       [AdminController::class, 'updateUser']);
@@ -2997,6 +2999,7 @@ Route::put('/video-schedule/doctors/{id}/availability', [\App\Http\Controllers\A
 Route::get('/video-schedule/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorVideoScheduleController::class, 'getAvailability']);
 Route::get('/video-schedule/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorVideoScheduleController::class, 'freeSlots']);
 // Pets
+Route::post('/users/pets', [\App\Http\Controllers\Api\PetsController::class, 'storeForUser']);
 Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
 Route::get('/doctor/users', [\App\Http\Controllers\Api\DoctorFollowUpUserController::class, 'users']);
 Route::get('/doctor/follow-up-users', [\App\Http\Controllers\Api\DoctorFollowUpUserController::class, 'index']);
