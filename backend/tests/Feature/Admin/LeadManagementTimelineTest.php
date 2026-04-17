@@ -6,6 +6,7 @@ use App\Models\Notification;
 use App\Models\Prescription;
 use App\Models\Transaction;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -18,6 +19,7 @@ class LeadManagementTimelineTest extends TestCase
 
         Schema::dropIfExists('prescriptions');
         Schema::dropIfExists('notifications');
+        Schema::dropIfExists('fcm_notifications');
         Schema::dropIfExists('transactions');
         Schema::dropIfExists('doctors');
         Schema::dropIfExists('users');
@@ -80,6 +82,21 @@ class LeadManagementTimelineTest extends TestCase
             $table->timestamp('sent_at')->nullable();
             $table->timestamps();
         });
+
+        Schema::create('fcm_notifications', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->json('data_payload')->nullable();
+            $table->string('call_session')->nullable();
+            $table->string('notification_type')->nullable()->index();
+            $table->string('status')->nullable()->index();
+            $table->text('title')->nullable();
+            $table->text('notification_text')->nullable();
+            $table->timestamp('sent_at')->nullable();
+            $table->boolean('clicked')->default(false);
+            $table->timestamp('clicked_at')->nullable();
+            $table->timestamps();
+        });
     }
 
     public function test_lead_management_serializes_transactions_and_prescriptions_for_timeline(): void
@@ -122,6 +139,42 @@ class LeadManagementTimelineTest extends TestCase
             'sent_at' => now()->subHour(),
         ]);
 
+        DB::table('fcm_notifications')->insert([
+            'user_id' => $user->id,
+            'data_payload' => json_encode([
+                'type' => 'pet_neutering_reminder',
+                'pet_id' => '42',
+                'pet_name' => 'Ulu',
+            ]),
+            'call_session' => null,
+            'notification_type' => 'pet_neutering_reminder',
+            'status' => 'sent',
+            'title' => 'Neutering Reminder Test',
+            'notification_text' => 'Please schedule the neutering consultation.',
+            'sent_at' => now()->subMinutes(40),
+            'clicked' => false,
+            'clicked_at' => null,
+            'created_at' => now()->subMinutes(40),
+            'updated_at' => now()->subMinutes(40),
+        ]);
+
+        DB::table('fcm_notifications')->insert([
+            'user_id' => $user->id,
+            'data_payload' => json_encode([
+                'type' => 'custom_admin_test',
+            ]),
+            'call_session' => null,
+            'notification_type' => 'custom_admin_test',
+            'status' => 'sent',
+            'title' => 'Custom Admin Test',
+            'notification_text' => 'Raw FCM log should be visible in admin panel.',
+            'sent_at' => now()->subMinutes(20),
+            'clicked' => true,
+            'clicked_at' => now()->subMinutes(10),
+            'created_at' => now()->subMinutes(20),
+            'updated_at' => now()->subMinutes(10),
+        ]);
+
         $response = $this->withSession([
             'is_admin' => true,
             'admin_email' => (string) config('admin.email', 'admin@snoutiq.com'),
@@ -133,6 +186,8 @@ class LeadManagementTimelineTest extends TestCase
         $response->assertSee('"related_transactions":[{"id":'.$transaction->id, false);
         $response->assertSee('"related_prescriptions":[{"id":'.$prescription->id, false);
         $response->assertSee('"title":"Vaccination Milestone Test"', false);
+        $response->assertSee('"title":"Neutering Reminder Test"', false);
+        $response->assertSee('"title":"Custom Admin Test"', false);
         $response->assertSee('(lead.related_transactions || []).forEach', false);
         $response->assertSee('(lead.related_prescriptions || []).forEach', false);
         $response->assertSee('Prescription added', false);

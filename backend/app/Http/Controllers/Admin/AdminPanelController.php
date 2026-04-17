@@ -1891,6 +1891,118 @@ class AdminPanelController extends Controller
             }
         }
 
+        if ($supportsFcmNotifications && $targetUsers->isNotEmpty()) {
+            try {
+                $leadUserIds = $targetUsers
+                    ->keys()
+                    ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                    ->map(fn ($userId) => (int) $userId)
+                    ->values()
+                    ->all();
+
+                if (!empty($leadUserIds)) {
+                    $fcmColumns = ['id', 'user_id'];
+                    if ($supportsNeuteringNotificationJoin) {
+                        $fcmColumns[] = 'data_payload';
+                    }
+                    if ($fcmHasCallSession) {
+                        $fcmColumns[] = 'call_session';
+                    }
+                    if ($fcmHasNotificationType) {
+                        $fcmColumns[] = 'notification_type';
+                    }
+                    if ($fcmHasStatus) {
+                        $fcmColumns[] = 'status';
+                    }
+                    if ($fcmHasTitle) {
+                        $fcmColumns[] = 'title';
+                    }
+                    if ($fcmHasNotificationText) {
+                        $fcmColumns[] = 'notification_text';
+                    }
+                    if ($fcmHasSentAt) {
+                        $fcmColumns[] = 'sent_at';
+                    }
+                    if ($fcmHasCreatedAt) {
+                        $fcmColumns[] = 'created_at';
+                    }
+                    if ($fcmHasClicked) {
+                        $fcmColumns[] = 'clicked';
+                    }
+                    if ($fcmHasClickedAt) {
+                        $fcmColumns[] = 'clicked_at';
+                    }
+
+                    $fcmRows = FcmNotification::query()
+                        ->select(array_unique($fcmColumns))
+                        ->whereIn('user_id', $leadUserIds)
+                        ->orderByDesc($fcmHasSentAt ? 'sent_at' : ($fcmHasCreatedAt ? 'created_at' : 'id'))
+                        ->orderByDesc('id')
+                        ->limit($maxFcmScanRows)
+                        ->get();
+
+                    foreach ($fcmRows as $fcmRow) {
+                        if (!$isDeliveredNotification($fcmRow)) {
+                            continue;
+                        }
+
+                        $userId = is_numeric($fcmRow->user_id ?? null) ? (int) $fcmRow->user_id : 0;
+                        if ($userId <= 0 || !$targetUsers->has($userId)) {
+                            continue;
+                        }
+
+                        $dataPayload = ($supportsNeuteringNotificationJoin && is_array($fcmRow->data_payload ?? null))
+                            ? $fcmRow->data_payload
+                            : [];
+                        $notificationType = trim((string) $resolveNotificationType($fcmRow, $dataPayload));
+                        $payloadType = trim((string) data_get($dataPayload, 'type'));
+                        $effectiveType = $notificationType !== '' && strtolower($notificationType) !== 'unknown'
+                            ? $notificationType
+                            : ($payloadType !== '' ? $payloadType : 'unknown');
+                        $bucket = $resolveNotificationBucket($effectiveType, $dataPayload) ?? 'other';
+                        $timestamp = $resolveNotificationTimestamp($fcmRow);
+                        $petIdRaw = data_get($dataPayload, 'pet_id');
+                        $callSession = $fcmHasCallSession
+                            ? trim((string) ($fcmRow->call_session ?? ''))
+                            : '';
+
+                        if ($callSession === '') {
+                            $callSession = trim((string) (
+                                data_get($dataPayload, 'call_session')
+                                ?: data_get($dataPayload, 'callSession')
+                                ?: data_get($dataPayload, 'channel_name')
+                            ));
+                        }
+
+                        $leadUser = $targetUsers->get($userId);
+                        if (!is_array($leadUser)) {
+                            continue;
+                        }
+
+                        $leadUser['all_notifications'][] = [
+                            'id' => (int) ($fcmRow->id ?? 0),
+                            'origin_notification_id' => $resolveOriginNotificationId($dataPayload),
+                            'notification_title' => $resolveNotificationTitle($fcmRow, $dataPayload),
+                            'notification_text' => $resolveNotificationText($fcmRow, $dataPayload),
+                            'notification_type' => $effectiveType,
+                            'timestamp' => $timestamp,
+                            'status' => $fcmHasStatus ? strtolower(trim((string) ($fcmRow->status ?? ''))) : null,
+                            'clicked' => $fcmHasClicked ? (bool) ($fcmRow->clicked ?? false) : null,
+                            'clicked_at' => $fcmHasClickedAt ? $normalizeDateTime($fcmRow->clicked_at ?? null) : null,
+                            'bucket' => $bucket,
+                            'pet_id' => is_numeric($petIdRaw) ? (int) $petIdRaw : null,
+                            'call_session' => $callSession !== '' ? $callSession : null,
+                            'source' => 'fcm_notifications',
+                        ];
+
+                        $targetUsers->put($userId, $leadUser);
+                    }
+                }
+            } catch (\Throwable $e) {
+                $captureLeadManagementError('fcm_notification_logs', $e);
+            }
+        }
+
         $targetUsers = $targetUsers->map(function (array $leadUser): array {
             $notifications = collect($leadUser['all_notifications'] ?? [])
                 ->unique(function (array $item): string {
@@ -1923,6 +2035,29 @@ class AdminPanelController extends Controller
 
             $leadUser['all_notifications'] = $notifications;
             $leadUser['all_notifications_count'] = count($notifications);
+            $leadUser['neutering_notification_count'] = collect($notifications)
+                ->filter(fn (array $item): bool => strtolower(trim((string) ($item['bucket'] ?? ''))) === 'neutering')
+                ->count();
+            $leadUser['vaccination_notification_count'] = collect($notifications)
+                ->filter(fn (array $item): bool => strtolower(trim((string) ($item['bucket'] ?? ''))) === 'vaccination')
+                ->count();
+            $leadUser['last_neutering_notification_at'] = collect($notifications)
+                ->filter(fn (array $item): bool => strtolower(trim((string) ($item['bucket'] ?? ''))) === 'neutering')
+                ->pluck('timestamp')
+                ->filter(fn ($timestamp): bool => trim((string) $timestamp) !== '')
+                ->sortDesc()
+                ->values()
+                ->first();
+            $leadUser['last_vaccination_notification_at'] = collect($notifications)
+                ->filter(fn (array $item): bool => strtolower(trim((string) ($item['bucket'] ?? ''))) === 'vaccination')
+                ->pluck('timestamp')
+                ->filter(fn ($timestamp): bool => trim((string) $timestamp) !== '')
+                ->sortDesc()
+                ->values()
+                ->first();
+            if ((int) $leadUser['vaccination_notification_count'] > 0) {
+                $leadUser['has_vaccination_reminder'] = true;
+            }
 
             return $leadUser;
         });
@@ -2425,6 +2560,10 @@ class AdminPanelController extends Controller
                     $transactionSessionKeys = is_array($transaction['session_keys'] ?? null)
                         ? $transaction['session_keys']
                         : [];
+
+                    if ($bucket === '' || $bucket === 'other') {
+                        return false;
+                    }
 
                     if ($bucket === 'follow_up' && $notificationSession !== '') {
                         return in_array($notificationSession, $transactionSessionKeys, true);
