@@ -1078,6 +1078,7 @@ class AdminPanelController extends Controller
             && ($fcmHasNotificationType || $supportsNeuteringNotificationJoin);
         $vaccinationReminderType = 'pet_vaccination_upcoming_reminder';
         $vaccinationNotificationTypes = [$vaccinationReminderType, 'vaccination_milestone'];
+        $vaccinationTypePlaceholders = implode(',', array_fill(0, count($vaccinationNotificationTypes), '?'));
         $maxFcmScanRows = min(max($limit * 20, 2000), 10000);
         $supportsNotificationRecords = Schema::hasTable('notifications')
             && Schema::hasColumn('notifications', 'user_id');
@@ -1507,8 +1508,8 @@ class AdminPanelController extends Controller
 
                 if ($fcmHasNotificationType) {
                     $fcmVaccinationQuery->whereRaw(
-                        "LOWER(TRIM(COALESCE(notification_type, ''))) = ?",
-                        [$vaccinationReminderType]
+                        "LOWER(TRIM(COALESCE(notification_type, ''))) IN ({$vaccinationTypePlaceholders})",
+                        $vaccinationNotificationTypes
                     );
                 }
 
