@@ -616,7 +616,7 @@ class ReceptionistBookingController extends Controller
         $patientName = trim((string) ($data['name'] ?? ''));
 
         $userPayload = [
-            'name' => $patientName !== '' ? $patientName : 'Pet Parent',
+            'name' => $patientName !== '' ? $patientName : null,
             'email' => $data['email'] ?? null,
             'phone' => $data['phone'] ?? null,
             'password' => Hash::make(Str::random(16)),
