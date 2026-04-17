@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Doctor;
 use App\Models\Pet;
 use App\Models\Prescription;
 use App\Models\Transaction;
@@ -51,11 +52,38 @@ class DoctorFollowUpUserController extends Controller
         $validated = $request->validate([
             'doctor_id' => ['required', 'integer', 'min:1'],
         ]);
+        $doctorId = (int) $validated['doctor_id'];
 
         if (!$this->hasRequiredColumns()) {
             return response()->json([
                 'success' => true,
                 'count' => 0,
+                'matched_user_count' => 0,
+                'vet_registeration_id' => null,
+                'data' => [],
+            ]);
+        }
+
+        $vetRegistrationId = $this->resolveVetRegistrationId($doctorId);
+        if ($vetRegistrationId === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found or clinic not linked.',
+            ], 404);
+        }
+
+        $matchedUserIds = User::query()
+            ->where('last_vet_id', $vetRegistrationId)
+            ->orderByDesc('id')
+            ->pluck('id');
+
+        if ($matchedUserIds->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'count' => 0,
+                'matched_user_count' => 0,
+                'vet_registeration_id' => $vetRegistrationId,
+                'total_earnings_sum' => $this->totalEarningsSum($doctorId),
                 'data' => [],
             ]);
         }
@@ -64,6 +92,8 @@ class DoctorFollowUpUserController extends Controller
             ->selectRaw('MAX(id) as latest_prescription_id, user_id')
             ->whereNotNull('follow_up_date')
             ->whereNotNull('user_id')
+            ->where('doctor_id', $doctorId)
+            ->whereIn('user_id', $matchedUserIds->all())
             ->groupBy('user_id');
 
         $rows = User::query()
@@ -72,7 +102,6 @@ class DoctorFollowUpUserController extends Controller
                 $join->on('latest_follow_up_prescriptions.user_id', '=', 'users.id');
             })
             ->join('prescriptions as p', 'p.id', '=', 'latest_follow_up_prescriptions.latest_prescription_id')
-            ->where('users.last_vet_id', (int) $validated['doctor_id'])
             ->orderBy('p.follow_up_date')
             ->orderByDesc('p.id')
             ->get();
@@ -82,7 +111,9 @@ class DoctorFollowUpUserController extends Controller
         return response()->json([
             'success' => true,
             'count' => $data->count(),
-            'total_earnings_sum' => $this->totalEarningsSum((int) $validated['doctor_id']),
+            'matched_user_count' => $matchedUserIds->count(),
+            'vet_registeration_id' => $vetRegistrationId,
+            'total_earnings_sum' => $this->totalEarningsSum($doctorId),
             'data' => $data,
         ]);
     }
@@ -91,10 +122,32 @@ class DoctorFollowUpUserController extends Controller
     {
         return Schema::hasTable('users')
             && Schema::hasColumn('users', 'last_vet_id')
+            && Schema::hasTable('doctors')
+            && Schema::hasColumn('doctors', 'vet_registeration_id')
             && Schema::hasTable('prescriptions')
             && Schema::hasColumn('prescriptions', 'id')
+            && Schema::hasColumn('prescriptions', 'doctor_id')
             && Schema::hasColumn('prescriptions', 'user_id')
             && Schema::hasColumn('prescriptions', 'follow_up_date');
+    }
+
+    private function resolveVetRegistrationId(int $doctorId): ?int
+    {
+        if ($doctorId <= 0) {
+            return null;
+        }
+
+        $doctor = Doctor::query()
+            ->select(['id', 'vet_registeration_id'])
+            ->find($doctorId);
+
+        if (!$doctor || !is_numeric($doctor->vet_registeration_id ?? null)) {
+            return null;
+        }
+
+        $vetRegistrationId = (int) $doctor->vet_registeration_id;
+
+        return $vetRegistrationId > 0 ? $vetRegistrationId : null;
     }
 
     private function selectColumns(): array
