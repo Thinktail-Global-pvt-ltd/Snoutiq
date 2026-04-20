@@ -299,6 +299,50 @@ class MonthlySubscriptionFlowTest extends TestCase
             ]);
     }
 
+    public function test_monthly_subscription_status_endpoint_returns_days_left_for_pending_subscription(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Pending Status User',
+            'email' => 'pending-status@example.com',
+            'password' => 'secret',
+        ]);
+
+        $pendingCreatedAt = now()->subDays(2)->startOfMinute();
+        $expectedDaysLeft = (int) ceil(now()->diffInSeconds($pendingCreatedAt->copy()->addMonthNoOverflow(), false) / 86400);
+
+        UserMonthlySubscription::query()->create([
+            'user_id' => $user->id,
+            'status' => 'pending',
+            'amount_paise' => 99900,
+            'starts_at' => null,
+            'expires_at' => null,
+            'activated_at' => null,
+            'metadata' => [
+                'order_type' => 'monthly_subscription',
+                'pending_order' => [
+                    'created_at' => $pendingCreatedAt->toIso8601String(),
+                ],
+            ],
+            'created_at' => $pendingCreatedAt,
+            'updated_at' => $pendingCreatedAt,
+        ]);
+
+        $response = $this->getJson('/api/monthly-subscription/status?user_id=' . $user->id);
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'user_id' => $user->id,
+                'has_active_subscription' => false,
+                'days_left' => $expectedDaysLeft,
+                'subscription' => [
+                    'status' => 'pending',
+                    'days_left' => $expectedDaysLeft,
+                ],
+            ]);
+    }
+
     private function makeController(): PaymentController
     {
         return new class(

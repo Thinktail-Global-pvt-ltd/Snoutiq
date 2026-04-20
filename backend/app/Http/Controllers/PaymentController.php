@@ -747,25 +747,9 @@ class PaymentController extends Controller
                     ?? ($record->raw_response['notes']['type'] ?? null)
                 );
 
-                if ($this->isVideoConsultTransactionType($orderType) && $this->isSuccessfulPaymentStatus($status)) {
-                    // On successful payment, send all video-consult WhatsApp messages.
-                    $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
-                        context: $context,
-                        notes: $notes,
-                        amountInInr: $amountInInr
-                    );
-
-                    $vetWhatsAppMeta = $this->notifyVetVideoConsultBooked(
-                        context: $context,
-                        notes: $notes,
-                        amountInInr: $amountInInr
-                    );
-
-                    $prescriptionDocMeta = $this->sendDoctorPrescriptionDocument($context);
-                } elseif ($orderType === 'excell_export_campaign' && $this->isSuccessfulPaymentStatus($status)) {
-                    // Excel export campaign WhatsApp is deferred until a doctor is assigned
-                    // from the admin lead/transaction management flow.
-                }
+                // Order-creation/payment verification should not send WhatsApp.
+                // User and doctor WhatsApp notifications are handled from the
+                // later doctor-assignment flow instead.
 
                 $vetPushMeta = $this->notifyDoctorPaymentCaptured(
                     context: $context,
@@ -852,7 +836,7 @@ class PaymentController extends Controller
             'success' => true,
             'user_id' => $userId,
             'has_active_subscription' => $activeSubscription !== null,
-            'days_left' => $this->monthlySubscriptionDaysLeft($activeSubscription),
+            'days_left' => $this->monthlySubscriptionDaysLeft($subscription),
             'subscription' => $this->serializeMonthlySubscription($subscription),
         ]);
     }
@@ -2562,11 +2546,31 @@ class PaymentController extends Controller
 
     protected function monthlySubscriptionDaysLeft(?UserMonthlySubscription $subscription): int
     {
-        if (! $subscription || ! $subscription->expires_at) {
+        if (! $subscription) {
             return 0;
         }
 
-        $secondsLeft = now()->diffInSeconds($subscription->expires_at, false);
+        $expiresAt = $subscription->expires_at;
+
+        if (! $expiresAt && strtolower(trim((string) ($subscription->status ?? ''))) === 'pending') {
+            $pendingCreatedAt = data_get($subscription->metadata, 'pending_order.created_at');
+
+            try {
+                $pendingStart = $pendingCreatedAt
+                    ? \Illuminate\Support\Carbon::parse((string) $pendingCreatedAt)
+                    : ($subscription->created_at ? $subscription->created_at->copy() : now()->copy());
+            } catch (\Throwable $e) {
+                $pendingStart = $subscription->created_at ? $subscription->created_at->copy() : now()->copy();
+            }
+
+            $expiresAt = $pendingStart->copy()->addMonthNoOverflow();
+        }
+
+        if (! $expiresAt) {
+            return 0;
+        }
+
+        $secondsLeft = now()->diffInSeconds($expiresAt, false);
         if ($secondsLeft <= 0) {
             return 0;
         }
