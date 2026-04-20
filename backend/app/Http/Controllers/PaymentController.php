@@ -74,6 +74,10 @@ class PaymentController extends Controller
             'coupon_code' => 'nullable|string|max:100',
             'couponCode' => 'nullable|string|max:100',
             'coupon' => 'nullable|string|max:100',
+            'subscription_selected' => 'nullable|boolean',
+            'subscriptionSelected' => 'nullable|boolean',
+            'plan_id' => 'nullable|string|max:100',
+            'total_count' => 'nullable|integer|min:1',
         ]);
 
         $amountInInr = (int) ($request->input('amount', 500));
@@ -83,18 +87,27 @@ class PaymentController extends Controller
         $context = $this->resolveTransactionContext($request, $notes);
         $notes = $this->mergeContextIntoNotes($notes, $context);
         $transactionType = $this->resolveTransactionType($notes);
+        $isCustomerSubscriptionTransaction = $this->isCustomerSubscriptionTransactionType($transactionType);
+        $subscriptionSelectionProvided = $request->exists('subscription_selected') || $request->exists('subscriptionSelected');
+        $subscriptionSelected = $subscriptionSelectionProvided
+            ? ($this->toBoolInt($request->input('subscription_selected', $request->input('subscriptionSelected'))) === 1)
+            : $isCustomerSubscriptionTransaction;
+        $isRepeatedSubscriptionTransaction = $subscriptionSelected || $isCustomerSubscriptionTransaction;
+        $isManagedMonthlySubscriptionTransaction = $this->isMonthlySubscriptionTransactionType($transactionType)
+            || $isRepeatedSubscriptionTransaction;
         $notes['order_type'] = $transactionType;
+        $notes['subscription_selected'] = $subscriptionSelected ? '1' : '0';
         $callSession = null;
         $requestedCouponCode = $this->resolveCouponCode($notes);
 
-        if ($this->isMonthlySubscriptionTransactionType($transactionType) && !($context['user_id'] ?? null)) {
+        if ($isManagedMonthlySubscriptionTransaction && !($context['user_id'] ?? null)) {
             return response()->json([
                 'success' => false,
-                'error' => 'Monthly subscription orders require a user_id',
+                'error' => 'Subscription orders require a user_id',
             ], 422);
         }
 
-        if ($this->isMonthlySubscriptionTransactionType($transactionType)) {
+        if ($isManagedMonthlySubscriptionTransaction) {
             $activeMonthlySubscription = $this->findActiveMonthlySubscription(
                 $this->toNullableInt($context['user_id'] ?? null)
             );
@@ -149,6 +162,55 @@ class PaymentController extends Controller
         try {
             $api = new Api($this->key, $this->secret);
 
+            if ($isRepeatedSubscriptionTransaction) {
+                $planId = trim((string) (
+                    $request->input('plan_id')
+                    ?? ($notes['plan_id'] ?? null)
+                    ?? env('RAZORPAY_MONTHLY_PLAN_ID', '')
+                ));
+
+                if ($planId === '') {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Customer subscription requires a plan_id',
+                    ], 422);
+                }
+
+                $totalCount = (int) (
+                    $request->input('total_count')
+                    ?? ($notes['total_count'] ?? null)
+                    ?? env('RAZORPAY_MONTHLY_TOTAL_COUNT', 1200)
+                );
+
+                if ($totalCount < 1) {
+                    $totalCount = 1;
+                }
+
+                $notes['plan_id'] = $planId;
+                $notes['total_count'] = $totalCount;
+
+                $subscription = $api->subscription->create([
+                    'plan_id' => $planId,
+                    'total_count' => $totalCount,
+                    'quantity' => 1,
+                    'customer_notify' => 1,
+                    'notes' => $notes,
+                ]);
+                $subscriptionArr = $subscription->toArray();
+
+                return response()->json([
+                    'success' => true,
+                    'key' => $this->key,
+                    'checkout_mode' => 'subscription',
+                    'subscription_selected' => true,
+                    'subscription' => $subscriptionArr,
+                    'subscription_id' => $subscriptionArr['id'] ?? null,
+                    'plan_id' => $subscriptionArr['plan_id'] ?? $planId,
+                    'total_count' => (int) ($subscriptionArr['total_count'] ?? $totalCount),
+                    'order_type' => $transactionType,
+                ]);
+            }
+
             $order = $api->order->create([
                 'receipt'  => 'rcpt_' . bin2hex(random_bytes(6)),
                 'amount'   => $amountInInr * 100, // paisa
@@ -199,6 +261,7 @@ class PaymentController extends Controller
             return response()->json([
                 'success'  => true,
                 'key'      => $this->key,
+                'subscription_selected' => false,
                 'order'    => $orderArr,
                 'order_id' => $orderArr['id'],
                 'doctor_push' => $doctorOrderPushMeta,
@@ -731,7 +794,6 @@ class PaymentController extends Controller
                 return [$record, $storedTransaction, $monthlySubscription];
             }, 3);
 
-            // Send WhatsApp after successful payment verification
             $amountInInr = $amount !== null ? (int) round(((int) $amount) / 100) : 0;
             $whatsAppMeta = null;
             $vetWhatsAppMeta = null;
@@ -2528,6 +2590,12 @@ class PaymentController extends Controller
     {
         $normalized = $this->normalizeOrderType($transactionType);
         return $normalized === 'monthly_subscription';
+    }
+
+    protected function isCustomerSubscriptionTransactionType(?string $transactionType): bool
+    {
+        $normalized = $this->normalizeOrderType($transactionType);
+        return $normalized === 'customer_subscription';
     }
 
     protected function findActiveMonthlySubscription(?int $userId): ?UserMonthlySubscription
