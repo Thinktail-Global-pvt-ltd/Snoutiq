@@ -15,6 +15,7 @@ use App\Models\Pet;
 use App\Models\Prescription;
 use App\Models\VideoApointment;
 use App\Models\HomeServiceRequiredByPet;
+use App\Models\UserMonthlySubscription;
 use Illuminate\Support\Str;
 use App\Services\WhatsAppService;
 use App\Services\Push\FcmService;
@@ -83,9 +84,32 @@ class PaymentController extends Controller
         $notes = $this->mergeContextIntoNotes($notes, $context);
         $transactionType = $this->resolveTransactionType($notes);
         $notes['order_type'] = $transactionType;
-        $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
         $callSession = null;
         $requestedCouponCode = $this->resolveCouponCode($notes);
+
+        if ($this->isMonthlySubscriptionTransactionType($transactionType) && !($context['user_id'] ?? null)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Monthly subscription orders require a user_id',
+            ], 422);
+        }
+
+        if ($this->isMonthlySubscriptionTransactionType($transactionType)) {
+            $activeMonthlySubscription = $this->findActiveMonthlySubscription(
+                $this->toNullableInt($context['user_id'] ?? null)
+            );
+
+            if ($activeMonthlySubscription) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Monthly subscription already active',
+                    'days_left' => $this->monthlySubscriptionDaysLeft($activeMonthlySubscription),
+                    'subscription' => $this->serializeMonthlySubscription($activeMonthlySubscription),
+                ], 409);
+            }
+        }
+
+        $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
 
         if ($requestedCouponCode !== null && $requestedCouponCode !== self::FREE_VIDEO_CONSULT_COUPON_CODE) {
             return response()->json([
@@ -133,8 +157,8 @@ class PaymentController extends Controller
             ]);
             $orderArr = $order->toArray();
 
-            $videoApointment = DB::transaction(function () use ($request, $orderArr, $notes, $context, $callSession) {
-                $this->recordPendingTransaction(
+            $orderArtifacts = DB::transaction(function () use ($request, $orderArr, $notes, $context, $callSession) {
+                $pendingTransaction = $this->recordPendingTransaction(
                     request: $request,
                     order: $orderArr,
                     notes: $notes,
@@ -142,14 +166,23 @@ class PaymentController extends Controller
                     throwOnFailure: true
                 );
 
-                return $this->recordVideoApointmentOrder(
-                    request: $request,
-                    order: $orderArr,
-                    context: $context,
-                    callSession: $callSession,
-                    notes: $notes,
-                    throwOnFailure: true
-                );
+                return [
+                    'video_appointment' => $this->recordVideoApointmentOrder(
+                        request: $request,
+                        order: $orderArr,
+                        context: $context,
+                        callSession: $callSession,
+                        notes: $notes,
+                        throwOnFailure: true
+                    ),
+                    'monthly_subscription' => $this->syncMonthlySubscriptionPending(
+                        context: $context,
+                        notes: $notes,
+                        order: $orderArr,
+                        transaction: $pendingTransaction,
+                        throwOnFailure: true
+                    ),
+                ];
             }, 3);
 
             $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
@@ -172,9 +205,10 @@ class PaymentController extends Controller
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
                 'prescription_doc' => $prescriptionDocMeta,
-                'video_appointment' => $videoApointment ? [
-                    'id' => $videoApointment->id,
+                'video_appointment' => ($orderArtifacts['video_appointment'] ?? null) ? [
+                    'id' => $orderArtifacts['video_appointment']->id,
                 ] : null,
+                'monthly_subscription' => $this->serializeMonthlySubscription($orderArtifacts['monthly_subscription'] ?? null),
                 'call_session' => $callSession ? [
                     'id' => $callSession->id,
                     'call_identifier' => $callSession->resolveIdentifier(),
@@ -638,7 +672,7 @@ class PaymentController extends Controller
             $notes = $this->mergeContextIntoNotes($notes, $context);
             $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
 
-            [$record, $storedTransaction] = DB::transaction(function () use (
+            [$record, $storedTransaction, $monthlySubscription] = DB::transaction(function () use (
                 $data,
                 $amount,
                 $currency,
@@ -685,7 +719,16 @@ class PaymentController extends Controller
                     throw new \RuntimeException('Payment verified but transaction update failed.');
                 }
 
-                return [$record, $storedTransaction];
+                $monthlySubscription = $this->activateMonthlySubscription(
+                    context: $context,
+                    notes: $notes,
+                    transaction: $storedTransaction,
+                    payment: $record,
+                    amountPaise: is_numeric($amount) ? (int) $amount : null,
+                    throwOnFailure: true
+                );
+
+                return [$record, $storedTransaction, $monthlySubscription];
             }, 3);
 
             // Send WhatsApp after successful payment verification
@@ -752,6 +795,7 @@ class PaymentController extends Controller
                     'reference' => $storedTransaction->reference,
                     'status' => $storedTransaction->status,
                 ],
+                'monthly_subscription' => $this->serializeMonthlySubscription($monthlySubscription),
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
                 'prescription_doc' => $prescriptionDocMeta,
@@ -769,6 +813,48 @@ class PaymentController extends Controller
                 'error'   => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function monthlySubscriptionStatus(Request $request)
+    {
+        $data = $request->validate([
+            'user_id' => 'nullable|integer',
+        ]);
+
+        $userId = $this->toNullableInt(
+            $data['user_id']
+            ?? ($request->user() ? $request->user()->getAuthIdentifier() : null)
+        );
+
+        if (! $userId) {
+            return response()->json([
+                'success' => false,
+                'error' => 'user_id is required',
+            ], 422);
+        }
+
+        if (! Schema::hasTable('user_monthly_subscriptions')) {
+            return response()->json([
+                'success' => true,
+                'user_id' => $userId,
+                'has_active_subscription' => false,
+                'days_left' => 0,
+                'subscription' => null,
+            ]);
+        }
+
+        $subscription = UserMonthlySubscription::query()
+            ->where('user_id', $userId)
+            ->first();
+        $activeSubscription = $this->findActiveMonthlySubscription($userId);
+
+        return response()->json([
+            'success' => true,
+            'user_id' => $userId,
+            'has_active_subscription' => $activeSubscription !== null,
+            'days_left' => $this->monthlySubscriptionDaysLeft($activeSubscription),
+            'subscription' => $this->serializeMonthlySubscription($subscription),
+        ]);
     }
 
     protected function buildCouponVerifyBypassPayload(Request $request, string $orderId): ?array
@@ -1273,7 +1359,7 @@ class PaymentController extends Controller
     protected function resolveClinicId(Request $request, array $notes, array $context = []): ?int
     {
         $transactionType = $this->resolveTransactionType($notes);
-        $allowGenericClinicFallback = ! in_array($transactionType, ['home_service', 'excell_export_campaign'], true);
+        $allowGenericClinicFallback = ! in_array($transactionType, ['home_service', 'excell_export_campaign', 'monthly_subscription'], true);
 
         $directId = $context['clinic_id']
             ?? $request->input('clinic_id')
@@ -2452,6 +2538,188 @@ class PaymentController extends Controller
     {
         $normalized = $this->normalizeOrderType($transactionType);
         return $normalized === 'video_consult';
+    }
+
+    protected function isMonthlySubscriptionTransactionType(?string $transactionType): bool
+    {
+        $normalized = $this->normalizeOrderType($transactionType);
+        return $normalized === 'monthly_subscription';
+    }
+
+    protected function findActiveMonthlySubscription(?int $userId): ?UserMonthlySubscription
+    {
+        if (! $userId || !Schema::hasTable('user_monthly_subscriptions')) {
+            return null;
+        }
+
+        return UserMonthlySubscription::query()
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '>', now())
+            ->first();
+    }
+
+    protected function monthlySubscriptionDaysLeft(?UserMonthlySubscription $subscription): int
+    {
+        if (! $subscription || ! $subscription->expires_at) {
+            return 0;
+        }
+
+        $secondsLeft = now()->diffInSeconds($subscription->expires_at, false);
+        if ($secondsLeft <= 0) {
+            return 0;
+        }
+
+        return (int) ceil($secondsLeft / 86400);
+    }
+
+    protected function syncMonthlySubscriptionPending(
+        array $context,
+        array $notes,
+        array $order,
+        ?Transaction $transaction = null,
+        bool $throwOnFailure = false
+    ): ?UserMonthlySubscription {
+        $transactionType = $this->resolveTransactionType($notes);
+        if (! $this->isMonthlySubscriptionTransactionType($transactionType) || !Schema::hasTable('user_monthly_subscriptions')) {
+            return null;
+        }
+
+        $userId = $this->toNullableInt($context['user_id'] ?? null);
+        if (! $userId) {
+            if ($throwOnFailure) {
+                throw new \RuntimeException('Monthly subscription orders require a user_id.');
+            }
+
+            return null;
+        }
+
+        try {
+            $subscription = UserMonthlySubscription::query()->firstOrNew(['user_id' => $userId]);
+            $metadata = is_array($subscription->metadata) ? $subscription->metadata : [];
+            $metadata['order_type'] = $transactionType;
+            $metadata['pending_order'] = array_filter([
+                'order_id' => $order['id'] ?? null,
+                'amount_paise' => isset($order['amount']) ? (int) $order['amount'] : null,
+                'currency' => $order['currency'] ?? 'INR',
+                'created_at' => now()->toIso8601String(),
+            ], static fn ($value) => $value !== null && $value !== '');
+
+            $currentStatus = strtolower(trim((string) ($subscription->status ?? '')));
+            if (! $subscription->exists || $currentStatus !== 'active') {
+                $subscription->status = 'pending';
+            }
+
+            $subscription->user_id = $userId;
+            $subscription->transaction_id = $transaction?->id ?? $subscription->transaction_id;
+            $subscription->order_reference = (string) ($order['id'] ?? $subscription->order_reference ?? '');
+            $subscription->amount_paise = (int) ($order['amount'] ?? 0);
+            $subscription->metadata = $metadata;
+            $subscription->save();
+
+            return $subscription->fresh();
+        } catch (\Throwable $e) {
+            report($e);
+            if ($throwOnFailure) {
+                throw $e;
+            }
+
+            return null;
+        }
+    }
+
+    protected function activateMonthlySubscription(
+        array $context,
+        array $notes,
+        ?Transaction $transaction = null,
+        ?Payment $payment = null,
+        ?int $amountPaise = null,
+        bool $throwOnFailure = false
+    ): ?UserMonthlySubscription {
+        $transactionType = $this->resolveTransactionType($notes);
+        if (! $this->isMonthlySubscriptionTransactionType($transactionType) || !Schema::hasTable('user_monthly_subscriptions')) {
+            return null;
+        }
+
+        $userId = $this->toNullableInt($context['user_id'] ?? null);
+        if (! $userId) {
+            if ($throwOnFailure) {
+                throw new \RuntimeException('Monthly subscription verification requires a user_id.');
+            }
+
+            return null;
+        }
+
+        try {
+            $subscription = UserMonthlySubscription::query()->firstOrNew(['user_id' => $userId]);
+            $now = now();
+            $currentStatus = strtolower(trim((string) ($subscription->status ?? '')));
+            $startsAt = $now->copy();
+
+            if (
+                $subscription->exists
+                && $currentStatus === 'active'
+                && $subscription->expires_at
+                && $subscription->expires_at->greaterThan($now)
+            ) {
+                $startsAt = $subscription->expires_at->copy();
+            }
+
+            $metadata = is_array($subscription->metadata) ? $subscription->metadata : [];
+            $metadata['order_type'] = $transactionType;
+            unset($metadata['pending_order']);
+            $metadata['last_activation'] = array_filter([
+                'activated_at' => $now->toIso8601String(),
+                'order_id' => $payment?->razorpay_order_id ?? data_get($transaction?->metadata, 'order_id'),
+                'payment_id' => $payment?->razorpay_payment_id ?? $transaction?->reference,
+                'transaction_id' => $transaction?->id,
+            ], static fn ($value) => $value !== null && $value !== '');
+
+            $subscription->fill([
+                'user_id' => $userId,
+                'transaction_id' => $transaction?->id,
+                'order_reference' => $payment?->razorpay_order_id ?? data_get($transaction?->metadata, 'order_id'),
+                'payment_reference' => $payment?->razorpay_payment_id ?? $transaction?->reference,
+                'status' => 'active',
+                'amount_paise' => max(0, (int) ($amountPaise ?? $transaction?->amount_paise ?? 0)),
+                'starts_at' => $startsAt,
+                'expires_at' => $startsAt->copy()->addMonthNoOverflow(),
+                'activated_at' => $now,
+                'metadata' => $metadata,
+            ]);
+            $subscription->save();
+
+            return $subscription->fresh();
+        } catch (\Throwable $e) {
+            report($e);
+            if ($throwOnFailure) {
+                throw $e;
+            }
+
+            return null;
+        }
+    }
+
+    protected function serializeMonthlySubscription(?UserMonthlySubscription $subscription): ?array
+    {
+        if (! $subscription) {
+            return null;
+        }
+
+        return [
+            'id' => $subscription->id,
+            'user_id' => $subscription->user_id,
+            'transaction_id' => $subscription->transaction_id,
+            'order_reference' => $subscription->order_reference,
+            'payment_reference' => $subscription->payment_reference,
+            'status' => $subscription->status,
+            'amount_paise' => (int) ($subscription->amount_paise ?? 0),
+            'days_left' => $this->monthlySubscriptionDaysLeft($subscription),
+            'starts_at' => optional($subscription->starts_at)->toIso8601String(),
+            'expires_at' => optional($subscription->expires_at)->toIso8601String(),
+            'activated_at' => optional($subscription->activated_at)->toIso8601String(),
+        ];
     }
 
     /**
