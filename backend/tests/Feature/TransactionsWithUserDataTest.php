@@ -104,7 +104,7 @@ class TransactionsWithUserDataTest extends TestCase
         });
     }
 
-    public function test_transactions_with_user_data_includes_continuety_subscription_rows(): void
+    public function test_transactions_with_user_data_includes_pending_continuety_subscription_rows(): void
     {
         DB::table('users')->insert([
             'id' => 1387,
@@ -149,7 +149,7 @@ class TransactionsWithUserDataTest extends TestCase
             'actual_amount_paid_by_consumer_paise' => 99900,
             'payment_to_snoutiq_paise' => 19900,
             'payment_to_doctor_paise' => 80000,
-            'status' => 'captured',
+            'status' => 'pending',
             'type' => 'continuety_subscription',
             'channel_name' => 'channel_cont_123',
             'payment_method' => 'razorpay',
@@ -204,7 +204,7 @@ class TransactionsWithUserDataTest extends TestCase
             ->assertJsonPath('data.0.actual_amount_paid_by_consumer_paise', 99900)
             ->assertJsonPath('data.0.payment_to_snoutiq_paise', 19900)
             ->assertJsonPath('data.0.payment_to_doctor_paise', 80000)
-            ->assertJsonPath('data.0.status', 'captured')
+            ->assertJsonPath('data.0.status', 'pending')
             ->assertJsonPath('data.0.type', 'continuety_subscription')
             ->assertJsonPath('data.0.payment_method', 'razorpay')
             ->assertJsonPath('data.0.reference', 'order_cont_123')

@@ -71,7 +71,12 @@ class TransactionController extends Controller
             ->whereDate('transactions.created_at', $date)
             ->where(function ($query) {
                 $query->whereNull('transactions.status')
-                    ->orWhere('transactions.status', '!=', 'pending');
+                    ->orWhere('transactions.status', '!=', 'pending')
+                    ->orWhere(function ($continuetySubscriptionQuery) {
+                        $continuetySubscriptionQuery
+                            ->where('transactions.type', 'continuety_subscription')
+                            ->where('transactions.status', 'pending');
+                    });
             })
             ->with([
                 'user' => fn ($q) => $q->select('id', 'name'),
