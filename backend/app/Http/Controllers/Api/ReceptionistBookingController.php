@@ -569,19 +569,42 @@ class ReceptionistBookingController extends Controller
 
         $hasRoleColumn = Schema::hasColumn('users', 'role');
         $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
+        $existingUser = null;
+
+        $phone = $request->input('phone');
+        if ($phone !== null && $phone !== '') {
+            $existingUserQuery = User::query()->where('phone', $phone);
+            if ($hasRoleColumn) {
+                $existingUserQuery->whereIn('role', self::PATIENT_ROLES);
+            }
+
+            $existingUser = $existingUserQuery->first();
+        }
 
         $phoneRules = ['nullable', 'string', 'max:25'];
+        $phoneUniqueRule = Rule::unique('users', 'phone');
+        if ($existingUser) {
+            $phoneUniqueRule = $phoneUniqueRule->ignore($existingUser->id);
+        }
+
         if ($hasRoleColumn) {
-            $phoneRules[] = Rule::unique('users', 'phone')->where(function ($query) {
+            $phoneRules[] = $phoneUniqueRule->where(function ($query) {
                 $query->whereIn('role', self::PATIENT_ROLES);
             });
         } else {
-            $phoneRules[] = 'unique:users,phone';
+            $phoneRules[] = $phoneUniqueRule;
         }
+
+        $emailRules = ['nullable', 'email'];
+        $emailUniqueRule = Rule::unique('users', 'email');
+        if ($existingUser) {
+            $emailUniqueRule = $emailUniqueRule->ignore($existingUser->id);
+        }
+        $emailRules[] = $emailUniqueRule;
 
         $data = $request->validate([
             'name' => 'nullable|string|max:255',
-            'email' => 'nullable|email|unique:users,email',
+            'email' => $emailRules,
             'phone' => $phoneRules,
             'pet_name' => 'nullable|string|max:120',
             'pet_type' => 'nullable|string|max:120',
@@ -615,13 +638,17 @@ class ReceptionistBookingController extends Controller
 
         $patientName = trim((string) ($data['name'] ?? ''));
 
-        $userPayload = [
-            'name' => $patientName !== '' ? $patientName : null,
-            'email' => $data['email'] ?? null,
-            'phone' => $data['phone'] ?? null,
-            'password' => Hash::make(Str::random(16)),
-        ];
-        if ($hasRoleColumn) {
+        $userPayload = [];
+        if (array_key_exists('name', $data)) {
+            $userPayload['name'] = $patientName !== '' ? $patientName : null;
+        }
+        if (array_key_exists('email', $data)) {
+            $userPayload['email'] = $data['email'] ?? null;
+        }
+        if (array_key_exists('phone', $data)) {
+            $userPayload['phone'] = $data['phone'] ?? null;
+        }
+        if ($hasRoleColumn && (!$existingUser || empty($existingUser->role))) {
             $userPayload['role'] = 'pet';
         }
         if ($hasLastVetIdColumn) {
@@ -638,10 +665,19 @@ class ReceptionistBookingController extends Controller
                 }
             }
 
-            $userPayload['last_vet_id'] = $lastVetId;
+            if (!$existingUser || $clinicId || array_key_exists('last_vet_id', $data)) {
+                $userPayload['last_vet_id'] = $lastVetId;
+            }
         }
 
-        $user = User::create($userPayload);
+        if ($existingUser) {
+            $existingUser->fill($userPayload);
+            $existingUser->save();
+            $user = $existingUser->fresh();
+        } else {
+            $userPayload['password'] = Hash::make(Str::random(16));
+            $user = User::create($userPayload);
+        }
 
         $pet = null;
         if (!empty($data['pet_name'])) {
