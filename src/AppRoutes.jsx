@@ -135,6 +135,7 @@ const FindVetsNearYou = lazy(() => import("./pages/FindVetsNearYou"));
 const NewDoctorRoute = lazy(() => import("./newdoctordata/NewDoctorRoute.jsx"));
 const AiRoute = lazy(() => import("./ai/AiRoute.jsx"));
 const PetLifelinePage = lazy(() => import("./ai/PetLifelinePage"));
+const EditPetPage = lazy(() => import("./ai/EditPetPage"));
 
 export default function AppRoutes() {
   return (
@@ -150,7 +151,7 @@ export default function AppRoutes() {
         <Route path="/in-clinic-payment" element={<InClinicPaymentPage />} />
         <Route path="/ai" element={<AiRoute />} />
      <Route path="/pet-lifeline/:petId" element={<PetLifelinePage />} />
-
+<Route path="/profile" element={<EditPetPage />} />
 
         <Route path="/about" element={<NewAbout />} />
         <Route path="/parents" element={<NewCounsult />} />

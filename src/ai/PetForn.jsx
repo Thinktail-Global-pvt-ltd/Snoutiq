@@ -347,12 +347,42 @@ pet_id:
 
 const dedupePets = (currentPets, updatedPet) => {
   const pets = Array.isArray(currentPets) ? currentPets : [];
+  const updatedPetId = String(updatedPet?.id ?? updatedPet?.pet_id ?? "").trim();
+  const updatedPetName = String(
+    updatedPet?.name ?? updatedPet?.pet_name ?? ""
+  )
+    .trim()
+    .toLowerCase();
+  const updatedPetType = String(
+    updatedPet?.pet_type ?? updatedPet?.species ?? updatedPet?.type ?? ""
+  )
+    .trim()
+    .toLowerCase();
 
   return [
     updatedPet,
     ...pets.filter((item) => {
       if (!item || typeof item !== "object") return false;
-      if (updatedPet?.id && item.id === updatedPet.id) return false;
+
+      const itemId = String(item?.id ?? item?.pet_id ?? "").trim();
+      if (updatedPetId && itemId && itemId === updatedPetId) return false;
+
+      const itemName = String(item?.name ?? item?.pet_name ?? "")
+        .trim()
+        .toLowerCase();
+      const itemType = String(item?.pet_type ?? item?.species ?? item?.type ?? "")
+        .trim()
+        .toLowerCase();
+
+      if (
+        !itemId &&
+        updatedPetName &&
+        itemName === updatedPetName &&
+        (!updatedPetType || !itemType || itemType === updatedPetType)
+      ) {
+        return false;
+      }
+
       return true;
     }),
   ];
@@ -972,9 +1002,6 @@ if (typeof onComplete === "function") {
               </div>
             ) : (
               <div style={styles.helperText}>
-                {form.pet_type === "cat"
-                  ? "Cat breeds are loaded from the Indian cat breeds API."
-                  : "Dog breeds are loaded from the breed API."}
               </div>
             )}
           </div>

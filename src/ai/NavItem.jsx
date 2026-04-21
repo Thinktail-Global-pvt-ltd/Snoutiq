@@ -11,7 +11,11 @@ import {
   User,
   Video,
   X,
-    Sparkles,ShieldCheck ,ChevronRight ,Clock 
+  Sparkles,
+  ShieldCheck,
+  ChevronRight,
+  Clock,
+  ChevronDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { clearAiAuthState } from "./AiAuth";
@@ -20,7 +24,9 @@ import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 const normalizeBoolean = (value) => {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
-  const normalized = String(value ?? "").trim().toLowerCase();
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "yes";
 };
 
@@ -30,8 +36,8 @@ const hasUsablePetProfile = (authState) => {
     user?.pet && typeof user.pet === "object"
       ? user.pet
       : Array.isArray(user?.pets) && user.pets.length > 0
-      ? user.pets[0]
-      : null;
+        ? user.pets[0]
+        : null;
 
   const registrationFlag =
     normalizeBoolean(authState?.registrationComplete) ||
@@ -42,14 +48,56 @@ const hasUsablePetProfile = (authState) => {
   if (registrationFlag) return true;
 
   const petName = String(
-    primaryPet?.name ?? primaryPet?.pet_name ?? user?.pet_name ?? ""
+    primaryPet?.name ?? primaryPet?.pet_name ?? user?.pet_name ?? "",
   ).trim();
 
   const ownerName = String(
-    user?.pet_owner_name ?? user?.owner_name ?? user?.name ?? ""
+    user?.pet_owner_name ?? user?.owner_name ?? user?.name ?? "",
   ).trim();
 
   return Boolean(petName && ownerName);
+};
+
+const resolvePetImageUrl = (...sources) => {
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+
+    const raw =
+      source?.pet_doc1 ??
+      source?.petDoc1 ??
+      source?.pet_image_url ??
+      source?.petImageUrl ??
+      source?.avatar ??
+      source?.photo ??
+      source?.image ??
+      source?.image_url ??
+      source?.imageUrl ??
+      source?.profile_image ??
+      source?.profileImage ??
+      source?.pet_photo ??
+      source?.petPhoto ??
+      "";
+
+    const value = String(raw || "").trim();
+    if (!value) continue;
+
+    if (
+      value.startsWith("http://") ||
+      value.startsWith("https://") ||
+      value.startsWith("blob:") ||
+      value.startsWith("data:")
+    ) {
+      return value;
+    }
+
+    if (value.startsWith("/")) {
+      return `https://snoutiq.com${value}`;
+    }
+
+    return `https://snoutiq.com/${value.replace(/^\/+/, "")}`;
+  }
+
+  return "";
 };
 
 export default function NavItem({
@@ -65,8 +113,24 @@ export default function NavItem({
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const messagesEndRef = useRef(null);
-console.log(authState,"ankit");
+
+  const currentUser = authState?.user || {};
+  const currentPet =
+    currentUser?.pet && typeof currentUser.pet === "object"
+      ? currentUser.pet
+      : Array.isArray(currentUser?.pets) && currentUser.pets.length > 0
+        ? currentUser.pets[0]
+        : null;
+
+  const resolvedPetId =
+    currentPet?.id ??
+    currentPet?.pet_id ??
+    currentUser?.pet_id ??
+    currentUser?.pet?.id ??
+    currentUser?.pet?.pet_id ??
+    "";
 
   const hasAuth = useMemo(() => {
     const user = authState?.user || {};
@@ -174,6 +238,20 @@ console.log(authState,"ankit");
     };
   }, []);
 
+  useEffect(() => {
+  const handleClickOutside = () => {
+    setProfileMenuOpen(false);
+  };
+
+  if (profileMenuOpen) {
+    window.addEventListener("click", handleClickOutside);
+  }
+
+  return () => {
+    window.removeEventListener("click", handleClickOutside);
+  };
+}, [profileMenuOpen]);
+
   const createNewConversation = () => {
     const newConv = {
       id: Date.now(),
@@ -204,8 +282,8 @@ console.log(authState,"ankit");
               title:
                 newTitle.slice(0, 30) + (newTitle.length > 30 ? "..." : ""),
             }
-          : conv
-      )
+          : conv,
+      ),
     );
   };
 
@@ -253,8 +331,10 @@ console.log(authState,"ankit");
       setMessages(newMessages);
       setConversations((convs) =>
         convs.map((conv) =>
-          conv.id === activeConversation ? { ...conv, messages: newMessages } : conv
-        )
+          conv.id === activeConversation
+            ? { ...conv, messages: newMessages }
+            : conv,
+        ),
       );
 
       if (messages.length === 0) {
@@ -270,8 +350,8 @@ console.log(authState,"ankit");
       setMessages(newMessages);
       setConversations((prev) =>
         prev.map((conv) =>
-          conv.id === newConvId ? { ...conv, messages: newMessages } : conv
-        )
+          conv.id === newConvId ? { ...conv, messages: newMessages } : conv,
+        ),
       );
       updateConversationTitle(newConvId, firstQuestionText);
     }, 0);
@@ -288,10 +368,11 @@ console.log(authState,"ankit");
   };
 
   const handleLogout = () => {
-    clearAiAuthState();
-    setIsSidebarOpen(false);
-    navigate("/", { replace: true });
-  };
+  clearAiAuthState();
+  setIsSidebarOpen(false);
+  setProfileMenuOpen(false);
+  navigate("/", { replace: true });
+};
 
   const handleLogin = () => {
     setIsSidebarOpen(false);
@@ -303,12 +384,16 @@ console.log(authState,"ankit");
 
     navigate("/ai", { replace: true });
   };
-console.log();
 
-  const viewTimeline=()=>{
-    navigate(`/pet-lifeline/${currentPet?.id || ""}`, { replace: true });
-  }
-
+  const viewTimeline = () => {
+    if (!resolvedPetId) return;
+    setIsSidebarOpen(false);
+    navigate(`/pet-lifeline/${resolvedPetId}`);
+  };
+const handleViewProfile = () => {
+  setProfileMenuOpen(false);
+  navigate("/profile");
+};
   const handleSendMessage = (forcedText = null) => {
     const inputText = String(forcedText ?? currentInput).trim();
     if (!inputText) return;
@@ -356,20 +441,16 @@ console.log();
     }
   }, [pendingQuestion, hasAuth, profileReady]);
 
-  const currentUser = authState?.user || {};
-  const currentPet =
-    currentUser?.pet && typeof currentUser.pet === "object"
-      ? currentUser.pet
-      : Array.isArray(currentUser?.pets) && currentUser.pets.length > 0
-      ? currentUser.pets[0]
-      : null;
-
   const petDisplayName = String(
-    currentPet?.name ?? currentPet?.pet_name ?? currentUser?.pet_name ?? ""
+    currentPet?.name ?? currentPet?.pet_name ?? currentUser?.pet_name ?? "",
   ).trim();
   const ownerDisplayName = String(
-    currentUser?.pet_owner_name ?? currentUser?.owner_name ?? currentUser?.name ?? ""
+    currentUser?.pet_owner_name ??
+      currentUser?.owner_name ??
+      currentUser?.name ??
+      "",
   ).trim();
+  const petProfileImageUrl = resolvePetImageUrl(currentPet, currentUser?.pet, currentUser);
 
   const quickPrompts = [
     { label: "Nutrition", prompt: "What should I feed my dog?" },
@@ -409,7 +490,9 @@ console.log();
     const previewText =
       conversation?.messages?.[conversation.messages.length - 1]?.text ||
       "Start a new pet health conversation";
-    return previewText.length > 70 ? `${previewText.slice(0, 70)}...` : previewText;
+    return previewText.length > 70
+      ? `${previewText.slice(0, 70)}...`
+      : previewText;
   };
 
   const formatTime = (value) => {
@@ -430,14 +513,14 @@ console.log();
         className: "border-amber-200 bg-amber-50 text-amber-700",
       }
     : profileReady
-    ? {
-        label: "Profile ready",
-        className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      }
-    : {
-        label: "Complete pet profile",
-        className: "border-indigo-200 bg-indigo-50 text-indigo-700",
-      };
+      ? {
+          label: "Profile ready",
+          className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        }
+      : {
+          label: "Complete pet profile",
+          className: "border-indigo-200 bg-indigo-50 text-indigo-700",
+        };
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
@@ -468,22 +551,28 @@ console.log();
           </button>
         </div>
 
-        <div className="p-4 border-b border-gray-200">
-          <button
-            onClick={createNewConversation}
-            className="w-full flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <MessageSquare size={20} />
-            New Chat
-          </button>
-          <button
-            onClick={viewTimeline}
-            className="w-full flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            <Clock size={20} />
-            View Timeline
-          </button>
-        </div>
+        <div className="p-4 border-b border-gray-200 space-y-2">
+  <button
+    onClick={createNewConversation}
+    className="w-full flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+  >
+    <MessageSquare size={20} />
+    New Chat
+  </button>
+
+  <button
+    onClick={viewTimeline}
+    disabled={!resolvedPetId}
+    className={`w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+      resolvedPetId
+        ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+    }`}
+  >
+    <Clock size={20} />
+    View Timeline
+  </button>
+</div>
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-2">
@@ -542,32 +631,114 @@ console.log();
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="bg-white p-4 border-b border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(true)}
-              className="rounded-xl border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 lg:hidden"
-              aria-label="Open sidebar"
-            >
-              <Menu size={20} />
-            </button>
+  <div className="flex items-center justify-between gap-3">
+    <div className="flex items-center gap-3 min-w-0">
+      <button
+        type="button"
+        onClick={() => setIsSidebarOpen(true)}
+        className="rounded-xl border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 lg:hidden"
+        aria-label="Open sidebar"
+      >
+        <Menu size={20} />
+      </button>
 
-            <img
-              src={snoutiq_app_icon}
-              alt="Snoutiq"
-              className="h-10 w-10 rounded-xl object-cover"
-            />
+      <img
+        src={snoutiq_app_icon}
+        alt="Snoutiq"
+        className="h-10 w-10 rounded-xl object-cover"
+      />
 
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold text-slate-900">
-                Snoutiq AI Assistant
-              </h1>
-              <p className="text-sm text-slate-500">
-                Ask anything about your pet
-              </p>
-            </div>
+      <div className="min-w-0">
+        <h1 className="truncate text-lg font-bold text-slate-900">
+          Snoutiq AI Assistant
+        </h1>
+        <p className="text-sm text-slate-500">
+          Ask anything about your pet
+        </p>
+      </div>
+    </div>
+
+    <div className="relative">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setProfileMenuOpen((prev) => !prev);
+        }}
+        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-50"
+      >
+        {petProfileImageUrl ? (
+          <img
+            src={petProfileImageUrl}
+            alt={petDisplayName || ownerDisplayName || "Pet"}
+            className="h-9 w-9 rounded-full object-cover ring-2 ring-indigo-100"
+          />
+        ) : (
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+            <User size={18} />
+          </div>
+        )}
+        <div className="hidden sm:block text-left">
+          <div className="max-w-[120px] truncate text-sm font-semibold text-slate-900">
+            {ownerDisplayName || "Profile"}
+          </div>
+          <div className="max-w-[120px] truncate text-xs text-slate-500">
+            {petDisplayName || "Pet Parent"}
           </div>
         </div>
+        <ChevronDown size={16} className="text-slate-500" />
+      </button>
+
+      {profileMenuOpen ? (
+        <div
+          className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="border-b border-slate-100 px-4 py-3">
+            <div className="flex items-center gap-3">
+              {petProfileImageUrl ? (
+                <img
+                  src={petProfileImageUrl}
+                  alt={petDisplayName || ownerDisplayName || "Pet"}
+                  className="h-11 w-11 rounded-full object-cover ring-2 ring-indigo-100"
+                />
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                  <User size={18} />
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900">
+                  {ownerDisplayName || "Profile"}
+                </div>
+                <div className="truncate text-xs text-slate-500">
+                  {petDisplayName || "Pet Parent"}
+                </div>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleViewProfile}
+            className="flex w-full items-center gap-2 px-4 py-3 text-sm text-slate-700 hover:bg-gray-50"
+          >
+            <User size={16} />
+            View Profile
+          </button>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        </div>
+      ) : null}
+    </div>
+  </div>
+</div>
 
         <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-indigo-50 via-white to-white">
           <div className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -590,8 +761,9 @@ console.log();
                             Welcome to Snoutiq AI
                           </h2>
                           <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
-                            Get instant guidance for symptoms, food, behaviour, exercise,
-                            and emergency situations. Ask your first question to begin.
+                            Get instant guidance for symptoms, food, behaviour,
+                            exercise, and emergency situations. Ask your first
+                            question to begin.
                           </p>
                         </div>
                       </div>

@@ -103,10 +103,117 @@ const removeStorageValue = (key) => {
   } catch {}
 };
 
-const normalizePets = (pets) =>
-  Array.isArray(pets)
-    ? pets.filter((item) => item && typeof item === "object")
-    : [];
+const resolvePetImageValue = (...sources) => {
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+
+    const resolved =
+      pickFirstValue(
+        source.pet_doc1,
+        source.petDoc1,
+        source.pet_image_url,
+        source.petImageUrl,
+        source.avatar,
+        source.photo,
+        source.image,
+        source.image_url,
+        source.imageUrl,
+        source.profile_image,
+        source.profileImage,
+        source.pet_photo,
+        source.petPhoto,
+      ) ?? "";
+
+    if (normalizeText(resolved)) {
+      return resolved;
+    }
+  }
+
+  return "";
+};
+
+const buildPetDedupeKey = (pet) => {
+  const normalizedPetId = normalizeId(pet?.id ?? pet?.pet_id);
+  if (normalizedPetId) {
+    return `id:${normalizedPetId}`;
+  }
+
+  const petName = normalizeText(pet?.name ?? pet?.pet_name).toLowerCase();
+  const petType = normalizeText(pet?.pet_type ?? pet?.species ?? pet?.type).toLowerCase();
+  const petDob = normalizeText(pet?.pet_dob ?? pet?.dob);
+
+  if (!petName) return "";
+  return `fallback:${petName}::${petType}::${petDob}`;
+};
+
+const normalizePetRecord = (pet) => {
+  if (!pet || typeof pet !== "object") return null;
+
+  const normalizedPetId = normalizeId(pet?.id ?? pet?.pet_id);
+  const normalizedPetImage = resolvePetImageValue(pet);
+  if (!normalizedPetId) {
+    return {
+      ...pet,
+      pet_doc1: normalizeText(pet?.pet_doc1 ?? normalizedPetImage) || "",
+      pet_image_url:
+        normalizeText(
+          pet?.pet_image_url ?? pet?.petImageUrl ?? normalizedPetImage,
+        ) || "",
+      avatar: normalizeText(pet?.avatar ?? normalizedPetImage) || "",
+      image: normalizeText(pet?.image ?? normalizedPetImage) || "",
+      image_url:
+        normalizeText(pet?.image_url ?? pet?.imageUrl ?? normalizedPetImage) || "",
+      profile_image:
+        normalizeText(
+          pet?.profile_image ?? pet?.profileImage ?? normalizedPetImage,
+        ) || "",
+    };
+  }
+
+  return {
+    ...pet,
+    id: normalizedPetId,
+    pet_id: normalizedPetId,
+    pet_doc1: normalizeText(pet?.pet_doc1 ?? normalizedPetImage) || "",
+    pet_image_url:
+      normalizeText(
+        pet?.pet_image_url ?? pet?.petImageUrl ?? normalizedPetImage,
+      ) || "",
+    avatar: normalizeText(pet?.avatar ?? normalizedPetImage) || "",
+    image: normalizeText(pet?.image ?? normalizedPetImage) || "",
+    image_url:
+      normalizeText(pet?.image_url ?? pet?.imageUrl ?? normalizedPetImage) || "",
+    profile_image:
+      normalizeText(
+        pet?.profile_image ?? pet?.profileImage ?? normalizedPetImage,
+      ) || "",
+  };
+};
+
+const normalizePets = (pets) => {
+  if (!Array.isArray(pets)) return [];
+
+  const seen = new Set();
+  const normalizedPets = [];
+
+  pets.forEach((item) => {
+    const normalizedPet = normalizePetRecord(item);
+    if (!normalizedPet) return;
+
+    const dedupeKey = buildPetDedupeKey(normalizedPet);
+    if (dedupeKey && seen.has(dedupeKey)) {
+      return;
+    }
+
+    if (dedupeKey) {
+      seen.add(dedupeKey);
+    }
+
+    normalizedPets.push(normalizedPet);
+  });
+
+  return normalizedPets;
+};
 
 const getPrimaryPet = (user = {}) => {
   if (user?.pet && typeof user.pet === "object") {
@@ -183,9 +290,24 @@ export const buildAiUserData = (user = {}, options = {}) => {
       mergedUser.weight,
     ) ?? "";
 
+  const resolvedPetImage =
+    resolvePetImageValue(options, mergedUser, primaryPet) || "";
+
+  const resolvedPetId =
+    normalizeId(
+      pickFirstValue(
+        options.pet_id,
+        mergedUser.pet_id,
+        primaryPet?.id,
+        primaryPet?.pet_id,
+      ),
+    ) || null;
+
   const resolvedPet = primaryPet
     ? {
         ...primaryPet,
+        id: resolvedPetId,
+        pet_id: resolvedPetId,
         name:
           pickFirstValue(
             options.pet_name,
@@ -236,6 +358,51 @@ export const buildAiUserData = (user = {}, options = {}) => {
             options.pet_doc1,
             mergedUser.pet_doc1,
             primaryPet?.pet_doc1,
+            resolvedPetImage,
+          ) ?? "",
+        pet_image_url:
+          pickFirstValue(
+            options.pet_image_url,
+            options.petImageUrl,
+            mergedUser.pet_image_url,
+            mergedUser.petImageUrl,
+            primaryPet?.pet_image_url,
+            primaryPet?.petImageUrl,
+            resolvedPetImage,
+          ) ?? "",
+        avatar:
+          pickFirstValue(
+            options.avatar,
+            mergedUser.avatar,
+            primaryPet?.avatar,
+            resolvedPetImage,
+          ) ?? "",
+        image:
+          pickFirstValue(
+            options.image,
+            mergedUser.image,
+            primaryPet?.image,
+            resolvedPetImage,
+          ) ?? "",
+        image_url:
+          pickFirstValue(
+            options.image_url,
+            options.imageUrl,
+            mergedUser.image_url,
+            mergedUser.imageUrl,
+            primaryPet?.image_url,
+            primaryPet?.imageUrl,
+            resolvedPetImage,
+          ) ?? "",
+        profile_image:
+          pickFirstValue(
+            options.profile_image,
+            options.profileImage,
+            mergedUser.profile_image,
+            mergedUser.profileImage,
+            primaryPet?.profile_image,
+            primaryPet?.profileImage,
+            resolvedPetImage,
           ) ?? "",
         pet_doc2:
           pickFirstValue(
@@ -274,9 +441,9 @@ export const buildAiUserData = (user = {}, options = {}) => {
       }
     : null;
 
-  const resolvedPets = resolvedPet
-    ? [resolvedPet, ...pets.filter((item) => item !== primaryPet)]
-    : pets;
+  const resolvedPets = normalizePets(
+    resolvedPet ? [resolvedPet, ...pets] : pets,
+  );
 
   const registrationComplete =
     normalizeBooleanFlag(
@@ -295,6 +462,15 @@ export const buildAiUserData = (user = {}, options = {}) => {
     ...(resolvedPet ? { pet: resolvedPet } : {}),
     id: normalizedId || mergedUser.id || mergedUser.user_id || "",
     user_id: normalizedId || mergedUser.user_id || mergedUser.id || "",
+    pet_id:
+      normalizeId(
+        pickFirstValue(
+          options.pet_id,
+          mergedUser.pet_id,
+          resolvedPet?.id,
+          resolvedPet?.pet_id,
+        ),
+      ) || "",
     phone,
     mobileNumber:
       buildPhoneNumber(
@@ -352,6 +528,48 @@ export const buildAiUserData = (user = {}, options = {}) => {
         options.pet_doc1,
         mergedUser.pet_doc1,
         resolvedPet?.pet_doc1,
+        resolvedPetImage,
+      ) ?? "",
+    pet_image_url:
+      pickFirstValue(
+        options.pet_image_url,
+        options.petImageUrl,
+        mergedUser.pet_image_url,
+        mergedUser.petImageUrl,
+        resolvedPet?.pet_image_url,
+        resolvedPetImage,
+      ) ?? "",
+    avatar:
+      pickFirstValue(
+        options.avatar,
+        mergedUser.avatar,
+        resolvedPet?.avatar,
+        resolvedPetImage,
+      ) ?? "",
+    image:
+      pickFirstValue(
+        options.image,
+        mergedUser.image,
+        resolvedPet?.image,
+        resolvedPetImage,
+      ) ?? "",
+    image_url:
+      pickFirstValue(
+        options.image_url,
+        options.imageUrl,
+        mergedUser.image_url,
+        mergedUser.imageUrl,
+        resolvedPet?.image_url,
+        resolvedPetImage,
+      ) ?? "",
+    profile_image:
+      pickFirstValue(
+        options.profile_image,
+        options.profileImage,
+        mergedUser.profile_image,
+        mergedUser.profileImage,
+        resolvedPet?.profile_image,
+        resolvedPetImage,
       ) ?? "",
     pet_doc2:
       pickFirstValue(
