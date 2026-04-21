@@ -366,22 +366,11 @@ class ReceptionistBookingController extends Controller
             $query->whereDate('a.appointment_date', $date);
         }
 
-        $rows = $query->get()
-            ->concat($this->continuetySubscriptionAppointments($clinicId, $date))
-            ->sortBy([
-                ['appointment_date', 'asc'],
-                ['appointment_time', 'asc'],
-                ['id', 'asc'],
-            ])
-            ->values();
+        $rows = $query->get();
 
         $rows = $rows->map(function ($row) {
-            $row->notes_payment = isset($row->notes_payment)
-                ? (bool) $row->notes_payment
-                : $this->extractNotesPaymentStatus($row->notes ?? null);
-            $row->patient_id = isset($row->patient_id) && is_numeric($row->patient_id)
-                ? (int) $row->patient_id
-                : $this->extractPatientId($row->notes ?? null);
+            $row->notes_payment = $this->extractNotesPaymentStatus($row->notes ?? null);
+            $row->patient_id = $this->extractPatientId($row->notes ?? null);
             unset($row->notes);
             return $row;
         });
@@ -511,103 +500,6 @@ class ReceptionistBookingController extends Controller
             'count' => $rows->count(),
             'appointments' => $rows,
         ]);
-    }
-
-    private function continuetySubscriptionAppointments(int $clinicId, string $date = ''): \Illuminate\Support\Collection
-    {
-        if (!Schema::hasTable('transactions')) {
-            return collect();
-        }
-
-        $hasUsersTable = Schema::hasTable('users');
-        $hasPetsTable = Schema::hasTable('pets');
-        $hasTransactionsChannelColumn = Schema::hasColumn('transactions', 'channel_name');
-        $canJoinPrescriptionByChannel = $hasTransactionsChannelColumn
-            && Schema::hasTable('prescriptions')
-            && Schema::hasColumn('prescriptions', 'call_session');
-
-        $query = DB::table('transactions as t')
-            ->leftJoin('doctors as d', 't.doctor_id', '=', 'd.id')
-            ->where('t.clinic_id', $clinicId)
-            ->where('t.type', 'continuety_subscription');
-
-        if ($hasUsersTable) {
-            $query->leftJoin('users as u', 't.user_id', '=', 'u.id');
-        }
-
-        if ($hasPetsTable) {
-            $query->leftJoin('pets as pt', 't.pet_id', '=', 'pt.id');
-        }
-
-        if ($date !== '') {
-            $query->whereDate('t.created_at', $date);
-        }
-
-        if ($canJoinPrescriptionByChannel) {
-            $latestPrescriptionByChannel = DB::table('prescriptions')
-                ->select('call_session', DB::raw('MAX(id) as latest_prescription_id'))
-                ->whereNotNull('call_session')
-                ->where('call_session', '!=', '')
-                ->groupBy('call_session');
-
-            $query
-                ->leftJoinSub($latestPrescriptionByChannel, 'lpc', function ($join) {
-                    $join->on('lpc.call_session', '=', 't.channel_name');
-                })
-                ->leftJoin('prescriptions as ptx', 'ptx.id', '=', 'lpc.latest_prescription_id');
-        }
-
-        $rows = $query
-            ->orderBy('t.created_at')
-            ->select(
-                't.id',
-                't.user_id as patient_id',
-                DB::raw('t.pet_id as appointment_pet_id'),
-                't.doctor_id',
-                't.status',
-                't.reference as transaction_reference',
-                't.created_at as transaction_created_at',
-                DB::raw($hasUsersTable && Schema::hasColumn('users', 'name') ? 'COALESCE(u.name, "") as patient_name' : '"" as patient_name'),
-                DB::raw($hasUsersTable && Schema::hasColumn('users', 'phone') ? 'COALESCE(u.phone, "") as patient_phone' : '"" as patient_phone'),
-                DB::raw($hasPetsTable && Schema::hasColumn('pets', 'name') ? 'COALESCE(pt.name, "") as pet_name' : '"" as pet_name'),
-                DB::raw('COALESCE(d.doctor_name, "") as doctor_name'),
-                DB::raw($canJoinPrescriptionByChannel ? 'ptx.id as prescription_id' : 'NULL as prescription_id'),
-                DB::raw('NULL as in_clinic_appointment_id'),
-                DB::raw($canJoinPrescriptionByChannel && Schema::hasColumn('prescriptions', 'diagnosis') ? 'ptx.diagnosis as prescription_diagnosis' : 'NULL as prescription_diagnosis'),
-                DB::raw($canJoinPrescriptionByChannel && Schema::hasColumn('prescriptions', 'follow_up_date') ? 'ptx.follow_up_date as prescription_follow_up_date' : 'NULL as prescription_follow_up_date'),
-                DB::raw($canJoinPrescriptionByChannel && Schema::hasColumn('prescriptions', 'follow_up_type') ? 'ptx.follow_up_type as prescription_follow_up_type' : 'NULL as prescription_follow_up_type'),
-                DB::raw($canJoinPrescriptionByChannel && Schema::hasColumn('prescriptions', 'follow_up_notes') ? 'ptx.follow_up_notes as prescription_follow_up_notes' : 'NULL as prescription_follow_up_notes')
-            )
-            ->get();
-
-        return $rows->map(function ($row) {
-            $createdAt = null;
-
-            try {
-                $createdAt = $row->transaction_created_at
-                    ? Carbon::parse((string) $row->transaction_created_at)
-                    : null;
-            } catch (\Throwable $e) {
-                $createdAt = null;
-            }
-
-            $row->appointment_date = $createdAt?->toDateString();
-            $row->appointment_time = $createdAt?->format('H:i:s');
-            $row->notes = null;
-            $row->notes_payment = $this->isSuccessfulTransactionStatus((string) ($row->status ?? ''));
-            $row->source = 'continuety_subscription';
-            $row->order_type = 'continuety_subscription';
-            unset($row->transaction_created_at);
-
-            return $row;
-        });
-    }
-
-    private function isSuccessfulTransactionStatus(?string $status): bool
-    {
-        $normalized = strtolower(trim((string) $status));
-
-        return in_array($normalized, ['captured', 'paid', 'completed', 'success', 'successful', 'settled'], true);
     }
 
     private function extractPatientId(?string $notes): ?int
