@@ -132,10 +132,7 @@ class PaymentController extends Controller
             ], 422);
         }
 
-        if (
-            $this->isVideoConsultTransactionType($transactionType)
-            || $transactionType === 'excell_export_campaign'
-        ) {
+        if ($this->usesVideoConsultCreateOrderFlow($transactionType)) {
             $callSession = $this->createCallSessionIfMissing($context);
             if ($callSession) {
                 $notes['call_session_id'] = $callSession->resolveIdentifier();
@@ -2579,6 +2576,19 @@ class PaymentController extends Controller
         return $normalized === 'video_consult';
     }
 
+    protected function isContinuetySubscriptionTransactionType(?string $transactionType): bool
+    {
+        $normalized = $this->normalizeOrderType($transactionType);
+        return $normalized === 'continuety_subscription';
+    }
+
+    protected function usesVideoConsultCreateOrderFlow(?string $transactionType): bool
+    {
+        return $this->isVideoConsultTransactionType($transactionType)
+            || $this->isContinuetySubscriptionTransactionType($transactionType)
+            || $transactionType === 'excell_export_campaign';
+    }
+
     protected function isMonthlySubscriptionTransactionType(?string $transactionType): bool
     {
         $normalized = $this->normalizeOrderType($transactionType);
@@ -3502,7 +3512,7 @@ HTML;
         }
 
         $orderType = strtolower((string) $this->resolveTransactionType($notes));
-        if (!in_array($orderType, ['video_consult', 'excell_export_campaign'], true)) {
+        if (!in_array($orderType, ['video_consult', 'continuety_subscription', 'excell_export_campaign'], true)) {
             return null;
         }
 
