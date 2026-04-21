@@ -2791,6 +2791,7 @@ Route::get('/razorpay-ping', function () {
 });
 
   Route::post('/razorpay/payment-link-webhook', [RazorpayPaymentLinkWebhookController::class, 'handle']);
+  Route::post('/razorpay/subscription-webhook', [\App\Http\Controllers\Api\RazorpaySubscriptionWebhookController::class, 'handle']);
 
   Route::post('/rzp/verify', [PaymentController::class, 'verifyPayment']);
 
@@ -2798,6 +2799,7 @@ Route::get('/razorpay-ping', function () {
 
   Route::post('/create-order', [PaymentController::class, 'createOrder']);
   Route::get('/monthly-subscription/status', [PaymentController::class, 'monthlySubscriptionStatus']);
+  Route::get('/monthly-subscription/validity', [PaymentController::class, 'monthlySubscriptionValidity']);
   Route::post('/coupon/apply', [UserCouponController::class, 'apply'])->name('api.coupon.apply');
 
   Route::get('/user-chats/{user_id}', [GeminiChatController::class, 'getUserChats']);

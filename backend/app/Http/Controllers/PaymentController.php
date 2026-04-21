@@ -197,6 +197,14 @@ class PaymentController extends Controller
                     'notes' => $notes,
                 ]);
                 $subscriptionArr = $subscription->toArray();
+                $monthlySubscription = DB::transaction(function () use ($context, $notes, $subscriptionArr) {
+                    return $this->syncRecurringMonthlySubscriptionPending(
+                        context: $context,
+                        notes: $notes,
+                        gatewaySubscription: $subscriptionArr,
+                        throwOnFailure: true
+                    );
+                }, 3);
 
                 return response()->json([
                     'success' => true,
@@ -208,6 +216,7 @@ class PaymentController extends Controller
                     'plan_id' => $subscriptionArr['plan_id'] ?? $planId,
                     'total_count' => (int) ($subscriptionArr['total_count'] ?? $totalCount),
                     'order_type' => $transactionType,
+                    'monthly_subscription' => $this->serializeMonthlySubscription($monthlySubscription),
                 ]);
             }
 
@@ -879,28 +888,12 @@ class PaymentController extends Controller
             ], 422);
         }
 
-        if (! Schema::hasTable('user_monthly_subscriptions')) {
-            return response()->json([
-                'success' => true,
-                'user_id' => $userId,
-                'has_active_subscription' => false,
-                'days_left' => 0,
-                'subscription' => null,
-            ]);
-        }
+        return response()->json($this->buildMonthlySubscriptionStatusPayload($userId));
+    }
 
-        $subscription = UserMonthlySubscription::query()
-            ->where('user_id', $userId)
-            ->first();
-        $activeSubscription = $this->findActiveMonthlySubscription($userId);
-
-        return response()->json([
-            'success' => true,
-            'user_id' => $userId,
-            'has_active_subscription' => $activeSubscription !== null,
-            'days_left' => $this->monthlySubscriptionDaysLeft($subscription),
-            'subscription' => $this->serializeMonthlySubscription($subscription),
-        ]);
+    public function monthlySubscriptionValidity(Request $request)
+    {
+        return $this->monthlySubscriptionStatus($request);
     }
 
     protected function buildCouponVerifyBypassPayload(Request $request, string $orderId): ?array
@@ -2612,13 +2605,192 @@ class PaymentController extends Controller
             ->first();
     }
 
-    protected function monthlySubscriptionDaysLeft(?UserMonthlySubscription $subscription): int
+    protected function buildMonthlySubscriptionStatusPayload(int $userId): array
     {
-        if (! $subscription) {
-            return 0;
+        $tableSnapshot = $this->buildMonthlySubscriptionTableSnapshot($userId);
+        $transactionSnapshot = $this->buildMonthlySubscriptionTransactionSnapshot($userId);
+        $snapshot = $this->pickPreferredMonthlySubscriptionSnapshot($tableSnapshot, $transactionSnapshot);
+
+        return [
+            'success' => true,
+            'user_id' => $userId,
+            'has_valid_subscription' => (bool) ($snapshot['has_valid_subscription'] ?? false),
+            'has_active_subscription' => (bool) ($snapshot['has_valid_subscription'] ?? false),
+            'has_subscription_record' => $tableSnapshot !== null || $transactionSnapshot !== null,
+            'days_left' => (int) ($snapshot['days_left'] ?? 0),
+            'status' => $snapshot['status'] ?? 'none',
+            'source' => $snapshot['source'] ?? null,
+            'payment_mode' => $snapshot['payment_mode'] ?? null,
+            'subscription' => $snapshot['subscription'] ?? null,
+        ];
+    }
+
+    protected function buildMonthlySubscriptionTableSnapshot(int $userId): ?array
+    {
+        if (! Schema::hasTable('user_monthly_subscriptions')) {
+            return null;
         }
 
-        $expiresAt = $subscription->expires_at;
+        $subscription = UserMonthlySubscription::query()
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $subscription) {
+            return null;
+        }
+
+        $expiresAt = $this->resolveMonthlySubscriptionExpiresAt($subscription);
+        $daysLeft = $this->monthlySubscriptionDaysLeft($subscription);
+        $rawStatus = strtolower(trim((string) ($subscription->status ?? '')));
+        $status = $rawStatus !== '' ? $rawStatus : 'pending';
+        $hasValidSubscription = $status === 'active' && $expiresAt && $expiresAt->greaterThan(now());
+
+        if (! $hasValidSubscription && $expiresAt && $expiresAt->lessThanOrEqualTo(now()) && in_array($status, ['active', 'pending'], true)) {
+            $status = 'expired';
+        }
+
+        $paymentMode = $this->resolveMonthlySubscriptionPaymentMode(
+            is_array($subscription->metadata) ? $subscription->metadata : [],
+            $subscription->order_reference,
+            $subscription->payment_reference
+        );
+
+        $serialized = $this->serializeMonthlySubscription($subscription) ?? [];
+        $serialized['source'] = 'user_monthly_subscriptions';
+        $serialized['payment_mode'] = $paymentMode;
+
+        return [
+            'source' => 'user_monthly_subscriptions',
+            'status' => $status,
+            'payment_mode' => $paymentMode,
+            'days_left' => $daysLeft,
+            'has_valid_subscription' => $hasValidSubscription,
+            'subscription' => $serialized,
+            'sort_valid_until' => $expiresAt ? $expiresAt->getTimestamp() : 0,
+            'sort_updated_at' => optional($subscription->updated_at)->getTimestamp() ?? optional($subscription->created_at)->getTimestamp() ?? 0,
+        ];
+    }
+
+    protected function buildMonthlySubscriptionTransactionSnapshot(int $userId): ?array
+    {
+        if (! Schema::hasTable('transactions')) {
+            return null;
+        }
+
+        $transaction = Transaction::query()
+            ->where('user_id', $userId)
+            ->where('type', 'monthly_subscription')
+            ->completed()
+            ->latest('id')
+            ->first();
+
+        if (! $transaction) {
+            $transaction = Transaction::query()
+                ->where('user_id', $userId)
+                ->where('type', 'monthly_subscription')
+                ->latest('id')
+                ->first();
+        }
+
+        if (! $transaction) {
+            return null;
+        }
+
+        $expiresAt = $this->resolveMonthlySubscriptionTransactionExpiresAt($transaction);
+        $startsAt = $this->resolveMonthlySubscriptionTransactionStartsAt($transaction);
+        $transactionStatus = strtolower(trim((string) ($transaction->status ?? '')));
+        $isSuccessful = $this->isSuccessfulPaymentStatus($transactionStatus);
+        $hasValidSubscription = $isSuccessful && $expiresAt && $expiresAt->greaterThan(now());
+        $status = $hasValidSubscription ? 'active' : ($transactionStatus !== '' ? $transactionStatus : 'pending');
+
+        if (! $hasValidSubscription && $isSuccessful && $expiresAt && $expiresAt->lessThanOrEqualTo(now())) {
+            $status = 'expired';
+        }
+
+        $paymentMode = $this->resolveMonthlySubscriptionPaymentMode(
+            is_array($transaction->metadata) ? $transaction->metadata : [],
+            data_get($transaction->metadata, 'subscription_id')
+                ?? data_get($transaction->metadata, 'order_id')
+                ?? $transaction->reference,
+            $transaction->reference
+        );
+
+        $daysLeft = 0;
+        if ($expiresAt && $expiresAt->greaterThan(now())) {
+            $daysLeft = (int) ceil(now()->diffInSeconds($expiresAt, false) / 86400);
+        }
+
+        return [
+            'source' => 'transactions',
+            'status' => $status,
+            'payment_mode' => $paymentMode,
+            'days_left' => $daysLeft,
+            'has_valid_subscription' => $hasValidSubscription,
+            'subscription' => [
+                'id' => null,
+                'user_id' => $transaction->user_id,
+                'transaction_id' => $transaction->id,
+                'order_reference' => data_get($transaction->metadata, 'subscription_id')
+                    ?? data_get($transaction->metadata, 'order_id')
+                    ?? $transaction->reference,
+                'payment_reference' => $transaction->reference,
+                'status' => $status,
+                'amount_paise' => (int) ($transaction->amount_paise ?? 0),
+                'days_left' => $daysLeft,
+                'starts_at' => $startsAt?->toIso8601String(),
+                'expires_at' => $expiresAt?->toIso8601String(),
+                'activated_at' => optional($transaction->created_at)->toIso8601String(),
+                'source' => 'transactions',
+                'payment_mode' => $paymentMode,
+            ],
+            'sort_valid_until' => $expiresAt ? $expiresAt->getTimestamp() : 0,
+            'sort_updated_at' => optional($transaction->updated_at)->getTimestamp() ?? optional($transaction->created_at)->getTimestamp() ?? 0,
+        ];
+    }
+
+    protected function pickPreferredMonthlySubscriptionSnapshot(?array $tableSnapshot, ?array $transactionSnapshot): ?array
+    {
+        $snapshots = array_values(array_filter([$tableSnapshot, $transactionSnapshot]));
+
+        if (empty($snapshots)) {
+            return null;
+        }
+
+        usort($snapshots, function (array $left, array $right): int {
+            $leftValid = $left['has_valid_subscription'] ?? false;
+            $rightValid = $right['has_valid_subscription'] ?? false;
+            if ($leftValid !== $rightValid) {
+                return $rightValid <=> $leftValid;
+            }
+
+            $leftValidUntil = (int) ($left['sort_valid_until'] ?? 0);
+            $rightValidUntil = (int) ($right['sort_valid_until'] ?? 0);
+            if ($leftValidUntil !== $rightValidUntil) {
+                return $rightValidUntil <=> $leftValidUntil;
+            }
+
+            $leftUpdatedAt = (int) ($left['sort_updated_at'] ?? 0);
+            $rightUpdatedAt = (int) ($right['sort_updated_at'] ?? 0);
+            if ($leftUpdatedAt !== $rightUpdatedAt) {
+                return $rightUpdatedAt <=> $leftUpdatedAt;
+            }
+
+            $leftPriority = ($left['source'] ?? null) === 'user_monthly_subscriptions' ? 1 : 0;
+            $rightPriority = ($right['source'] ?? null) === 'user_monthly_subscriptions' ? 1 : 0;
+
+            return $rightPriority <=> $leftPriority;
+        });
+
+        return $snapshots[0];
+    }
+
+    protected function resolveMonthlySubscriptionExpiresAt(?UserMonthlySubscription $subscription): ?\Illuminate\Support\Carbon
+    {
+        if (! $subscription) {
+            return null;
+        }
+
+        $expiresAt = $subscription->expires_at ? $subscription->expires_at->copy() : null;
 
         if (! $expiresAt && strtolower(trim((string) ($subscription->status ?? ''))) === 'pending') {
             $pendingCreatedAt = data_get($subscription->metadata, 'pending_order.created_at');
@@ -2633,6 +2805,91 @@ class PaymentController extends Controller
 
             $expiresAt = $pendingStart->copy()->addMonthNoOverflow();
         }
+
+        return $expiresAt;
+    }
+
+    protected function resolveMonthlySubscriptionTransactionStartsAt(?Transaction $transaction): ?\Illuminate\Support\Carbon
+    {
+        if (! $transaction) {
+            return null;
+        }
+
+        $candidate = data_get($transaction->metadata, 'current_start')
+            ?? data_get($transaction->metadata, 'start_at')
+            ?? optional($transaction->created_at)->toIso8601String();
+
+        if ($candidate === null || $candidate === '') {
+            return null;
+        }
+
+        try {
+            if (is_numeric($candidate)) {
+                return \Illuminate\Support\Carbon::createFromTimestamp((int) $candidate);
+            }
+
+            return \Illuminate\Support\Carbon::parse((string) $candidate);
+        } catch (\Throwable $e) {
+            return $transaction->created_at ? $transaction->created_at->copy() : null;
+        }
+    }
+
+    protected function resolveMonthlySubscriptionTransactionExpiresAt(?Transaction $transaction): ?\Illuminate\Support\Carbon
+    {
+        if (! $transaction) {
+            return null;
+        }
+
+        $candidate = data_get($transaction->metadata, 'current_end')
+            ?? data_get($transaction->metadata, 'end_at')
+            ?? data_get($transaction->metadata, 'expires_at');
+
+        if ($candidate !== null && $candidate !== '') {
+            try {
+                if (is_numeric($candidate)) {
+                    return \Illuminate\Support\Carbon::createFromTimestamp((int) $candidate);
+                }
+
+                return \Illuminate\Support\Carbon::parse((string) $candidate);
+            } catch (\Throwable $e) {
+                // Fall back to created-at based window below.
+            }
+        }
+
+        $startsAt = $this->resolveMonthlySubscriptionTransactionStartsAt($transaction);
+        return $startsAt?->copy()->addMonthNoOverflow();
+    }
+
+    protected function resolveMonthlySubscriptionPaymentMode(array $metadata = [], ?string $orderReference = null, ?string $paymentReference = null): ?string
+    {
+        $subscriptionSelected = $this->toBoolInt($metadata['subscription_selected'] ?? null) === 1;
+        $subscriptionId = trim((string) ($metadata['subscription_id'] ?? ''));
+        $resolvedOrderReference = trim((string) ($orderReference ?? ''));
+        $resolvedPaymentReference = trim((string) ($paymentReference ?? ''));
+
+        if (
+            $subscriptionSelected
+            || $subscriptionId !== ''
+            || str_starts_with($resolvedOrderReference, 'sub_')
+            || str_starts_with($resolvedPaymentReference, 'sub_')
+        ) {
+            return 'recurring';
+        }
+
+        if ($resolvedOrderReference !== '' || $resolvedPaymentReference !== '') {
+            return 'one_time';
+        }
+
+        return null;
+    }
+
+    protected function monthlySubscriptionDaysLeft(?UserMonthlySubscription $subscription): int
+    {
+        if (! $subscription) {
+            return 0;
+        }
+
+        $expiresAt = $this->resolveMonthlySubscriptionExpiresAt($subscription);
 
         if (! $expiresAt) {
             return 0;
@@ -2687,6 +2944,83 @@ class PaymentController extends Controller
             $subscription->transaction_id = $transaction?->id ?? $subscription->transaction_id;
             $subscription->order_reference = (string) ($order['id'] ?? $subscription->order_reference ?? '');
             $subscription->amount_paise = (int) ($order['amount'] ?? 0);
+            $subscription->metadata = $metadata;
+            $subscription->save();
+
+            return $subscription->fresh();
+        } catch (\Throwable $e) {
+            report($e);
+            if ($throwOnFailure) {
+                throw $e;
+            }
+
+            return null;
+        }
+    }
+
+    protected function syncRecurringMonthlySubscriptionPending(
+        array $context,
+        array $notes,
+        array $gatewaySubscription,
+        bool $throwOnFailure = false
+    ): ?UserMonthlySubscription {
+        if (! Schema::hasTable('user_monthly_subscriptions')) {
+            return null;
+        }
+
+        $userId = $this->toNullableInt($context['user_id'] ?? null);
+        if (! $userId) {
+            if ($throwOnFailure) {
+                throw new \RuntimeException('Recurring subscriptions require a user_id.');
+            }
+
+            return null;
+        }
+
+        try {
+            $subscription = UserMonthlySubscription::query()->firstOrNew(['user_id' => $userId]);
+            $subscriptionId = trim((string) ($gatewaySubscription['id'] ?? ''));
+            $planId = trim((string) ($gatewaySubscription['plan_id'] ?? ($notes['plan_id'] ?? '')));
+            $totalCount = isset($gatewaySubscription['total_count'])
+                ? (int) $gatewaySubscription['total_count']
+                : $this->toNullableInt($notes['total_count'] ?? null);
+            $gatewayStatus = strtolower(trim((string) ($gatewaySubscription['status'] ?? 'created')));
+            $currentStatus = strtolower(trim((string) ($subscription->status ?? '')));
+
+            $metadata = is_array($subscription->metadata) ? $subscription->metadata : [];
+            $metadata['order_type'] = 'monthly_subscription';
+            $metadata['source_order_type'] = $this->resolveTransactionType($notes);
+            $metadata['subscription_selected'] = 1;
+            if ($planId !== '') {
+                $metadata['plan_id'] = $planId;
+            }
+            $metadata['pending_order'] = array_filter([
+                'order_id' => $subscriptionId !== '' ? $subscriptionId : null,
+                'subscription_id' => $subscriptionId !== '' ? $subscriptionId : null,
+                'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : null,
+                'created_at' => now()->toIso8601String(),
+                'total_count' => $totalCount ?: null,
+            ], static fn ($value) => $value !== null && $value !== '');
+            $metadata['recurring_subscription'] = array_filter([
+                'subscription_id' => $subscriptionId !== '' ? $subscriptionId : null,
+                'plan_id' => $planId !== '' ? $planId : null,
+                'status' => $gatewayStatus !== '' ? $gatewayStatus : null,
+                'quantity' => isset($gatewaySubscription['quantity']) ? (int) $gatewaySubscription['quantity'] : null,
+                'total_count' => $totalCount ?: null,
+                'created_at' => now()->toIso8601String(),
+            ], static fn ($value) => $value !== null && $value !== '');
+
+            if (! $subscription->exists || ! in_array($currentStatus, ['active', 'charged'], true)) {
+                $subscription->status = 'pending';
+            }
+
+            $subscription->user_id = $userId;
+            if ($subscriptionId !== '') {
+                $subscription->order_reference = $subscriptionId;
+            }
+            if ($planId !== '' && (int) ($subscription->amount_paise ?? 0) <= 0) {
+                $subscription->amount_paise = (int) ($subscription->amount_paise ?? 0);
+            }
             $subscription->metadata = $metadata;
             $subscription->save();
 
@@ -2779,6 +3113,8 @@ class PaymentController extends Controller
             return null;
         }
 
+        $resolvedExpiresAt = $this->resolveMonthlySubscriptionExpiresAt($subscription);
+
         return [
             'id' => $subscription->id,
             'user_id' => $subscription->user_id,
@@ -2789,7 +3125,7 @@ class PaymentController extends Controller
             'amount_paise' => (int) ($subscription->amount_paise ?? 0),
             'days_left' => $this->monthlySubscriptionDaysLeft($subscription),
             'starts_at' => optional($subscription->starts_at)->toIso8601String(),
-            'expires_at' => optional($subscription->expires_at)->toIso8601String(),
+            'expires_at' => $resolvedExpiresAt?->toIso8601String(),
             'activated_at' => optional($subscription->activated_at)->toIso8601String(),
         ];
     }
