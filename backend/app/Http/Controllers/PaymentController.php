@@ -157,6 +157,16 @@ class PaymentController extends Controller
         }
 
         try {
+            $continuetySubscriptionResponse = $this->applyContinuetySubscriptionAutoCapture(
+                request: $request,
+                notes: $notes,
+                context: $context,
+                callSession: $callSession
+            );
+            if ($continuetySubscriptionResponse !== null) {
+                return response()->json($continuetySubscriptionResponse);
+            }
+
             $api = new Api($this->key, $this->secret);
 
             if ($isRepeatedSubscriptionTransaction) {
@@ -523,6 +533,130 @@ class PaymentController extends Controller
                 'patient_id' => $couponCallSession->patient_id,
                 'status' => $couponCallSession->status,
                 'payment_status' => $couponCallSession->payment_status,
+            ] : null,
+        ];
+    }
+
+    protected function applyContinuetySubscriptionAutoCapture(
+        Request $request,
+        array $notes,
+        array $context,
+        ?CallSession $callSession
+    ): ?array {
+        $transactionType = $this->resolveTransactionType($notes);
+        if (! $this->isContinuetySubscriptionTransactionType($transactionType)) {
+            return null;
+        }
+
+        $capturedNotes = array_merge($notes, [
+            'auto_captured' => '1',
+            'auto_capture_reason' => 'continuety_subscription',
+        ]);
+
+        $localOrder = [
+            'id' => 'order_cont_' . Str::lower(Str::random(20)),
+            'amount' => 0,
+            'currency' => 'INR',
+            'receipt' => 'local_' . Str::lower(Str::random(12)),
+            'notes' => $capturedNotes,
+        ];
+
+        $result = DB::transaction(function () use ($request, $localOrder, $capturedNotes, $context, $callSession) {
+            $transaction = $this->recordPendingTransaction(
+                request: $request,
+                order: $localOrder,
+                notes: $capturedNotes,
+                context: $context,
+                throwOnFailure: true
+            );
+
+            $metadata = is_array($transaction?->metadata) ? $transaction->metadata : [];
+            $metadata['notes'] = $capturedNotes;
+            $metadata['is_auto_captured'] = true;
+            $metadata['auto_capture_reason'] = 'continuety_subscription';
+            $metadata['captured_at'] = now()->toIso8601String();
+
+            $transaction->amount_paise = 0;
+            $transaction->status = 'captured';
+            $transaction->payment_method = 'continuety_subscription';
+            $transaction->metadata = $metadata;
+
+            foreach ([
+                'actual_amount_paid_by_consumer_paise',
+                'payment_to_snoutiq_paise',
+                'payment_to_doctor_paise',
+            ] as $column) {
+                if (Schema::hasColumn('transactions', $column)) {
+                    $transaction->{$column} = 0;
+                }
+            }
+
+            $transaction->save();
+
+            if ($callSession) {
+                try {
+                    $callSession->payment_status = 'paid';
+                    $callSession->save();
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+
+            return [
+                'transaction' => $transaction,
+                'video_appointment' => $this->recordVideoApointmentOrder(
+                    request: $request,
+                    order: $localOrder,
+                    context: $context,
+                    callSession: $callSession,
+                    notes: $capturedNotes,
+                    throwOnFailure: true
+                ),
+                'call_session' => $callSession,
+                'order' => $localOrder,
+            ];
+        }, 3);
+
+        /** @var \App\Models\Transaction $transaction */
+        $transaction = $result['transaction'];
+        $videoApointment = $result['video_appointment'] ?? null;
+        $capturedCallSession = $result['call_session'] ?? null;
+        $capturedOrder = $result['order'];
+
+        return [
+            'success' => true,
+            'payment_required' => false,
+            'auto_captured' => true,
+            'subscription_selected' => false,
+            'key' => null,
+            'order' => $capturedOrder,
+            'order_id' => $capturedOrder['id'],
+            'doctor_push' => [
+                'sent' => false,
+                'reason' => 'payment_not_required',
+            ],
+            'whatsapp' => null,
+            'vet_whatsapp' => null,
+            'prescription_doc' => null,
+            'transaction' => [
+                'id' => $transaction->id,
+                'reference' => $transaction->reference,
+                'status' => $transaction->status,
+                'type' => $transaction->type,
+                'payment_method' => $transaction->payment_method,
+                'amount_paise' => (int) ($transaction->amount_paise ?? 0),
+            ],
+            'video_appointment' => $videoApointment ? [
+                'id' => $videoApointment->id,
+            ] : null,
+            'call_session' => $capturedCallSession ? [
+                'id' => $capturedCallSession->id,
+                'call_identifier' => $capturedCallSession->resolveIdentifier(),
+                'channel_name' => $capturedCallSession->channel_name,
+                'doctor_id' => $capturedCallSession->doctor_id,
+                'patient_id' => $capturedCallSession->patient_id,
+                'status' => $capturedCallSession->status,
+                'payment_status' => $capturedCallSession->payment_status,
             ] : null,
         ];
     }

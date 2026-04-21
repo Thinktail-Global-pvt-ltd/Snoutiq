@@ -133,6 +133,63 @@ class ContinuetySubscriptionCreateOrderFlowTest extends TestCase
         $this->assertFalse((bool) $videoApointment->is_completed);
     }
 
+    public function test_create_order_auto_captures_continuety_subscription_with_zero_amount(): void
+    {
+        $controller = $this->makeController();
+
+        $request = Request::create('/api/create-order', 'POST', [
+            'user_id' => 1387,
+            'doctor_id' => 116,
+            'clinic_id' => 115,
+            'pet_id' => 501,
+            'amount' => 999,
+            'order_type' => 'continuety_subscription',
+        ]);
+
+        $response = $controller->createOrder($request);
+
+        $this->assertSame(200, $response->getStatusCode());
+
+        $payload = $response->getData(true);
+        $orderId = (string) ($payload['order_id'] ?? '');
+
+        $this->assertTrue((bool) ($payload['success'] ?? false));
+        $this->assertTrue((bool) ($payload['auto_captured'] ?? false));
+        $this->assertFalse((bool) ($payload['payment_required'] ?? true));
+        $this->assertSame('continuety_subscription', data_get($payload, 'transaction.type'));
+        $this->assertSame('captured', data_get($payload, 'transaction.status'));
+        $this->assertSame('continuety_subscription', data_get($payload, 'transaction.payment_method'));
+        $this->assertSame(0, data_get($payload, 'transaction.amount_paise'));
+        $this->assertNotSame('', $orderId);
+
+        $transaction = Transaction::query()->latest('id')->first();
+        $callSession = CallSession::query()->latest('id')->first();
+        $videoApointment = VideoApointment::query()->latest('id')->first();
+
+        $this->assertInstanceOf(Transaction::class, $transaction);
+        $this->assertInstanceOf(CallSession::class, $callSession);
+        $this->assertInstanceOf(VideoApointment::class, $videoApointment);
+
+        $this->assertSame('continuety_subscription', $transaction->type);
+        $this->assertSame('captured', $transaction->status);
+        $this->assertSame('continuety_subscription', $transaction->payment_method);
+        $this->assertSame(0, (int) $transaction->amount_paise);
+        $this->assertSame($orderId, $transaction->reference);
+        $this->assertTrue((bool) data_get($transaction->metadata, 'is_auto_captured'));
+        $this->assertSame('continuety_subscription', data_get($transaction->metadata, 'auto_capture_reason'));
+
+        $this->assertSame('pending', $callSession->status);
+        $this->assertSame('paid', $callSession->payment_status);
+        $this->assertSame(data_get($payload, 'call_session.channel_name'), $callSession->channel_name);
+
+        $this->assertSame($orderId, $videoApointment->order_id);
+        $this->assertSame(501, (int) $videoApointment->pet_id);
+        $this->assertSame(1387, (int) $videoApointment->user_id);
+        $this->assertSame(116, (int) $videoApointment->doctor_id);
+        $this->assertSame(115, (int) $videoApointment->clinic_id);
+        $this->assertSame(data_get($payload, 'call_session.call_identifier'), $videoApointment->call_session);
+    }
+
     private function makeController(): PaymentController
     {
         return new class(
