@@ -16,6 +16,7 @@ class Chat extends Model
            'chat_room_token',  
         'question',
         'answer',
+        'response_tag',
         'pet_name',
         'pet_breed',
         'pet_age',

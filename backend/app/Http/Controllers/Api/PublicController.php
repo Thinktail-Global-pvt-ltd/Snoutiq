@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
+use App\Services\GooglePlacesLookupService;
 
 use Illuminate\Http\Request;
 use App\Models\User;
@@ -50,31 +51,39 @@ class PublicController extends Controller
 
     public function fetchNearbyPlaces(Request $request)
 {
-    $lat = $request->input('lat'); // e.g., 28.6139
-    $lng = $request->input('lng'); // e.g., 77.2090
-    $radius = 5000; // in meters
-    $apiKey = env('GOOGLE_API_KEY');
-// dd($apiKey);
-    // Fetch vets (official type)
-    $vetsResponse = Http::get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', [
-        'location' => "$lat,$lng",
-        'radius' => $radius,
-        'type' => 'veterinary_care',
-        'key' => $apiKey,
-    ]);
+    $service = app(GooglePlacesLookupService::class);
+    $placeType = trim((string) $request->input('place_type', ''));
+    $location = trim((string) $request->input('location', ''));
+    $location = $location !== '' ? $location : null;
+    $latitude = $request->filled('lat') ? (float) $request->input('lat') : ($request->filled('latitude') ? (float) $request->input('latitude') : null);
+    $longitude = $request->filled('lng') ? (float) $request->input('lng') : ($request->filled('longitude') ? (float) $request->input('longitude') : null);
+    $limit = max(1, min((int) $request->input('limit', 5), 10));
 
-    // Fetch groomers (using keyword, as there's no official type)
-    $groomersResponse = Http::get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', [
-        'location' => "$lat,$lng",
-        'radius' => $radius,
-        'keyword' => 'pet grooming',
-        'key' => $apiKey,
-    ]);
-// dd($vetsResponse->json(), $groomersResponse->json());
+    if ($placeType !== '') {
+        $result = $service->search($placeType, $location, $latitude, $longitude, $limit);
+        $status = ($result['success'] ?? false)
+            ? 200
+            : (($result['requires_location'] ?? false) ? 422 : 500);
+
+        return response()->json($result, $status);
+    }
+
+    if (($latitude === null || $longitude === null) && $location === null) {
+        return response()->json([
+            'success' => false,
+            'message' => 'location or lat/lng is required',
+            'supported_types' => $service->supportedTypes(),
+        ], 422);
+    }
+
+    $clinicResult = $service->search('clinic', $location, $latitude, $longitude, $limit);
+    $groomerResult = $service->search('groomer', $location, $latitude, $longitude, $limit);
 
     return response()->json([
-        'vets' => $vetsResponse->successful() ? $vetsResponse->json()['results'] : [],
-        'groomers' => $groomersResponse->successful() ? $groomersResponse->json()['results'] : [],
+        'vets' => $clinicResult['places'] ?? [],
+        'groomers' => $groomerResult['places'] ?? [],
+        'supported_types' => $service->supportedTypes(),
+        'location' => $clinicResult['location'] ?? $groomerResult['location'] ?? $location,
     ]);
 }
 }

@@ -54,6 +54,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Chat;
 use App\Models\ChatRoom;
+use App\Services\GooglePlacesLookupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -434,28 +435,51 @@ class SnoutiqSymptomController extends Controller
             'neutered'       => 'nullable|string|max:10',
             'pet_location'   => 'nullable|string|max:100',
             'location'       => 'nullable|string|max:100',
+            'place_type'     => 'nullable|string|max:30',
+            'lat'            => 'nullable|numeric|between:-90,90',
+            'latitude'       => 'nullable|numeric|between:-90,90',
+            'long'           => 'nullable|numeric|between:-180,180',
+            'lng'            => 'nullable|numeric|between:-180,180',
+            'lon'            => 'nullable|numeric|between:-180,180',
+            'longitude'      => 'nullable|numeric|between:-180,180',
             'image_base64'   => 'nullable|string',
             'image_mime'     => 'nullable|string|max:20',
             'image'          => 'nullable|file|image|max:5120',
         ]);
+
+        $payload = $this->normalizeSymptomEntryPayload($payload);
 
         $sessionId = $payload['session_id']
             ?? $payload['chat_room_token']
             ?? $payload['context_token']
             ?? null;
         $promptText = (string) ($payload['question'] ?? $payload['message'] ?? '');
+        $resolvedSessionId = $sessionId ?: $this->resolveSessionId(array_merge($payload, [
+            'message' => $promptText,
+        ]));
+
+        $nearbyResponse = $this->maybeHandleNearbyPlaceLookupForChatSend(
+            $payload,
+            $resolvedSessionId,
+            $promptText
+        );
+        if (is_array($nearbyResponse)) {
+            return response()->json($nearbyResponse);
+        }
 
         $internal = Request::create('/api/symptom-check', 'POST', [
             'user_id' => isset($payload['user_id']) ? (int) $payload['user_id'] : null,
             'pet_id' => isset($payload['pet_id']) ? (int) $payload['pet_id'] : 0,
             'message' => $promptText,
-            'session_id' => $sessionId,
+            'session_id' => $resolvedSessionId,
             'pet_name' => $payload['pet_name'] ?? null,
             'species' => $payload['species'] ?? ($payload['pet_type'] ?? null),
             'breed' => $payload['breed'] ?? ($payload['pet_breed'] ?? null),
             'sex' => $payload['sex'] ?? null,
             'neutered' => $payload['neutered'] ?? null,
             'location' => $payload['location'] ?? ($payload['pet_location'] ?? null),
+            'lat' => $payload['latitude'] ?? null,
+            'long' => $payload['longitude'] ?? null,
             'image_base64' => $payload['image_base64'] ?? null,
             'image_mime' => $payload['image_mime'] ?? null,
         ]);
@@ -471,7 +495,7 @@ class SnoutiqSymptomController extends Controller
 
         $routing = (string) ($rawBody['routing'] ?? 'video_consult');
         $score = (int) ($rawBody['score'] ?? 0);
-        $session = (string) ($rawBody['session_id'] ?? $sessionId ?? '');
+        $session = (string) ($rawBody['session_id'] ?? $resolvedSessionId ?? '');
 
         $assistantMessage = (string) ($rawBody['response']['message'] ?? '');
 
@@ -493,6 +517,9 @@ class SnoutiqSymptomController extends Controller
         $compatBody['evidence_tags'] = is_array($rawBody['triage_detail']['red_flags_found'] ?? null)
             ? $rawBody['triage_detail']['red_flags_found']
             : [];
+        $compatBody['structured_data'] = $rawBody['structured_data'] ?? null;
+        $compatBody['tool_used'] = $rawBody['tool_used'] ?? null;
+        $compatBody['timestamp'] = now()->toIso8601String();
         $compatBody['symptom_analysis'] = [
             'routing' => $routing,
             'severity' => $rawBody['severity'] ?? null,
@@ -509,6 +536,247 @@ class SnoutiqSymptomController extends Controller
         );
 
         return response()->json($compatBody, $response->getStatusCode());
+    }
+
+    private const NEARBY_INTENT_KEYWORDS = [
+        'near me', 'nearby', 'nearest', 'closest', 'around me', 'close by',
+        'find', 'show', 'search', 'where can i', 'where is', 'maps', 'map',
+    ];
+
+    private const NEARBY_PLACE_TYPE_KEYWORDS = [
+        'hospital' => ['emergency hospital', 'animal hospital', 'vet hospital', 'hospital'],
+        'groomer' => ['groomer', 'grooming', 'pet spa'],
+        'boarding' => ['boarding', 'kennel', 'pet hostel'],
+        'trainer' => ['trainer', 'dog trainer', 'obedience trainer'],
+        'petshop' => ['pet shop', 'pet store', 'pet supplies', 'petshop'],
+        'dogpark' => ['dog park', 'pet park'],
+        'clinic' => ['clinic', 'vet', 'veterinary', 'veterinarian', 'doctor'],
+    ];
+
+    private function maybeHandleNearbyPlaceLookupForChatSend(array $payload, string $sessionId, string $promptText): ?array
+    {
+        $placeType = $this->detectNearbyPlaceType(
+            $promptText,
+            isset($payload['place_type']) ? (string) $payload['place_type'] : null
+        );
+
+        if ($placeType === null) {
+            return null;
+        }
+
+        $payload['session_id'] = $sessionId;
+        $resolvedEntities = $this->persistSymptomEntryUserAndPet($payload);
+        if (!empty($resolvedEntities['user_id'])) {
+            $payload['user_id'] = $resolvedEntities['user_id'];
+        }
+        if (!empty($resolvedEntities['pet_id'])) {
+            $payload['pet_id'] = $resolvedEntities['pet_id'];
+        }
+
+        $state = $this->loadConversationState($sessionId) ?? $this->defaultState();
+        $pet = $this->loadPetProfile($payload);
+        if (isset($pet['error'])) {
+            $pet = $this->defaultPet($payload);
+        }
+
+        $state['pet'] = $pet;
+        $state['user_id'] = $payload['user_id'] ?? ($state['user_id'] ?? null);
+        $state['pet_id'] = $payload['pet_id'] ?? ($state['pet_id'] ?? null);
+
+        $location = $this->resolveNearbySearchLocation($payload, $state, $promptText);
+        $latitude = $payload['latitude'] ?? null;
+        $longitude = $payload['longitude'] ?? null;
+
+        /** @var GooglePlacesLookupService $places */
+        $places = app(GooglePlacesLookupService::class);
+        $toolResult = $places->search($placeType, $location, $latitude, $longitude);
+        $assistantMessage = $this->buildNearbyAssistantMessage($toolResult, $placeType, $location);
+
+        $responsePayload = [
+            'message' => $assistantMessage,
+            'what_we_think_is_happening' => $assistantMessage,
+            'diagnosis_summary' => 'Nearby place lookup requested by the pet parent.',
+            'do_now' => $this->buildNearbyDoNow($toolResult, $placeType),
+            'time_sensitivity' => ($toolResult['success'] ?? false)
+                ? 'Call ahead before you leave'
+                : 'Share a locality or enable location to continue',
+            'safe_to_do_while_waiting' => ($toolResult['success'] ?? false)
+                ? ['Open Maps for directions', 'Call ahead to confirm availability', 'Check opening status before leaving']
+                : ['Send your city, sector, or locality', 'Enable current location if available'],
+            'what_to_watch' => [],
+            'be_ready_to_tell_vet' => null,
+            'follow_up_question' => null,
+        ];
+
+        $turn = count($state['history'] ?? []) + 1;
+        $this->appendHistory($state, $promptText, $assistantMessage, 'nearby_places', 0);
+        Cache::put("snoutiq_symptom:{$sessionId}", $state, now()->addMinutes(self::SESSION_TTL_MINUTES));
+        $this->saveToDb($payload, $sessionId, $promptText, $assistantMessage, 'nearby_places', 'informational');
+        $this->saveWebChatCampaign(
+            $payload,
+            $sessionId,
+            $turn,
+            $promptText,
+            $responsePayload,
+            $state,
+            'nearby_places',
+            'informational',
+            0
+        );
+
+        return [
+            'success' => true,
+            'session_id' => $sessionId,
+            'context_token' => $sessionId,
+            'chat_room_token' => $sessionId,
+            'user_id' => $state['user_id'] ?? null,
+            'pet_id' => $state['pet_id'] ?? null,
+            'routing' => 'nearby_places',
+            'severity' => 'informational',
+            'response' => $responsePayload,
+            'message' => $assistantMessage,
+            'chat' => [
+                'question' => $promptText,
+                'answer' => $assistantMessage,
+            ],
+            'decision' => 'nearby_places',
+            'emergency_status' => null,
+            'status_text' => 'Nearby place lookup',
+            'evidence_tags' => [],
+            'buttons' => [
+                'primary' => null,
+                'secondary' => null,
+            ],
+            'structured_data' => $toolResult,
+            'tool_used' => 'find_nearby_places',
+            'supported_place_types' => $places->supportedTypes(),
+            'timestamp' => now()->toIso8601String(),
+        ];
+    }
+
+    private function detectNearbyPlaceType(string $message, ?string $explicitType = null): ?string
+    {
+        /** @var GooglePlacesLookupService $places */
+        $places = app(GooglePlacesLookupService::class);
+
+        if ($explicitType !== null && trim($explicitType) !== '') {
+            $normalizedType = $places->normalizeType($explicitType);
+            if ($normalizedType !== null) {
+                return $normalizedType;
+            }
+        }
+
+        $text = mb_strtolower($this->cleanAssistantText($message));
+        if ($text === '') {
+            return null;
+        }
+
+        $hasIntent = false;
+        foreach (self::NEARBY_INTENT_KEYWORDS as $keyword) {
+            if (str_contains($text, $keyword)) {
+                $hasIntent = true;
+                break;
+            }
+        }
+        if (!$hasIntent && preg_match('/\b(?:in|near|around)\s+[a-z]/u', $text)) {
+            $hasIntent = true;
+        }
+        if (!$hasIntent) {
+            return null;
+        }
+
+        foreach (self::NEARBY_PLACE_TYPE_KEYWORDS as $type => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($text, $keyword)) {
+                    return $type;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveNearbySearchLocation(array $payload, array $state, string $promptText): ?string
+    {
+        $candidates = [
+            $payload['location'] ?? null,
+            $payload['pet_location'] ?? null,
+            $this->extractLocationFromNearbyPrompt($promptText),
+            $state['pet']['location'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $clean = trim((string) ($candidate ?? ''));
+            if ($clean !== '') {
+                return $clean;
+            }
+        }
+
+        return null;
+    }
+
+    private function extractLocationFromNearbyPrompt(string $promptText): ?string
+    {
+        $text = trim($this->cleanAssistantText($promptText));
+        if ($text === '') {
+            return null;
+        }
+
+        if (preg_match('/\b(?:near me|nearby|around me)\b/i', $text)) {
+            return null;
+        }
+
+        if (preg_match('/\b(?:in|near|around)\s+([a-z0-9][a-z0-9,\- ]{1,80})$/iu', $text, $matches)) {
+            $location = trim((string) ($matches[1] ?? ''));
+            return $location !== '' ? rtrim($location, " .,!?:;") : null;
+        }
+
+        return null;
+    }
+
+    private function buildNearbyAssistantMessage(array $toolResult, string $placeType, ?string $location): string
+    {
+        $label = $this->friendlyNearbyPlaceLabel($placeType);
+        $locationLabel = trim((string) ($toolResult['location'] ?? $location ?? 'your area'));
+        $count = (int) ($toolResult['count'] ?? 0);
+
+        if (($toolResult['requires_location'] ?? false) === true) {
+            return sprintf('Share your area or enable location and I will find nearby %s for you.', strtolower($label));
+        }
+
+        if (($toolResult['success'] ?? false) !== true) {
+            return sprintf('I could not load nearby %s right now. Please try again in a moment.', strtolower($label));
+        }
+
+        if ($count <= 0) {
+            return sprintf('I could not find any nearby %s around %s. Try sending a broader city or a more specific locality.', strtolower($label), $locationLabel);
+        }
+
+        return sprintf('I found %d nearby %s options around %s. I have included Maps links, ratings, and open status where Google provides it.', $count, strtolower($label), $locationLabel);
+    }
+
+    private function buildNearbyDoNow(array $toolResult, string $placeType): string
+    {
+        $label = $this->friendlyNearbyPlaceLabel($placeType);
+
+        if (($toolResult['success'] ?? false) !== true) {
+            return sprintf('Send your city, locality, or current location and I will search for nearby %s.', strtolower($label));
+        }
+
+        if ((int) ($toolResult['count'] ?? 0) <= 0) {
+            return sprintf('Try a different locality or city name to widen the %s search.', strtolower($label));
+        }
+
+        return 'Open the best match in Maps and call ahead before you leave.';
+    }
+
+    private function friendlyNearbyPlaceLabel(string $placeType): string
+    {
+        return match ($placeType) {
+            'petshop' => 'Pet Shop',
+            'dogpark' => 'Dog Park',
+            default => ucwords(str_replace('_', ' ', $placeType)),
+        };
     }
 
     /**
