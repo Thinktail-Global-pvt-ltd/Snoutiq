@@ -139,4 +139,7 @@ return [
         'base_url' => env('CAT_API_BASE_URL', 'https://api.thecatapi.com/v1'),
         'key' => env('CAT_API_KEY', 'live_EcJoIUWAeJuDuodSIODIa2lBKst4Sg3gvWkq7Lcf2BKkW2ZyHDTcmVvylWZsXbuH'),
     ],
+    'google_maps' => [
+    'api_key' => env('GOOGLE_MAPS_API_KEY'),
+],
 ];
