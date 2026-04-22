@@ -451,6 +451,16 @@ const handleViewProfile = () => {
       "",
   ).trim();
   const petProfileImageUrl = resolvePetImageUrl(currentPet, currentUser?.pet, currentUser);
+  const hasProfileIdentity = Boolean(
+    ownerDisplayName || petDisplayName || petProfileImageUrl,
+  );
+  const canOpenProfileMenu = hasAuth && hasProfileIdentity;
+
+  useEffect(() => {
+    if (!canOpenProfileMenu && profileMenuOpen) {
+      setProfileMenuOpen(false);
+    }
+  }, [canOpenProfileMenu, profileMenuOpen]);
 
   const quickPrompts = [
     { label: "Nutrition", prompt: "What should I feed my dog?" },
@@ -658,15 +668,18 @@ const handleViewProfile = () => {
       </div>
     </div>
 
+    {canOpenProfileMenu ? (
     <div className="relative">
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
+          if (!canOpenProfileMenu) return;
           setProfileMenuOpen((prev) => !prev);
         }}
         className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-50"
       >
+        
         {petProfileImageUrl ? (
           <img
             src={petProfileImageUrl}
@@ -689,7 +702,7 @@ const handleViewProfile = () => {
         <ChevronDown size={16} className="text-slate-500" />
       </button>
 
-      {profileMenuOpen ? (
+      {profileMenuOpen && canOpenProfileMenu ? (
         <div
           className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
           onClick={(e) => e.stopPropagation()}
@@ -717,6 +730,7 @@ const handleViewProfile = () => {
               </div>
             </div>
           </div>
+          
           <button
             type="button"
             onClick={handleViewProfile}
@@ -737,6 +751,7 @@ const handleViewProfile = () => {
         </div>
       ) : null}
     </div>
+    ) : null}
   </div>
 </div>
 
