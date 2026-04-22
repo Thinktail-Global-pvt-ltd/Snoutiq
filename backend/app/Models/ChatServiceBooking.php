@@ -9,22 +9,38 @@ class ChatServiceBooking extends Model
 {
     use HasFactory;
 
+    protected $table = 'chat_service_bookings';
+
     protected $fillable = [
+        'booking_reference',
+        'session_id',
         'user_id',
         'pet_id',
-        'vet_registeration_id',
+        'consultation_type',
+        'booking_status',
+        'slot_id',
+        'scheduled_date',
+        'scheduled_time',
+        'scheduled_for',
+        'timezone',
         'doctor_id',
-        'chat_room_token',
-        'context_token',
-        'service_type',
-        'appointment_date',
-        'appointment_time',
+        'clinic_id',
+        'external_place_id',
+        'clinic_name',
+        'doctor_name',
+        'address',
+        'phone',
+        'maps_link',
+        'price',
+        'currency',
+        'source_tool',
+        'booking_payload',
         'notes',
-        'source_payload',
     ];
 
     protected $casts = [
-        'appointment_date' => 'date',
-        'source_payload' => 'array',
+        'booking_payload' => 'array',
+        'scheduled_for' => 'datetime',
+        'price' => 'float',
     ];
 }

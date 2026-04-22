@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import { updateAiUserData } from "./AiAuth";
@@ -8,32 +8,47 @@ const API_BASE_URL = "https://snoutiq.com/backend/api";
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(135deg, #e8f5e9 0%, #f3e5f5 100%)",
-    padding: "24px 16px",
+    background: "#f8fafc",
     boxSizing: "border-box",
   },
   wrap: {
     maxWidth: 760,
     margin: "0 auto",
+    padding: "16px",
   },
-  headerBar: {
+  headerShell: {
+    position: "sticky",
+    top: 0,
+    zIndex: 20,
+    background: "rgba(255,255,255,0.96)",
+    backdropFilter: "blur(10px)",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  headerInner: {
+    maxWidth: 760,
+    margin: "0 auto",
+    padding: "14px 16px",
     display: "flex",
     alignItems: "center",
     gap: 12,
-    marginBottom: 16,
   },
   backButton: {
-    border: "1px solid #d0d7de",
-    background: "#fff",
-    borderRadius: 12,
-    padding: "10px 14px",
+    width: 40,
+    height: 40,
+    border: "1px solid #e2e8f0",
+    background: "#ffffff",
+    borderRadius: 999,
     cursor: "pointer",
-    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 18,
+    color: "#334155",
   },
   heading: {
-    fontSize: 28,
-    fontWeight: 800,
-    color: "#1f2937",
+    fontSize: 18,
+    fontWeight: 600,
+    color: "#0f172a",
     margin: 0,
   },
   subheading: {
@@ -44,9 +59,10 @@ const styles = {
   },
   card: {
     background: "#fff",
-    borderRadius: 20,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+    borderRadius: 24,
+    boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
     padding: 24,
+    border: "1px solid #e2e8f0",
   },
   sectionTitle: {
     fontSize: 12,
@@ -740,10 +756,24 @@ export default function EditPetPage() {
   if (!selectedPet) {
     return (
       <div style={styles.page}>
+        <div style={styles.headerShell}>
+          <div style={styles.headerInner}>
+            <button
+              style={styles.backButton}
+              onClick={() => navigate(-1)}
+              aria-label="Go back"
+            >
+              ←
+            </button>
+            <h1 style={styles.heading}>Edit Pet</h1>
+          </div>
+        </div>
+
         <div style={styles.wrap}>
           <div style={styles.card}>
-            <h1 style={styles.heading}>Edit Pet</h1>
-            <p style={styles.subheading}>No pet data found to edit.</p>
+            <p style={{ margin: 0, fontSize: 14, color: "#475569" }}>
+              Pet details are unavailable.
+            </p>
             <div style={styles.footer}>
               <button style={styles.secondaryBtn} onClick={() => navigate(-1)}>
                 Go Back
@@ -757,19 +787,20 @@ export default function EditPetPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.wrap}>
-        <div style={styles.headerBar}>
-          <button style={styles.backButton} onClick={() => navigate(-1)}>
-            ← Back
+      <div style={styles.headerShell}>
+        <div style={styles.headerInner}>
+          <button
+            style={styles.backButton}
+            onClick={() => navigate(-1)}
+            aria-label="Go back"
+          >
+            ←
           </button>
-          <div>
-            <h1 style={styles.heading}>Edit Pet</h1>
-            <p style={styles.subheading}>
-              Update your pet details using the existing edit pet API.
-            </p>
-          </div>
+          <h1 style={styles.heading}>Edit Pet</h1>
         </div>
+      </div>
 
+      <div style={styles.wrap}>
         <div style={styles.card}>
         
           <p style={styles.sectionTitle}>Pet Photo</p>
@@ -963,3 +994,4 @@ export default function EditPetPage() {
     </div>
   );
 }
+
