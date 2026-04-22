@@ -54,6 +54,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Chat;
 use App\Models\ChatRoom;
+use App\Services\ChatBookingToolService;
 use App\Services\GooglePlacesLookupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -435,6 +436,25 @@ class SnoutiqSymptomController extends Controller
             'neutered'       => 'nullable|string|max:10',
             'pet_location'   => 'nullable|string|max:100',
             'location'       => 'nullable|string|max:100',
+            'tool_name'      => 'nullable|string|max:40',
+            'consultation_type' => 'nullable|string|max:30',
+            'doctor_id'      => 'nullable|integer',
+            'clinic_id'      => 'nullable|integer',
+            'place_id'       => 'nullable|string|max:191',
+            'place_name'     => 'nullable|string|max:255',
+            'place_address'  => 'nullable|string|max:500',
+            'maps_link'      => 'nullable|string|max:1000',
+            'phone'          => 'nullable|string|max:60',
+            'slot_id'        => 'nullable|string|max:191',
+            'slot_date'      => 'nullable|date_format:Y-m-d',
+            'slot_time'      => 'nullable|string|max:20',
+            'date'           => 'nullable|date_format:Y-m-d',
+            'time'           => 'nullable|string|max:20',
+            'days'           => 'nullable|integer|min:1|max:7',
+            'confirm_booking'=> 'nullable|boolean',
+            'notes'          => 'nullable|string|max:1000',
+            'currency'       => 'nullable|string|max:10',
+            'price'          => 'nullable|numeric|min:0',
             'place_type'     => 'nullable|string|max:30',
             'lat'            => 'nullable|numeric|between:-90,90',
             'latitude'       => 'nullable|numeric|between:-90,90',
@@ -457,6 +477,24 @@ class SnoutiqSymptomController extends Controller
         $resolvedSessionId = $sessionId ?: $this->resolveSessionId(array_merge($payload, [
             'message' => $promptText,
         ]));
+
+        $bookingResponse = $this->maybeHandleBookAppointmentForChatSend(
+            $payload,
+            $resolvedSessionId,
+            $promptText
+        );
+        if (is_array($bookingResponse)) {
+            return response()->json($bookingResponse);
+        }
+
+        $availableSlotsResponse = $this->maybeHandleAvailableSlotsForChatSend(
+            $payload,
+            $resolvedSessionId,
+            $promptText
+        );
+        if (is_array($availableSlotsResponse)) {
+            return response()->json($availableSlotsResponse);
+        }
 
         $nearbyResponse = $this->maybeHandleNearbyPlaceLookupForChatSend(
             $payload,
@@ -590,6 +628,15 @@ class SnoutiqSymptomController extends Controller
         /** @var GooglePlacesLookupService $places */
         $places = app(GooglePlacesLookupService::class);
         $toolResult = $places->search($placeType, $location, $latitude, $longitude);
+        if (($toolResult['success'] ?? false) === true && !empty($toolResult['places']) && is_array($toolResult['places'])) {
+            /** @var ChatBookingToolService $bookingTools */
+            $bookingTools = app(ChatBookingToolService::class);
+            $toolResult['places'] = $bookingTools->attachSuggestedSlotsToPlaces(
+                $toolResult['places'],
+                $placeType,
+                $payload['slot_date'] ?? $payload['date'] ?? null
+            );
+        }
         $assistantMessage = $this->buildNearbyAssistantMessage($toolResult, $placeType, $location);
 
         $responsePayload = [
@@ -652,6 +699,111 @@ class SnoutiqSymptomController extends Controller
             'supported_place_types' => $places->supportedTypes(),
             'timestamp' => now()->toIso8601String(),
         ];
+    }
+
+    private function maybeHandleAvailableSlotsForChatSend(array $payload, string $sessionId, string $promptText): ?array
+    {
+        /** @var ChatBookingToolService $bookingTools */
+        $bookingTools = app(ChatBookingToolService::class);
+        $toolName = strtolower(trim((string) ($payload['tool_name'] ?? '')));
+        $consultationType = $bookingTools->normalizeConsultationType($payload['consultation_type'] ?? null);
+        $lowerPrompt = mb_strtolower($this->cleanAssistantText($promptText));
+
+        $explicitTool = $toolName === 'get_available_slots';
+        $implicitTool = $consultationType !== null
+            && (
+                str_contains($lowerPrompt, 'slot')
+                || str_contains($lowerPrompt, 'availability')
+                || str_contains($lowerPrompt, 'available')
+                || str_contains($lowerPrompt, 'time')
+            );
+
+        if (!$explicitTool && !$implicitTool) {
+            return null;
+        }
+
+        $payload['session_id'] = $sessionId;
+        $resolvedEntities = $this->persistSymptomEntryUserAndPet($payload);
+        if (!empty($resolvedEntities['user_id'])) {
+            $payload['user_id'] = $resolvedEntities['user_id'];
+        }
+        if (!empty($resolvedEntities['pet_id'])) {
+            $payload['pet_id'] = $resolvedEntities['pet_id'];
+        }
+
+        $result = $bookingTools->getAvailableSlots($payload);
+        $assistantMessage = $this->buildAvailableSlotsAssistantMessage($result);
+
+        return $this->finalizeChatToolResponse(
+            payload: $payload,
+            sessionId: $sessionId,
+            promptText: $promptText,
+            routing: 'available_slots',
+            severity: 'informational',
+            toolUsed: 'get_available_slots',
+            structuredData: $result,
+            assistantMessage: $assistantMessage,
+            diagnosisSummary: 'Available booking slots requested by the pet parent.',
+            doNow: ($result['success'] ?? false) ? 'Choose one of the returned slots and then confirm the booking.' : 'Send the consultation type and, for clinic slots, the selected place_id.',
+            timeSensitivity: ($result['success'] ?? false) ? 'Slots can change quickly' : 'Try again after adding the missing booking details',
+            safeToDoWhileWaiting: ($result['success'] ?? false)
+                ? ['Review the returned slots', 'Pick the preferred date and time', 'Send slot_id back with booking confirmation']
+                : ['Share the missing booking details', 'Try a different consultation type if needed']
+        );
+    }
+
+    private function maybeHandleBookAppointmentForChatSend(array $payload, string $sessionId, string $promptText): ?array
+    {
+        /** @var ChatBookingToolService $bookingTools */
+        $bookingTools = app(ChatBookingToolService::class);
+        $toolName = strtolower(trim((string) ($payload['tool_name'] ?? '')));
+        $consultationType = $bookingTools->normalizeConsultationType($payload['consultation_type'] ?? null);
+        $lowerPrompt = mb_strtolower($this->cleanAssistantText($promptText));
+        $hasSlotSelection = !empty($payload['slot_id']) || (!empty($payload['slot_date']) && !empty($payload['slot_time']));
+
+        $explicitTool = $toolName === 'book_appointment';
+        $implicitTool = $consultationType !== null
+            && $hasSlotSelection
+            && (
+                !empty($payload['confirm_booking'])
+                || str_contains($lowerPrompt, 'book')
+                || str_contains($lowerPrompt, 'confirm')
+                || str_contains($lowerPrompt, 'schedule')
+                || str_contains($lowerPrompt, 'reserve')
+            );
+
+        if (!$explicitTool && !$implicitTool) {
+            return null;
+        }
+
+        $payload['session_id'] = $sessionId;
+        $resolvedEntities = $this->persistSymptomEntryUserAndPet($payload);
+        if (!empty($resolvedEntities['user_id'])) {
+            $payload['user_id'] = $resolvedEntities['user_id'];
+        }
+        if (!empty($resolvedEntities['pet_id'])) {
+            $payload['pet_id'] = $resolvedEntities['pet_id'];
+        }
+
+        $result = $bookingTools->bookAppointment($payload);
+        $assistantMessage = $this->buildBookingAssistantMessage($result);
+
+        return $this->finalizeChatToolResponse(
+            payload: $payload,
+            sessionId: $sessionId,
+            promptText: $promptText,
+            routing: 'booking_confirmation',
+            severity: ($result['success'] ?? false) ? 'informational' : 'moderate',
+            toolUsed: 'book_appointment',
+            structuredData: $result,
+            assistantMessage: $assistantMessage,
+            diagnosisSummary: 'Booking confirmation requested by the pet parent.',
+            doNow: ($result['success'] ?? false) ? 'Save the booking reference and share it with the pet parent if needed.' : 'Resend the booking request with consultation_type and selected slot details.',
+            timeSensitivity: ($result['success'] ?? false) ? 'Booking saved successfully' : 'Booking could not be created yet',
+            safeToDoWhileWaiting: ($result['success'] ?? false)
+                ? ['Save the booking reference', 'Open Maps if it is a clinic booking', 'Keep your phone reachable for follow-up']
+                : ['Choose a slot first', 'Include slot_id or slot_date + slot_time', 'Retry booking with the selected consultation type']
+        );
     }
 
     private function detectNearbyPlaceType(string $message, ?string $explicitType = null): ?string
@@ -777,6 +929,108 @@ class SnoutiqSymptomController extends Controller
             'dogpark' => 'Dog Park',
             default => ucwords(str_replace('_', ' ', $placeType)),
         };
+    }
+
+    private function finalizeChatToolResponse(
+        array $payload,
+        string $sessionId,
+        string $promptText,
+        string $routing,
+        string $severity,
+        string $toolUsed,
+        array $structuredData,
+        string $assistantMessage,
+        string $diagnosisSummary,
+        string $doNow,
+        string $timeSensitivity,
+        array $safeToDoWhileWaiting
+    ): array {
+        $state = $this->loadConversationState($sessionId) ?? $this->defaultState();
+        $pet = $this->loadPetProfile($payload);
+        if (isset($pet['error'])) {
+            $pet = $this->defaultPet($payload);
+        }
+
+        $state['pet'] = $pet;
+        $state['user_id'] = $payload['user_id'] ?? ($state['user_id'] ?? null);
+        $state['pet_id'] = $payload['pet_id'] ?? ($state['pet_id'] ?? null);
+
+        $responsePayload = [
+            'message' => $assistantMessage,
+            'what_we_think_is_happening' => $assistantMessage,
+            'diagnosis_summary' => $diagnosisSummary,
+            'do_now' => $doNow,
+            'time_sensitivity' => $timeSensitivity,
+            'safe_to_do_while_waiting' => $safeToDoWhileWaiting,
+            'what_to_watch' => [],
+            'be_ready_to_tell_vet' => null,
+            'follow_up_question' => null,
+        ];
+
+        $turn = count($state['history'] ?? []) + 1;
+        $this->appendHistory($state, $promptText, $assistantMessage, $routing, 0);
+        Cache::put("snoutiq_symptom:{$sessionId}", $state, now()->addMinutes(self::SESSION_TTL_MINUTES));
+        $this->saveToDb($payload, $sessionId, $promptText, $assistantMessage, $routing, $severity);
+        $this->saveWebChatCampaign(
+            $payload,
+            $sessionId,
+            $turn,
+            $promptText,
+            $responsePayload,
+            $state,
+            $routing,
+            $severity,
+            0
+        );
+
+        return [
+            'success' => true,
+            'session_id' => $sessionId,
+            'context_token' => $sessionId,
+            'chat_room_token' => $sessionId,
+            'user_id' => $state['user_id'] ?? null,
+            'pet_id' => $state['pet_id'] ?? null,
+            'routing' => $routing,
+            'severity' => $severity,
+            'response' => $responsePayload,
+            'message' => $assistantMessage,
+            'chat' => [
+                'question' => $promptText,
+                'answer' => $assistantMessage,
+            ],
+            'decision' => $routing,
+            'emergency_status' => null,
+            'status_text' => ucwords(str_replace('_', ' ', $routing)),
+            'evidence_tags' => [],
+            'buttons' => [
+                'primary' => null,
+                'secondary' => null,
+            ],
+            'structured_data' => $structuredData,
+            'tool_used' => $toolUsed,
+            'timestamp' => now()->toIso8601String(),
+        ];
+    }
+
+    private function buildAvailableSlotsAssistantMessage(array $result): string
+    {
+        if (($result['success'] ?? false) !== true) {
+            return (string) ($result['error'] ?? 'I could not load available slots right now.');
+        }
+
+        $count = (int) ($result['count'] ?? count($result['slots'] ?? []));
+        $type = trim((string) ($result['consultation_type'] ?? 'booking'));
+
+        return sprintf('I found %d %s slot options. Pick one slot_id and send it back to confirm the booking.', $count, $type);
+    }
+
+    private function buildBookingAssistantMessage(array $result): string
+    {
+        if (($result['success'] ?? false) !== true) {
+            return (string) ($result['error'] ?? 'I could not create the booking right now.');
+        }
+
+        return (string) ($result['message'] ?? 'Booking saved successfully.');
     }
 
     /**
