@@ -1276,7 +1276,24 @@ class PushController extends Controller
     {
         $message = strtolower($e->getMessage());
 
-        if (!str_contains($message, 'invalid_grant') && !str_contains($message, 'unauthorized')) {
+        $authMarkers = [
+            'invalid_grant',
+            'unauthorized',
+            'unauthenticated',
+            'request is missing required authentication credential',
+            'expected oauth 2 access token',
+            'invalid jwt signature',
+        ];
+
+        $isAuthFailure = false;
+        foreach ($authMarkers as $marker) {
+            if (str_contains($message, $marker)) {
+                $isAuthFailure = true;
+                break;
+            }
+        }
+
+        if (! $isAuthFailure) {
             return null;
         }
 

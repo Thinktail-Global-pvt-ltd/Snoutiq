@@ -4,7 +4,9 @@ namespace App\Services\Push;
 
 use App\Models\DeviceToken;
 use App\Models\FcmNotification;
+use Google\Auth\Credentials\ServiceAccountCredentials;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Exception\FirebaseException;
@@ -29,8 +31,122 @@ class FcmService
     private static ?bool $notificationTableExists = null;
     private static ?bool $notificationCallSessionColumnExists = null;
 
+    private ?string $firebaseAccessToken = null;
+    private ?int $firebaseAccessTokenExpiresAt = null;
+
     public function __construct(private readonly Messaging $messaging)
     {
+    }
+
+    private function firebaseCredentialsPath(): string
+    {
+        $path = config('firebase.projects.app.credentials.file');
+
+        if (!is_string($path) || trim($path) === '') {
+            throw new \RuntimeException('Firebase credentials path is not configured.');
+        }
+
+        $path = trim($path);
+        if (!is_file($path) || !is_readable($path)) {
+            throw new \RuntimeException(sprintf('Firebase credentials file is not readable: %s', $path));
+        }
+
+        return $path;
+    }
+
+    private function firebaseProjectId(): string
+    {
+        $projectId = config('firebase.projects.app.project_id');
+
+        if (is_string($projectId)) {
+            $projectId = trim($projectId);
+        }
+
+        if (!is_string($projectId) || $projectId === '') {
+            throw new \RuntimeException('Firebase project ID is not configured.');
+        }
+
+        return $projectId;
+    }
+
+    private function firebaseSendUrl(): string
+    {
+        return sprintf(
+            'https://fcm.googleapis.com/v1/projects/%s/messages:send',
+            $this->firebaseProjectId()
+        );
+    }
+
+    private function firebaseAccessToken(): string
+    {
+        $now = time();
+        if (
+            $this->firebaseAccessToken !== null
+            && $this->firebaseAccessTokenExpiresAt !== null
+            && $now < ($this->firebaseAccessTokenExpiresAt - 60)
+        ) {
+            return $this->firebaseAccessToken;
+        }
+
+        $credentials = new ServiceAccountCredentials(
+            ['https://www.googleapis.com/auth/firebase.messaging'],
+            $this->firebaseCredentialsPath()
+        );
+
+        $tokenData = $credentials->fetchAuthToken();
+        $accessToken = is_array($tokenData) ? trim((string) ($tokenData['access_token'] ?? '')) : '';
+
+        if ($accessToken === '') {
+            throw new \RuntimeException('Unable to obtain Firebase access token.');
+        }
+
+        $expiresIn = is_array($tokenData) ? (int) ($tokenData['expires_in'] ?? 3600) : 3600;
+        if ($expiresIn <= 0) {
+            $expiresIn = 3600;
+        }
+
+        $this->firebaseAccessToken = $accessToken;
+        $this->firebaseAccessTokenExpiresAt = $now + $expiresIn;
+
+        return $this->firebaseAccessToken;
+    }
+
+    /**
+     * @param array<string, mixed> $messagePayload
+     * @return array<string, mixed>
+     */
+    private function sendFirebaseMessagePayload(array $messagePayload, string $target): array
+    {
+        $response = Http::acceptJson()
+            ->asJson()
+            ->withToken($this->firebaseAccessToken())
+            ->post($this->firebaseSendUrl(), [
+                'message' => $messagePayload,
+            ]);
+
+        if ($response->successful()) {
+            $payload = $response->json();
+            return is_array($payload) ? $payload : [];
+        }
+
+        $errorMessage = null;
+        $errorPayload = $response->json();
+        if (is_array($errorPayload)) {
+            $errorMessage = data_get($errorPayload, 'error.message') ?? data_get($errorPayload, 'message');
+        }
+        if (!is_string($errorMessage) || trim($errorMessage) === '') {
+            $errorMessage = trim((string) $response->body());
+        }
+        if ($errorMessage === '') {
+            $errorMessage = 'FCM send request failed';
+        }
+
+        throw new \RuntimeException(sprintf(
+            'FCM send failed for %s (%d): %s',
+            $this->maskToken($target),
+            $response->status(),
+            $errorMessage
+        ), $response->status());
     }
 
     private function normalizeToken(?string $token): string
@@ -877,7 +993,7 @@ class FcmService
     private function sendMessage(CloudMessage $message, string $target): array
     {
         try {
-            return $this->messaging->send($message);
+            return $this->sendFirebaseMessagePayload($message->jsonSerialize(), $target);
         } catch (MessagingException | FirebaseException | Throwable $e) {
             Log::error('FCM send failed', [
                 'target' => $target,
@@ -892,20 +1008,53 @@ class FcmService
      */
     private function sendMulticastMessage(CloudMessage $message, array $tokens): array
     {
-        try {
-            $report = $this->messaging->sendMulticast($message, $tokens);
-        } catch (MessagingException | FirebaseException | Throwable $e) {
+        $basePayload = $message->jsonSerialize();
+        unset($basePayload['token'], $basePayload['topic'], $basePayload['condition']);
+
+        $results = [];
+        $success = 0;
+        $failure = 0;
+        $lastError = null;
+
+        foreach ($tokens as $token) {
+            $payload = $basePayload;
+            $payload['token'] = $token;
+
+            try {
+                $responsePayload = $this->sendFirebaseMessagePayload($payload, $token);
+
+                $results[$token] = [
+                    'ok' => true,
+                    'provider_message_id' => $this->extractProviderMessageId($responsePayload),
+                    'response' => $responsePayload,
+                ];
+                $success++;
+            } catch (Throwable $e) {
+                $results[$token] = [
+                    'ok' => false,
+                    'code' => $e->getCode(),
+                    'error' => $e->getMessage(),
+                    'provider_message_id' => null,
+                    'response' => null,
+                ];
+                $failure++;
+                $lastError = $e;
+            }
+        }
+
+        if ($success === 0 && $failure > 0 && $lastError instanceof Throwable) {
             Log::error('FCM multicast send failed', [
                 'tokens' => $tokens,
-                'error' => $e->getMessage(),
+                'error' => $lastError->getMessage(),
             ]);
-            throw $e;
+
+            throw $lastError;
         }
 
         return [
-            'success' => $report->successes()->count(),
-            'failure' => $report->failures()->count(),
-            'results' => $this->mapMulticastResults($report),
+            'success' => $success,
+            'failure' => $failure,
+            'results' => $results,
         ];
     }
 
