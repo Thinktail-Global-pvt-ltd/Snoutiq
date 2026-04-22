@@ -11,6 +11,7 @@ use App\Models\Doctor;
 use App\Models\DeviceToken;
 use App\Services\Push\FcmService;
 use App\Support\DeviceTokenOwnerResolver;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -282,6 +283,10 @@ class PushController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
+            if ($response = $this->firebaseAuthFailureResponse($e)) {
+                return $response;
+            }
+
             return response()->json([
                 'error' => 'FCM send failed',
                 'details' => $e->getMessage(),
@@ -422,6 +427,10 @@ class PushController extends Controller
                 'user_id' => Auth::id(),
                 'error' => $e->getMessage(),
             ]);
+
+            if ($response = $this->firebaseAuthFailureResponse($e)) {
+                return $response;
+            }
 
             return response()->json([
                 'error' => 'FCM send failed',
@@ -1261,5 +1270,19 @@ class PushController extends Controller
         }
 
         return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
+    }
+
+    private function firebaseAuthFailureResponse(Throwable $e): ?JsonResponse
+    {
+        $message = strtolower($e->getMessage());
+
+        if (!str_contains($message, 'invalid_grant') && !str_contains($message, 'unauthorized')) {
+            return null;
+        }
+
+        return response()->json([
+            'error' => 'Firebase authentication failed',
+            'details' => 'FCM could not obtain an access token. Check FIREBASE_CREDENTIALS and replace the service-account JSON if it is stale or revoked.',
+        ], 503);
     }
 }
