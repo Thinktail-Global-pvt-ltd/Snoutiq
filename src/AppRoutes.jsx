@@ -136,6 +136,18 @@ const NewDoctorRoute = lazy(() => import("./newdoctordata/NewDoctorRoute.jsx"));
 const AiRoute = lazy(() => import("./ai/AiRoute.jsx"));
 const PetLifelinePage = lazy(() => import("./ai/PetLifelinePage"));
 const EditPetPage = lazy(() => import("./ai/EditPetPage"));
+const ConsultBookingFlow = lazy(() => import("./ai/ConsultBookingFlow"));
+const InClinicFastBookingFlow = lazy(() => import("./ai/InClinicFastBookingFlow"));
+const AppointmentPage = lazy(() =>
+  import("./ai/usePetOverviewCards.jsx").then((module) => ({
+    default: module.AppointmentPage,
+  }))
+);
+const FollowupPage = lazy(() =>
+  import("./ai/usePetOverviewCards.jsx").then((module) => ({
+    default: module.FollowupPage,
+  }))
+);
 
 export default function AppRoutes() {
   return (
@@ -152,6 +164,10 @@ export default function AppRoutes() {
         <Route path="/ai" element={<AiRoute />} />
      <Route path="/pet-lifeline/:petId" element={<PetLifelinePage />} />
 <Route path="/profile" element={<EditPetPage />} />
+<Route path="/video-counsult" element={<ConsultBookingFlow />} />
+<Route path="/inclinic-fast-booking" element={<InClinicFastBookingFlow />} />
+<Route path="/appointment-page" element={<AppointmentPage />} />
+<Route path="/followup-page" element={<FollowupPage />} />
 
         <Route path="/about" element={<NewAbout />} />
         <Route path="/parents" element={<NewCounsult />} />
