@@ -386,7 +386,7 @@ export default function NavItem({
   };
 
   const viewTimeline = () => {
-    if (!resolvedPetId) return;
+    if (!canOpenProfileMenu || !resolvedPetId) return;
     setIsSidebarOpen(false);
     navigate(`/pet-lifeline/${resolvedPetId}`);
   };
@@ -570,18 +570,20 @@ const handleViewProfile = () => {
     New Chat
   </button>
 
-  <button
-    onClick={viewTimeline}
-    disabled={!resolvedPetId}
-    className={`w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-      resolvedPetId
-        ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-        : "bg-gray-100 text-gray-400 cursor-not-allowed"
-    }`}
-  >
-    <Clock size={20} />
-    View Timeline
-  </button>
+  {canOpenProfileMenu ? (
+    <button
+      onClick={viewTimeline}
+      disabled={!resolvedPetId}
+      className={`w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+        resolvedPetId
+          ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          : "bg-gray-100 text-gray-400 cursor-not-allowed"
+      }`}
+    >
+      <Clock size={20} />
+      View Timeline
+    </button>
+  ) : null}
 </div>
 
         <div className="flex-1 overflow-y-auto">
