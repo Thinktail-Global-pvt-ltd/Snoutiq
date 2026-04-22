@@ -228,7 +228,8 @@ const normalizeDateInputValue = (value) => {
 
 const getLatestPetSource = (storedUser = {}, selectedPet = null) => {
   if (selectedPet && typeof selectedPet === "object") return selectedPet;
-  if (storedUser?.pet && typeof storedUser.pet === "object") return storedUser.pet;
+  if (storedUser?.pet && typeof storedUser.pet === "object")
+    return storedUser.pet;
   if (Array.isArray(storedUser?.pets) && storedUser.pets.length > 0) {
     return storedUser.pets[0];
   }
@@ -236,7 +237,9 @@ const getLatestPetSource = (storedUser = {}, selectedPet = null) => {
 };
 
 const normalizeGenderValue = (value) => {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
   if (normalized === "male" || normalized === "female") return normalized;
   return "";
 };
@@ -252,7 +255,9 @@ const normalizeYesNoValue = (value, fallback = "") => {
 };
 
 const normalizePetTypeValue = (value) => {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
   if (normalized.includes("dog")) return "dog";
   if (normalized.includes("cat")) return "cat";
   if (normalized.includes("exotic")) return "exotic";
@@ -276,7 +281,8 @@ const parseDobInput = (value) => {
 };
 
 const deriveAgeMonthsFromDob = (dobDate) => {
-  if (!(dobDate instanceof Date) || Number.isNaN(dobDate.getTime())) return null;
+  if (!(dobDate instanceof Date) || Number.isNaN(dobDate.getTime()))
+    return null;
   const now = new Date();
   if (dobDate > now) return null;
 
@@ -303,7 +309,11 @@ const buildPetImageUrl = (path) => {
   if (!path) return "";
   const trimmed = String(path).trim();
   if (!trimmed) return "";
-  if (/^https?:\/\//i.test(trimmed) || /^blob:/i.test(trimmed) || /^data:/i.test(trimmed)) {
+  if (
+    /^https?:\/\//i.test(trimmed) ||
+    /^blob:/i.test(trimmed) ||
+    /^data:/i.test(trimmed)
+  ) {
     return trimmed;
   }
   if (trimmed.startsWith("/")) {
@@ -369,7 +379,9 @@ const buildPetIdentityKey = (pet) => {
   const normalizedPetId = String(pet?.id ?? pet?.pet_id ?? "").trim();
   if (normalizedPetId) return `id:${normalizedPetId}`;
 
-  const name = String(pet?.name ?? pet?.pet_name ?? "").trim().toLowerCase();
+  const name = String(pet?.name ?? pet?.pet_name ?? "")
+    .trim()
+    .toLowerCase();
   const type = String(pet?.pet_type ?? pet?.species ?? pet?.type ?? "")
     .trim()
     .toLowerCase();
@@ -407,126 +419,144 @@ export default function EditPetPage() {
   const location = useLocation();
 
   const authToken = localStorage.getItem("auth_token") || "";
-  const storedUser = useMemo(() => getStoredUser(), []);
+  const [storedUser, setStoredUser] = useState(() => getStoredUser());
+
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, [location.key]);
 
   const fallbackPet = getPrimaryPetFromUser(storedUser);
 
   const routePet = location.state?.pet || null;
-const storedPrimaryPet = getPrimaryPetFromUser(storedUser);
+  const storedPrimaryPet = getPrimaryPetFromUser(storedUser);
 
-const selectedPet = routePet || storedPrimaryPet || null;
+  const selectedPet = routePet || storedPrimaryPet || null;
 
-const resolvedPet = useMemo(() => {
-  return {
-    ...(routePet && typeof routePet === "object" ? routePet : {}),
-    ...(storedPrimaryPet && typeof storedPrimaryPet === "object" ? storedPrimaryPet : {}),
-  };
-}, [routePet, storedPrimaryPet]);
+  const resolvedPet = useMemo(() => {
+    return {
+      ...(routePet && typeof routePet === "object" ? routePet : {}),
+      ...(storedPrimaryPet && typeof storedPrimaryPet === "object"
+        ? storedPrimaryPet
+        : {}),
+    };
+  }, [routePet, storedPrimaryPet]);
 
-const buildInitialFormValues = (resolvedPet, storedUser) => ({
-  petOwnerName:
-    resolvedPet?.pet_owner_name ||
-    resolvedPet?.owner_name ||
-    storedUser?.pet_owner_name ||
-    storedUser?.owner_name ||
-    storedUser?.name ||
-    "",
+  const buildInitialFormValues = (resolvedPet, storedUser) => ({
+    petOwnerName:
+      resolvedPet?.pet_owner_name ||
+      resolvedPet?.owner_name ||
+      storedUser?.pet_owner_name ||
+      storedUser?.owner_name ||
+      storedUser?.name ||
+      "",
 
-  name:
-    resolvedPet?.name ||
-    resolvedPet?.pet_name ||
-    storedUser?.pet_name ||
-    "",
+    name:
+      resolvedPet?.name || resolvedPet?.pet_name || storedUser?.pet_name || "",
 
-  breed:
-    resolvedPet?.breed ||
-    storedUser?.breed ||
-    "",
+    breed: resolvedPet?.breed || storedUser?.breed || "",
 
-  exoticType:
-    normalizePetTypeValue(resolvedPet?.pet_type || resolvedPet?.petType) === "exotic"
-      ? resolvedPet?.exoticType || resolvedPet?.exotic_type || resolvedPet?.breed || ""
-      : "",
+    exoticType:
+      normalizePetTypeValue(resolvedPet?.pet_type || resolvedPet?.petType) ===
+      "exotic"
+        ? resolvedPet?.exoticType ||
+          resolvedPet?.exotic_type ||
+          resolvedPet?.breed ||
+          ""
+        : "",
 
-  petDob: normalizeDateInputValue(
-    resolvedPet?.pet_dob ||
-      resolvedPet?.petDob ||
-      resolvedPet?.dob ||
-      storedUser?.pet_dob ||
-      storedUser?.pet?.pet_dob ||
-      storedUser?.pet?.dob ||
-      ""
-  ),
+    petDob: normalizeDateInputValue(
+      resolvedPet?.pet_dob ||
+        resolvedPet?.petDob ||
+        resolvedPet?.dob ||
+        storedUser?.pet_dob ||
+        storedUser?.pet?.pet_dob ||
+        storedUser?.pet?.dob ||
+        "",
+    ),
 
-  gender: normalizeGenderValue(
-    resolvedPet?.pet_gender ||
-      resolvedPet?.gender ||
-      storedUser?.pet_gender ||
-      storedUser?.pet?.pet_gender ||
-      ""
-  ),
+    gender: normalizeGenderValue(
+      resolvedPet?.pet_gender ||
+        resolvedPet?.gender ||
+        storedUser?.pet_gender ||
+        storedUser?.pet?.pet_gender ||
+        "",
+    ),
 
-  weight:
-    resolvedPet?.weight ??
-    resolvedPet?.pet_weight ??
-    storedUser?.weight ??
-    storedUser?.pet_weight ??
-    storedUser?.pet?.weight ??
-    storedUser?.pet?.pet_weight ??
-    "",
+    weight:
+      resolvedPet?.weight ??
+      resolvedPet?.pet_weight ??
+      storedUser?.weight ??
+      storedUser?.pet_weight ??
+      storedUser?.pet?.weight ??
+      storedUser?.pet?.pet_weight ??
+      "",
 
-  petType: normalizePetTypeValue(
-    resolvedPet?.pet_type ||
-      resolvedPet?.petType ||
-      resolvedPet?.type ||
-      storedUser?.pet_type ||
-      storedUser?.pet?.pet_type ||
-      "dog"
-  ),
+    petType: normalizePetTypeValue(
+      resolvedPet?.pet_type ||
+        resolvedPet?.petType ||
+        resolvedPet?.type ||
+        storedUser?.pet_type ||
+        storedUser?.pet?.pet_type ||
+        "dog",
+    ),
 
-  isNuetered: normalizeYesNoValue(
-    resolvedPet?.is_nuetered ??
-      resolvedPet?.is_neutered ??
-      storedUser?.is_nuetered ??
-      storedUser?.is_neutered ??
-      storedUser?.pet?.is_nuetered ??
-      storedUser?.pet?.is_neutered ??
-      (Array.isArray(storedUser?.pets) ? storedUser.pets[0]?.is_nuetered : undefined) ??
-      (Array.isArray(storedUser?.pets) ? storedUser.pets[0]?.is_neutered : undefined),
-    ""
-  ),
+    isNuetered: normalizeYesNoValue(
+      resolvedPet?.is_nuetered ??
+        resolvedPet?.is_neutered ??
+        storedUser?.is_nuetered ??
+        storedUser?.is_neutered ??
+        storedUser?.pet?.is_nuetered ??
+        storedUser?.pet?.is_neutered ??
+        (Array.isArray(storedUser?.pets)
+          ? storedUser.pets[0]?.is_nuetered
+          : undefined) ??
+        (Array.isArray(storedUser?.pets)
+          ? storedUser.pets[0]?.is_neutered
+          : undefined),
+      "",
+    ),
 
-  dewormingYesNo: normalizeYesNoValue(
-    resolvedPet?.deworming_yes_no ??
-      storedUser?.deworming_yes_no ??
-      storedUser?.pet?.deworming_yes_no ??
-      (Array.isArray(storedUser?.pets) ? storedUser.pets[0]?.deworming_yes_no : undefined),
-    ""
-  ),
+    dewormingYesNo: normalizeYesNoValue(
+      resolvedPet?.deworming_yes_no ??
+        storedUser?.deworming_yes_no ??
+        storedUser?.pet?.deworming_yes_no ??
+        (Array.isArray(storedUser?.pets)
+          ? storedUser.pets[0]?.deworming_yes_no
+          : undefined),
+      "",
+    ),
 
-  lastDewormingDate: normalizeDateInputValue(
-    resolvedPet?.last_deworming_date ||
-      storedUser?.last_deworming_date ||
-      storedUser?.pet?.last_deworming_date ||
-      (Array.isArray(storedUser?.pets) ? storedUser.pets[0]?.last_deworming_date : "") ||
-      ""
-  ),
-});
-const [form, setForm] = useState(() => buildInitialFormValues(resolvedPet, storedUser));
-useEffect(() => {
-  setForm(buildInitialFormValues(resolvedPet, storedUser));
-}, [resolvedPet, storedUser]);
+    lastDewormingDate: normalizeDateInputValue(
+      resolvedPet?.last_deworming_date ||
+        storedUser?.last_deworming_date ||
+        storedUser?.pet?.last_deworming_date ||
+        (Array.isArray(storedUser?.pets)
+          ? storedUser.pets[0]?.last_deworming_date
+          : "") ||
+        "",
+    ),
+  });
+  const [form, setForm] = useState(() =>
+    buildInitialFormValues(resolvedPet, storedUser),
+  );
+  useEffect(() => {
+    setForm(buildInitialFormValues(resolvedPet, storedUser));
+  }, [resolvedPet, storedUser]);
 
   const [petPhotoPreview, setPetPhotoPreview] = useState(
-    buildPetImageUrl(resolvePetImageValue(selectedPet, storedUser?.pet, storedUser))
+    buildPetImageUrl(
+      resolvePetImageValue(selectedPet, storedUser?.pet, storedUser),
+    ),
   );
   const [petPhotoFile, setPetPhotoFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const petId = selectedPet?.id ?? selectedPet?.pet_id ?? storedUser?.pet_id ?? null;
-  const userId = selectedPet?.user_id ?? storedUser?.user_id ?? storedUser?.id ?? null;
+  const petId =
+    selectedPet?.id ?? selectedPet?.pet_id ?? storedUser?.pet_id ?? null;
+  const userId =
+    selectedPet?.user_id ?? storedUser?.user_id ?? storedUser?.id ?? null;
 
   const agePreview = useMemo(() => {
     const date = parseDobInput(form.petDob);
@@ -651,7 +681,7 @@ useEffect(() => {
         payload.append("deworming_yes_no", dewormingValue);
         payload.append(
           "last_deworming_date",
-          dewormingValue === "0" ? "" : lastDewormingDateValue || ""
+          dewormingValue === "0" ? "" : lastDewormingDateValue || "",
         );
       }
 
@@ -676,7 +706,7 @@ useEffect(() => {
             Authorization: `Bearer ${authToken}`,
             Accept: "application/json",
           },
-        }
+        },
       );
 
       const responseData = response?.data || {};
@@ -711,9 +741,7 @@ useEffect(() => {
       const persistedImagePath = savedImagePath || existingImagePath;
       const resolvedAvatarUrl =
         buildPetImageUrl(
-          responsePet?.pet_doc1 ||
-            responsePet?.petDoc1 ||
-            persistedImagePath,
+          responsePet?.pet_doc1 || responsePet?.petDoc1 || persistedImagePath,
         ) ||
         responsePet?.pet_image_url ||
         responsePet?.petImageUrl ||
@@ -722,16 +750,9 @@ useEffect(() => {
       const updatedPet = {
         ...(selectedPet || {}),
         ...(responsePet || {}),
-        id:
-          responsePet?.id ??
-          selectedPet?.id ??
-          selectedPet?.pet_id ??
-          petId,
+        id: responsePet?.id ?? selectedPet?.id ?? selectedPet?.pet_id ?? petId,
         pet_id:
-          responsePet?.id ??
-          selectedPet?.pet_id ??
-          selectedPet?.id ??
-          petId,
+          responsePet?.id ?? selectedPet?.pet_id ?? selectedPet?.id ?? petId,
         user_id: userId,
         pet_owner_name: ownerNameValue,
         name: nameValue,
@@ -747,10 +768,13 @@ useEffect(() => {
         is_nuetered: neuteredValue === "1",
         is_neutered: neuteredValue === "1",
         deworming_yes_no: dewormingValue === "1",
-        last_deworming_date: dewormingValue === "1" ? lastDewormingDateValue : "",
+        last_deworming_date:
+          dewormingValue === "1" ? lastDewormingDateValue : "",
         pet_doc1: persistedImagePath,
         pet_image_url:
-          responsePet?.pet_image_url || responsePet?.petImageUrl || resolvedAvatarUrl,
+          responsePet?.pet_image_url ||
+          responsePet?.petImageUrl ||
+          resolvedAvatarUrl,
         avatar: resolvedAvatarUrl,
         image: resolvedAvatarUrl,
         image_url: resolvedAvatarUrl,
@@ -764,15 +788,23 @@ useEffect(() => {
         pet_id: updatedPet?.pet_id ?? updatedPet?.id ?? petId,
         pet_doc1: persistedImagePath || "",
         pet_image_url:
-          responsePet?.pet_image_url || responsePet?.petImageUrl || resolvedAvatarUrl,
+          responsePet?.pet_image_url ||
+          responsePet?.petImageUrl ||
+          resolvedAvatarUrl,
         avatar: resolvedAvatarUrl || "",
       };
-      const nextPets = mergeEditedPetIntoPets(latestStoredUser?.pets, normalizedUpdatedPet);
+      const nextPets = mergeEditedPetIntoPets(
+        latestStoredUser?.pets,
+        normalizedUpdatedPet,
+      );
 
       updateAiUserData({
         name: ownerNameValue || latestStoredUser?.name || "",
         owner_name:
-          ownerNameValue || latestStoredUser?.owner_name || latestStoredUser?.name || "",
+          ownerNameValue ||
+          latestStoredUser?.owner_name ||
+          latestStoredUser?.name ||
+          "",
         pet_owner_name:
           ownerNameValue ||
           latestStoredUser?.pet_owner_name ||
@@ -820,6 +852,8 @@ useEffect(() => {
         pets: nextPets,
       });
 
+      setStoredUser(getStoredUser());
+
       if (savedImageUrl) {
         setPetPhotoPreview(savedImageUrl);
       }
@@ -831,7 +865,7 @@ useEffect(() => {
         err?.response?.data?.message ||
           err?.response?.data?.error ||
           err?.message ||
-          "Failed to update pet."
+          "Failed to update pet.",
       );
     } finally {
       setLoading(false);
@@ -887,22 +921,28 @@ useEffect(() => {
 
       <div style={styles.wrap}>
         <div style={styles.card}>
-        
           <p style={styles.sectionTitle}>Pet Photo</p>
           <div style={styles.imageBox}>
             {petPhotoPreview ? (
-              <img src={petPhotoPreview} alt="Pet" style={styles.imagePreview} />
+              <img
+                src={petPhotoPreview}
+                alt="Pet"
+                style={styles.imagePreview}
+              />
             ) : (
               <div style={styles.imagePlaceholder}>No photo</div>
             )}
 
             <input type="file" accept="image/*" onChange={handleImageChange} />
             <div style={styles.helper}>
-              Optional. If you choose a new image, it will be sent as <b>pet_doc1</b>.
+              Optional. If you choose a new image, it will be sent as{" "}
+              <b>pet_doc1</b>.
             </div>
           </div>
 
-          <p style={{ ...styles.sectionTitle, marginTop: 22 }}>About Your Pet</p>
+          <p style={{ ...styles.sectionTitle, marginTop: 22 }}>
+            About Your Pet
+          </p>
 
           <div style={styles.row}>
             <div style={styles.field}>
@@ -1048,10 +1088,10 @@ useEffect(() => {
               />
             </div>
           ) : null}
-<div>
-                 {error ? <div style={styles.error}>{error}</div> : null}
-          {success ? <div style={styles.success}>{success}</div> : null}
-</div>
+          <div>
+            {error ? <div style={styles.error}>{error}</div> : null}
+            {success ? <div style={styles.success}>{success}</div> : null}
+          </div>
           <div style={styles.footer}>
             <button
               type="button"
@@ -1070,12 +1110,9 @@ useEffect(() => {
             >
               {loading ? "Saving..." : "Update Pet"}
             </button>
- 
-
           </div>
         </div>
       </div>
     </div>
   );
 }
-
