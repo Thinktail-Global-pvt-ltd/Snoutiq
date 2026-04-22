@@ -212,6 +212,29 @@ const styles = {
   },
 };
 
+const normalizeDateInputValue = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getFullYear();
+  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+  const day = `${parsed.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getLatestPetSource = (storedUser = {}, selectedPet = null) => {
+  if (selectedPet && typeof selectedPet === "object") return selectedPet;
+  if (storedUser?.pet && typeof storedUser.pet === "object") return storedUser.pet;
+  if (Array.isArray(storedUser?.pets) && storedUser.pets.length > 0) {
+    return storedUser.pets[0];
+  }
+  return null;
+};
+
 const normalizeGenderValue = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "male" || normalized === "female") return normalized;
@@ -385,52 +408,114 @@ export default function EditPetPage() {
 
   const authToken = localStorage.getItem("auth_token") || "";
   const storedUser = useMemo(() => getStoredUser(), []);
-  const routePet = location.state?.pet || null;
-  const fallbackPet = getPrimaryPetFromUser(storedUser);
-  const selectedPet = routePet || fallbackPet || null;
 
-  const [form, setForm] = useState(() => ({
-    petOwnerName:
-      selectedPet?.pet_owner_name ||
-      selectedPet?.owner_name ||
-      storedUser?.pet_owner_name ||
-      storedUser?.owner_name ||
-      storedUser?.name ||
-      "",
-    name: selectedPet?.name || selectedPet?.pet_name || storedUser?.pet_name || "",
-    breed: selectedPet?.breed || storedUser?.breed || "",
-    exoticType:
-      normalizePetTypeValue(selectedPet?.pet_type || selectedPet?.petType) === "exotic"
-        ? selectedPet?.exoticType || selectedPet?.exotic_type || selectedPet?.breed || ""
-        : "",
-    petDob: selectedPet?.pet_dob || selectedPet?.petDob || storedUser?.pet_dob || "",
-    gender: normalizeGenderValue(
-      selectedPet?.pet_gender || selectedPet?.gender || storedUser?.pet_gender || ""
-    ),
-    weight:
-      selectedPet?.weight ??
-      selectedPet?.pet_weight ??
-      storedUser?.weight ??
-      storedUser?.pet_weight ??
-      "",
-    petType: normalizePetTypeValue(
-      selectedPet?.pet_type ||
-        selectedPet?.petType ||
-        selectedPet?.type ||
-        storedUser?.pet_type ||
-        "dog"
-    ),
-    isNuetered: normalizeYesNoValue(
-      selectedPet?.is_nuetered ?? selectedPet?.is_neutered ?? storedUser?.is_nuetered,
+  const fallbackPet = getPrimaryPetFromUser(storedUser);
+
+  const routePet = location.state?.pet || null;
+const storedPrimaryPet = getPrimaryPetFromUser(storedUser);
+
+const selectedPet = routePet || storedPrimaryPet || null;
+
+const resolvedPet = useMemo(() => {
+  return {
+    ...(routePet && typeof routePet === "object" ? routePet : {}),
+    ...(storedPrimaryPet && typeof storedPrimaryPet === "object" ? storedPrimaryPet : {}),
+  };
+}, [routePet, storedPrimaryPet]);
+
+const buildInitialFormValues = (resolvedPet, storedUser) => ({
+  petOwnerName:
+    resolvedPet?.pet_owner_name ||
+    resolvedPet?.owner_name ||
+    storedUser?.pet_owner_name ||
+    storedUser?.owner_name ||
+    storedUser?.name ||
+    "",
+
+  name:
+    resolvedPet?.name ||
+    resolvedPet?.pet_name ||
+    storedUser?.pet_name ||
+    "",
+
+  breed:
+    resolvedPet?.breed ||
+    storedUser?.breed ||
+    "",
+
+  exoticType:
+    normalizePetTypeValue(resolvedPet?.pet_type || resolvedPet?.petType) === "exotic"
+      ? resolvedPet?.exoticType || resolvedPet?.exotic_type || resolvedPet?.breed || ""
+      : "",
+
+  petDob: normalizeDateInputValue(
+    resolvedPet?.pet_dob ||
+      resolvedPet?.petDob ||
+      resolvedPet?.dob ||
+      storedUser?.pet_dob ||
+      storedUser?.pet?.pet_dob ||
+      storedUser?.pet?.dob ||
       ""
-    ),
-    dewormingYesNo: normalizeYesNoValue(
-      selectedPet?.deworming_yes_no ?? storedUser?.deworming_yes_no,
+  ),
+
+  gender: normalizeGenderValue(
+    resolvedPet?.pet_gender ||
+      resolvedPet?.gender ||
+      storedUser?.pet_gender ||
+      storedUser?.pet?.pet_gender ||
       ""
-    ),
-    lastDewormingDate:
-      selectedPet?.last_deworming_date || storedUser?.last_deworming_date || "",
-  }));
+  ),
+
+  weight:
+    resolvedPet?.weight ??
+    resolvedPet?.pet_weight ??
+    storedUser?.weight ??
+    storedUser?.pet_weight ??
+    storedUser?.pet?.weight ??
+    storedUser?.pet?.pet_weight ??
+    "",
+
+  petType: normalizePetTypeValue(
+    resolvedPet?.pet_type ||
+      resolvedPet?.petType ||
+      resolvedPet?.type ||
+      storedUser?.pet_type ||
+      storedUser?.pet?.pet_type ||
+      "dog"
+  ),
+
+  isNuetered: normalizeYesNoValue(
+    resolvedPet?.is_nuetered ??
+      resolvedPet?.is_neutered ??
+      storedUser?.is_nuetered ??
+      storedUser?.is_neutered ??
+      storedUser?.pet?.is_nuetered ??
+      storedUser?.pet?.is_neutered ??
+      (Array.isArray(storedUser?.pets) ? storedUser.pets[0]?.is_nuetered : undefined) ??
+      (Array.isArray(storedUser?.pets) ? storedUser.pets[0]?.is_neutered : undefined),
+    ""
+  ),
+
+  dewormingYesNo: normalizeYesNoValue(
+    resolvedPet?.deworming_yes_no ??
+      storedUser?.deworming_yes_no ??
+      storedUser?.pet?.deworming_yes_no ??
+      (Array.isArray(storedUser?.pets) ? storedUser.pets[0]?.deworming_yes_no : undefined),
+    ""
+  ),
+
+  lastDewormingDate: normalizeDateInputValue(
+    resolvedPet?.last_deworming_date ||
+      storedUser?.last_deworming_date ||
+      storedUser?.pet?.last_deworming_date ||
+      (Array.isArray(storedUser?.pets) ? storedUser.pets[0]?.last_deworming_date : "") ||
+      ""
+  ),
+});
+const [form, setForm] = useState(() => buildInitialFormValues(resolvedPet, storedUser));
+useEffect(() => {
+  setForm(buildInitialFormValues(resolvedPet, storedUser));
+}, [resolvedPet, storedUser]);
 
   const [petPhotoPreview, setPetPhotoPreview] = useState(
     buildPetImageUrl(resolvePetImageValue(selectedPet, storedUser?.pet, storedUser))
@@ -907,7 +992,6 @@ export default function EditPetPage() {
                 onChange={(e) => setField("petDob", e.target.value)}
                 max={new Date().toISOString().split("T")[0]}
               />
-              {agePreview ? <div style={styles.helper}>{agePreview}</div> : null}
             </div>
 
             <div style={styles.field}>

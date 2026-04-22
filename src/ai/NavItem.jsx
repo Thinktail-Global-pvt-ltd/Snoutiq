@@ -38,6 +38,8 @@ const hasUsablePetProfile = (authState) => {
       : Array.isArray(user?.pets) && user.pets.length > 0
         ? user.pets[0]
         : null;
+        console.log(user,'ankit');
+        
   const registrationFlag =
     normalizeBoolean(authState?.registrationComplete) ||
     normalizeBoolean(user?.registrationComplete) ||
@@ -612,7 +614,7 @@ const handleViewProfile = () => {
       }`}
     >
       <Clock size={20} />
-      View Timeline
+      View Pet Health line
     </button>
   ) : null}
 </div>
