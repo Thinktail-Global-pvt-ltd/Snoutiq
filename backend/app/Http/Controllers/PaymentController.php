@@ -269,9 +269,13 @@ class PaymentController extends Controller
                 amountInInr: $amountInInr
             );
 
-            // WhatsApp for video consult is intentionally deferred to payment verify success.
-            $whatsAppMeta = null;
-            $vetWhatsAppMeta = null;
+            $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
+                context: $context,
+                notes: $notes,
+                amountInInr: $amountInInr
+            );
+            $whatsAppMeta = $videoConsultWhatsAppMeta['whatsapp'];
+            $vetWhatsAppMeta = $videoConsultWhatsAppMeta['vet_whatsapp'];
             $prescriptionDocMeta = null;
 
             return response()->json([
@@ -498,6 +502,12 @@ class PaymentController extends Controller
             amountInInr: 0
         );
 
+        $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
+            context: $couponContext,
+            notes: $couponNotes,
+            amountInInr: 0
+        );
+
         return [
             'success' => true,
             'payment_required' => false,
@@ -512,8 +522,8 @@ class PaymentController extends Controller
             'order' => $couponOrder,
             'order_id' => $couponOrder['id'],
             'doctor_push' => $doctorOrderPushMeta,
-            'whatsapp' => null,
-            'vet_whatsapp' => null,
+            'whatsapp' => $videoConsultWhatsAppMeta['whatsapp'],
+            'vet_whatsapp' => $videoConsultWhatsAppMeta['vet_whatsapp'],
             'prescription_doc' => null,
             'transaction' => [
                 'id' => $transaction->id,
@@ -2067,6 +2077,22 @@ class PaymentController extends Controller
             report($e);
             return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
         }
+    }
+
+    protected function sendVideoConsultWhatsAppNotifications(array $context, array $notes, int $amountInInr): array
+    {
+        $transactionType = $this->resolveTransactionType($notes);
+        if (! $this->isVideoConsultTransactionType($transactionType)) {
+            return [
+                'whatsapp' => null,
+                'vet_whatsapp' => null,
+            ];
+        }
+
+        return [
+            'whatsapp' => $this->notifyVideoConsultBooked($context, $notes, $amountInInr),
+            'vet_whatsapp' => $this->notifyVetVideoConsultBooked($context, $notes, $amountInInr),
+        ];
     }
 
     protected function buildVetTemplateComponents(
