@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 
 class GooglePlacesLookupService
@@ -152,6 +153,19 @@ class GooglePlacesLookupService
             }
         }
 
+        foreach ($places as $index => $place) {
+            if (!empty($place['available_hours']) || empty($place['place_id'])) {
+                continue;
+            }
+
+            $hoursMeta = $this->fetchPlaceHours((string) $place['place_id'], $apiKey);
+            if (!empty($hoursMeta['available_hours'])) {
+                $places[$index]['available_hours'] = $hoursMeta['available_hours'];
+                $places[$index]['active_hours_today'] = $hoursMeta['active_hours_today'];
+                $places[$index]['active_hours_status'] = $hoursMeta['active_hours_status'];
+            }
+        }
+
         $originLabel = $cleanLocation;
         if ($originLabel === null && $hasCoordinates) {
             $originLabel = sprintf('%.5f, %.5f', (float) $latitude, (float) $longitude);
@@ -226,6 +240,9 @@ class GooglePlacesLookupService
             'open_now' => array_key_exists('open_now', $openingHours)
                 ? (bool) $openingHours['open_now']
                 : null,
+            'available_hours' => $this->extractAvailableHours($place),
+            'active_hours_today' => $this->extractActiveHoursToday($place),
+            'active_hours_status' => $this->extractOpenStatusLabel($place),
             'place_id' => $place['place_id'] ?? null,
             'maps_link' => !empty($place['place_id'])
                 ? 'https://www.google.com/maps/place/?q=place_id:' . rawurlencode((string) $place['place_id'])
@@ -252,6 +269,89 @@ class GooglePlacesLookupService
             'dogpark', 'dogparks', 'park', 'parks' => 'dogpark',
             default => $normalized,
         };
+    }
+
+    private function extractAvailableHours(array $place): ?array
+    {
+        $openingHours = is_array($place['opening_hours'] ?? null) ? $place['opening_hours'] : null;
+        if ($openingHours !== null && !empty($openingHours['weekday_text']) && is_array($openingHours['weekday_text'])) {
+            return array_values(array_filter(array_map(static function ($line) {
+                return is_string($line) ? trim($line) : null;
+            }, $openingHours['weekday_text'])));
+        }
+
+        $currentOpeningHours = is_array($place['current_opening_hours'] ?? null) ? $place['current_opening_hours'] : null;
+        if ($currentOpeningHours !== null && !empty($currentOpeningHours['weekday_text']) && is_array($currentOpeningHours['weekday_text'])) {
+            return array_values(array_filter(array_map(static function ($line) {
+                return is_string($line) ? trim($line) : null;
+            }, $currentOpeningHours['weekday_text'])));
+        }
+
+        return null;
+    }
+
+    private function fetchPlaceHours(string $placeId, string $apiKey): ?array
+    {
+        $response = Http::timeout(8)
+            ->retry(1, 200)
+            ->get('https://maps.googleapis.com/maps/api/place/details/json', [
+                'place_id' => $placeId,
+                'fields' => 'opening_hours,current_opening_hours',
+                'key' => $apiKey,
+            ]);
+
+        if (!$response->successful()) {
+            return null;
+        }
+
+        $payload = $response->json();
+        $status = strtoupper((string) ($payload['status'] ?? 'UNKNOWN_ERROR'));
+        if ($status !== 'OK') {
+            return null;
+        }
+
+        $result = is_array($payload['result'] ?? null) ? $payload['result'] : [];
+        return [
+            'available_hours' => $this->extractAvailableHours($result),
+            'active_hours_today' => $this->extractActiveHoursToday($result),
+            'active_hours_status' => $this->extractOpenStatusLabel($result),
+        ];
+    }
+
+    private function extractActiveHoursToday(array $place): ?string
+    {
+        $hours = $this->extractAvailableHours($place);
+        if (empty($hours)) {
+            return null;
+        }
+
+        $today = CarbonImmutable::now(config('app.timezone'))->format('l');
+        foreach ($hours as $line) {
+            if (!is_string($line)) {
+                continue;
+            }
+            $trimmed = trim($line);
+            if (str_starts_with($trimmed, $today . ':')) {
+                return trim((string) preg_replace('/^' . preg_quote($today, '/') . ':\s*/', '', $trimmed));
+            }
+        }
+
+        return null;
+    }
+
+    private function extractOpenStatusLabel(array $place): ?string
+    {
+        $currentOpeningHours = is_array($place['current_opening_hours'] ?? null) ? $place['current_opening_hours'] : null;
+        if ($currentOpeningHours !== null && array_key_exists('open_now', $currentOpeningHours)) {
+            return $currentOpeningHours['open_now'] ? 'OPEN' : 'CLOSED';
+        }
+
+        $openingHours = is_array($place['opening_hours'] ?? null) ? $place['opening_hours'] : null;
+        if ($openingHours !== null && array_key_exists('open_now', $openingHours)) {
+            return $openingHours['open_now'] ? 'OPEN' : 'CLOSED';
+        }
+
+        return null;
     }
 
     private function cleanText(?string $value): ?string
