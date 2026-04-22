@@ -1280,9 +1280,57 @@ class PushController extends Controller
             return null;
         }
 
+        $diagnostics = $this->firebaseCredentialsDiagnostics();
+        $details = [
+            'FCM could not obtain an access token.',
+            'Check FIREBASE_CREDENTIALS and replace the service-account JSON if it is stale or revoked.',
+        ];
+
+        if ($diagnostics['file_exists'] === false) {
+            $details[] = 'The configured credentials file does not exist.';
+        } elseif ($diagnostics['is_readable'] === false) {
+            $details[] = 'The configured credentials file exists but is not readable by the PHP process.';
+        } elseif ($diagnostics['is_valid_json'] === false) {
+            $details[] = 'The configured credentials file is not valid JSON.';
+        } elseif ($diagnostics['has_private_key'] === false) {
+            $details[] = 'The credentials file is missing private_key.';
+        } else {
+            $details[] = 'If the file is valid, the service-account key is likely revoked or the server clock is skewed.';
+        }
+
         return response()->json([
             'error' => 'Firebase authentication failed',
-            'details' => 'FCM could not obtain an access token. Check FIREBASE_CREDENTIALS and replace the service-account JSON if it is stale or revoked.',
+            'details' => implode(' ', $details),
+            'diagnostics' => $diagnostics,
         ], 503);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function firebaseCredentialsDiagnostics(): array
+    {
+        $path = config('firebase.projects.app.credentials.file');
+        $fileExists = is_string($path) && $path !== '' && file_exists($path);
+        $fileReadable = $fileExists ? is_readable($path) : false;
+        $json = null;
+
+        if ($fileReadable) {
+            $content = @file_get_contents($path);
+            if (is_string($content)) {
+                $json = json_decode($content, true);
+            }
+        }
+
+        return [
+            'path' => is_string($path) ? $path : null,
+            'file_exists' => $fileExists,
+            'is_readable' => $fileReadable,
+            'is_valid_json' => is_array($json),
+            'has_private_key' => is_array($json) && isset($json['private_key']) && is_string($json['private_key']) && trim($json['private_key']) !== '',
+            'project_id' => is_array($json) ? ($json['project_id'] ?? null) : null,
+            'client_email' => is_array($json) ? ($json['client_email'] ?? null) : null,
+            'token_uri' => is_array($json) ? ($json['token_uri'] ?? null) : null,
+        ];
     }
 }
