@@ -38,7 +38,6 @@ const hasUsablePetProfile = (authState) => {
       : Array.isArray(user?.pets) && user.pets.length > 0
         ? user.pets[0]
         : null;
-
   const registrationFlag =
     normalizeBoolean(authState?.registrationComplete) ||
     normalizeBoolean(user?.registrationComplete) ||
@@ -130,6 +129,11 @@ export default function NavItem({
     currentUser?.pet_id ??
     currentUser?.pet?.id ??
     currentUser?.pet?.pet_id ??
+    "";
+
+  const resolvedUserId =
+    currentUser?.id ??
+    currentUser?.user_id ??
     "";
 
   const hasAuth = useMemo(() => {
@@ -394,6 +398,33 @@ const handleViewProfile = () => {
   setProfileMenuOpen(false);
   navigate("/profile");
 };
+
+  const handleOpenAppointmentPage = () => {
+    setProfileMenuOpen(false);
+    if (!resolvedPetId) return;
+
+    navigate("/appointment-page", {
+      state: {
+        petId: resolvedPetId,
+        userId: resolvedUserId,
+        source: "nav_profile_dropdown",
+      },
+    });
+  };
+
+  const handleOpenFollowupPage = () => {
+    setProfileMenuOpen(false);
+    if (!resolvedPetId) return;
+
+    navigate("/followup-page", {
+      state: {
+        petId: resolvedPetId,
+        userId: resolvedUserId,
+        source: "nav_profile_dropdown",
+      },
+    });
+  };
+
   const handleSendMessage = (forcedText = null) => {
     const inputText = String(forcedText ?? currentInput).trim();
     if (!inputText) return;
@@ -706,7 +737,7 @@ const handleViewProfile = () => {
 
       {profileMenuOpen && canOpenProfileMenu ? (
         <div
-          className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+          className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="border-b border-slate-100 px-4 py-3">
@@ -744,8 +775,36 @@ const handleViewProfile = () => {
 
           <button
             type="button"
+            onClick={handleOpenAppointmentPage}
+            disabled={!resolvedPetId}
+            className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-gray-50 ${
+              resolvedPetId
+                ? "text-slate-700"
+                : "cursor-not-allowed text-slate-400"
+            }`}
+          >
+            <Calendar size={16} />
+            Appointment
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenFollowupPage}
+            disabled={!resolvedPetId}
+            className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-gray-50 ${
+              resolvedPetId
+                ? "text-slate-700"
+                : "cursor-not-allowed text-slate-400"
+            }`}
+          >
+            <MessageSquare size={16} />
+            Followup
+          </button>
+
+          <button
+            type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50"
+            className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-3 text-sm text-red-600 hover:bg-red-50"
           >
             <LogOut size={16} />
             Logout
@@ -757,52 +816,47 @@ const handleViewProfile = () => {
   </div>
 </div>
 
-        <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-indigo-50 via-white to-white">
-          <div className="mx-auto flex max-w-4xl flex-col gap-4">
+        <div className="flex-1 overflow-y-auto bg-white p-4">
+          <div
+            className={`mx-auto flex max-w-4xl flex-col gap-4 ${
+              messages.length === 0 ? "min-h-full justify-center" : ""
+            }`}
+          >
             {messages.length === 0 ? (
-              <>
-                <div className="rounded-[28px] border border-indigo-100 bg-white p-6 shadow-sm sm:p-8">
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="max-w-2xl">
-                      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700">
-                        <Sparkles size={14} />
-                        Smart pet care assistant
-                      </div>
+              <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700">
+                  <Sparkles size={14} />
+                  Smart pet care assistant
+                </div>
 
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
-                          <PawPrint size={26} />
-                        </div>
-                        <div>
-                          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                            Welcome to Snoutiq AI
-                          </h2>
-                          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
-                            Get instant guidance for symptoms, food, behaviour,
-                            exercise, and emergency situations. Ask your first
-                            question to begin.
-                          </p>
-                        </div>
-                      </div>
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-indigo-50 text-indigo-700">
+                  <PawPrint size={28} />
+                </div>
 
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
-                          <ShieldCheck size={14} />
-                          Safe pet guidance
-                        </div>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700">
-                          <User size={14} />
-                          {ownerDisplayName || "Pet parent"}
-                        </div>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700">
-                          <PawPrint size={14} />
-                          {petDisplayName || "Your pet"}
-                        </div>
-                      </div>
-                    </div>
+                <h2 className="mt-5 text-3xl font-bold text-slate-900 sm:text-4xl">
+                  Welcome to Snoutiq AI
+                </h2>
+
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
+                  Get instant guidance for symptoms, food, behaviour, exercise,
+                  and emergency situations. Ask your first question to begin.
+                </p>
+
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700">
+                    <ShieldCheck size={14} />
+                    Safe pet guidance
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700">
+                    <User size={14} />
+                    {ownerDisplayName || "Pet parent"}
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700">
+                    <PawPrint size={14} />
+                    {petDisplayName || "Your pet"}
                   </div>
                 </div>
-              </>
+              </div>
             ) : null}
 
             {messages.map((message) => (
