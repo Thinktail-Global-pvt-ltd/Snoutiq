@@ -452,12 +452,15 @@ class GooglePlacesLookupService
             return null;
         }
 
-        $today = CarbonImmutable::now(config('app.timezone'))->format('l');
+        $today = Carbon::now(config('app.timezone'))->format('l');
+
         foreach ($hours as $line) {
             if (!is_string($line)) {
                 continue;
             }
+
             $trimmed = trim($line);
+
             if (str_starts_with($trimmed, $today . ':')) {
                 return trim((string) preg_replace('/^' . preg_quote($today, '/') . ':\s*/', '', $trimmed));
             }
