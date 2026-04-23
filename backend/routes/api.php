@@ -3005,6 +3005,7 @@ Route::get('/video-schedule/doctors/{id}/free-slots', [\App\Http\Controllers\Api
 // Pets
 Route::post('/users/pets', [\App\Http\Controllers\Api\PetsController::class, 'storeForUser']);
 Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
+Route::put('/users/{userId}/pets/{petId}/reported-symptom', [\App\Http\Controllers\Api\PetsController::class, 'updateReportedSymptom']);
 Route::get('/doctor/users', [\App\Http\Controllers\Api\DoctorFollowUpUserController::class, 'users']);
 Route::get('/doctor/follow-up-users', [\App\Http\Controllers\Api\DoctorFollowUpUserController::class, 'index']);
 Route::get('/doctor/pending-prescription', [\App\Http\Controllers\Api\DoctorPendingPrescriptionController::class, 'show']);

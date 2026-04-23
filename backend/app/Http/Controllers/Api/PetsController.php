@@ -100,6 +100,68 @@ class PetsController extends Controller
         ], 201);
     }
 
+    public function updateReportedSymptom(Request $request, int $userId, int $petId): JsonResponse
+    {
+        $data = $request->validate([
+            'reported_symptom' => ['required', 'string', 'max:5000'],
+        ]);
+
+        if (!Schema::hasTable('pets')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets table is not available.',
+            ], 500);
+        }
+
+        $userRefColumn = Schema::hasColumn('pets', 'user_id')
+            ? 'user_id'
+            : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+        if (!$userRefColumn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets table is missing user reference column.',
+            ], 500);
+        }
+
+        $reportedSymptom = trim((string) $data['reported_symptom']);
+        if ($reportedSymptom === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'reported_symptom is required.',
+            ], 422);
+        }
+
+        $pet = Pet::query()
+            ->whereKey($petId)
+            ->where($userRefColumn, $userId)
+            ->first();
+
+        if (!$pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found for the provided user.',
+            ], 404);
+        }
+
+        $pet->reported_symptom = $reportedSymptom;
+        $pet->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Reported symptom saved successfully.',
+            'data' => [
+                'user_id' => $userId,
+                'pet' => [
+                    'id' => $pet->id,
+                    'user_id' => $userId,
+                    'reported_symptom' => $pet->reported_symptom,
+                    'updated_at' => optional($pet->updated_at)->toDateTimeString(),
+                ],
+            ],
+        ]);
+    }
+
     // GET /api/users/{id}/pets
     public function byUser(string $id)
     {
