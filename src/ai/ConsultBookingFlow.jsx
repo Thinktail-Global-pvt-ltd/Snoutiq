@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 const API_BASE = "https://snoutiq.com/backend/api";
 const ENDPOINTS = {
@@ -338,6 +339,35 @@ export default function ConsultBookingFlow({
   endpoints = ENDPOINTS,
   onSuccess,
 }) {
+  const location = useLocation();
+  const routeState =
+    location?.state && typeof location.state === "object" ? location.state : {};
+  const initialDoctorSelectionAppliedRef = useRef(false);
+
+  const requestedDoctorId = useMemo(
+    () =>
+      normalizeText(
+        routeState?.doctorId ??
+          routeState?.doctor_id ??
+          routeState?.suggestedDoctor?.doctorId ??
+          routeState?.suggestedDoctor?.doctor_id ??
+          ""
+      ),
+    [routeState]
+  );
+
+  const requestedDoctorName = useMemo(
+    () =>
+      normalizeText(
+        routeState?.doctorName ??
+          routeState?.doctor_name ??
+          routeState?.suggestedDoctor?.doctorName ??
+          routeState?.suggestedDoctor?.doctor_name ??
+          ""
+      ).toLowerCase(),
+    [routeState]
+  );
+
   const [doctors, setDoctors] = useState([]);
   const [loadingDoctors, setLoadingDoctors] = useState(true);
   const [listError, setListError] = useState("");
@@ -409,6 +439,41 @@ export default function ConsultBookingFlow({
       active = false;
     };
   }, [apiBase, endpoints.list, token]);
+
+  useEffect(() => {
+    if (initialDoctorSelectionAppliedRef.current || loadingDoctors) {
+      return;
+    }
+
+    if (!requestedDoctorId && !requestedDoctorName) {
+      initialDoctorSelectionAppliedRef.current = true;
+      return;
+    }
+
+    const matchedDoctor = doctors.find((doctor) => {
+      const doctorId = normalizeText(doctor?.doctorId || doctor?.id);
+      const doctorName = normalizeText(doctor?.name).toLowerCase();
+
+      if (requestedDoctorId && doctorId === requestedDoctorId) {
+        return true;
+      }
+
+      if (requestedDoctorName && doctorName === requestedDoctorName) {
+        return true;
+      }
+
+      return false;
+    });
+
+    initialDoctorSelectionAppliedRef.current = true;
+
+    if (!matchedDoctor) {
+      return;
+    }
+
+    setSelectedDoctor(matchedDoctor);
+    setShowDetailsSheet(true);
+  }, [doctors, loadingDoctors, requestedDoctorId, requestedDoctorName]);
 
   const handleSelectDoctor = (doctor) => {
     setSelectedDoctor(doctor);

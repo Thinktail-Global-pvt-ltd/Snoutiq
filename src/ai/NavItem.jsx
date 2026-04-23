@@ -298,19 +298,139 @@ const dedupeButtons = (items) => {
   });
 };
 
+const resolveActionDoctorId = (item) => {
+  const possible = [
+    item?.doctor_id,
+    item?.doctorId,
+    item?.doctor?.doctor_id,
+    item?.doctor?.doctorId,
+    item?.doctor?.id,
+  ];
+
+  const hit = possible.find((value) => String(value ?? "").trim());
+  return String(hit ?? "").trim();
+};
+
+const resolveActionClinicId = (item) => {
+  const possible = [
+    item?.clinic_id,
+    item?.clinicId,
+    item?.vet_registeration_id,
+    item?.vetRegistrationId,
+    item?.clinic?.clinic_id,
+    item?.clinic?.clinicId,
+    item?.clinic?.id,
+  ];
+
+  const hit = possible.find((value) => String(value ?? "").trim());
+  return String(hit ?? "").trim();
+};
+
+const resolveActionDoctorName = (item) => {
+  const possible = [
+    item?.doctor_name,
+    item?.doctorName,
+    item?.doctor?.doctor_name,
+    item?.doctor?.doctorName,
+    item?.doctor?.name,
+    item?.name,
+  ];
+
+  const hit = possible.find((value) => String(value ?? "").trim());
+  return String(hit ?? "").trim();
+};
+
+const resolveActionClinicName = (item) => {
+  const possible = [
+    item?.clinic_name,
+    item?.clinicName,
+    item?.place_name,
+    item?.title,
+    item?.name,
+    item?.clinic?.clinic_name,
+    item?.clinic?.clinicName,
+    item?.clinic?.name,
+  ];
+
+  const hit = possible.find((value) => String(value ?? "").trim());
+  return String(hit ?? "").trim();
+};
+
+const normalizeSuggestedClinic = (item) => {
+  if (!item || typeof item !== "object") return null;
+
+  return {
+    name: resolveActionClinicName(item),
+    address: String(
+      item?.address ?? item?.place_address ?? item?.formatted_address ?? "",
+    ).trim(),
+    place_id: String(
+      item?.place_id ?? item?.placeId ?? item?.external_place_id ?? "",
+    ).trim(),
+    maps_link: String(
+      item?.maps_link ?? item?.mapsLink ?? item?.website ?? "",
+    ).trim(),
+    phone: String(item?.phone ?? item?.mobile ?? item?.clinic_mobile ?? "").trim(),
+    latitude: item?.latitude ?? item?.lat ?? null,
+    longitude: item?.longitude ?? item?.lng ?? null,
+  };
+};
+
+const isVideoConsultAction = (item) => {
+  const deeplink = String(item?.deeplink ?? "").trim().toLowerCase();
+  const type = String(item?.type ?? "").trim().toLowerCase();
+
+  return (
+    type === "video_consult" ||
+    type === "video" ||
+    deeplink.includes("video-consult") ||
+    deeplink.includes("videoconsult") ||
+    deeplink.includes("video-call") ||
+    deeplink.includes("videocall")
+  );
+};
+
 const isClinicBookingAction = (item) => {
   const deeplink = String(item?.deeplink ?? "").trim().toLowerCase();
   const type = String(item?.type ?? "").trim().toLowerCase();
 
   return (
     type === "clinic" ||
+    type === "clinic_booking" ||
+    type === "in_clinic" ||
     deeplink.includes("find-clinic") ||
+    deeplink.includes("clinic-booking") ||
+    deeplink.includes("book-clinic") ||
     deeplink.includes("clinic")
   );
 };
 
+const isDoctorBookingAction = (item) => {
+  if (isVideoConsultAction(item) || isClinicBookingAction(item)) {
+    return false;
+  }
+
+  const deeplink = String(item?.deeplink ?? "").trim().toLowerCase();
+  const type = String(item?.type ?? "").trim().toLowerCase();
+  const label = String(item?.label ?? item?.title ?? "").trim().toLowerCase();
+
+  return (
+    type === "doctor" ||
+    type === "doctor_consult" ||
+    type === "consult" ||
+    deeplink.includes("doctor") ||
+    Boolean(resolveActionDoctorId(item)) ||
+    ((label.includes("doctor") || label.includes("vet")) &&
+      (label.includes("book") || label.includes("consult")))
+  );
+};
+
 const getActionButtonLabel = (item) => {
-  if (isClinicBookingAction(item)) {
+  if (
+    isClinicBookingAction(item) ||
+    isVideoConsultAction(item) ||
+    isDoctorBookingAction(item)
+  ) {
     return "Book Consult";
   }
 
@@ -896,29 +1016,30 @@ export default function NavItem({
     await loadRoomChats(roomToken, { shouldSetActive: true });
   };
 
-  const handleVideoCall = () => {
-    window.open("/payment", "_blank");
+  const handleVideoCall = (button = null) => {
+    navigate("/video-counsult", {
+      state: {
+        source: isDoctorBookingAction(button) ? "ai_doctor_suggestion" : "ai_video_consult",
+        petId: resolvedPetId || null,
+        userId: resolvedUserId || null,
+        doctorId: resolveActionDoctorId(button) || null,
+        clinicId: resolveActionClinicId(button) || null,
+        doctorName: resolveActionDoctorName(button) || null,
+        clinicName: resolveActionClinicName(button) || null,
+      },
+    });
   };
 
   const handleBookAppointment = (place = null) => {
-    const normalizedPlace =
-      place && typeof place === "object"
-        ? {
-            name: String(place?.name ?? "").trim(),
-            address: String(place?.address ?? "").trim(),
-            place_id: String(place?.place_id ?? "").trim(),
-            maps_link: String(place?.maps_link ?? "").trim(),
-            phone: String(place?.phone ?? "").trim(),
-            latitude: place?.latitude ?? null,
-            longitude: place?.longitude ?? null,
-          }
-        : null;
+    const normalizedPlace = normalizeSuggestedClinic(place);
 
     navigate("/inclinic-fast-booking", {
       state: {
         source: normalizedPlace ? "ai_nearby_place" : "ai_clinic_suggestion",
         petId: resolvedPetId || null,
         userId: resolvedUserId || null,
+        doctorId: resolveActionDoctorId(place) || null,
+        clinicId: resolveActionClinicId(place) || null,
         suggestedClinic: normalizedPlace,
       },
     });
@@ -928,12 +1049,12 @@ export default function NavItem({
     const deeplink = String(button?.deeplink ?? "").trim().toLowerCase();
     const type = String(button?.type ?? "").trim().toLowerCase();
 
-    if (deeplink.includes("video-consult") || type === "video_consult") {
-      handleVideoCall();
+    if (isVideoConsultAction(button) || isDoctorBookingAction(button)) {
+      handleVideoCall(button);
       return;
     }
 
-    if (deeplink.includes("find-clinic") || type === "clinic") {
+    if (isClinicBookingAction(button)) {
       handleBookAppointment(button);
       return;
     }
