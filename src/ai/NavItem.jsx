@@ -29,6 +29,7 @@ import { clearAiAuthState } from "./AiAuth";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 
 const API_BASE = "https://snoutiq.com/backend/api";
+const CHAT_CACHE_PREFIX = "snoutiq.ai.chatCache";
 
 const normalizeBoolean = (value) => {
   if (typeof value === "boolean") return value;
@@ -151,6 +152,47 @@ const createHeaders = (token, hasJsonBody = true) => {
   return headers;
 };
 
+const getChatCacheKey = (userId) =>
+  `${CHAT_CACHE_PREFIX}:${String(userId ?? "").trim()}`;
+
+const readChatCache = (userId) => {
+  if (typeof window === "undefined") return null;
+
+  const key = getChatCacheKey(userId);
+  if (!key) return null;
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeChatCache = (userId, payload) => {
+  if (typeof window === "undefined") return;
+
+  const key = getChatCacheKey(userId);
+  if (!key) return;
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(payload));
+  } catch {}
+};
+
+const clearChatCache = (userId) => {
+  if (typeof window === "undefined") return;
+
+  const key = getChatCacheKey(userId);
+  if (!key) return;
+
+  try {
+    window.localStorage.removeItem(key);
+  } catch {}
+};
+
 const formatTime = (value) => {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
@@ -160,6 +202,71 @@ const formatTime = (value) => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+const normalizeCachedMessage = (message, index) => {
+  if (!message || typeof message !== "object") return null;
+
+  const sender = message?.sender === "user" ? "user" : "bot";
+  const text = String(message?.text ?? "").trim();
+
+  if (!text && sender === "user") return null;
+
+  return {
+    id:
+      message?.id ??
+      `${sender}-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    text,
+    sender,
+    timestamp: message?.timestamp ?? new Date().toISOString(),
+    queryType: message?.queryType ?? null,
+    hasActions: Boolean(message?.hasActions),
+    structuredData:
+      message?.structuredData && typeof message.structuredData === "object"
+        ? message.structuredData
+        : null,
+    richContent:
+      message?.richContent && typeof message.richContent === "object"
+        ? message.richContent
+        : null,
+    raw: message?.raw && typeof message.raw === "object" ? message.raw : null,
+  };
+};
+
+const normalizeCachedConversation = (conversation, index) => {
+  if (!conversation || typeof conversation !== "object") return null;
+
+  const token = String(
+    conversation?.token ??
+      conversation?.chat_room_token ??
+      conversation?.context_token ??
+      conversation?.session_id ??
+      "",
+  ).trim();
+
+  if (!token) return null;
+
+  const messages = Array.isArray(conversation?.messages)
+    ? conversation.messages
+        .map((message, messageIndex) =>
+          normalizeCachedMessage(message, messageIndex),
+        )
+        .filter(Boolean)
+    : [];
+
+  return {
+    id: conversation?.id ?? token ?? `cached-room-${index}`,
+    token,
+    title:
+      String(conversation?.title ?? conversation?.name ?? "New Chat").trim() ||
+      "New Chat",
+    summary: String(conversation?.summary ?? "").trim(),
+    turns: Number(conversation?.turns ?? 0),
+    createdAt: conversation?.createdAt ?? conversation?.created_at ?? null,
+    updatedAt: conversation?.updatedAt ?? conversation?.updated_at ?? null,
+    messages,
+    loaded: Boolean(conversation?.loaded ?? messages.length > 0),
+  };
 };
 
 const normalizeRoom = (room, existingRoom = null) => ({
@@ -189,6 +296,25 @@ const dedupeButtons = (items) => {
     seen.add(key);
     return true;
   });
+};
+
+const isClinicBookingAction = (item) => {
+  const deeplink = String(item?.deeplink ?? "").trim().toLowerCase();
+  const type = String(item?.type ?? "").trim().toLowerCase();
+
+  return (
+    type === "clinic" ||
+    deeplink.includes("find-clinic") ||
+    deeplink.includes("clinic")
+  );
+};
+
+const getActionButtonLabel = (item) => {
+  if (isClinicBookingAction(item)) {
+    return "Book Consult";
+  }
+
+  return item?.label || item?.title || "Continue";
 };
 
 const extractRichContent = (payload) => {
@@ -372,6 +498,7 @@ export default function NavItem({
   const navigate = useNavigate();
   const latestBotMessageRef = useRef(null);
   const shouldPinLatestResponseRef = useRef(false);
+  const hasHydratedChatCacheRef = useRef(false);
 
   const [messages, setMessages] = useState([]);
   const [currentInput, setCurrentInput] = useState("");
@@ -440,6 +567,58 @@ export default function NavItem({
     ownerDisplayName || petDisplayName || petProfileImageUrl,
   );
   const canOpenProfileMenu = hasAuth && hasProfileIdentity;
+
+  useEffect(() => {
+    if (!hasAuth || !resolvedUserId) {
+      hasHydratedChatCacheRef.current = false;
+      setMessages([]);
+      setConversations([]);
+      setActiveConversation(null);
+      return;
+    }
+
+    if (hasHydratedChatCacheRef.current) return;
+
+    hasHydratedChatCacheRef.current = true;
+
+    const cached = readChatCache(resolvedUserId);
+    if (!cached) return;
+
+    const cachedConversations = Array.isArray(cached?.conversations)
+      ? cached.conversations
+          .map((conversation, index) =>
+            normalizeCachedConversation(conversation, index),
+          )
+          .filter(Boolean)
+      : [];
+
+    if (cachedConversations.length > 0) {
+      setConversations(cachedConversations);
+    }
+
+    const cachedActiveToken = String(cached?.activeConversation ?? "").trim();
+    if (!cachedActiveToken) return;
+
+    setActiveConversation(cachedActiveToken);
+
+    const cachedActiveRoom = cachedConversations.find(
+      (conversation) => conversation.token === cachedActiveToken,
+    );
+    if (cachedActiveRoom?.messages?.length) {
+      setMessages(cachedActiveRoom.messages);
+    }
+  }, [hasAuth, resolvedUserId]);
+
+  useEffect(() => {
+    if (!hasAuth || !resolvedUserId) return;
+    if (!hasHydratedChatCacheRef.current) return;
+
+    writeChatCache(resolvedUserId, {
+      activeConversation,
+      conversations,
+      savedAt: Date.now(),
+    });
+  }, [activeConversation, conversations, hasAuth, resolvedUserId]);
 
   useEffect(() => {
     if (!shouldPinLatestResponseRef.current) return;
@@ -721,8 +900,28 @@ export default function NavItem({
     window.open("/payment", "_blank");
   };
 
-  const handleBookAppointment = () => {
-    window.open("/Appointment", "_blank");
+  const handleBookAppointment = (place = null) => {
+    const normalizedPlace =
+      place && typeof place === "object"
+        ? {
+            name: String(place?.name ?? "").trim(),
+            address: String(place?.address ?? "").trim(),
+            place_id: String(place?.place_id ?? "").trim(),
+            maps_link: String(place?.maps_link ?? "").trim(),
+            phone: String(place?.phone ?? "").trim(),
+            latitude: place?.latitude ?? null,
+            longitude: place?.longitude ?? null,
+          }
+        : null;
+
+    navigate("/inclinic-fast-booking", {
+      state: {
+        source: normalizedPlace ? "ai_nearby_place" : "ai_clinic_suggestion",
+        petId: resolvedPetId || null,
+        userId: resolvedUserId || null,
+        suggestedClinic: normalizedPlace,
+      },
+    });
   };
 
   const handleActionButton = (button) => {
@@ -735,7 +934,7 @@ export default function NavItem({
     }
 
     if (deeplink.includes("find-clinic") || type === "clinic") {
-      handleBookAppointment();
+      handleBookAppointment(button);
       return;
     }
 
@@ -755,6 +954,7 @@ export default function NavItem({
   };
 
   const handleLogout = () => {
+    clearChatCache(resolvedUserId);
     clearAiAuthState();
     setIsSidebarOpen(false);
     setProfileMenuOpen(false);
@@ -1061,6 +1261,16 @@ export default function NavItem({
                   ) : null}
                 </div>
 
+                {place?.phone ? (
+                  <a
+                    href={`tel:${place.phone}`}
+                    className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                  >
+                    <Phone size={14} />
+                    Call Clinic
+                  </a>
+                ) : null}
+
                 <div className="mt-auto flex gap-2 pt-5">
                   {place?.maps_link ? (
                     <a
@@ -1074,15 +1284,14 @@ export default function NavItem({
                     </a>
                   ) : null}
 
-                  {place?.phone ? (
-                    <a
-                      href={`tel:${place.phone}`}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
-                    >
-                      <Phone size={15} />
-                      Call Clinic
-                    </a>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => handleBookAppointment(place)}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                  >
+                    <Calendar size={15} />
+                    Book Consult
+                  </button>
                 </div>
               </div>
             ))}
@@ -1255,8 +1464,8 @@ export default function NavItem({
                 onClick={() => handleActionButton(button)}
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
               >
-                {button?.type === "clinic" ? <MapPin size={16} /> : <Video size={16} />}
-                {button?.label || button?.title || "Continue"}
+                {button?.type === "clinic" ? <Calendar size={16} /> : <Video size={16} />}
+                {getActionButtonLabel(button)}
               </button>
             ))}
           </div>
@@ -1318,7 +1527,7 @@ export default function NavItem({
                     className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
                   >
                     <ExternalLink size={14} />
-                    {card.cta.label}
+                    {getActionButtonLabel(card.cta)}
                   </button>
                 ) : null}
               </div>
