@@ -2214,8 +2214,31 @@ Route::get('/users/last-vet-details', function (Request $request) {
         ]);
     }
 
+    $nowIst = \Illuminate\Support\Carbon::now('Asia/Kolkata');
+    $currentDayOfWeek = (int) $nowIst->dayOfWeek;
+    $currentTime = $nowIst->format('H:i:s');
+
+    $availableDoctorIds = collect();
+    if (Schema::hasTable('doctor_video_availability')) {
+        $availableDoctorIds = DB::table('doctor_video_availability')
+            ->where('is_active', 1)
+            ->where('day_of_week', $currentDayOfWeek)
+            ->where('start_time', '<=', $currentTime)
+            ->where('end_time', '>=', $currentTime)
+            ->where(function ($q) use ($currentTime) {
+                $q->whereNull('break_start')
+                    ->orWhereNull('break_end')
+                    ->orWhere('break_start', '>', $currentTime)
+                    ->orWhere('break_end', '<=', $currentTime);
+            })
+            ->distinct()
+            ->pluck('doctor_id')
+            ->map(fn ($id) => (int) $id);
+    }
+
     $doctors = Doctor::query()
         ->where('vet_registeration_id', $clinic->id)
+        ->whereIn('id', $availableDoctorIds->all())
         ->get();
 
     return response()->json([
@@ -2225,6 +2248,12 @@ Route::get('/users/last-vet-details', function (Request $request) {
             'last_vet_id' => $user->last_vet_id,
             'clinic' => $clinic,
             'doctors' => $doctors->values(),
+            'availability' => [
+                'source' => 'doctor_video_availability',
+                'timezone' => 'Asia/Kolkata',
+                'day_of_week' => $currentDayOfWeek,
+                'time' => $currentTime,
+            ],
         ],
     ]);
 });
