@@ -2239,7 +2239,16 @@ Route::get('/users/last-vet-details', function (Request $request) {
     $doctors = Doctor::query()
         ->where('vet_registeration_id', $clinic->id)
         ->whereIn('id', $availableDoctorIds->all())
-        ->get();
+        ->get()
+        ->map(function (Doctor $doctor) {
+            $item = $doctor->toArray();
+            $item['doctor_image_blob_url'] = empty($doctor->doctor_image_blob)
+                ? null
+                : route('api.doctors.blob-image', ['doctor' => $doctor->id]);
+
+            return $item;
+        })
+        ->values();
 
     return response()->json([
         'success' => true,
@@ -2247,7 +2256,7 @@ Route::get('/users/last-vet-details', function (Request $request) {
             'user_id' => $user->id,
             'last_vet_id' => $user->last_vet_id,
             'clinic' => $clinic,
-            'doctors' => $doctors->values(),
+            'doctors' => $doctors,
             'availability' => [
                 'source' => 'doctor_video_availability',
                 'timezone' => 'Asia/Kolkata',
