@@ -203,11 +203,16 @@ class DoctorFollowUpUserController extends Controller
         if (
             !Schema::hasTable('transactions')
             || !Schema::hasColumn('transactions', 'doctor_id')
+            || !Schema::hasColumn('transactions', 'type')
+            || !Schema::hasColumn('transactions', 'status')
         ) {
             return 0;
         }
 
-        $query = Transaction::query()->where('doctor_id', $doctorId);
+        $query = Transaction::query()
+            ->where('doctor_id', $doctorId)
+            ->where('type', 'excell_export_campaign')
+            ->where('status', 'captured');
 
         if (Schema::hasColumn('transactions', 'amount')) {
             return (float) $query->sum('amount');
