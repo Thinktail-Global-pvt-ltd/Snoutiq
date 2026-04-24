@@ -111,12 +111,17 @@ class RazorpayPaymentLinkWebhookController extends Controller
                 'consult_session_id' => $consultSession?->id,
                 'consult_session_status' => $consultSession?->status,
                 'send_parent_payment_alert' => $shouldSendPaymentAlerts,
+                'send_parent_booking_confirmed_alert' => $shouldSendPaymentAlerts,
                 'send_vet_payment_alert' => $shouldSendPaymentAlerts,
             ];
         });
 
         if (!($result['duplicate'] ?? false) && ($result['send_parent_payment_alert'] ?? false)) {
             $result['parent_payment_alert'] = $this->sendParentPaymentConfirmedAlert($result['payment_link_id'] ?? null);
+        }
+
+        if (!($result['duplicate'] ?? false) && ($result['send_parent_booking_confirmed_alert'] ?? false)) {
+            $result['parent_booking_confirmed_alert'] = $this->sendParentBookingConfirmedAlert($result['payment_link_id'] ?? null);
         }
 
         if (!($result['duplicate'] ?? false) && ($result['send_vet_payment_alert'] ?? false)) {
@@ -564,6 +569,117 @@ class RazorpayPaymentLinkWebhookController extends Controller
         }
     }
 
+    private function sendParentBookingConfirmedAlert(?string $paymentLinkId): array
+    {
+        $paymentLinkId = trim((string) $paymentLinkId);
+        if ($paymentLinkId === '') {
+            return ['sent' => false, 'skipped' => true, 'reason' => 'missing_payment_link_id'];
+        }
+
+        $paymentLink = RazorpayPaymentLink::where('payment_link_id', $paymentLinkId)->first();
+        if (!$paymentLink) {
+            return ['sent' => false, 'skipped' => true, 'reason' => 'payment_link_not_found'];
+        }
+
+        if ($this->hasSentParentBookingConfirmedAlert($paymentLink)) {
+            return ['sent' => false, 'skipped' => true, 'reason' => 'already_sent'];
+        }
+
+        $parent = $this->resolvePetParent($paymentLink);
+        $parentPhone = $this->normalizeWhatsAppPhone($parent['phone'] ?? null);
+        if (!$parentPhone) {
+            $this->logParentBookingConfirmedAlert($paymentLink, 'skipped', null, null, null, 'missing_parent_phone');
+
+            return ['sent' => false, 'skipped' => true, 'reason' => 'missing_parent_phone'];
+        }
+
+        if (!$this->whatsApp->isConfigured()) {
+            $this->logParentBookingConfirmedAlert($paymentLink, 'skipped', $parentPhone, null, null, 'whatsapp_not_configured');
+
+            return ['sent' => false, 'skipped' => true, 'reason' => 'whatsapp_not_configured'];
+        }
+
+        $pet = $this->resolvePetDetails($paymentLink);
+        $doctorName = $this->resolveDoctorName($paymentLink);
+        $parentName = $this->cleanText($parent['name'] ?? null) ?: $this->formatIndianPhoneForTemplate($parent['phone'] ?? null) ?: 'Pet Parent';
+        $petName = $this->cleanText($pet['name'] ?? null) ?: 'your pet';
+        $petType = $this->cleanText($pet['type'] ?? null) ?: 'pet';
+        $amount = $this->formatRupeesForTemplate($this->resolvePaidAmountPaise($paymentLink));
+        $responseTime = $this->resolveResponseTimeMinutes($paymentLink);
+        $template = config('services.whatsapp.templates.pp_booking_confirmed', 'pp_booking_confirmed');
+        $language = config('services.whatsapp.templates.pp_booking_confirmed_language', 'en');
+
+        $components = [
+            [
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $parentName],
+                    ['type' => 'text', 'text' => $petName],
+                    ['type' => 'text', 'text' => $petType],
+                    ['type' => 'text', 'text' => $doctorName],
+                    ['type' => 'text', 'text' => $responseTime],
+                    ['type' => 'text', 'text' => $amount],
+                    ['type' => 'text', 'text' => $doctorName],
+                ],
+            ],
+        ];
+
+        try {
+            $response = $this->whatsApp->sendTemplateWithResult(
+                to: $parentPhone,
+                template: $template,
+                components: $components,
+                language: $language,
+                channelName: 'payment_confirmed_parent_booking'
+            );
+
+            $this->logParentBookingConfirmedAlert($paymentLink, 'sent', $parentPhone, $template, $language, null, [
+                'parent_name' => $parentName,
+                'pet_name' => $petName,
+                'pet_type' => $petType,
+                'doctor_name' => $doctorName,
+                'amount' => $amount,
+                'response_time_minutes' => $responseTime,
+                'whatsapp_response' => $response,
+            ]);
+
+            return [
+                'sent' => true,
+                'template' => $template,
+                'to' => $parentPhone,
+                'parent_name' => $parentName,
+                'pet_name' => $petName,
+                'pet_type' => $petType,
+                'doctor_name' => $doctorName,
+                'amount' => $amount,
+                'response_time_minutes' => $responseTime,
+            ];
+        } catch (\Throwable $e) {
+            $this->logParentBookingConfirmedAlert($paymentLink, 'failed', $parentPhone, $template, $language, $e->getMessage(), [
+                'parent_name' => $parentName,
+                'pet_name' => $petName,
+                'pet_type' => $petType,
+                'doctor_name' => $doctorName,
+                'amount' => $amount,
+                'response_time_minutes' => $responseTime,
+            ]);
+
+            Log::warning('razorpay.payment_link_webhook.parent_booking_confirmed_alert_failed', [
+                'payment_link_id' => $paymentLink->payment_link_id,
+                'parent_phone' => $parentPhone,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'sent' => false,
+                'skipped' => false,
+                'reason' => $e->getMessage(),
+                'template' => $template,
+                'to' => $parentPhone,
+            ];
+        }
+    }
+
     private function hasSentVetPaymentAlert(RazorpayPaymentLink $paymentLink): bool
     {
         if (!Schema::hasTable('vet_response_reminder_logs')) {
@@ -585,6 +701,19 @@ class RazorpayPaymentLinkWebhookController extends Controller
 
         return DB::table('vet_response_reminder_logs')
             ->whereJsonContains('meta->type', 'cf_payment_confirmed_parent')
+            ->whereJsonContains('meta->payment_link_id', $paymentLink->payment_link_id)
+            ->where('status', 'sent')
+            ->exists();
+    }
+
+    private function hasSentParentBookingConfirmedAlert(RazorpayPaymentLink $paymentLink): bool
+    {
+        if (!Schema::hasTable('vet_response_reminder_logs')) {
+            return false;
+        }
+
+        return DB::table('vet_response_reminder_logs')
+            ->whereJsonContains('meta->type', 'pp_booking_confirmed')
             ->whereJsonContains('meta->payment_link_id', $paymentLink->payment_link_id)
             ->where('status', 'sent')
             ->exists();
@@ -638,6 +767,54 @@ class RazorpayPaymentLinkWebhookController extends Controller
             'phone' => $user->phone
                 ?? data_get($paymentLink->webhook_payload, 'payload.payment.entity.contact')
                 ?? data_get($paymentLink->webhook_payload, 'payload.payment_link.entity.customer.contact'),
+        ];
+    }
+
+    private function resolvePetDetails(RazorpayPaymentLink $paymentLink): array
+    {
+        $pet = null;
+        $petId = $paymentLink->pet_id;
+
+        if ($petId && Schema::hasTable('pets')) {
+            $columns = array_values(array_filter([
+                'id',
+                Schema::hasColumn('pets', 'name') ? 'name' : null,
+                Schema::hasColumn('pets', 'pet_type') ? 'pet_type' : null,
+                Schema::hasColumn('pets', 'type') ? 'type' : null,
+                Schema::hasColumn('pets', 'breed') ? 'breed' : null,
+            ]));
+
+            $pet = DB::table('pets')
+                ->select($columns)
+                ->where('id', $petId)
+                ->first();
+        }
+
+        if (!$pet && $petId && Schema::hasTable('user_pets')) {
+            $columns = array_values(array_filter([
+                'id',
+                Schema::hasColumn('user_pets', 'name') ? 'name' : null,
+                Schema::hasColumn('user_pets', 'pet_type') ? 'pet_type' : null,
+                Schema::hasColumn('user_pets', 'type') ? 'type' : null,
+                Schema::hasColumn('user_pets', 'breed') ? 'breed' : null,
+            ]));
+
+            $pet = DB::table('user_pets')
+                ->select($columns)
+                ->where('id', $petId)
+                ->first();
+        }
+
+        $petName = $pet->name ?? data_get($paymentLink->webhook_payload, 'payload.payment_link.entity.notes.pet_name');
+        $petType = $pet->pet_type
+            ?? $pet->type
+            ?? $pet->breed
+            ?? data_get($paymentLink->webhook_payload, 'payload.payment_link.entity.notes.pet_type')
+            ?? data_get($paymentLink->webhook_payload, 'payload.payment_link.entity.notes.pet_breed');
+
+        return [
+            'name' => $petName,
+            'type' => $petType,
         ];
     }
 
@@ -815,6 +992,48 @@ class RazorpayPaymentLinkWebhookController extends Controller
             ]);
         } catch (\Throwable $e) {
             Log::error('razorpay.payment_link_webhook.vet_payment_alert_log_failed', [
+                'payment_link_id' => $paymentLink->payment_link_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function logParentBookingConfirmedAlert(
+        RazorpayPaymentLink $paymentLink,
+        string $status,
+        ?string $phone,
+        ?string $template,
+        ?string $language,
+        ?string $error,
+        array $extraMeta = []
+    ): void {
+        if (!Schema::hasTable('vet_response_reminder_logs')) {
+            return;
+        }
+
+        try {
+            DB::table('vet_response_reminder_logs')->insert([
+                'transaction_id' => null,
+                'user_id' => $paymentLink->user_id,
+                'pet_id' => $paymentLink->pet_id,
+                'phone' => $phone,
+                'template' => $template,
+                'language' => $language,
+                'status' => $status,
+                'error' => $error,
+                'meta' => json_encode(array_merge([
+                    'type' => 'pp_booking_confirmed',
+                    'payment_link_id' => $paymentLink->payment_link_id,
+                    'razorpay_payment_link_row_id' => $paymentLink->id,
+                    'payment_id' => $paymentLink->payment_id,
+                    'clinic_id' => $paymentLink->clinic_id,
+                    'doctor_id' => $paymentLink->doctor_id,
+                ], $extraMeta)),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('razorpay.payment_link_webhook.parent_booking_confirmed_alert_log_failed', [
                 'payment_link_id' => $paymentLink->payment_link_id,
                 'error' => $e->getMessage(),
             ]);
