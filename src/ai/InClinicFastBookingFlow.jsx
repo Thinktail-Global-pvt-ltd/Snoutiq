@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { readAiAuthState } from "./AiAuth";
+import { IN_CLINIC_PRICING } from "../newflow/askBooking/inClinicFlowShared";
 
 const API_BASE = "https://snoutiq.com/backend/api";
 
 const DEFAULT_ENDPOINTS = {
-  clinics: "/nearby-plus-featured?user_id=1394",
+  clinics: "/nearby-plus-featured",
   clinicDoctors: null,
   clinicAvailability: "/clinics/:clinicId/doctor-availability?service_type=in_clinic&date=:date",
+  serviceBookings: "/chat/service-bookings",
   createOrder: "/create-order",
   verifyPayment: "/rzp/verify",
 };
@@ -66,6 +70,55 @@ function formatCurrency(value) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(Number.isFinite(amount) ? amount : 0);
+}
+
+function toInteger(value, fallback = 0) {
+  const amount = Math.round(Number(value));
+  return Number.isFinite(amount) ? amount : fallback;
+}
+
+function pickFirst(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string") {
+      const text = value.trim();
+      if (text) return text;
+      continue;
+    }
+    return value;
+  }
+  return "";
+}
+
+function parseTimeForApi(value) {
+  const text = normalizeText(value).toUpperCase();
+  if (!text) return "";
+  if (/^\d{2}:\d{2}$/.test(text)) return `${text}:00`;
+  if (/^\d{1,2}:\d{2}\s?(AM|PM)$/.test(text)) {
+    const parsed = new Date(`1970-01-01 ${text}`);
+    if (!Number.isNaN(parsed.getTime())) {
+      return `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}:00`;
+    }
+  }
+  return text;
+}
+
+async function readApiBody(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
+}
+
+function stripEmpty(payload) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(
+      ([, value]) => value !== undefined && value !== null && value !== "",
+    ),
+  );
 }
 
 function getHeaders(token, extra = {}) {
@@ -429,6 +482,121 @@ export default function InClinicFastBookingFlow({
   endpoints = DEFAULT_ENDPOINTS,
   onSuccess,
 }) {
+  const location = useLocation();
+  const routeState =
+    location?.state && typeof location.state === "object" ? location.state : {};
+  const authState = useMemo(() => readAiAuthState(), []);
+  const authUser =
+    authState?.user && typeof authState.user === "object" ? authState.user : {};
+  const routeUser =
+    routeState?.user && typeof routeState.user === "object" ? routeState.user : {};
+  const resolvedUser = useMemo(
+    () => ({
+      ...authUser,
+      ...(user && typeof user === "object" ? user : {}),
+      ...routeUser,
+    }),
+    [authUser, routeUser, user],
+  );
+  const resolvedToken = useMemo(
+    () => normalizeText(pickFirst(token, routeState?.token, authState?.token)),
+    [authState?.token, routeState?.token, token],
+  );
+  const resolvedUserId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.userId,
+          routeState?.user_id,
+          resolvedUser?.id,
+          resolvedUser?.user_id,
+        ),
+      ),
+    [resolvedUser, routeState?.userId, routeState?.user_id],
+  );
+  const resolvedPetId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.petId,
+          routeState?.pet_id,
+          routeState?.prescriptionPrefill?.petId,
+          resolvedUser?.pet_id,
+          resolvedUser?.pet?.id,
+          resolvedUser?.pet?.pet_id,
+        ),
+      ),
+    [
+      resolvedUser,
+      routeState?.petId,
+      routeState?.pet_id,
+      routeState?.prescriptionPrefill?.petId,
+    ],
+  );
+  const requestedClinicId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.clinicId,
+          routeState?.clinic_id,
+          routeState?.prescriptionPrefill?.clinicId,
+        ),
+      ),
+    [routeState?.clinicId, routeState?.clinic_id, routeState?.prescriptionPrefill?.clinicId],
+  );
+  const requestedDoctorId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.doctorId,
+          routeState?.doctor_id,
+          routeState?.prescriptionPrefill?.doctorId,
+        ),
+      ),
+    [routeState?.doctorId, routeState?.doctor_id, routeState?.prescriptionPrefill?.doctorId],
+  );
+  const chatRoomToken = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.chat_room_token,
+          routeState?.chatRoomToken,
+          authState?.chatRoomToken,
+        ),
+      ),
+    [authState?.chatRoomToken, routeState?.chatRoomToken, routeState?.chat_room_token],
+  );
+  const contextToken = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.context_token,
+          routeState?.contextToken,
+          chatRoomToken,
+        ),
+      ),
+    [chatRoomToken, routeState?.contextToken, routeState?.context_token],
+  );
+  const suggestedClinicFromRoute =
+    routeState?.suggestedClinic && typeof routeState.suggestedClinic === "object"
+      ? routeState.suggestedClinic
+      : null;
+  const symptomPrefillText = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.symptomText,
+          routeState?.symptom_text,
+          routeState?.prescriptionPrefill?.symptomText,
+        ),
+      ),
+    [
+      routeState?.prescriptionPrefill?.symptomText,
+      routeState?.symptomText,
+      routeState?.symptom_text,
+    ],
+  );
+
   const initialDates = useMemo(() => buildDateStrip(14), []);
 
   const [clinics, setClinics] = useState([]);
@@ -447,20 +615,55 @@ export default function InClinicFastBookingFlow({
   const [expandedStep, setExpandedStep] = useState(1);
   const [paymentPhase, setPaymentPhase] = useState(PAYMENT_PHASES.idle);
   const [localError, setLocalError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
   const [successState, setSuccessState] = useState(null);
+  const [apiResponses, setApiResponses] = useState({
+    reportedSymptom: null,
+    serviceBooking: null,
+    createOrder: null,
+    verifyPayment: null,
+  });
 
   const [form, setForm] = useState({
-    ownerName: normalizeText(user?.name || ""),
-    phone: normalizePhone(user?.phone || user?.mobile || ""),
-    email: normalizeText(user?.email || ""),
-    petName: normalizeText(user?.pet?.name || user?.selectedPet?.name || user?.pet_name || ""),
-    petType: normalizeText(user?.pet?.pet_type || user?.selectedPet?.pet_type || "dog") || "dog",
-    symptoms: "",
+    ownerName: normalizeText(
+      pickFirst(
+        resolvedUser?.pet_owner_name,
+        resolvedUser?.owner_name,
+        resolvedUser?.name,
+      ),
+    ),
+    phone: normalizePhone(
+      pickFirst(
+        resolvedUser?.phone,
+        resolvedUser?.mobile,
+        resolvedUser?.mobileNumber,
+      ),
+    ),
+    email: normalizeText(pickFirst(resolvedUser?.email)),
+    petName: normalizeText(
+      pickFirst(
+        routeState?.petName,
+        routeState?.pet_name,
+        resolvedUser?.pet_name,
+        resolvedUser?.pet?.name,
+        resolvedUser?.pet?.pet_name,
+      ),
+    ),
+    petType:
+      normalizeText(
+        pickFirst(
+          routeState?.petType,
+          routeState?.pet_type,
+          resolvedUser?.pet_type,
+          resolvedUser?.pet?.pet_type,
+        ),
+      ) || "dog",
+    symptoms: symptomPrefillText,
     consentGiven: false,
   });
   const [mediaFiles, setMediaFiles] = useState([]);
 
-  const payableAmount = useMemo(() => Number(selectedDoctor?.price || 0), [selectedDoctor]);
+  const payableAmount = IN_CLINIC_PRICING.totalAmount;
   const paymentBusy = paymentPhase !== PAYMENT_PHASES.idle;
 
   useEffect(() => {
@@ -469,14 +672,23 @@ export default function InClinicFastBookingFlow({
     async function fetchClinics() {
       setLoadingClinics(true);
       setClinicError("");
+      setStatusMessage("");
 
       try {
-        const response = await fetch(`${apiBase}${endpoints.clinics}`, {
+        const clinicsBasePath = `${apiBase}${endpoints.clinics}`;
+        const querySeparator = clinicsBasePath.includes("?") ? "&" : "?";
+        const clinicsUrl = resolvedUserId
+          ? `${clinicsBasePath}${querySeparator}user_id=${encodeURIComponent(resolvedUserId)}`
+          : clinicsBasePath;
+
+        const response = await fetch(clinicsUrl, {
           method: "GET",
-          headers: getHeaders(token),
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+          }),
         });
 
-        const data = await response.json().catch(() => ({}));
+        const data = await readApiBody(response);
 
         if (!response.ok) {
           throw new Error(data?.message || "Clinics load nahi hue.");
@@ -485,10 +697,19 @@ export default function InClinicFastBookingFlow({
         const normalized = flattenClinics(data);
         if (!active) return;
         setClinics(normalized);
+
         if (normalized.length) {
-          const firstClinic = normalized[0];
-          setSelectedClinic(firstClinic);
-          setDoctors(flattenDoctorsFromClinic(firstClinic));
+          const preferredClinic =
+            normalized.find((item) => resolveClinicId(item) === requestedClinicId) ||
+            normalized.find(
+              (item) =>
+                suggestedClinicFromRoute &&
+                normalizeText(item?.name).toLowerCase() ===
+                  normalizeText(suggestedClinicFromRoute?.name).toLowerCase(),
+            ) ||
+            normalized[0];
+          setSelectedClinic(preferredClinic);
+          setDoctors(flattenDoctorsFromClinic(preferredClinic));
         }
       } catch (error) {
         if (!active) return;
@@ -503,22 +724,43 @@ export default function InClinicFastBookingFlow({
     return () => {
       active = false;
     };
-  }, [apiBase, endpoints.clinics, token]);
+  }, [
+    apiBase,
+    endpoints.clinics,
+    requestedClinicId,
+    resolvedToken,
+    resolvedUserId,
+    suggestedClinicFromRoute,
+  ]);
 
   useEffect(() => {
     if (!selectedClinic) return;
 
     async function fetchDoctorsIfNeeded() {
       if (!endpoints.clinicDoctors) {
-        setDoctors(flattenDoctorsFromClinic(selectedClinic));
+        const doctorList = flattenDoctorsFromClinic(selectedClinic);
+        setDoctors(doctorList);
+        if (requestedDoctorId) {
+          const matchedDoctor = doctorList.find(
+            (item) => resolveDoctorId(item) === requestedDoctorId,
+          );
+          if (matchedDoctor) {
+            setSelectedDoctor(matchedDoctor);
+            setExpandedStep(3);
+          }
+        }
         return;
       }
 
       try {
         const clinicId = resolveClinicId(selectedClinic);
         const url = `${apiBase}${endpoints.clinicDoctors.replace(":clinicId", clinicId)}`;
-        const response = await fetch(url, { headers: getHeaders(token) });
-        const data = await response.json().catch(() => ({}));
+        const response = await fetch(url, {
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+          }),
+        });
+        const data = await readApiBody(response);
         if (!response.ok) {
           throw new Error(data?.message || "Doctors load nahi hue.");
         }
@@ -535,6 +777,15 @@ export default function InClinicFastBookingFlow({
           .map((doctor) => normalizeDoctorRecord(doctor, selectedClinic))
           .filter(Boolean);
         setDoctors(normalized);
+        if (requestedDoctorId) {
+          const matchedDoctor = normalized.find(
+            (item) => resolveDoctorId(item) === requestedDoctorId,
+          );
+          if (matchedDoctor) {
+            setSelectedDoctor(matchedDoctor);
+            setExpandedStep(3);
+          }
+        }
       } catch (error) {
         setLocalError(error?.message || "Doctors load nahi hue.");
       }
@@ -544,7 +795,7 @@ export default function InClinicFastBookingFlow({
     setSelectedTime("");
     setSlots([]);
     fetchDoctorsIfNeeded();
-  }, [apiBase, endpoints.clinicDoctors, selectedClinic, token]);
+  }, [apiBase, endpoints.clinicDoctors, requestedDoctorId, resolvedToken, selectedClinic]);
 
   useEffect(() => {
     if (!selectedClinic || !selectedDate) return;
@@ -560,9 +811,11 @@ export default function InClinicFastBookingFlow({
         const url = `${apiBase}${buildAvailabilityUrl(endpoints.clinicAvailability, clinicId, selectedDate)}`;
         const response = await fetch(url, {
           method: "GET",
-          headers: getHeaders(token),
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+          }),
         });
-        const data = await response.json().catch(() => ({}));
+        const data = await readApiBody(response);
 
         if (!response.ok) {
           throw new Error(data?.message || "Slots load nahi hue.");
@@ -585,7 +838,7 @@ export default function InClinicFastBookingFlow({
     return () => {
       active = false;
     };
-  }, [apiBase, endpoints.clinicAvailability, selectedClinic, selectedDate, token]);
+  }, [apiBase, endpoints.clinicAvailability, resolvedToken, selectedClinic, selectedDate]);
 
   const clinicSummary = useMemo(() => {
     if (!selectedClinic) return "No clinic selected";
@@ -594,7 +847,7 @@ export default function InClinicFastBookingFlow({
 
   const doctorSummary = useMemo(() => {
     if (!selectedDoctor) return "No doctor selected";
-    return `${selectedDoctor.name} • ${formatCurrency(selectedDoctor.price)}`;
+    return `${selectedDoctor.name} • ${formatCurrency(IN_CLINIC_PRICING.totalAmount)} payable`;
   }, [selectedDoctor]);
 
   const slotSummary = useMemo(() => {
@@ -616,12 +869,14 @@ export default function InClinicFastBookingFlow({
     setSelectedClinic(clinic);
     setExpandedStep(2);
     setLocalError("");
+    setStatusMessage("");
   }
 
   function handleDoctorSelect(doctor) {
     setSelectedDoctor(doctor);
     setExpandedStep(3);
     setLocalError("");
+    setStatusMessage("");
   }
 
   function handleMediaChange(event) {
@@ -633,12 +888,24 @@ export default function InClinicFastBookingFlow({
     setMediaFiles((current) => current.filter((file) => file !== targetFile));
   }
 
+  function recordApiResponse(key, payload) {
+    setApiResponses((current) => ({
+      ...current,
+      [key]: payload,
+    }));
+  }
+
   function validateBeforePayment() {
+    if (!resolvedUserId || !resolvedPetId) {
+      return "User/Pet context missing hai. Ask flow se dubara open kijiye.";
+    }
     if (!selectedClinic) return "Please select a clinic.";
     if (!selectedDoctor) return "Please select a doctor.";
     if (!selectedDate || !selectedTime) return "Please select date and slot.";
     if (!normalizeText(form.ownerName)) return "Owner name required hai.";
-    if (!normalizePhone(form.phone)) return "Phone number required hai.";
+    if (normalizePhone(form.phone).replace(/\D/g, "").length < 10) {
+      return "Valid phone number required hai.";
+    }
     if (!normalizeText(form.petName)) return "Pet name required hai.";
     if (!normalizeText(form.symptoms)) return "Please describe your pet symptoms.";
     if (!form.consentGiven) return "Please acknowledge the consent checkbox before payment.";
@@ -683,35 +950,241 @@ export default function InClinicFastBookingFlow({
     }
 
     setLocalError("");
+    setStatusMessage("");
+    setApiResponses({
+      reportedSymptom: null,
+      serviceBooking: null,
+      createOrder: null,
+      verifyPayment: null,
+    });
     setPaymentPhase(PAYMENT_PHASES.submitting);
 
     try {
-      const formData = new FormData();
-      formData.append("user_id", user?.id || user?.user_id || "");
-      formData.append("appointment_type", "in_clinic");
-      formData.append("clinic_id", selectedClinic.id);
-      formData.append("doctor_id", selectedDoctor.id);
-      formData.append("appointment_date", selectedDate);
-      formData.append("appointment_time", selectedTime);
-      formData.append("amount", String(Math.round(payableAmount)));
-      formData.append("pet_name", form.petName);
-      formData.append("pet_type", form.petType);
-      formData.append("symptoms", form.symptoms);
-      formData.append("description", form.symptoms);
-      formData.append("owner_name", form.ownerName);
-      formData.append("mobile", form.phone);
-      formData.append("consent", form.consentGiven ? "1" : "0");
+      const userIdNumber = toInteger(resolvedUserId, 0);
+      const petIdNumber = toInteger(resolvedPetId, 0);
+      const clinicIdText = normalizeText(resolveClinicId(selectedClinic) || requestedClinicId);
+      const doctorIdText = normalizeText(resolveDoctorId(selectedDoctor) || requestedDoctorId);
+      const clinicIdNumber = toInteger(clinicIdText, 0);
+      const doctorIdNumber = toInteger(doctorIdText, 0);
+      const symptomText = normalizeText(form.symptoms);
 
-      mediaFiles.forEach((file, index) => {
-        formData.append(`attachments[${index}]`, file);
+      const symptomRes = await fetch(
+        `${apiBase}/users/${encodeURIComponent(resolvedUserId)}/pets/${encodeURIComponent(resolvedPetId)}/reported-symptom`,
+        {
+          method: "PUT",
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({
+            reported_symptom: symptomText,
+          }),
+        },
+      );
+      const symptomData = await readApiBody(symptomRes);
+      recordApiResponse("reportedSymptom", symptomData);
+      if (
+        !symptomRes.ok ||
+        (symptomData &&
+          typeof symptomData === "object" &&
+          symptomData.success === false)
+      ) {
+        setStatusMessage(
+          normalizeText(
+            symptomData?.message ||
+              symptomData?.error ||
+              "Reported symptom update failed.",
+          ) || "Reported symptom update failed.",
+        );
+      } else {
+        setStatusMessage("Reported symptom updated successfully.");
+      }
+
+      const serviceBookingPayload = stripEmpty({
+        user_id: userIdNumber || resolvedUserId,
+        pet_id: petIdNumber || resolvedPetId,
+        clinic_name: normalizeText(
+          pickFirst(
+            selectedClinic?.name,
+            suggestedClinicFromRoute?.name,
+            selectedDoctor?.clinicName,
+          ),
+        ),
+        clinic_mobile: normalizePhone(
+          pickFirst(
+            suggestedClinicFromRoute?.phone,
+            selectedClinic?.raw?.clinic_mobile,
+            selectedClinic?.raw?.mobile,
+            selectedDoctor?.raw?.clinic_mobile,
+            selectedDoctor?.mobile,
+          ),
+        ),
+        clinic_email: normalizeText(
+          pickFirst(
+            selectedClinic?.raw?.clinic_email,
+            selectedClinic?.raw?.email,
+            suggestedClinicFromRoute?.email,
+          ),
+        ),
+        clinic_city: normalizeText(
+          pickFirst(
+            selectedClinic?.raw?.clinic_city,
+            selectedClinic?.raw?.city,
+            suggestedClinicFromRoute?.city,
+          ),
+        ),
+        clinic_pincode: normalizeText(
+          pickFirst(
+            selectedClinic?.raw?.clinic_pincode,
+            selectedClinic?.raw?.pincode,
+            suggestedClinicFromRoute?.pincode,
+          ),
+        ),
+        clinic_address: normalizeText(
+          pickFirst(
+            selectedClinic?.raw?.clinic_address,
+            selectedClinic?.address,
+            selectedClinic?.raw?.address,
+            suggestedClinicFromRoute?.address,
+          ),
+        ),
+        clinic_lat: pickFirst(
+          selectedClinic?.raw?.lat,
+          selectedClinic?.raw?.latitude,
+          suggestedClinicFromRoute?.latitude,
+        ),
+        clinic_lng: pickFirst(
+          selectedClinic?.raw?.lng,
+          selectedClinic?.raw?.longitude,
+          suggestedClinicFromRoute?.longitude,
+        ),
+        clinic_place_id: normalizeText(
+          pickFirst(
+            selectedClinic?.raw?.place_id,
+            suggestedClinicFromRoute?.place_id,
+          ),
+        ),
+        doctor_name: normalizeText(
+          pickFirst(
+            selectedDoctor?.name,
+            selectedDoctor?.raw?.doctor_name,
+          ),
+        ),
+        doctor_mobile: normalizePhone(
+          pickFirst(
+            selectedDoctor?.mobile,
+            selectedDoctor?.raw?.doctor_mobile,
+            selectedDoctor?.raw?.mobile,
+          ),
+        ),
+        doctor_email: normalizeText(
+          pickFirst(
+            selectedDoctor?.raw?.doctor_email,
+            selectedDoctor?.raw?.email,
+          ),
+        ),
+        doctor_license: normalizeText(
+          pickFirst(
+            selectedDoctor?.raw?.doctor_license,
+            selectedDoctor?.raw?.license_number,
+            selectedDoctor?.raw?.license,
+          ),
+        ),
+        doctor_price: toInteger(
+          pickFirst(
+            selectedDoctor?.price,
+            selectedDoctor?.raw?.doctors_price,
+            selectedDoctor?.raw?.price,
+            IN_CLINIC_PRICING.discountedAmount,
+          ),
+          IN_CLINIC_PRICING.discountedAmount,
+        ),
+        chat_room_token: chatRoomToken || undefined,
+        context_token: contextToken || undefined,
+        service_type: "in_clinic",
+        appointment_date: selectedDate || toDateOnly(new Date()),
+        appointment_time: parseTimeForApi(selectedTime),
+        notes: symptomText,
+      });
+
+      let serviceRes = await fetch(
+        `${apiBase}${endpoints.serviceBookings || DEFAULT_ENDPOINTS.serviceBookings}`,
+        {
+          method: "POST",
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(serviceBookingPayload),
+        },
+      );
+      let serviceData = await readApiBody(serviceRes);
+
+      const duplicatePlaceIdError =
+        normalizeText(serviceData?.message).toLowerCase().includes("duplicate entry") &&
+        normalizeText(serviceData?.message).toLowerCase().includes("place_id");
+
+      if ((!serviceRes.ok || serviceData?.success === false) && duplicatePlaceIdError) {
+        const retryPayload = { ...serviceBookingPayload };
+        delete retryPayload.clinic_place_id;
+        const retryRes = await fetch(
+          `${apiBase}${endpoints.serviceBookings || DEFAULT_ENDPOINTS.serviceBookings}`,
+          {
+            method: "POST",
+            headers: getHeaders(resolvedToken, {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            }),
+            body: JSON.stringify(retryPayload),
+          },
+        );
+        const retryData = await readApiBody(retryRes);
+        recordApiResponse("serviceBooking", {
+          firstAttempt: serviceData,
+          retryAttempt: retryData,
+        });
+        serviceRes = retryRes;
+        serviceData = retryData;
+      } else {
+        recordApiResponse("serviceBooking", serviceData);
+      }
+
+      if (
+        !serviceRes.ok ||
+        (serviceData &&
+          typeof serviceData === "object" &&
+          serviceData.success === false)
+      ) {
+        setStatusMessage(
+          normalizeText(
+            serviceData?.message ||
+              serviceData?.error ||
+              "Service booking sync failed, but payment can continue.",
+          ) || "Service booking sync failed, but payment can continue.",
+        );
+      } else {
+        setStatusMessage("Service booking created. Opening payment...");
+      }
+
+      const createPayload = stripEmpty({
+        amount: IN_CLINIC_PRICING.totalAmount,
+        order_type: "appointment",
+        user_id: userIdNumber || resolvedUserId,
+        doctor_id: doctorIdNumber || doctorIdText,
+        clinic_id: clinicIdNumber || clinicIdText,
+        pet_id: petIdNumber || resolvedPetId,
       });
 
       const createRes = await fetch(`${apiBase}${endpoints.createOrder}`, {
         method: "POST",
-        headers: getHeaders(token),
-        body: formData,
+        headers: getHeaders(resolvedToken, {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(createPayload),
       });
-      const createData = await createRes.json().catch(() => ({}));
+      const createData = await readApiBody(createRes);
+      recordApiResponse("createOrder", createData);
 
       if (!createRes.ok) {
         throw new Error(createData?.message || createData?.error || "Order create nahi hua.");
@@ -720,7 +1193,7 @@ export default function InClinicFastBookingFlow({
       const order = createData?.order || createData?.data?.order || createData?.data || {};
       const razorpayKey = normalizeText(createData?.key || createData?.data?.key || "");
       const orderId = normalizeText(order?.id || order?.order_id || createData?.order_id || createData?.data?.order_id);
-      const amountInPaise = Number(order?.amount || Math.round(payableAmount * 100));
+      const amountInPaise = Number(order?.amount || IN_CLINIC_PRICING.totalAmount * 100);
 
       if (!razorpayKey) throw new Error("Razorpay key missing hai.");
       if (!orderId) throw new Error("Order ID missing hai.");
@@ -738,24 +1211,28 @@ export default function InClinicFastBookingFlow({
         razorpay_order_id: razorpayResponse?.razorpay_order_id || orderId,
         razorpay_payment_id: razorpayResponse?.razorpay_payment_id,
         razorpay_signature: razorpayResponse?.razorpay_signature,
-        appointment_type: "in_clinic",
-        clinic_id: selectedClinic.id,
-        doctor_id: selectedDoctor.id,
+        order_type: "appointment",
+        user_id: userIdNumber || resolvedUserId,
+        pet_id: petIdNumber || resolvedPetId,
+        clinic_id: clinicIdNumber || clinicIdText,
+        doctor_id: doctorIdNumber || doctorIdText,
         appointment_date: selectedDate,
-        appointment_time: selectedTime,
+        appointment_time: parseTimeForApi(selectedTime),
       };
+      const finalVerifyPayload = stripEmpty(verifyPayload);
 
       const verifyRes = await fetch(`${apiBase}${endpoints.verifyPayment}`, {
         method: "POST",
-        headers: {
-          ...getHeaders(token),
+        headers: getHeaders(resolvedToken, {
+          Accept: "application/json",
           "Content-Type": "application/json",
-        },
-        body: JSON.stringify(verifyPayload),
+        }),
+        body: JSON.stringify(finalVerifyPayload),
       });
-      const verifyData = await verifyRes.json().catch(() => ({}));
+      const verifyData = await readApiBody(verifyRes);
+      recordApiResponse("verifyPayment", verifyData);
 
-      if (!verifyRes.ok && !verifyData?.success) {
+      if (!verifyRes.ok || !verifyData?.success) {
         throw new Error(verifyData?.message || verifyData?.error || "Payment verify nahi hua.");
       }
 
@@ -767,6 +1244,12 @@ export default function InClinicFastBookingFlow({
         appointmentTime: selectedTime,
         paymentId: razorpayResponse?.razorpay_payment_id,
         amount: payableAmount,
+        responses: {
+          reportedSymptom: symptomData,
+          serviceBooking: serviceData,
+          createOrder: createData,
+          verifyPayment: verifyData,
+        },
       };
 
       setSuccessState(successPayload);
@@ -1097,6 +1580,27 @@ export default function InClinicFastBookingFlow({
                 <div className="rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{localError}</div>
               ) : null}
 
+              {statusMessage ? (
+                <div className="rounded-[24px] border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                  {statusMessage}
+                </div>
+              ) : null}
+
+              {apiResponses.reportedSymptom ||
+              apiResponses.serviceBooking ||
+              apiResponses.createOrder ||
+              apiResponses.verifyPayment ? (
+                <details className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-800">
+                    Full Backend Responses
+                  </summary>
+                  <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-white p-3 text-xs text-slate-700">
+                    {JSON.stringify(apiResponses, null, 2)}
+                  </pre>
+                </details>
+              ) : null}
+
+
               {successState ? (
                 <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5">
                   <div className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Appointment booked</div>
@@ -1109,6 +1613,16 @@ export default function InClinicFastBookingFlow({
                     <div><span className="font-semibold">Date:</span> {formatDateLabel(successState.appointmentDate)}</div>
                     <div><span className="font-semibold">Time:</span> {successState.appointmentTime}</div>
                   </div>
+                  {successState?.responses ? (
+                    <details className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-emerald-800">
+                        Full Backend Responses
+                      </summary>
+                      <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-white p-3 text-xs text-slate-700">
+                        {JSON.stringify(successState.responses, null, 2)}
+                      </pre>
+                    </details>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -1130,6 +1644,14 @@ export default function InClinicFastBookingFlow({
                   <div className="flex items-center justify-between py-3"><span className="text-slate-500">Pet</span><span className="max-w-[55%] truncate font-medium text-slate-900">{form.petName || "Enter pet name"}</span></div>
                 </div>
 
+                <div className="mt-4 rounded-2xl border border-slate-200 p-3 text-sm">
+                  <div className="flex items-center justify-between py-1.5"><span className="text-slate-500">Consultation fee</span><span className="font-medium text-slate-900">{formatCurrency(IN_CLINIC_PRICING.originalAmount)}</span></div>
+                  <div className="flex items-center justify-between py-1.5"><span className="text-slate-500">Discount</span><span className="font-medium text-emerald-700">- {formatCurrency(IN_CLINIC_PRICING.discountAmount)}</span></div>
+                  <div className="flex items-center justify-between py-1.5"><span className="text-slate-500">After discount</span><span className="font-medium text-slate-900">{formatCurrency(IN_CLINIC_PRICING.discountedAmount)}</span></div>
+                  <div className="flex items-center justify-between py-1.5"><span className="text-slate-500">GST ({IN_CLINIC_PRICING.gstRate}%)</span><span className="font-medium text-slate-900">{formatCurrency(IN_CLINIC_PRICING.gstAmount)}</span></div>
+                  <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-2"><span className="font-semibold text-slate-900">Total</span><span className="font-semibold text-slate-900">{formatCurrency(IN_CLINIC_PRICING.totalAmount)}</span></div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handlePayNow}
@@ -1137,7 +1659,7 @@ export default function InClinicFastBookingFlow({
                   className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {paymentPhase === PAYMENT_PHASES.submitting
-                    ? "Creating order..."
+                    ? "Syncing booking..."
                     : paymentPhase === PAYMENT_PHASES.success_processing
                       ? "Opening Razorpay..."
                       : paymentPhase === PAYMENT_PHASES.redirecting

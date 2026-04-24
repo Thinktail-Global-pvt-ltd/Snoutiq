@@ -1016,6 +1016,16 @@ export default function NavItem({
     await loadRoomChats(roomToken, { shouldSetActive: true });
   };
 
+  const getLatestUserMessageText = () => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.sender !== "user") continue;
+      const text = String(message?.text ?? "").trim();
+      if (text) return text;
+    }
+    return "";
+  };
+
   const handleVideoCall = (button = null) => {
     navigate("/video-counsult", {
       state: {
@@ -1026,6 +1036,10 @@ export default function NavItem({
         clinicId: resolveActionClinicId(button) || null,
         doctorName: resolveActionDoctorName(button) || null,
         clinicName: resolveActionClinicName(button) || null,
+        chat_room_token: activeConversation || null,
+        context_token: activeConversation || null,
+        symptomText: getLatestUserMessageText() || null,
+        actionPayload: button || null,
       },
     });
   };
@@ -1041,6 +1055,10 @@ export default function NavItem({
         doctorId: resolveActionDoctorId(place) || null,
         clinicId: resolveActionClinicId(place) || null,
         suggestedClinic: normalizedPlace,
+        chat_room_token: activeConversation || null,
+        context_token: activeConversation || null,
+        symptomText: getLatestUserMessageText() || null,
+        actionPayload: place || null,
       },
     });
   };
@@ -1576,7 +1594,7 @@ export default function NavItem({
           </div>
         ) : null}
 
-        {actionButtons.length > 0 ? (
+        {/* {actionButtons.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">
             {actionButtons.map((button, index) => (
               <button
@@ -1590,7 +1608,7 @@ export default function NavItem({
               </button>
             ))}
           </div>
-        ) : null}
+        ) : null} */}
 
         {serviceCards.length > 0 ? (
           <div className="space-y-3">

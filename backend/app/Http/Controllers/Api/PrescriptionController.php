@@ -582,7 +582,7 @@ class PrescriptionController extends Controller
         $pets = $petsQuery
             ->orderByDesc('id')
             ->get()
-            ->map(function ($pet) use ($hasPetWeightColumn) {
+            ->map(function (Pet $pet) use ($hasPetWeightColumn) {
                 // Surface vaccination info from dog_disease_payload if present.
                 $payload = $pet->dog_disease_payload ?? null;
                 if (is_string($payload)) {
@@ -595,12 +595,19 @@ class PrescriptionController extends Controller
                 if (!$hasPetWeightColumn) {
                     $pet->weight = null;
                 }
+
+                $blobUrl = $this->petDoc2BlobUrl($pet);
+                $pet->setAttribute('pet_doc2_blob_url', $blobUrl);
+                $pet->setAttribute('pet_image_url', $blobUrl ?: ($pet->pet_doc1 ?? $pet->pet_doc2 ?? $pet->pic_link ?? null));
+
                 return $pet;
             });
 
-        $userData = DB::table('users')
-            ->where('id', $user->id)
-            ->first();
+        $userBlobUrl = $this->userPetDoc2BlobUrl($user);
+        $userData = array_merge($user->toArray(), [
+            'pet_doc2_blob_url' => $userBlobUrl,
+            'pet_image_url' => $userBlobUrl ?: ($user->pet_doc1 ?? $user->pet_doc2 ?? null),
+        ]);
 
         if ($petId && $pets->isEmpty()) {
             return response()->json([
@@ -657,16 +664,19 @@ class PrescriptionController extends Controller
                 return $prescription;
             });
 
+        $jsonFlags = 0;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => [
-                    ...((array) $userData),
-                ],
+                'user' => $userData,
                 'pets' => $pets,
                 'prescriptions' => $prescriptions,
             ],
-        ]);
+        ], 200, [], $jsonFlags);
     }
 
     // POST /api/prescriptions

@@ -1,15 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { readAiAuthState } from "./AiAuth";
 
 const API_BASE = "https://snoutiq.com/backend/api";
 const ENDPOINTS = {
   list: "/exported_from_excell_doctors",
   createOrder: "/create-order",
   verifyPayment: "/rzp/verify",
+  serviceBookings: "/chat/service-bookings",
 };
 
 const DAY_RATE_START_HOUR = 8;
 const DAY_RATE_END_HOUR = 20;
+const STATIC_CONSULTATION_AMOUNT = 599;
+const STATIC_SERVICE_AMOUNT = 0;
+const STATIC_DISCOUNT_AMOUNT = 100;
+const GST_RATE = 0.18;
 
 function normalizeText(value) {
   if (value === null || value === undefined) return "";
@@ -69,6 +75,34 @@ function roundAmount(value) {
   const amount = Number(value || 0);
   if (!Number.isFinite(amount)) return 0;
   return Math.max(0, Math.round((amount + Number.EPSILON) * 100) / 100);
+}
+
+function toInteger(value, fallback = 0) {
+  const amount = Math.round(Number(value));
+  return Number.isFinite(amount) ? amount : fallback;
+}
+
+function pickFirst(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string") {
+      const text = value.trim();
+      if (text) return text;
+      continue;
+    }
+    return value;
+  }
+  return "";
+}
+
+async function readApiBody(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
 }
 
 function currentSlot() {
@@ -342,7 +376,131 @@ export default function ConsultBookingFlow({
   const location = useLocation();
   const routeState =
     location?.state && typeof location.state === "object" ? location.state : {};
+  const authState = useMemo(() => readAiAuthState(), []);
+  const authUser =
+    authState?.user && typeof authState.user === "object" ? authState.user : {};
+  const routeUser =
+    routeState?.user && typeof routeState.user === "object" ? routeState.user : {};
   const initialDoctorSelectionAppliedRef = useRef(false);
+
+  const resolvedUser = useMemo(
+    () => ({
+      ...authUser,
+      ...(user && typeof user === "object" ? user : {}),
+      ...routeUser,
+    }),
+    [authUser, routeUser, user],
+  );
+
+  const resolvedToken = useMemo(
+    () => normalizeText(pickFirst(token, routeState?.token, authState?.token)),
+    [authState?.token, routeState?.token, token],
+  );
+
+  const resolvedUserId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.userId,
+          routeState?.user_id,
+          resolvedUser?.id,
+          resolvedUser?.user_id,
+        ),
+      ),
+    [resolvedUser, routeState?.userId, routeState?.user_id],
+  );
+
+  const resolvedPetId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.petId,
+          routeState?.pet_id,
+          routeState?.prescriptionPrefill?.petId,
+          resolvedUser?.pet_id,
+          resolvedUser?.pet?.id,
+          resolvedUser?.pet?.pet_id,
+        ),
+      ),
+    [
+      resolvedUser,
+      routeState?.petId,
+      routeState?.pet_id,
+      routeState?.prescriptionPrefill?.petId,
+    ],
+  );
+
+  const resolvedClinicId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.clinicId,
+          routeState?.clinic_id,
+          routeState?.prescriptionPrefill?.clinicId,
+        ),
+      ),
+    [routeState?.clinicId, routeState?.clinic_id, routeState?.prescriptionPrefill?.clinicId],
+  );
+
+  const resolvedCallSessionId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.callSessionId,
+          routeState?.call_session_id,
+          routeState?.latestCallSession?.call_identifier,
+          routeState?.latestCallSession?.callIdentifier,
+          authState?.latestCallSession?.call_identifier,
+          authState?.latestCallSession?.callIdentifier,
+        ),
+      ),
+    [
+      authState?.latestCallSession?.call_identifier,
+      authState?.latestCallSession?.callIdentifier,
+      routeState?.callSessionId,
+      routeState?.call_session_id,
+      routeState?.latestCallSession?.call_identifier,
+      routeState?.latestCallSession?.callIdentifier,
+    ],
+  );
+
+  const resolvedChannelName = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.channelName,
+          routeState?.channel_name,
+          routeState?.latestCallSession?.channel_name,
+          routeState?.latestCallSession?.channelName,
+          authState?.latestCallSession?.channel_name,
+          authState?.latestCallSession?.channelName,
+        ),
+      ),
+    [
+      authState?.latestCallSession?.channel_name,
+      authState?.latestCallSession?.channelName,
+      routeState?.channelName,
+      routeState?.channel_name,
+      routeState?.latestCallSession?.channel_name,
+      routeState?.latestCallSession?.channelName,
+    ],
+  );
+
+  const symptomPrefillText = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          routeState?.symptomText,
+          routeState?.symptom_text,
+          routeState?.prescriptionPrefill?.symptomText,
+        ),
+      ),
+    [
+      routeState?.prescriptionPrefill?.symptomText,
+      routeState?.symptomText,
+      routeState?.symptom_text,
+    ],
+  );
 
   const requestedDoctorId = useMemo(
     () =>
@@ -377,13 +535,41 @@ export default function ConsultBookingFlow({
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
 
   const [details, setDetails] = useState({
-    ownerName: normalizeText(user?.name || ""),
-    phone: normalizePhone(user?.phone || user?.mobile || ""),
-    email: normalizeText(user?.email || ""),
-    petName: "",
-    petType: "dog",
+    ownerName: normalizeText(
+      pickFirst(
+        resolvedUser?.pet_owner_name,
+        resolvedUser?.owner_name,
+        resolvedUser?.name,
+      ),
+    ),
+    phone: normalizePhone(
+      pickFirst(
+        resolvedUser?.phone,
+        resolvedUser?.mobile,
+        resolvedUser?.mobileNumber,
+      ),
+    ),
+    email: normalizeText(pickFirst(resolvedUser?.email)),
+    petName: normalizeText(
+      pickFirst(
+        routeState?.petName,
+        routeState?.pet_name,
+        resolvedUser?.pet_name,
+        resolvedUser?.pet?.name,
+        resolvedUser?.pet?.pet_name,
+      ),
+    ),
+    petType:
+      normalizeText(
+        pickFirst(
+          routeState?.petType,
+          routeState?.pet_type,
+          resolvedUser?.pet_type,
+          resolvedUser?.pet?.pet_type,
+        ),
+      ) || "dog",
     petAge: "",
-    issue: "",
+    issue: symptomPrefillText,
     notes: "",
   });
 
@@ -393,13 +579,36 @@ export default function ConsultBookingFlow({
 
   const [createOrderLoading, setCreateOrderLoading] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [reportedSymptomMessage, setReportedSymptomMessage] = useState("");
   const [couponMessage, setCouponMessage] = useState("");
   const [successState, setSuccessState] = useState(null);
+  const [apiResponses, setApiResponses] = useState({
+    reportedSymptom: null,
+    createOrder: null,
+    verifyPayment: null,
+  });
 
   const slot = useMemo(() => currentSlot(), []);
-  const baseFee = useMemo(() => (selectedDoctor ? resolveDoctorFee(selectedDoctor, slot) : 0), [selectedDoctor, slot]);
-  const gstAmount = useMemo(() => roundAmount((baseFee * 18) / 100), [baseFee]);
-  const payableAmount = useMemo(() => roundAmount(baseFee + (gstEnabled ? gstAmount : 0)), [baseFee, gstAmount, gstEnabled]);
+  const consultationAmount = STATIC_CONSULTATION_AMOUNT;
+  const serviceAmount = STATIC_SERVICE_AMOUNT;
+  const subtotalAmount = useMemo(
+    () => roundAmount(consultationAmount + serviceAmount),
+    [consultationAmount, serviceAmount],
+  );
+  const discountAmount = useMemo(
+    () => roundAmount(Math.min(STATIC_DISCOUNT_AMOUNT, subtotalAmount)),
+    [subtotalAmount],
+  );
+  const taxableAmount = useMemo(
+    () => roundAmount(Math.max(subtotalAmount - discountAmount, 0)),
+    [discountAmount, subtotalAmount],
+  );
+  const gstAmount = useMemo(() => roundAmount(taxableAmount * GST_RATE), [taxableAmount]);
+  const payableAmount = useMemo(
+    () => roundAmount(taxableAmount + gstAmount),
+    [gstAmount, taxableAmount],
+  );
+  const payableAmountInr = useMemo(() => toInteger(payableAmount), [payableAmount]);
 
   useEffect(() => {
     let active = true;
@@ -411,7 +620,9 @@ export default function ConsultBookingFlow({
       try {
         const response = await fetch(`${apiBase}${endpoints.list}`, {
           method: "GET",
-        //   headers: getAuthHeaders(token),
+          headers: getAuthHeaders(resolvedToken, {
+            Accept: "application/json",
+          }),
         });
 
         const data = await response.json().catch(() => ({}));
@@ -438,7 +649,7 @@ export default function ConsultBookingFlow({
     return () => {
       active = false;
     };
-  }, [apiBase, endpoints.list, token]);
+  }, [apiBase, endpoints.list, resolvedToken]);
 
   useEffect(() => {
     if (initialDoctorSelectionAppliedRef.current || loadingDoctors) {
@@ -486,10 +697,22 @@ export default function ConsultBookingFlow({
     setDetails((current) => ({ ...current, [key]: value }));
   };
 
+  const recordApiResponse = (key, payload) => {
+    setApiResponses((current) => ({
+      ...current,
+      [key]: payload,
+    }));
+  };
+
   const validateDetails = () => {
+    if (!resolvedUserId || !resolvedPetId) {
+      return "User/Pet context missing hai. Ask flow se dubara open kijiye.";
+    }
     if (!selectedDoctor) return "Please choose a doctor first.";
     if (!normalizeText(details.ownerName)) return "Owner name required hai.";
-    if (!normalizePhone(details.phone)) return "Mobile number required hai.";
+    if (normalizePhone(details.phone).replace(/\D/g, "").length < 10) {
+      return "Valid mobile number required hai.";
+    }
     if (!normalizeText(details.petName)) return "Pet name required hai.";
     if (!normalizeText(details.issue)) return "Disease / issue details required hain.";
     if (gstEnabled && normalizeText(gstNumber).length !== 15) {
@@ -561,34 +784,84 @@ export default function ConsultBookingFlow({
     setCreateOrderLoading(true);
     setPaymentError("");
     setCouponMessage("");
+    setReportedSymptomMessage("");
+    setApiResponses({
+      reportedSymptom: null,
+      createOrder: null,
+      verifyPayment: null,
+    });
 
     try {
-      const createPayload = {
-        user_id: user?.id || user?.user_id || null,
-        doctor_id: selectedDoctor.doctorId || selectedDoctor.id,
-        clinic_id: selectedDoctor.clinicId || null,
-        pet_id: user?.pet_id || user?.selectedPet?.id || null,
-        pet_name: details.petName,
-        pet_type: details.petType,
-        pet_age: details.petAge,
-        disease: details.issue,
-        symptoms: details.issue,
-        notes: details.notes,
-        description: details.notes,
-        coupon_code: normalizeText(couponCode).toUpperCase(),
-        gst_invoice: gstEnabled,
-        gst_number: gstEnabled ? normalizeText(gstNumber).toUpperCase() : "",
-        consultation_type: "video",
-        amount: payableAmount,
-      };
+      const doctorId = normalizeText(selectedDoctor.doctorId || selectedDoctor.id);
+      const clinicId = normalizeText(selectedDoctor.clinicId || resolvedClinicId);
+      const userIdNumber = toInteger(resolvedUserId, 0);
+      const petIdNumber = toInteger(resolvedPetId, 0);
+      const doctorIdNumber = toInteger(doctorId, 0);
+      const clinicIdNumber = toInteger(clinicId, 0);
+      const symptomText = normalizeText(details.issue);
 
-      const createRes = await fetch(`${apiBase}${endpoints.createOrder}`, {
+      const reportedSymptomResponse = await fetch(
+        `${apiBase}/users/${encodeURIComponent(resolvedUserId)}/pets/${encodeURIComponent(resolvedPetId)}/reported-symptom`,
+        {
+          method: "PUT",
+          headers: getAuthHeaders(resolvedToken, {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({
+            reported_symptom: symptomText,
+          }),
+        },
+      );
+      const reportedSymptomData = await readApiBody(reportedSymptomResponse);
+      recordApiResponse("reportedSymptom", reportedSymptomData);
+
+      if (
+        !reportedSymptomResponse.ok ||
+        (reportedSymptomData &&
+          typeof reportedSymptomData === "object" &&
+          reportedSymptomData.success === false)
+      ) {
+        setReportedSymptomMessage(
+          normalizeText(
+            reportedSymptomData?.message ||
+              reportedSymptomData?.error ||
+              "Reported symptom update failed.",
+          ) || "Reported symptom update failed.",
+        );
+      } else {
+        setReportedSymptomMessage("Reported symptom updated successfully.");
+      }
+
+      const createPayload = {
+        amount: payableAmountInr,
+        order_type: "video_consult",
+        user_id: userIdNumber || resolvedUserId,
+        doctor_id: doctorIdNumber || doctorId,
+        clinic_id: clinicId ? clinicIdNumber || clinicId : undefined,
+        pet_id: petIdNumber || resolvedPetId,
+        call_session_id: normalizeText(resolvedCallSessionId) || undefined,
+        channel_name: normalizeText(resolvedChannelName) || undefined,
+        coupon_code: normalizeText(couponCode).toUpperCase() || undefined,
+        gst_invoice: gstEnabled ? 1 : undefined,
+        gst_number: gstEnabled ? normalizeText(gstNumber).toUpperCase() : undefined,
+      };
+      const finalCreatePayload = Object.fromEntries(
+        Object.entries(createPayload).filter(
+          ([, value]) => value !== undefined && value !== null && value !== "",
+        ),
+      );
+
+      const createRes = await fetch(`${apiBase}${endpoints.createOrder || ENDPOINTS.createOrder}`, {
         method: "POST",
-        headers: getAuthHeaders(token),
-        body: JSON.stringify(createPayload),
+        headers: getAuthHeaders(resolvedToken, {
+          Accept: "application/json",
+        }),
+        body: JSON.stringify(finalCreatePayload),
       });
 
-      const createData = await createRes.json().catch(() => ({}));
+      const createData = await readApiBody(createRes);
+      recordApiResponse("createOrder", createData);
       if (!createRes.ok) {
         throw new Error(createData?.message || createData?.error || "Order create nahi hua.");
       }
@@ -614,7 +887,7 @@ export default function ConsultBookingFlow({
         normalizeText(createData?.order_id) ||
         normalizeText(createData?.data?.order_id);
 
-      const amountInPaise = Number(order?.amount || Math.round(payableAmount * 100));
+      const amountInPaise = Number(order?.amount || payableAmountInr * 100);
 
       if (!razorpayKey) {
         throw new Error("Razorpay key missing hai.");
@@ -635,20 +908,30 @@ export default function ConsultBookingFlow({
         razorpay_order_id: razorpayResponse?.razorpay_order_id || orderId,
         razorpay_payment_id: razorpayResponse?.razorpay_payment_id,
         razorpay_signature: razorpayResponse?.razorpay_signature,
-        user_id: user?.id || user?.user_id || null,
-        doctor_id: selectedDoctor.doctorId || selectedDoctor.id,
-        clinic_id: selectedDoctor.clinicId || null,
-        pet_id: user?.pet_id || user?.selectedPet?.id || null,
+        user_id: userIdNumber || resolvedUserId,
+        doctor_id: doctorIdNumber || doctorId,
+        clinic_id: clinicId ? clinicIdNumber || clinicId : undefined,
+        pet_id: petIdNumber || resolvedPetId,
         order_type: "video_consult",
+        call_session_id: normalizeText(resolvedCallSessionId) || undefined,
+        channel_name: normalizeText(resolvedChannelName) || undefined,
       };
+      const finalVerifyPayload = Object.fromEntries(
+        Object.entries(verifyPayload).filter(
+          ([, value]) => value !== undefined && value !== null && value !== "",
+        ),
+      );
 
-      const verifyRes = await fetch(`${apiBase}${endpoints.verifyPayment}`, {
+      const verifyRes = await fetch(`${apiBase}${endpoints.verifyPayment || ENDPOINTS.verifyPayment}`, {
         method: "POST",
-        headers: getAuthHeaders(token),
-        body: JSON.stringify(verifyPayload),
+        headers: getAuthHeaders(resolvedToken, {
+          Accept: "application/json",
+        }),
+        body: JSON.stringify(finalVerifyPayload),
       });
 
-      const verifyData = await verifyRes.json().catch(() => ({}));
+      const verifyData = await readApiBody(verifyRes);
+      recordApiResponse("verifyPayment", verifyData);
       if (!verifyRes.ok || !verifyData?.success) {
         throw new Error(verifyData?.message || verifyData?.error || "Payment verify nahi hua.");
       }
@@ -657,8 +940,13 @@ export default function ConsultBookingFlow({
         doctorName: selectedDoctor.name,
         paymentId: razorpayResponse?.razorpay_payment_id,
         orderId,
-        amount: payableAmount,
+        amount: payableAmountInr,
         issue: details.issue,
+        responses: {
+          reportedSymptom: reportedSymptomData,
+          createOrder: createData,
+          verifyPayment: verifyData,
+        },
       };
 
       setSuccessState(successPayload);
@@ -813,6 +1101,16 @@ export default function ConsultBookingFlow({
                 <InfoRow label="Issue" value={successState.issue} />
               </div>
             </div>
+            {successState?.responses ? (
+              <details className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3">
+                <summary className="cursor-pointer text-sm font-semibold text-emerald-800">
+                  Full Backend Responses
+                </summary>
+                <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-white p-3 text-xs text-slate-700">
+                  {JSON.stringify(successState.responses, null, 2)}
+                </pre>
+              </details>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -821,7 +1119,11 @@ export default function ConsultBookingFlow({
         open={showDetailsSheet}
         onClose={() => setShowDetailsSheet(false)}
         title="Tell us the issue"
-        subtitle={selectedDoctor ? `${selectedDoctor.name} • ${formatCurrency(activeDoctorFee)}` : "Fill details to continue"}
+        subtitle={
+          selectedDoctor
+            ? `${selectedDoctor.name} • Pay ${formatCurrency(payableAmountInr)}`
+            : "Fill details to continue"
+        }
       >
         {selectedDoctor ? (
           <div className="space-y-4">
@@ -949,7 +1251,7 @@ export default function ConsultBookingFlow({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm text-slate-300">Payable amount</div>
-                  <div className="mt-1 text-3xl font-bold">{formatCurrency(payableAmount)}</div>
+                  <div className="mt-1 text-3xl font-bold">{formatCurrency(payableAmountInr)}</div>
                   <div className="mt-2 text-sm text-slate-300">Doctor: {selectedDoctor.name}</div>
                 </div>
                 <div className="rounded-2xl bg-white/10 px-3 py-2 text-xs font-semibold text-white/90">
@@ -963,9 +1265,11 @@ export default function ConsultBookingFlow({
               <div className="mt-3 divide-y divide-slate-100">
                 <InfoRow label="Pet" value={`${details.petName} • ${details.petType}`} />
                 <InfoRow label="Issue" value={details.issue} />
-                <InfoRow label="Base fee" value={formatCurrency(baseFee)} />
-                <InfoRow label="GST" value={gstEnabled ? formatCurrency(gstAmount) : "Not added"} />
-                <InfoRow label="Total" value={formatCurrency(payableAmount)} strong />
+                <InfoRow label="Consultation fee" value={formatCurrency(consultationAmount)} />
+                <InfoRow label="Service fee" value={formatCurrency(serviceAmount)} />
+                <InfoRow label="Discount" value={`- ${formatCurrency(discountAmount)}`} />
+                <InfoRow label={`GST (${Math.round(GST_RATE * 100)}%)`} value={formatCurrency(gstAmount)} />
+                <InfoRow label="Total" value={formatCurrency(payableAmountInr)} strong />
               </div>
             </div>
 
@@ -1013,6 +1317,25 @@ export default function ConsultBookingFlow({
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{paymentError}</div>
             ) : null}
 
+            {reportedSymptomMessage ? (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                {reportedSymptomMessage}
+              </div>
+            ) : null}
+
+            {apiResponses.reportedSymptom ||
+            apiResponses.createOrder ||
+            apiResponses.verifyPayment ? (
+              <details className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-800">
+                  Full Backend Responses
+                </summary>
+                <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-white p-3 text-xs text-slate-700">
+                  {JSON.stringify(apiResponses, null, 2)}
+                </pre>
+              </details>
+            ) : null}
+
             <div className="flex gap-3 pt-1">
               <button
                 type="button"
@@ -1030,7 +1353,7 @@ export default function ConsultBookingFlow({
                 disabled={createOrderLoading}
                 className="inline-flex flex-[1.4] items-center justify-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {createOrderLoading ? "Processing..." : `Pay ${formatCurrency(payableAmount)}`}
+                {createOrderLoading ? "Processing..." : `Pay ${formatCurrency(payableAmountInr)}`}
               </button>
             </div>
           </div>
