@@ -6,9 +6,12 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  Copy,
   CreditCard,
   IndianRupee,
+  Link2,
   Mail,
+  MessageCircle,
   Phone,
   User,
   PawPrint,
@@ -25,8 +28,8 @@ const RECEPTIONIST_PATIENTS_URL =
   "https://snoutiq.com/backend/api/receptionist/patients";
 const EXISTING_PAYMENT_LINK_URL =
   "https://snoutiq.com/backend/api/receptionist/patients/existing-payment-link";
-const PENDING_PRESCRIPTION_STATUS_URL =
-  "https://snoutiq.com/backend/api/doctor/pending-prescription";
+const RECEPTIONIST_CONSULT_SESSIONS_URL =
+  "https://snoutiq.com/backend/api/receptionist/consult-sessions";
 const PAYMENT_STATUS_POLL_INTERVAL_MS = 5000;
 const DEFAULT_CLINIC_ID = 115;
 const POLL_STATE_KEY = "newDoctor.pendingPaymentPoll";
@@ -149,6 +152,30 @@ const getPendingPrescriptionMeta = (requestResponse = {}) => {
         petPayload?.id,
     ),
   };
+};
+
+const getConsultSessionPayload = (requestResponse = {}) => {
+  const payload = getRequestResponsePayload(requestResponse);
+  const consultSession =
+    payload?.consult_session && typeof payload.consult_session === "object"
+      ? payload.consult_session
+      : requestResponse?.consult_session;
+
+  return consultSession && typeof consultSession === "object"
+    ? consultSession
+    : null;
+};
+
+const copyTextToClipboard = async (text) => {
+  const normalized = normalizeText(text);
+  if (!normalized) return false;
+
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(normalized);
+    return true;
+  }
+
+  return false;
 };
 
 const buildPendingPrescriptionPatientData = (form, requestResponse = {}) => {
@@ -334,6 +361,7 @@ export default function NewDoctorNewRequestView() {
   const [breedQuery, setBreedQuery] = useState("");
   const [isBreedMenuOpen, setIsBreedMenuOpen] = useState(false);
   const [requestResponse, setRequestResponse] = useState(null);
+  const [consultSessionStatus, setConsultSessionStatus] = useState(null);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [restoredPollingDoctorId, setRestoredPollingDoctorId] = useState("");
@@ -363,6 +391,7 @@ export default function NewDoctorNewRequestView() {
   useEffect(() => {
     hasHandledPaymentRef.current = false;
     isPaymentPollingRef.current = false;
+    setConsultSessionStatus(null);
   }, [requestResponse, step]);
 
   useEffect(() => {
@@ -401,6 +430,23 @@ export default function NewDoctorNewRequestView() {
   const parentPhonePreview = useMemo(() => {
     return form.phone?.trim() || "2342342342";
   }, [form.phone]);
+
+  const consultSession = useMemo(
+    () => getConsultSessionPayload(requestResponse),
+    [requestResponse],
+  );
+  const consultSessionToken = normalizeText(consultSession?.session_id);
+  const consultSessionPayload = consultSessionStatus || consultSession || null;
+  const consultSessionLandingUrl = normalizeText(
+    consultSessionPayload?.landing_url,
+  );
+  const consultSessionShareWhatsAppUrl = normalizeText(
+    consultSessionPayload?.share_whatsapp_url,
+  );
+  const consultSessionCurrentStatus = normalizeStatusText(
+    consultSessionPayload?.status || "pending",
+  );
+  const isConsultationInitiated = consultSessionCurrentStatus === "initiated";
 
   const filteredBreedOptions = useMemo(() => {
     const query = breedQuery.trim().toLowerCase();
@@ -553,18 +599,26 @@ export default function NewDoctorNewRequestView() {
       });
 
       const responsePayload = await response.json().catch(() => ({}));
+      const consultSessionPayload = getConsultSessionPayload(responsePayload);
 
-      if (!response.ok || responsePayload?.success === false) {
+      if (
+        !response.ok ||
+        responsePayload?.success === false ||
+        !consultSessionPayload?.session_id
+      ) {
         throw new Error(buildRequestErrorMessage(responsePayload));
       }
 
       setRequestResponse(responsePayload);
+      setConsultSessionStatus(consultSessionPayload);
       goNext();
     } catch (error) {
-      const message = error?.message || "Failed to send payment link.";
+      const message =
+        error?.message || "Failed to create consultation link.";
       const normalizedMessage = message.toLowerCase();
 
       setRequestResponse(null);
+      setConsultSessionStatus(null);
       setRequestError(message);
 
       if (
@@ -651,13 +705,61 @@ export default function NewDoctorNewRequestView() {
     [doctorId, existingPetId, existingUserId, form, navigate],
   );
 
-  useEffect(() => {
-    const pendingPrescriptionMeta = getPendingPrescriptionMeta(requestResponse);
-    const trackedUserId = pendingPrescriptionMeta.userId || existingUserId;
+  const handleShareViaWhatsApp = useCallback(() => {
+    if (!consultSessionShareWhatsAppUrl) {
+      void Swal.fire({
+        icon: "error",
+        title: "Link unavailable",
+        text: "Consultation share link is not ready yet.",
+        confirmButtonColor: "#16a34a",
+      });
+      return;
+    }
 
+    window.open(
+      consultSessionShareWhatsAppUrl,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }, [consultSessionShareWhatsAppUrl]);
+
+  const handleCopyConsultationLink = useCallback(async () => {
+    if (!consultSessionLandingUrl) {
+      await Swal.fire({
+        icon: "error",
+        title: "Link unavailable",
+        text: "Consultation link is not ready yet.",
+        confirmButtonColor: "#16a34a",
+      });
+      return;
+    }
+
+    const copied = await copyTextToClipboard(consultSessionLandingUrl).catch(
+      () => false,
+    );
+
+    if (copied) {
+      await Swal.fire({
+        icon: "success",
+        title: "Link copied",
+        text: "Consultation link copied to clipboard.",
+        confirmButtonColor: "#16a34a",
+      });
+      return;
+    }
+
+    await Swal.fire({
+      icon: "info",
+      title: "Copy this link",
+      text: consultSessionLandingUrl,
+      confirmButtonColor: "#16a34a",
+    });
+  }, [consultSessionLandingUrl]);
+
+  useEffect(() => {
     if (
       step !== 1 ||
-      !trackedUserId ||
+      !consultSessionToken ||
       !requestResponse ||
       hasHandledPaymentRef.current
     ) {
@@ -678,15 +780,17 @@ export default function NewDoctorNewRequestView() {
       isPaymentPollingRef.current = true;
 
       try {
-        const url = new URL(PENDING_PRESCRIPTION_STATUS_URL);
-        url.searchParams.set("user_id", trackedUserId);
-
-        const response = await fetch(url.toString(), {
+        const response = await fetch(
+          `${RECEPTIONIST_CONSULT_SESSIONS_URL}/${encodeURIComponent(
+            consultSessionToken,
+          )}`,
+          {
           headers: {
             Accept: "application/json",
             ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
           },
-        });
+          },
+        );
 
         if (!response.ok) {
           return;
@@ -698,7 +802,11 @@ export default function NewDoctorNewRequestView() {
             ? responseData.data
             : responseData;
 
-        if (!cancelled && isPendingPrescriptionLockedStatus(statusPayload)) {
+        if (!cancelled) {
+          setConsultSessionStatus(statusPayload);
+        }
+
+        if (!cancelled && normalizeStatusText(statusPayload?.status) === "paid") {
           await handlePaymentReceived(requestResponse);
         }
       } catch {
@@ -721,7 +829,7 @@ export default function NewDoctorNewRequestView() {
     };
   }, [
     authToken,
-    existingUserId,
+    consultSessionToken,
     handlePaymentReceived,
     requestResponse,
     step,
@@ -1014,7 +1122,9 @@ export default function NewDoctorNewRequestView() {
                   disabled={isSubmittingRequest}
                   className={`${primaryBtn} disabled:cursor-not-allowed disabled:opacity-70`}
                 >
-                  {isSubmittingRequest ? "Sending..." : "Send Payment Link"}
+                  {isSubmittingRequest
+                    ? "Creating..."
+                    : "Share Consultation Link"}
                   <CreditCard size={18} />
                 </button>
               </div>
@@ -1035,25 +1145,55 @@ export default function NewDoctorNewRequestView() {
               </div>
 
               <h2 className="text-[20px] font-bold text-[#0f2749] mb-3">
-                Awaiting Payment
+                {isConsultationInitiated
+                  ? "Awaiting Payment"
+                  : "Share Consultation Link"}
               </h2>
 
               <p className="text-[15px] leading-7 text-[#667085] max-w-[290px]">
-                Payment link sent to {parentPhonePreview}.
-                <br />
-                Waiting for confirmation...
+                {isConsultationInitiated
+                  ? `Parent started the consultation on WhatsApp. Payment link sent to ${parentPhonePreview}. Waiting for confirmation...`
+                  : `Send this link to ${parentPhonePreview}. Once the parent sends the WhatsApp message, the payment link will be sent automatically.`}
               </p>
 
-              <button
-                type="button"
-                onClick={() => handlePaymentReceived(requestResponse)}
-                className="mt-12 h-[50px] px-8 rounded-full bg-[#2fd161] text-white text-[15px] font-bold flex items-center gap-2 shadow-[0_10px_22px_rgba(47,209,97,0.24)] active:scale-[0.98] transition-transform"
-              >
-                Simulate Payment Received
-                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/70">
-                  <Check size={12} />
-                </span>
-              </button>
+              <div className="mt-8 w-full max-w-[320px] rounded-3xl border border-[#e5e7eb] bg-white p-4 text-left shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+                <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#16a34a]">
+                  <Link2 size={14} />
+                  Status
+                </div>
+                <p className="text-[15px] font-semibold text-[#0f2749]">
+                  {isConsultationInitiated
+                    ? "Parent initiated. Payment link sent."
+                    : "Waiting for parent to start on WhatsApp."}
+                </p>
+                {consultSessionLandingUrl ? (
+                  <p className="mt-3 break-all text-[12px] leading-5 text-[#667085]">
+                    {consultSessionLandingUrl}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-6 flex w-full max-w-[320px] flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={handleShareViaWhatsApp}
+                  disabled={!consultSessionShareWhatsAppUrl}
+                  className="flex h-[50px] items-center justify-center gap-2 rounded-full bg-[#2fd161] px-6 text-[15px] font-bold text-white shadow-[0_10px_22px_rgba(47,209,97,0.24)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <MessageCircle size={16} />
+                  Share via WhatsApp
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyConsultationLink}
+                  disabled={!consultSessionLandingUrl}
+                  className="flex h-[50px] items-center justify-center gap-2 rounded-full border border-[#d7dee8] bg-white px-6 text-[15px] font-bold text-[#0f2749] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Copy size={16} />
+                  Copy Link
+                </button>
+              </div>
             </div>
           </div>
         )}

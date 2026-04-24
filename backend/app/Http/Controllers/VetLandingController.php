@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ConsultationShareSession;
 use App\Models\LegacyQrRedirect;
 use App\Models\VetRegisterationTemp;
+use App\Services\ConsultationShareSessionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -107,6 +109,15 @@ class VetLandingController extends Controller
 
     public function redirectByPublicId(Request $request, string $publicId)
     {
+        $consultSession = ConsultationShareSession::query()
+            ->with('doctor')
+            ->where('session_token', strtolower($publicId))
+            ->first();
+
+        if ($consultSession) {
+            return $this->showConsultationLanding($consultSession);
+        }
+
         // Always attempt to record a scan when arriving via the shortlink,
         // except when already coming from the legacy-qr controller (to avoid double counts).
         if ($request->query('via') !== 'legacy-qr') {
@@ -126,6 +137,22 @@ class VetLandingController extends Controller
         $target = url('/vets/'.$vet->slug).($params ? ('?'.http_build_query($params)) : '');
 
         return redirect()->to($target, 301);
+    }
+
+    private function showConsultationLanding(ConsultationShareSession $session)
+    {
+        $service = app(ConsultationShareSessionService::class);
+        $clinic = $session->clinic_id
+            ? VetRegisterationTemp::query()->find($session->clinic_id)
+            : null;
+
+        return view('consultation-share', [
+            'session' => $session,
+            'clinicName' => $clinic?->clinic_name ?: $clinic?->name ?: 'Snoutiq',
+            'doctorName' => $session->doctor?->doctor_name ?: 'Snoutiq Vet',
+            'openWhatsAppUrl' => $service->buildParentInitiationWhatsAppUrl($session),
+            'businessPhone' => $service->normalizedBusinessPhone(),
+        ]);
     }
 
     private function referralCodeForClinic(VetRegisterationTemp $clinic): string

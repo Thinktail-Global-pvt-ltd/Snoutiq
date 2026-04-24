@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\RazorpayPaymentLink;
 use App\Models\Transaction;
 use App\Models\WebhookEvent;
+use App\Services\ConsultationShareSessionService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,10 @@ use Illuminate\Support\Str;
 
 class RazorpayPaymentLinkWebhookController extends Controller
 {
-    public function __construct(private readonly WhatsAppService $whatsApp)
+    public function __construct(
+        private readonly WhatsAppService $whatsApp,
+        private readonly ConsultationShareSessionService $consultSessions
+    )
     {
     }
 
@@ -86,6 +90,10 @@ class RazorpayPaymentLinkWebhookController extends Controller
             $paymentLink = $this->upsertPaymentLink($payload, $eventName);
             $payment = $this->upsertPayment($payload, $signature);
             $transaction = $this->upsertTransaction($payload, $paymentLink);
+            $consultSession = null;
+            if ($this->isPaymentLinkMarkedPaid($paymentLink)) {
+                $consultSession = $this->consultSessions->markPaidFromPaymentLinkId($paymentLink?->payment_link_id);
+            }
             $shouldSendPaymentAlerts = $this->shouldSendPaymentConfirmedAlerts($paymentLink, $payment, $transaction);
 
             $webhookEvent->processed_at = now();
@@ -100,6 +108,8 @@ class RazorpayPaymentLinkWebhookController extends Controller
                 'payment_status' => $payment?->status,
                 'transaction_id' => $transaction?->id,
                 'transaction_status' => $transaction?->status,
+                'consult_session_id' => $consultSession?->id,
+                'consult_session_status' => $consultSession?->status,
                 'send_parent_payment_alert' => $shouldSendPaymentAlerts,
                 'send_vet_payment_alert' => $shouldSendPaymentAlerts,
             ];
@@ -356,6 +366,13 @@ class RazorpayPaymentLinkWebhookController extends Controller
             || $this->isPaidStatus($paymentLink->payment_status)
             || $this->isPaidStatus($payment?->status)
             || $this->isPaidStatus($transaction?->status);
+    }
+
+    private function isPaymentLinkMarkedPaid(?RazorpayPaymentLink $paymentLink): bool
+    {
+        $status = strtolower(trim((string) ($paymentLink?->status ?? '')));
+
+        return in_array($status, ['paid', 'captured', 'partially_paid'], true);
     }
 
     private function sendParentPaymentConfirmedAlert(?string $paymentLinkId): array

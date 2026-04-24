@@ -11,6 +11,7 @@ use App\Models\Receptionist;
 use App\Models\Appointment;
 use App\Models\RazorpayPaymentLink;
 use App\Models\Transaction;
+use App\Services\ConsultationShareSessionService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -28,7 +29,10 @@ class ReceptionistBookingController extends Controller
 {
     private const PATIENT_ROLES = ['pet', 'pet_owner', 'patient', 'user'];
 
-    public function __construct(private readonly WhatsAppService $whatsApp)
+    public function __construct(
+        private readonly WhatsAppService $whatsApp,
+        private readonly ConsultationShareSessionService $consultSessions
+    )
     {
     }
 
@@ -798,7 +802,7 @@ class ReceptionistBookingController extends Controller
             }
         }
 
-        $paymentMessage = $this->maybeSendPaymentLinkWhatsApp(
+        $consultSession = $this->consultSessions->createForPatient(
             user: $user,
             pet: $pet,
             data: $data,
@@ -824,7 +828,12 @@ class ReceptionistBookingController extends Controller
                     'pet_doc2_blob_url' => $pet->pet_doc2_blob_url ?? null,
                     'pet_image_url' => $pet->pet_doc2_blob_url ?? $pet->pet_doc1 ?? $pet->pic_link ?? null,
                 ] : null,
-                'payment_link_whatsapp' => $paymentMessage,
+                'consult_session' => $this->consultSessions->formatForResponse($consultSession),
+                'payment_link_whatsapp' => [
+                    'sent' => false,
+                    'skipped' => true,
+                    'reason' => 'awaiting_parent_initiation',
+                ],
             ],
         ], 201);
     }
@@ -874,7 +883,7 @@ class ReceptionistBookingController extends Controller
             'pet_breed' => $pet->breed ?? null,
         ]);
 
-        $paymentMessage = $this->maybeSendPaymentLinkWhatsApp(
+        $consultSession = $this->consultSessions->createForPatient(
             user: $user,
             pet: $pet,
             data: $paymentData,
@@ -893,9 +902,30 @@ class ReceptionistBookingController extends Controller
                     'last_vet_id' => Schema::hasColumn('users', 'last_vet_id') ? $user->last_vet_id : null,
                 ],
                 'pet' => $this->formatExistingPatientPet($pet),
-                'payment_link_whatsapp' => $paymentMessage,
+                'consult_session' => $this->consultSessions->formatForResponse($consultSession),
+                'payment_link_whatsapp' => [
+                    'sent' => false,
+                    'skipped' => true,
+                    'reason' => 'awaiting_parent_initiation',
+                ],
             ],
         ], 201);
+    }
+
+    public function consultSessionStatus(string $sessionToken)
+    {
+        $session = $this->consultSessions->findByToken($sessionToken);
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Consult session not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->consultSessions->formatForResponse($session),
+        ]);
     }
 
     private function resolveExistingPatientPet(User $user, int $petId): ?object

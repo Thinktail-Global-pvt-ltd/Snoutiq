@@ -75,6 +75,7 @@ use App\Http\Controllers\Api\PetVaccinationRecordController;
 use App\Http\Controllers\Api\ErrorLogController;
 use App\Http\Controllers\Api\SocketServerController;
 use App\Http\Controllers\Api\WhatsAppMessageController;
+use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Api\FcmBnotificationController;
 use App\Http\Controllers\Api\CallSessionCrudController;
 use App\Http\Controllers\Api\V1\OtpController as V1OtpController;
@@ -110,6 +111,8 @@ Route::post('/whatsapp/send/new-year', [WhatsAppMessageController::class, 'sendN
 Route::post('/whatsapp/broadcast/new-year', [WhatsAppMessageController::class, 'broadcastNewYearTemplate']);
 Route::post('/whatsapp/vet-opened-case', [WhatsAppMessageController::class, 'vetOpenedCase']);
 Route::post('/whatsapp/vet-video-consult-test', [WhatsAppMessageController::class, 'vetVideoConsultTest']);
+Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
+Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
 Route::post('/fcm-notifications/click', [FcmBnotificationController::class, 'store']);
 
 Route::prefix('socket')->group(function () {
@@ -2897,6 +2900,7 @@ Route::prefix('staff')->group(function () {
 Route::prefix('receptionist')->group(function () {
     Route::get('/bookings', [ReceptionistBookingController::class, 'bookings']);
     Route::post('/bookings', [ReceptionistBookingController::class, 'storeBooking']);
+    Route::get('/consult-sessions/{sessionToken}', [ReceptionistBookingController::class, 'consultSessionStatus']);
     Route::get('/patients', [ReceptionistBookingController::class, 'patients']);
     Route::post('/patients', [ReceptionistBookingController::class, 'storePatient']);
     Route::post('/patients/existing-payment-link', [ReceptionistBookingController::class, 'sendExistingPatientPaymentLink']);
