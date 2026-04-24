@@ -40,6 +40,10 @@ class ReceptionistStorePatientTest extends TestCase
             $table->string('name')->nullable();
             $table->string('breed')->nullable();
             $table->string('type')->nullable();
+            $table->unsignedInteger('pet_age')->nullable();
+            $table->string('pet_gender')->nullable();
+            $table->decimal('weight', 8, 2)->nullable();
+            $table->unique(['user_id', 'name', 'breed', 'pet_age', 'pet_gender'], 'uniq_user_pet');
             $table->timestamps();
         });
     }
@@ -94,5 +98,77 @@ class ReceptionistStorePatientTest extends TestCase
         $this->assertSame('Bruno', $pet->name);
         $this->assertSame('Labrador', $pet->breed);
         $this->assertSame('dog', $pet->type);
+    }
+
+    public function test_store_patient_replaces_existing_pets_for_the_user_before_insert(): void
+    {
+        $existingUser = User::query()->create([
+            'name' => 'Old Name',
+            'email' => 'old@example.com',
+            'phone' => '9999999999',
+            'role' => 'pet',
+            'password' => 'existing-password',
+            'last_vet_id' => 10,
+        ]);
+
+        DB::table('pets')->insert([
+            [
+                'user_id' => $existingUser->id,
+                'name' => 'Bruno',
+                'breed' => 'Labrador',
+                'type' => 'dog',
+                'pet_age' => 3,
+                'pet_gender' => 'male',
+                'weight' => 20,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $existingUser->id,
+                'name' => 'Lucy',
+                'breed' => 'Beagle',
+                'type' => 'dog',
+                'pet_age' => 5,
+                'pet_gender' => 'female',
+                'weight' => 10,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $response = $this->postJson('/api/receptionist/patients', [
+            'clinic_id' => 77,
+            'name' => 'Rohit Sharma',
+            'phone' => '9999999999',
+            'email' => 'rohit@example.com',
+            'pet_name' => 'Bruno',
+            'pet_type' => 'dog',
+            'pet_breed' => 'Labrador',
+            'pet_age' => 3,
+            'pet_gender' => 'male',
+            'weight' => 24,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.id', $existingUser->id)
+            ->assertJsonPath('data.pet.name', 'Bruno')
+            ->assertJsonPath('data.pet.type', 'dog')
+            ->assertJsonPath('data.pet.breed', 'Labrador');
+
+        $pets = DB::table('pets')
+            ->where('user_id', $existingUser->id)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(1, $pets);
+        $pet = $pets->first();
+        $this->assertSame('Bruno', $pet->name);
+        $this->assertSame('Labrador', $pet->breed);
+        $this->assertSame('dog', $pet->type);
+        $this->assertSame(3, (int) $pet->pet_age);
+        $this->assertSame('male', $pet->pet_gender);
+        $this->assertSame(24.0, (float) $pet->weight);
     }
 }
