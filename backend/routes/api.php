@@ -2214,9 +2214,41 @@ Route::get('/users/last-vet-details', function (Request $request) {
         ]);
     }
 
+    $nowIst = \Illuminate\Support\Carbon::now('Asia/Kolkata');
+    $currentDayOfWeek = (int) $nowIst->dayOfWeek;
+    $currentTime = $nowIst->format('H:i:s');
+
+    $availableDoctorIds = collect();
+    if (Schema::hasTable('doctor_video_availability')) {
+        $availableDoctorIds = DB::table('doctor_video_availability')
+            ->where('is_active', 1)
+            ->where('day_of_week', $currentDayOfWeek)
+            ->where('start_time', '<=', $currentTime)
+            ->where('end_time', '>=', $currentTime)
+            ->where(function ($q) use ($currentTime) {
+                $q->whereNull('break_start')
+                    ->orWhereNull('break_end')
+                    ->orWhere('break_start', '>', $currentTime)
+                    ->orWhere('break_end', '<=', $currentTime);
+            })
+            ->distinct()
+            ->pluck('doctor_id')
+            ->map(fn ($id) => (int) $id);
+    }
+
     $doctors = Doctor::query()
         ->where('vet_registeration_id', $clinic->id)
-        ->get();
+        ->whereIn('id', $availableDoctorIds->all())
+        ->get()
+        ->map(function (Doctor $doctor) {
+            $item = $doctor->toArray();
+            $item['doctor_image_blob_url'] = empty($doctor->doctor_image_blob)
+                ? null
+                : route('api.doctors.blob-image', ['doctor' => $doctor->id]);
+
+            return $item;
+        })
+        ->values();
 
     return response()->json([
         'success' => true,
@@ -2224,7 +2256,13 @@ Route::get('/users/last-vet-details', function (Request $request) {
             'user_id' => $user->id,
             'last_vet_id' => $user->last_vet_id,
             'clinic' => $clinic,
-            'doctors' => $doctors->values(),
+            'doctors' => $doctors,
+            'availability' => [
+                'source' => 'doctor_video_availability',
+                'timezone' => 'Asia/Kolkata',
+                'day_of_week' => $currentDayOfWeek,
+                'time' => $currentTime,
+            ],
         ],
     ]);
 });
