@@ -1,8 +1,8 @@
 import "./app.css";
 
-import React, { lazy } from "react";
+import React, { lazy, useEffect } from "react";
 import { HelmetProvider } from "react-helmet-async";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import TalkToVet from "./newflow/TalkToVet";
 import PetDoctorOnline from "./newflow/PetDoctorOnline";
 
@@ -149,10 +149,23 @@ const FollowupPage = lazy(() =>
   }))
 );
 
+function ConsultationShortLinkBridge() {
+  const { publicId = "" } = useParams();
+  const location = useLocation();
+
+  useEffect(() => {
+    const target = `/backend/c/${encodeURIComponent(publicId)}${location.search}${location.hash}`;
+    window.location.replace(target);
+  }, [location.hash, location.search, publicId]);
+
+  return null;
+}
+
 export default function AppRoutes() {
   return (
     <HelmetProvider>
       <Routes>
+        <Route path="/c/:publicId" element={<ConsultationShortLinkBridge />} />
            <Route path="/counsltflow/*" element={<NewDoctorRoute />} />
 <Route path="/doctor/*" element={<Navigate to="/counsltflow" replace />} />
         <Route path="/video-call-pet-details" element={<VideoCallPetDetails />} />

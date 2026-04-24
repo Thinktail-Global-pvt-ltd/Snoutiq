@@ -193,11 +193,11 @@ class ConsultationShareSessionService
             $base = rtrim(url('/'), '/');
         }
 
-        if (str_ends_with($base, '/backend')) {
-            $base = substr($base, 0, -strlen('/backend'));
-        }
+        $path = str_ends_with($base, '/backend')
+            ? '/c/'
+            : '/backend/c/';
 
-        return $base . '/c/' . rawurlencode($session->session_token);
+        return $base . $path . rawurlencode($session->session_token);
     }
 
     private function resolveSessionFromInboundMessage(array $message): ?ConsultationShareSession
