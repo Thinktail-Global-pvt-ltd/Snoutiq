@@ -478,10 +478,6 @@ export default function NewDoctorNewRequestView() {
     }));
   }, [selectedParent]);
 
-  const parentPhonePreview = useMemo(() => {
-    return form.phone?.trim() || "2342342342";
-  }, [form.phone]);
-
   const consultSession = useMemo(
     () => getConsultSessionPayload(requestResponse),
     [requestResponse],
@@ -1263,8 +1259,8 @@ export default function NewDoctorNewRequestView() {
 
               <p className="text-[15px] leading-7 text-[#667085] max-w-[290px]">
                 {isConsultationInitiated
-                  ? `Parent started the consultation on WhatsApp. Payment link sent to ${parentPhonePreview}. Waiting for confirmation...`
-                  : `Send this link to ${parentPhonePreview}. Once the parent sends the WhatsApp message, the payment link will be sent automatically.`}
+                  ? "Parent started the consultation on WhatsApp. Payment link sent. Waiting for confirmation..."
+                  : "Share this consultation link with the parent. Once they send the WhatsApp message, the payment link will be sent automatically."}
               </p>
 
               <div className="mt-8 w-full max-w-[320px] rounded-3xl border border-[#e5e7eb] bg-white p-4 text-left shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
@@ -1277,11 +1273,6 @@ export default function NewDoctorNewRequestView() {
                     ? "Parent initiated. Payment link sent."
                     : "Waiting for parent to start on WhatsApp."}
                 </p>
-                {consultSessionLandingUrl ? (
-                  <p className="mt-3 break-all text-[12px] leading-5 text-[#667085]">
-                    {consultSessionLandingUrl}
-                  </p>
-                ) : null}
               </div>
 
               <div className="mt-6 flex w-full max-w-[320px] flex-col gap-3">

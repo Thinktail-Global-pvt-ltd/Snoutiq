@@ -91,10 +91,7 @@ class ConsultationShareSessionService
             return null;
         }
 
-        $message = sprintf(
-            'Hi, I want to start consultation. Session: %s',
-            $session->session_token
-        );
+        $message = 'Hi, I want to start consultation.';
 
         return sprintf(
             'https://wa.me/%s?text=%s',

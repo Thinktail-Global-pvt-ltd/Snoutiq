@@ -70,33 +70,6 @@
             padding: 24px 28px 28px;
         }
 
-        .meta {
-            display: grid;
-            gap: 12px;
-            margin-bottom: 22px;
-        }
-
-        .meta-item {
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            padding: 14px 16px;
-            background: #fbfdff;
-        }
-
-        .meta-label {
-            display: block;
-            font-size: 12px;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 5px;
-        }
-
-        .meta-value {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
         .copy {
             margin: 0 0 20px;
             color: var(--muted);
@@ -143,18 +116,6 @@
         </section>
 
         <section class="body">
-            <div class="meta">
-                <div class="meta-item">
-                    <span class="meta-label">Clinic</span>
-                    <span class="meta-value">{{ $clinicName }}</span>
-                </div>
-
-                <div class="meta-item">
-                    <span class="meta-label">Session</span>
-                    <span class="meta-value">{{ $session->session_token }}</span>
-                </div>
-            </div>
-
             <p class="copy">
                 Tap the button below and send the prefilled WhatsApp message. Once your message is received,
                 your payment link will be sent automatically in the same 24-hour WhatsApp window.
@@ -168,12 +129,6 @@
                 <div class="warning">
                     WhatsApp start is not configured for this environment yet. Set
                     <strong>WHATSAPP_BUSINESS_PHONE</strong> so this button can open the correct business chat.
-                </div>
-            @endif
-
-            @if ($businessPhone)
-                <div class="warning">
-                    Message will be sent to WhatsApp number {{ $businessPhone }}.
                 </div>
             @endif
         </section>
