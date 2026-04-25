@@ -122,7 +122,12 @@
             </p>
 
             @if ($openWhatsAppUrl)
-                <a class="cta" href="{{ $openWhatsAppUrl }}">
+                <a
+                    class="cta"
+                    href="{{ $openWhatsAppUrl }}"
+                    id="open-whatsapp-link"
+                    data-web-url="{{ $openWhatsAppUrl }}"
+                >
                     Open WhatsApp
                 </a>
             @else
@@ -133,5 +138,90 @@
             @endif
         </section>
     </main>
+    <script>
+        (function () {
+            const link = document.getElementById('open-whatsapp-link');
+            if (!link) {
+                return;
+            }
+
+            const userAgent = navigator.userAgent || '';
+            const isMobile = /android|iphone|ipad|ipod|mobile/i.test(userAgent);
+            if (!isMobile) {
+                return;
+            }
+
+            const webUrl = String(link.dataset.webUrl || '').trim();
+            if (!webUrl) {
+                return;
+            }
+
+            const buildTargets = () => {
+                try {
+                    const parsed = new URL(webUrl);
+                    const phone = /(^|\.)wa\.me$/i.test(parsed.hostname)
+                        ? (parsed.pathname || '').replace(/^\/+/, '').split('/')[0] || ''
+                        : String(parsed.searchParams.get('phone') || '').trim();
+                    const text = String(parsed.searchParams.get('text') || '').trim();
+
+                    if (!phone && !text) {
+                        return null;
+                    }
+
+                    const params = new URLSearchParams();
+                    if (phone) params.set('phone', phone);
+                    if (text) params.set('text', text);
+
+                    return {
+                        appUrl: `whatsapp://send?${params.toString()}`,
+                        webUrl,
+                    };
+                } catch {
+                    return null;
+                }
+            };
+
+            const targets = buildTargets();
+            if (!targets?.appUrl) {
+                return;
+            }
+
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+
+                let fallbackTimerId = null;
+
+                const cleanup = () => {
+                    if (fallbackTimerId !== null) {
+                        window.clearTimeout(fallbackTimerId);
+                        fallbackTimerId = null;
+                    }
+
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                    window.removeEventListener('pagehide', cleanup);
+                    window.removeEventListener('blur', cleanup);
+                };
+
+                const handleVisibilityChange = () => {
+                    if (document.visibilityState === 'hidden') {
+                        cleanup();
+                    }
+                };
+
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                window.addEventListener('pagehide', cleanup, { once: true });
+                window.addEventListener('blur', cleanup, { once: true });
+
+                fallbackTimerId = window.setTimeout(() => {
+                    if (document.visibilityState === 'visible') {
+                        window.location.assign(targets.webUrl);
+                    }
+                    cleanup();
+                }, 900);
+
+                window.location.assign(targets.appUrl);
+            });
+        })();
+    </script>
 </body>
 </html>

@@ -20,6 +20,7 @@ import {
 import Swal from "sweetalert2";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
 import { startDoctorPendingPrescription } from "./doctorPendingPrescriptionService";
+import { openWhatsAppLaunchUrl } from "./whatsAppLaunch";
 
 const TOTAL_STEPS = 2;
 const DOG_BREEDS_URL = "https://snoutiq.com/backend/api/dog-breeds/all";
@@ -712,11 +713,7 @@ export default function NewDoctorNewRequestView() {
       return;
     }
 
-    window.open(
-      consultSessionShareWhatsAppUrl,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    openWhatsAppLaunchUrl(consultSessionShareWhatsAppUrl);
   }, [consultSessionShareWhatsAppUrl]);
 
   const handleCopyConsultationLink = useCallback(async () => {

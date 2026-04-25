@@ -20,6 +20,7 @@ import {
 import Swal from "sweetalert2";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
 import { startDoctorPendingPrescription } from "./doctorPendingPrescriptionService";
+import { openWhatsAppLaunchUrl } from "./whatsAppLaunch";
 import {
   clearStoredDoctorSelectedParent,
   isExistingParentFlowSearch,
@@ -782,11 +783,7 @@ export default function NewDoctorNewRequestView() {
       return;
     }
 
-    window.open(
-      consultSessionShareWhatsAppUrl,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    openWhatsAppLaunchUrl(consultSessionShareWhatsAppUrl);
   }, [consultSessionShareWhatsAppUrl]);
 
   const handleCopyConsultationLink = useCallback(async () => {
