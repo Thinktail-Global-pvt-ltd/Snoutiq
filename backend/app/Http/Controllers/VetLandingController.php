@@ -115,7 +115,7 @@ class VetLandingController extends Controller
             ->first();
 
         if ($consultSession) {
-            return $this->showConsultationLanding($consultSession);
+            return $this->showConsultationLanding($request, $consultSession);
         }
 
         // Always attempt to record a scan when arriving via the shortlink,
@@ -139,20 +139,46 @@ class VetLandingController extends Controller
         return redirect()->to($target, 301);
     }
 
-    private function showConsultationLanding(ConsultationShareSession $session)
+    private function showConsultationLanding(Request $request, ConsultationShareSession $session)
     {
         $service = app(ConsultationShareSessionService::class);
         $clinic = $session->clinic_id
             ? VetRegisterationTemp::query()->find($session->clinic_id)
             : null;
+        $openWhatsAppUrl = $service->buildParentInitiationWhatsAppUrl($session);
+
+        if ($this->shouldRedirectDirectlyToWhatsApp($request)) {
+            $appUrl = $service->buildParentInitiationWhatsAppAppUrl($session);
+            if ($appUrl) {
+                return redirect()->away($appUrl);
+            }
+        }
 
         return view('consultation-share', [
             'session' => $session,
             'clinicName' => $clinic?->clinic_name ?: $clinic?->name ?: 'Snoutiq',
             'doctorName' => $session->doctor?->doctor_name ?: 'Snoutiq Vet',
-            'openWhatsAppUrl' => $service->buildParentInitiationWhatsAppUrl($session),
+            'openWhatsAppUrl' => $openWhatsAppUrl,
             'businessPhone' => $service->normalizedBusinessPhone(),
         ]);
+    }
+
+    private function shouldRedirectDirectlyToWhatsApp(Request $request): bool
+    {
+        if ($request->query('web') === '1' || $request->query('stay') === '1') {
+            return false;
+        }
+
+        $userAgent = strtolower((string) $request->userAgent());
+        if ($userAgent === '') {
+            return false;
+        }
+
+        return str_contains($userAgent, 'android')
+            || str_contains($userAgent, 'iphone')
+            || str_contains($userAgent, 'ipad')
+            || str_contains($userAgent, 'ipod')
+            || str_contains($userAgent, 'mobile');
     }
 
     private function referralCodeForClinic(VetRegisterationTemp $clinic): string

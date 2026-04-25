@@ -62,7 +62,11 @@ class ConsultationShareSessionService
     public function formatForResponse(ConsultationShareSession $session): array
     {
         $landingUrl = $this->buildLandingUrl($session);
-        $shareMessage = $this->buildVetShareMessage($session, $landingUrl);
+        $parentWhatsAppUrl = $this->buildParentInitiationWhatsAppUrl($session);
+        $shareMessage = $this->buildVetShareMessage(
+            $session,
+            $parentWhatsAppUrl ?: $landingUrl
+        );
 
         return [
             'id' => $session->id,
@@ -73,6 +77,7 @@ class ConsultationShareSessionService
             'amount_rupees' => $this->formatRupeesForTemplate($session->amount_paise),
             'response_time_minutes' => $session->response_time_minutes,
             'landing_url' => $landingUrl,
+            'parent_whatsapp_url' => $parentWhatsAppUrl,
             'share_message' => $shareMessage,
             'share_whatsapp_url' => $this->buildVetShareWhatsAppUrl($session, $shareMessage),
             'payment_link_sent' => $session->payment_link_sent_at !== null,
@@ -91,12 +96,26 @@ class ConsultationShareSessionService
             return null;
         }
 
-        $message = 'Hi, I want to start consultation.';
+        $message = $this->buildParentInitiationMessage($session);
 
         return sprintf(
             'https://wa.me/%s?text=%s',
             $businessPhone,
             rawurlencode($message)
+        );
+    }
+
+    public function buildParentInitiationWhatsAppAppUrl(ConsultationShareSession $session): ?string
+    {
+        $businessPhone = $this->normalizedBusinessPhone();
+        if ($businessPhone === null) {
+            return null;
+        }
+
+        return sprintf(
+            'whatsapp://send?phone=%s&text=%s',
+            $businessPhone,
+            rawurlencode($this->buildParentInitiationMessage($session))
         );
     }
 
@@ -471,7 +490,7 @@ class ConsultationShareSessionService
         $doctorName = $this->resolveTemplateDoctorName($session->doctor_id, $session->clinic_id);
 
         return trim(sprintf(
-            "Hi%s, start your consultation with Dr %s here:\n%s\n\nOnce you send the WhatsApp message on that page, your payment link will be sent automatically.",
+            "Hi%s, start your consultation with Dr %s on WhatsApp here:\n%s\n\nOnce you send the WhatsApp message, your payment link will be sent automatically.",
             $session->parent_name ? ' ' . $session->parent_name : '',
             $doctorName,
             $landingUrl
@@ -491,6 +510,11 @@ class ConsultationShareSessionService
             $session->parent_phone,
             rawurlencode($shareMessage)
         );
+    }
+
+    private function buildParentInitiationMessage(ConsultationShareSession $session): string
+    {
+        return 'Hi, I want to start consultation.';
     }
 
     private function generateSessionToken(): string
