@@ -44,15 +44,56 @@ const buildWhatsAppLaunchTargets = (rawUrl) => {
   }
 };
 
-export const openWhatsAppLaunchUrl = (rawUrl) => {
+const openDesktopWhatsAppUrl = (webUrl, keepSourceFocused = false) => {
+  if (!keepSourceFocused) {
+    window.open(webUrl, "_blank", "noopener,noreferrer");
+    return true;
+  }
+
+  const popup = window.open("", "_blank");
+  if (!popup) {
+    window.open(webUrl, "_blank", "noopener,noreferrer");
+    return true;
+  }
+
+  try {
+    popup.opener = null;
+    popup.location.replace(webUrl);
+    popup.blur();
+  } catch {
+    try {
+      popup.location.href = webUrl;
+      popup.blur();
+    } catch {}
+  }
+
+  window.setTimeout(() => {
+    try {
+      window.focus();
+    } catch {}
+  }, 0);
+
+  window.setTimeout(() => {
+    try {
+      window.focus();
+    } catch {}
+  }, 200);
+
+  return true;
+};
+
+export const openWhatsAppLaunchUrl = (rawUrl, options = {}) => {
+  const { keepSourceFocusedOnDesktop = false } = options;
   const targets = buildWhatsAppLaunchTargets(rawUrl);
   if (!targets?.webUrl || typeof window === "undefined") {
     return false;
   }
 
   if (!targets.appUrl || !isProbablyMobileDevice() || typeof document === "undefined") {
-    window.open(targets.webUrl, "_blank", "noopener,noreferrer");
-    return true;
+    return openDesktopWhatsAppUrl(
+      targets.webUrl,
+      keepSourceFocusedOnDesktop,
+    );
   }
 
   let fallbackTimerId = null;

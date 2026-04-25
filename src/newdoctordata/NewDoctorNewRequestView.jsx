@@ -786,7 +786,9 @@ export default function NewDoctorNewRequestView() {
       return;
     }
 
-    openWhatsAppLaunchUrl(consultSessionShareWhatsAppUrl);
+    openWhatsAppLaunchUrl(consultSessionShareWhatsAppUrl, {
+      keepSourceFocusedOnDesktop: true,
+    });
   }, [consultSessionShareWhatsAppUrl]);
 
   const handleCopyConsultationLink = useCallback(async () => {
