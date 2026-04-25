@@ -2,10 +2,8 @@ import React, { useEffect, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/images/logo.png";
+import { apiPost } from "../lib/api";
 import { useNewDoctorAuth } from "./NewDoctorAuth";
-
-const REQUEST_OTP_URL = "https://snoutiq.com/backend/api/doctor/otp/request-any";
-const VERIFY_OTP_URL = "https://snoutiq.com/backend/api/doctor/otp/verify-any";
 
 export default function NewDoctorLogin() {
   const [step, setStep] = useState(1);
@@ -61,19 +59,10 @@ export default function NewDoctorLogin() {
     setError("");
 
     try {
-      const response = await fetch(REQUEST_OTP_URL, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ phone }),
-      });
-
-      const data = await response.json();
+      const data = await apiPost("/api/doctor/otp/request-any", { phone });
       console.log("doctor otp request response:", data);
 
-      if (!response.ok || !data?.success) {
+      if (!data?.success) {
         throw new Error(data?.message || "OTP send failed");
       }
 
@@ -84,7 +73,7 @@ export default function NewDoctorLogin() {
         otp_requested_at: Date.now(),
         phone_verified: false,
         phone_exists: Boolean(data.phone_exists),
-         doctor: data.doctor || null, 
+        doctor: data.doctor || null,
       });
 
       setStep(2);
@@ -107,23 +96,14 @@ export default function NewDoctorLogin() {
     setError("");
 
     try {
-      const response = await fetch(VERIFY_OTP_URL, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          phone,
-          otp,
-          request_id: auth.request_id,
-        }),
+      const data = await apiPost("/api/doctor/otp/verify-any", {
+        phone,
+        otp,
+        request_id: auth.request_id,
       });
-
-      const data = await response.json();
       console.log("doctor otp verify response:", data);
 
-      if (!response.ok || !data?.success) {
+      if (!data?.success) {
         throw new Error(data?.message || "OTP verification failed");
       }
 
@@ -131,7 +111,7 @@ export default function NewDoctorLogin() {
         phone,
         phone_verified: Boolean(data.phone_verified),
         phone_exists: Boolean(data.phone_exists),
-         doctor: data.doctor || null, 
+        doctor: data.doctor || null,
       });
 
       if (data.phone_exists) {
@@ -158,7 +138,7 @@ export default function NewDoctorLogin() {
       otp_requested_at: null,
       phone_verified: false,
       phone_exists: false,
-       doctor: null,
+      doctor: null,
     });
   };
 

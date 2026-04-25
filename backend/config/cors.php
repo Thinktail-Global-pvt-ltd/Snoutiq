@@ -9,7 +9,8 @@ return [
     'allowed_origins' => [
         'http://localhost:5173',
         'http://10.163.123.215:3000',
-        'https://snoutiq.com'
+        'https://snoutiq.com',
+        'https://www.snoutiq.com'
     ],
 
     'allowed_origins_patterns' => [],
@@ -22,4 +23,3 @@ return [
 
     'supports_credentials' => true, // ✅ ye true hona chahiye
 ];
-
