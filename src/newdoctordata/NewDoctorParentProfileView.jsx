@@ -437,6 +437,9 @@ export default function NewDoctorNewRequestView() {
   const consultSessionLandingUrl = normalizeText(
     consultSessionPayload?.landing_url,
   );
+  const consultSessionParentWhatsAppUrl = normalizeText(
+    consultSessionPayload?.parent_whatsapp_url,
+  );
   const consultSessionShareWhatsAppUrl = normalizeText(
     consultSessionPayload?.share_whatsapp_url,
   );
@@ -717,7 +720,10 @@ export default function NewDoctorNewRequestView() {
   }, [consultSessionShareWhatsAppUrl]);
 
   const handleCopyConsultationLink = useCallback(async () => {
-    if (!consultSessionLandingUrl) {
+    const copyTargetUrl =
+      consultSessionParentWhatsAppUrl || consultSessionLandingUrl;
+
+    if (!copyTargetUrl) {
       await Swal.fire({
         icon: "error",
         title: "Link unavailable",
@@ -727,7 +733,7 @@ export default function NewDoctorNewRequestView() {
       return;
     }
 
-    const copied = await copyTextToClipboard(consultSessionLandingUrl).catch(
+    const copied = await copyTextToClipboard(copyTargetUrl).catch(
       () => false,
     );
 
@@ -744,10 +750,10 @@ export default function NewDoctorNewRequestView() {
     await Swal.fire({
       icon: "info",
       title: "Copy this link",
-      text: consultSessionLandingUrl,
+      text: copyTargetUrl,
       confirmButtonColor: "#16a34a",
     });
-  }, [consultSessionLandingUrl]);
+  }, [consultSessionLandingUrl, consultSessionParentWhatsAppUrl]);
 
   useEffect(() => {
     if (

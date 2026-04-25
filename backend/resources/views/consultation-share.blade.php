@@ -186,8 +186,15 @@
                 return;
             }
 
-            link.addEventListener('click', function (event) {
-                event.preventDefault();
+            const launchWhatsApp = () => {
+                const storageKey = `consult-whatsapp-launch:${window.location.pathname}`;
+
+                try {
+                    if (window.sessionStorage.getItem(storageKey) === '1') {
+                        return;
+                    }
+                    window.sessionStorage.setItem(storageKey, '1');
+                } catch {}
 
                 let fallbackTimerId = null;
 
@@ -214,13 +221,22 @@
 
                 fallbackTimerId = window.setTimeout(() => {
                     if (document.visibilityState === 'visible') {
-                        window.location.assign(targets.webUrl);
+                        try {
+                            window.sessionStorage.removeItem(storageKey);
+                        } catch {}
                     }
                     cleanup();
                 }, 900);
 
                 window.location.assign(targets.appUrl);
+            };
+
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                launchWhatsApp();
             });
+
+            window.setTimeout(launchWhatsApp, 60);
         })();
     </script>
 </body>
