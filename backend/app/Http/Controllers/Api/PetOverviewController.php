@@ -773,18 +773,6 @@ class PetOverviewController extends Controller
 
         $rows = $this->loadDailyCareRowsForDate($petId, $date);
 
-        // If no specific date was requested, fallback to latest saved daily care.
-        if (! $hasRequestedDate && $rows->isEmpty()) {
-            $latestDate = DB::table('pet_daily_cares')
-                ->where('pet_id', $petId)
-                ->max('care_date');
-
-            if (is_string($latestDate) && trim($latestDate) !== '') {
-                $date = Carbon::parse($latestDate)->toDateString();
-                $rows = $this->loadDailyCareRowsForDate($petId, $date);
-            }
-        }
-
         $bundleRow = $rows->first(function ($row) {
             return ($row->task_key ?? null) === '__daily_bundle__';
         });
