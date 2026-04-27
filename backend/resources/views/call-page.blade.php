@@ -16,7 +16,10 @@
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
   {{-- Agora NG (browser CDN) --}}
-  <script src="https://cdn.jsdelivr.net/npm/agora-rtc-sdk-ng@4.20.2/AgoraRTC_N.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/agora-rtc-sdk-ng@4.20.2/AgoraRTC_N-production.js"
+    onerror="(function(){var s=document.createElement('script');s.src='https://download.agora.io/sdk/release/AgoraRTC_N-4.20.2.js';document.head.appendChild(s);})();"
+  ></script>
 
   <style>
     .btn { @apply px-3 py-2 rounded-lg text-sm font-semibold transition; }
@@ -169,6 +172,28 @@
     elStatus.textContent = label;
   };
 
+  function ensureAgoraSdk(){
+    if (window.AgoraRTC) return Promise.resolve(window.AgoraRTC);
+
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-agora-fallback="1"]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.AgoraRTC), { once: true });
+        existing.addEventListener('error', () => reject(new Error('Agora SDK failed to load')), { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://download.agora.io/sdk/release/AgoraRTC_N-4.20.2.js';
+      script.dataset.agoraFallback = '1';
+      script.onload = () => window.AgoraRTC
+        ? resolve(window.AgoraRTC)
+        : reject(new Error('Agora SDK loaded but AgoraRTC is unavailable'));
+      script.onerror = () => reject(new Error('Agora SDK failed to load'));
+      document.head.appendChild(script);
+    });
+  }
+
   function getRemoteDivId(uid){ return `remote-${uid}`; }
   function ensureRemoteVideoContainer(uid){
     if(document.getElementById(getRemoteDivId(uid))) return;
@@ -307,6 +332,7 @@
       if (!AGORA_APP_ID){ log('❌ Missing AGORA_APP_ID'); return; }
 
       setStatus('Joining…', 'blue');
+      const AgoraSdk = await ensureAgoraSdk();
 
       // Use the app user id as Agora uid so doctor/patient get deterministic tokens.
       // Doctor example: uid=241, Patient example: uid=1404.
@@ -327,7 +353,7 @@
       if (!appId){ log('❌ No Agora app id'); setStatus('App ID error', 'red'); return; }
 
       // client
-      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+      const client = AgoraSdk.createClient({ mode: 'rtc', codec: 'vp8' });
       clientRef.current = client;
 
       client.on('user-published', async (user, mediaType) => {
@@ -355,7 +381,7 @@
       // join + local tracks
       await client.join(appId, channelName, token, rtcUid);
 
-      const [mic, cam] = await AgoraRTC.createMicrophoneAndCameraTracks();
+      const [mic, cam] = await AgoraSdk.createMicrophoneAndCameraTracks();
       localTracksRef.current = { mic, cam };
 
       cam.play('local-player');
