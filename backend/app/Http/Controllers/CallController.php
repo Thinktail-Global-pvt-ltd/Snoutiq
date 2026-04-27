@@ -93,7 +93,16 @@ class CallController extends Controller
 
         event(new CallAccepted($session->fresh()));
 
-        return response()->json($this->sessionPayload($session));
+        $doctorToken = $this->buildAgoraTokenPayload($session->channel_name, (int) $session->doctor_id);
+
+        return response()->json($this->sessionPayload($session, [
+            'uid' => (int) $session->doctor_id,
+            'appId' => $doctorToken['appId'],
+            'token' => $doctorToken['token'],
+            'agoraToken' => $doctorToken['token'],
+            'agora_token' => $doctorToken['token'],
+            'expiresIn' => $doctorToken['expiresIn'],
+        ]));
     }
 
     public function paymentSuccess(Request $request, int $sessionId): JsonResponse
@@ -311,8 +320,15 @@ class CallController extends Controller
 
     public function generateToken(Request $request): JsonResponse
     {
-        $appId = config('services.agora.app_id', 'b13636f3f07448e2bf6778f5bc2c506f');
-        $appCertificate = config('services.agora.certificate', 'c30ae10e278c490f9b09608b15c353ba');
+        $appId = trim((string) config('services.agora.app_id', ''));
+        $appCertificate = trim((string) config('services.agora.certificate', ''));
+
+        if ($appId === '' || $appCertificate === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Agora credentials are not configured.',
+            ], 500);
+        }
 
         $channelName = $request->input('channel_name');
         if (empty($channelName)) {
@@ -408,5 +424,29 @@ class CallController extends Controller
             'updated_at'      => $session->updated_at?->toIso8601String(),
             'session'         => $session,
         ], $extra);
+    }
+
+    protected function buildAgoraTokenPayload(string $channelName, int $uid): array
+    {
+        $appId = trim((string) config('services.agora.app_id', ''));
+        $appCertificate = trim((string) config('services.agora.certificate', ''));
+
+        abort_if($appId === '' || $appCertificate === '', 500, 'Agora credentials are not configured.');
+
+        $expiresIn = 3600;
+        $privilegeExpiredTs = time() + $expiresIn;
+
+        return [
+            'token' => RtcTokenBuilder::buildTokenWithUid(
+                $appId,
+                $appCertificate,
+                $channelName,
+                $uid,
+                RtcTokenBuilder::RolePublisher,
+                $privilegeExpiredTs
+            ),
+            'appId' => $appId,
+            'expiresIn' => $expiresIn,
+        ];
     }
 }
