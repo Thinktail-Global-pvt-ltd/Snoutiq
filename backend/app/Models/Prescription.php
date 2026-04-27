@@ -53,6 +53,7 @@ class Prescription extends Model
         'pet_id',
         'video_appointment_id',
         'in_clinic_appointment_id',
+        'seen',
     ];
 
     protected $casts = [
@@ -67,6 +68,7 @@ class Prescription extends Model
         'follow_up_notification_sent_at' => 'datetime',
         'is_chronic' => 'boolean',
         'medications_json' => 'array',
+        'seen' => 'boolean',
     ];
 
     public function doctor(): BelongsTo

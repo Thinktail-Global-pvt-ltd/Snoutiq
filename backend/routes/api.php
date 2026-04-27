@@ -2447,6 +2447,7 @@ Route::get('/nearby-plus-featured', [VideoCallingController::class, 'nearbyPlusF
 
 // ---- Prescriptions ----
 Route::get('/prescriptions', [PrescriptionController::class, 'index']);
+Route::post('/prescriptions/seen', [PrescriptionController::class, 'updateSeen']);
 Route::get('/prescriptions/by-user-pet', [PrescriptionController::class, 'byUserPet']); // ?user_id=&pet_id=
 Route::get('/users/medical-summary', [PrescriptionController::class, 'userData']); // ?user_id=
 Route::match(['put', 'patch'], '/users/medical-summary', [PrescriptionController::class, 'updateUserData']);

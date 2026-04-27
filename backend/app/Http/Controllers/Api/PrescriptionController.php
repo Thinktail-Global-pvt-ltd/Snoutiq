@@ -28,6 +28,7 @@ class PrescriptionController extends Controller
         $hasFollowUpDate  = Schema::hasColumn('prescriptions', 'follow_up_date');
         $hasFollowUpType  = Schema::hasColumn('prescriptions', 'follow_up_type');
         $hasFollowUpNotes = Schema::hasColumn('prescriptions', 'follow_up_notes');
+        $hasSeen = Schema::hasColumn('prescriptions', 'seen');
         $hasPetsTable = Schema::hasTable('pets');
         $hasPetDogDiseasePayload = $hasPetsTable && Schema::hasColumn('pets', 'dog_disease_payload');
         $hasPetIsNeutered = $hasPetsTable && Schema::hasColumn('pets', 'is_neutered');
@@ -61,8 +62,9 @@ class PrescriptionController extends Controller
         }
 
         $prescriptions = $query->paginate(20);
-        $prescriptions->getCollection()->transform(function ($prescription) use ($hasFollowUpDate, $hasFollowUpType, $hasFollowUpNotes) {
+        $prescriptions->getCollection()->transform(function ($prescription) use ($hasFollowUpDate, $hasFollowUpType, $hasFollowUpNotes, $hasSeen) {
             $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+            $prescription->seen = $hasSeen ? (bool) $prescription->seen : false;
 
             // Enrich medications_json with days_remaining based on created_at + duration
             $createdAt = $prescription->created_at ? Carbon::parse($prescription->created_at) : null;
@@ -158,6 +160,7 @@ class PrescriptionController extends Controller
         }
         return response()->json(array_merge($prescription->toArray(), [
             'image_url' => $this->buildPrescriptionUrl($prescription->image_path),
+            'seen' => Schema::hasColumn('prescriptions', 'seen') ? (bool) $prescription->seen : false,
         ]));
     }
 
@@ -175,6 +178,7 @@ class PrescriptionController extends Controller
         $prescriptions = $query->paginate(20);
         $prescriptions->getCollection()->transform(function ($prescription) {
             $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+            $prescription->seen = Schema::hasColumn('prescriptions', 'seen') ? (bool) $prescription->seen : false;
             return $prescription;
         });
 
@@ -205,6 +209,7 @@ class PrescriptionController extends Controller
             ->map(function (Prescription $prescription) {
                 $row = $prescription->toArray(); // full prescription row + loaded relations
                 $row['image_url'] = $this->buildPrescriptionUrl($prescription->image_path);
+                $row['seen'] = Schema::hasColumn('prescriptions', 'seen') ? (bool) $prescription->seen : false;
                 return $row;
             })
             ->values();
@@ -650,6 +655,9 @@ class PrescriptionController extends Controller
         if (Schema::hasColumn('prescriptions', 'follow_up_notes')) {
             $prescriptionColumns[] = 'follow_up_notes';
         }
+        if (Schema::hasColumn('prescriptions', 'seen')) {
+            $prescriptionColumns[] = 'seen';
+        }
 
         $prescriptions = Prescription::query()
             ->where('user_id', $user->id)
@@ -661,6 +669,7 @@ class PrescriptionController extends Controller
             ->get($prescriptionColumns)
             ->map(function ($prescription) {
                 $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+                $prescription->seen = Schema::hasColumn('prescriptions', 'seen') ? (bool) $prescription->seen : false;
                 return $prescription;
             });
 
@@ -768,6 +777,73 @@ class PrescriptionController extends Controller
                 'image_url' => $imageUrl,
             ]),
         ], 201);
+    }
+
+    // POST /api/prescriptions/seen
+    public function updateSeen(Request $request)
+    {
+        if (!Schema::hasTable('prescriptions') || !Schema::hasColumn('prescriptions', 'seen')) {
+            return response()->json([
+                'message' => 'prescriptions.seen column is missing. Run migrations first.',
+            ], 500);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'id' => 'nullable|integer|min:1',
+            'prescription_id' => 'nullable|integer|min:1',
+            'user_id' => 'nullable|integer|min:1',
+            'seen' => 'required_without:prescriptions|boolean',
+            'prescriptions' => 'nullable|array|min:1',
+            'prescriptions.*.id' => 'required_with:prescriptions|integer|min:1',
+            'prescriptions.*.seen' => 'required_with:prescriptions|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $payload = $validator->validated();
+        $updates = [];
+
+        foreach (($payload['prescriptions'] ?? []) as $row) {
+            $updates[(int) $row['id']] = (bool) $row['seen'];
+        }
+
+        $singleId = $payload['prescription_id'] ?? $payload['id'] ?? null;
+        if ($singleId !== null) {
+            $updates[(int) $singleId] = (bool) $payload['seen'];
+        }
+
+        if ($updates === []) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => [
+                    'id' => ['Provide id, prescription_id, or prescriptions array.'],
+                ],
+            ], 422);
+        }
+
+        $query = Prescription::query()->whereIn('id', array_keys($updates));
+        if (!empty($payload['user_id'])) {
+            $query->where('user_id', (int) $payload['user_id']);
+        }
+
+        $prescriptions = $query->get();
+        foreach ($prescriptions as $prescription) {
+            $prescription->seen = $updates[(int) $prescription->id];
+            $prescription->save();
+            $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+            $prescription->seen = (bool) $prescription->seen;
+        }
+
+        return response()->json([
+            'message' => 'Prescription seen status updated',
+            'updated_count' => $prescriptions->count(),
+            'data' => $prescriptions->values(),
+        ]);
     }
 
     private function buildPrescriptionUrl(?string $imagePath): ?string
