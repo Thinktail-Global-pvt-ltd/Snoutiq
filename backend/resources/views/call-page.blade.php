@@ -40,6 +40,7 @@
   $role     = request('role', 'audience');            // ?role=host|audience
   $callId   = request('callId');                      // ?callId=...
   $clinicId = request('clinicId');
+  $autoJoin = filter_var(request('autoJoin', false), FILTER_VALIDATE_BOOLEAN);
 @endphp
 
 <script>
@@ -55,6 +56,7 @@
   const PRESET_ROLE     = @json($role);    // 'host' or 'audience'
   const PRESET_CALL_ID  = @json($callId);
   const PRESET_CLINIC_ID = @json($clinicId ?? null);
+  const PRESET_AUTO_JOIN = @json($autoJoin);
 </script>
 
 <div class="max-w-6xl mx-auto p-4">
@@ -306,17 +308,23 @@
 
       setStatus('Joining…', 'blue');
 
-      // random UID for Agora join (independent of your app uid)
-      const rtcUid = Math.floor(Math.random() * 1_000_000);
+      // Use the app user id as Agora uid so doctor/patient get deterministic tokens.
+      // Doctor example: uid=241, Patient example: uid=1404.
+      const presetUid = Number(PRESET_UID);
+      const rtcUid = Number.isFinite(presetUid) && presetUid > 0
+        ? presetUid
+        : Math.floor(Math.random() * 1_000_000);
 
       // get token
       const tokRes = await axios.post(`${API_BASE}/api/agora/token`, {
-        channel: channelName,
+        channel_name: channelName,
         uid: rtcUid,
         role: 'publisher'
       });
       const token = tokRes.data?.token;
+      const appId = tokRes.data?.appId || AGORA_APP_ID;
       if (!token){ log('❌ No Agora token'); setStatus('Token error', 'red'); return; }
+      if (!appId){ log('❌ No Agora app id'); setStatus('App ID error', 'red'); return; }
 
       // client
       const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
@@ -345,7 +353,7 @@
       });
 
       // join + local tracks
-      await client.join(AGORA_APP_ID, channelName, token, rtcUid);
+      await client.join(appId, channelName, token, rtcUid);
 
       const [mic, cam] = await AgoraRTC.createMicrophoneAndCameraTracks();
       localTracksRef.current = { mic, cam };
@@ -364,10 +372,12 @@
 
       callStartedAt = Date.now();
       try {
-        await axios.post(`${API_BASE}/api/call/${sessionId}/start`, {
-          started_at: new Date(callStartedAt).toISOString(),
-        });
-        log('🕑 Marked call session as started');
+        if (sessionId) {
+          await axios.post(`${API_BASE}/api/call/${sessionId}/start`, {
+            started_at: new Date(callStartedAt).toISOString(),
+          });
+          log('🕑 Marked call session as started');
+        }
       } catch (err) {
         log('⚠️ Failed to mark call start: ' + (err?.message || String(err)));
       }
@@ -492,9 +502,10 @@
 
     if (PRESET_CHANNEL){
       log(`Preset channel detected: ${PRESET_CHANNEL}`);
-      // We don't auto-call join(). Doctor/patient clicks Join for a clean UX;
-      // If you want auto-join, uncomment:
-      // joinAgora(PRESET_CALL_ID, PRESET_CHANNEL);
+      if (PRESET_AUTO_JOIN) {
+        log('Auto-join enabled from URL');
+        joinAgora(PRESET_CALL_ID, PRESET_CHANNEL);
+      }
     }
   })();
 </script>
