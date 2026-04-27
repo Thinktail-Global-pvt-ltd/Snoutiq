@@ -72,14 +72,10 @@ class GeminiChatController extends Controller
         $diseaseName = $inference['suggested_disease'] ?? 'Unknown dog disease';
         $category = $inference['category'] ?? 'normal';
 
-        // Handle optional video calling upload file
-        $videoUploadPath = $this->storePetCardForAi($request, 'video_calling_upload_file');
-        if (!$videoUploadPath && $request->filled('video_calling_upload_file')) {
-            $videoUploadPath = $request->input('video_calling_upload_file');
-        }
+        $petDoc2BlobSaved = $this->storeUploadInPetDoc2Blob($request, (int) $data['pet_id'], 'video_calling_upload_file');
 
         DB::update(
-            'UPDATE pets SET dog_disease_payload = ?, pet_card_for_ai = ?, video_calling_upload_file = ?, updated_at = NOW() WHERE id = ?',
+            'UPDATE pets SET dog_disease_payload = ?, pet_card_for_ai = ?, updated_at = NOW() WHERE id = ?',
             [
                 json_encode([
                     'user_id' => $data['user_id'],
@@ -91,10 +87,8 @@ class GeminiChatController extends Controller
                     'pet_gender' => $data['pet_gender'] ?? null,
                     'vaccination' => $data['vaccination'] ?? null,
                     'pet_card_for_ai' => $petCardPath,
-                    'video_calling_upload_file' => $videoUploadPath,
                 ]),
                 $petCardPath,
-                $videoUploadPath,
                 $data['pet_id'],
             ]
         );
@@ -109,7 +103,7 @@ class GeminiChatController extends Controller
                 'category' => in_array($category, ['normal','chronic'], true) ? $category : 'normal',
                 'pet_profile' => $context,
                 'pet_card_for_ai' => $petCardUrl,
-                'video_calling_upload_file' => $videoUploadPath ? $this->buildPetCardUrl($videoUploadPath) : null,
+                'pet_doc2_blob_saved' => $petDoc2BlobSaved,
             ],
         ]);
     }
@@ -159,41 +153,15 @@ class GeminiChatController extends Controller
         }
         $payload['question'] = $question;
 
-        // Save uploaded file (or accept existing string path)
-        $videoUploadPath = $this->storePetCardForAi($request, 'video_calling_upload_file');
-        if (!$videoUploadPath && $request->filled('video_calling_upload_file')) {
-            $videoUploadPath = $request->input('video_calling_upload_file');
-        }
-        if ($videoUploadPath) {
-            $payload['video_calling_upload_file'] = $videoUploadPath;
-        }
+        unset($payload['video_calling_upload_file']);
+        $petDoc2BlobSaved = $this->storeUploadInPetDoc2Blob($request, (int) $petRow->id, 'video_calling_upload_file');
 
         $updatePayload = [
             'dog_disease_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
             'updated_at' => now(),
         ];
-        if ($videoUploadPath !== null) {
-            $updatePayload['video_calling_upload_file'] = $videoUploadPath;
-        }
-
-        if (
-            Schema::hasTable('pets')
-            && Schema::hasColumn('pets', 'pet_doc2_blob')
-            && is_string($videoUploadPath)
-            && $videoUploadPath !== ''
-        ) {
-            [$petDoc2Blob, $petDoc2Mime] = $this->extractLocalUploadBlob($videoUploadPath);
-            if ($petDoc2Blob !== null) {
-                $updatePayload['pet_doc2_blob'] = $petDoc2Blob;
-                if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
-                    $updatePayload['pet_doc2_mime'] = $petDoc2Mime ?: 'application/octet-stream';
-                }
-            }
-        }
 
         DB::table('pets')->where('id', $petRow->id)->update($updatePayload);
-
-        $responseVideoUploadPath = $videoUploadPath ?: ($payload['video_calling_upload_file'] ?? null);
 
         return response()->json([
             'success' => true,
@@ -202,7 +170,7 @@ class GeminiChatController extends Controller
             'suggested_disease' => $inference['suggested_disease'],
             'category' => $inference['category'],
             'dog_disease_payload' => $payload,
-            'video_calling_upload_file' => $responseVideoUploadPath ? $this->buildPetCardUrl($responseVideoUploadPath) : null,
+            'pet_doc2_blob_saved' => $petDoc2BlobSaved,
         ]);
     }
 
@@ -1500,6 +1468,49 @@ PROMPT;
         $file->move($uploadPath, $fileName);
 
         return 'uploads/pet_cards/'.$fileName;
+    }
+
+    private function storeUploadInPetDoc2Blob(Request $request, int $petId, string $field): bool
+    {
+        if (!Schema::hasTable('pets') || !Schema::hasColumn('pets', 'pet_doc2_blob')) {
+            return false;
+        }
+
+        $blob = null;
+        $mime = null;
+
+        if ($request->hasFile($field)) {
+            $file = $request->file($field);
+            if (is_array($file)) {
+                $file = collect($file)->first(function ($item) {
+                    return $item && method_exists($item, 'isValid') && $item->isValid();
+                });
+            }
+
+            if ($file && method_exists($file, 'isValid') && $file->isValid()) {
+                $path = $file->getRealPath();
+                $blob = is_string($path) && $path !== '' && File::exists($path)
+                    ? File::get($path)
+                    : null;
+                $mime = $file->getMimeType() ?: 'application/octet-stream';
+            }
+        } elseif ($request->filled($field)) {
+            [$blob, $mime] = $this->extractLocalUploadBlob((string) $request->input($field));
+        }
+
+        if ($blob === null || $blob === false || $blob === '') {
+            return false;
+        }
+
+        $updates = [
+            'pet_doc2_blob' => $blob,
+            'updated_at' => now(),
+        ];
+        if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
+            $updates['pet_doc2_mime'] = $mime ?: 'application/octet-stream';
+        }
+
+        return DB::table('pets')->where('id', $petId)->update($updates) > 0;
     }
 
     private function extractLocalUploadBlob(string $path): array
