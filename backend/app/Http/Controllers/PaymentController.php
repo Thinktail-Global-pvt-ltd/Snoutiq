@@ -269,13 +269,8 @@ class PaymentController extends Controller
                 amountInInr: $amountInInr
             );
 
-            $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
-                context: $context,
-                notes: $notes,
-                amountInInr: $amountInInr
-            );
-            $whatsAppMeta = $videoConsultWhatsAppMeta['whatsapp'];
-            $vetWhatsAppMeta = $videoConsultWhatsAppMeta['vet_whatsapp'];
+            $whatsAppMeta = null;
+            $vetWhatsAppMeta = null;
             $prescriptionDocMeta = null;
 
             return response()->json([
@@ -959,9 +954,18 @@ class PaymentController extends Controller
                     ?? ($record->raw_response['notes']['type'] ?? null)
                 );
 
-                // Order-creation/payment verification should not send WhatsApp.
-                // User and doctor WhatsApp notifications are handled from the
-                // later doctor-assignment flow instead.
+                if (
+                    $this->isVideoConsultTransactionType($orderType)
+                    && strtolower(trim((string) $status)) === 'captured'
+                ) {
+                    $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
+                        context: $context,
+                        notes: $notes,
+                        amountInInr: $amountInInr
+                    );
+                    $whatsAppMeta = $videoConsultWhatsAppMeta['whatsapp'];
+                    $vetWhatsAppMeta = $videoConsultWhatsAppMeta['vet_whatsapp'];
+                }
 
                 $vetPushMeta = $this->notifyDoctorPaymentCaptured(
                     context: $context,
