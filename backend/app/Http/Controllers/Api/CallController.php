@@ -140,8 +140,8 @@ class CallController extends Controller
 
     private function buildAgoraToken(string $channelName, int $uid): array
     {
-        $appId = trim((string) config('services.agora.app_id', ''));
-        $appCertificate = trim((string) config('services.agora.certificate', ''));
+        $appId = trim((string) (env('AGORA_APP_ID') ?: config('services.agora.app_id', '')));
+        $appCertificate = trim((string) (env('AGORA_APP_CERTIFICATE') ?: config('services.agora.certificate', '')));
 
         abort_if($appId === '' || $appCertificate === '', 500, 'Agora credentials are not configured.');
 
