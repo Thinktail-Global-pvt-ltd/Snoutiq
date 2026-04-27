@@ -62,6 +62,7 @@ class CallController extends Controller
             'agoraToken' => $doctorToken['token'],
             'agora_token' => $doctorToken['token'],
             'expiresIn' => $doctorToken['expiresIn'],
+            'tokenRequired' => $doctorToken['tokenRequired'],
         ]);
     }
 
@@ -91,6 +92,7 @@ class CallController extends Controller
             'agoraToken' => $doctorToken['token'],
             'agora_token' => $doctorToken['token'],
             'expiresIn' => $doctorToken['expiresIn'],
+            'tokenRequired' => $doctorToken['tokenRequired'],
         ]);
     }
 
@@ -142,23 +144,41 @@ class CallController extends Controller
     {
         $appId = trim((string) (env('AGORA_APP_ID') ?: config('services.agora.app_id', '')));
         $appCertificate = trim((string) (env('AGORA_APP_CERTIFICATE') ?: config('services.agora.certificate', '')));
+        $tokenRequired = $this->agoraTokenRequired($appCertificate);
 
-        abort_if($appId === '' || $appCertificate === '', 500, 'Agora credentials are not configured.');
+        abort_if($appId === '', 500, 'Agora App ID is not configured.');
+        abort_if($tokenRequired && $appCertificate === '', 500, 'Agora App Certificate is required when token auth is enabled.');
 
         $expiresIn = 3600;
-        $privilegeExpiredTs = time() + $expiresIn;
+        $token = null;
 
-        return [
-            'token' => RtcTokenBuilder::buildTokenWithUid(
+        if ($tokenRequired) {
+            $token = RtcTokenBuilder::buildTokenWithUid(
                 $appId,
                 $appCertificate,
                 $channelName,
                 $uid,
                 RtcTokenBuilder::RolePublisher,
-                $privilegeExpiredTs
-            ),
+                time() + $expiresIn
+            );
+        }
+
+        return [
+            'token' => $token,
             'appId' => $appId,
             'expiresIn' => $expiresIn,
+            'tokenRequired' => $tokenRequired,
         ];
+    }
+
+    private function agoraTokenRequired(string $appCertificate): bool
+    {
+        $configured = env('AGORA_TOKEN_REQUIRED');
+
+        if ($configured !== null) {
+            return filter_var($configured, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return trim($appCertificate) !== '';
     }
 }

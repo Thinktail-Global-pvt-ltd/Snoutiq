@@ -349,8 +349,10 @@
       });
       const token = tokRes.data?.token;
       const appId = tokRes.data?.appId || AGORA_APP_ID;
-      if (!token){ log('❌ No Agora token'); setStatus('Token error', 'red'); return; }
+      const tokenRequired = tokRes.data?.tokenRequired !== false;
+      if (tokenRequired && !token){ log('❌ No Agora token'); setStatus('Token error', 'red'); return; }
       if (!appId){ log('❌ No Agora app id'); setStatus('App ID error', 'red'); return; }
+      if (!tokenRequired) log('ℹ️ Agora tokenless mode enabled');
 
       // client
       const client = AgoraSdk.createClient({ mode: 'rtc', codec: 'vp8' });
@@ -379,7 +381,7 @@
       });
 
       // join + local tracks
-      await client.join(appId, channelName, token, rtcUid);
+      await client.join(appId, channelName, tokenRequired ? token : null, rtcUid);
 
       const [mic, cam] = await AgoraSdk.createMicrophoneAndCameraTracks();
       localTracksRef.current = { mic, cam };

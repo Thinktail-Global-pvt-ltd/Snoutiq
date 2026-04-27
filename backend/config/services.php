@@ -86,6 +86,7 @@ return [
     'agora' => [
         'app_id' => env('AGORA_APP_ID'),
         'certificate' => env('AGORA_APP_CERTIFICATE'),
+        'token_required' => filter_var(env('AGORA_TOKEN_REQUIRED', env('AGORA_APP_CERTIFICATE') ? true : false), FILTER_VALIDATE_BOOLEAN),
         'customer_id' => env('AGORA_CUSTOMER_ID'),
         'customer_secret' => env('AGORA_CUSTOMER_SECRET'),
         'rest_endpoint' => env('AGORA_REST_ENDPOINT', 'https://api.agora.io'),
