@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Services\GooglePlacesLookupService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Mockery;
 use Tests\TestCase;
 
 class UserNearbyClinicsApiTest extends TestCase
@@ -22,59 +24,39 @@ class UserNearbyClinicsApiTest extends TestCase
             $table->decimal('longitude', 10, 7)->nullable();
             $table->timestamps();
         });
-
-        $this->createClinicSchema();
     }
 
-    public function test_user_nearby_clinics_returns_only_database_clinics(): void
+    public function test_user_nearby_clinics_returns_google_clinics_only(): void
     {
         DB::table('users')->insert([
             'id' => 1388,
             'name' => 'Pet Parent',
             'city' => 'Gurgaon',
-            'latitude' => null,
-            'longitude' => null,
+            'latitude' => 28.4595,
+            'longitude' => 77.0266,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        DB::table('vet_registerations_temp')->insert([
-            [
-                'id' => 25,
-                'name' => 'Snoutiq Partner Clinic',
-                'mobile' => '9999999999',
-                'city' => 'Gurgaon',
-                'address' => 'Sector 45',
-                'formatted_address' => 'Sector 45, Gurgaon',
-                'place_id' => 'db_place_25',
-                'business_status' => 'OPERATIONAL',
-                'lat' => 28.4595,
-                'lng' => 77.0266,
-                'open_now' => true,
-                'rating' => 4.7,
-                'user_ratings_total' => 44,
-                'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'id' => 26,
-                'name' => 'Other City Clinic',
-                'mobile' => null,
-                'city' => 'Delhi',
-                'address' => null,
-                'formatted_address' => null,
-                'place_id' => null,
-                'business_status' => null,
-                'lat' => null,
-                'lng' => null,
-                'open_now' => null,
-                'rating' => null,
-                'user_ratings_total' => null,
-                'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
+
+        $places = Mockery::mock(GooglePlacesLookupService::class);
+        $places->shouldReceive('search')
+            ->once()
+            ->with('clinic', 'Gurgaon', 28.4595, 77.0266, 5)
+            ->andReturn([
+                'success' => true,
+                'location' => 'Gurgaon',
+                'count' => 1,
+                'source' => 'google_places',
+                'places' => [
+                    [
+                        'name' => 'Google Vet Clinic',
+                        'address' => 'Sector 45, Gurgaon',
+                        'rating' => 4.8,
+                        'place_id' => 'google_place_123',
+                    ],
+                ],
+            ]);
+        $this->app->instance(GooglePlacesLookupService::class, $places);
 
         $response = $this->getJson('/api/users/nearby-clinics?user_id=1388');
 
@@ -82,18 +64,55 @@ class UserNearbyClinicsApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('user_id', 1388)
             ->assertJsonPath('count', 1)
-            ->assertJsonPath('source', 'snoutiq_database')
-            ->assertJsonPath('clinics.0.name', 'Snoutiq Partner Clinic')
-            ->assertJsonPath('clinics.0.phone', '9999999999')
+            ->assertJsonPath('source', 'google_places')
+            ->assertJsonPath('range_km', 5)
+            ->assertJsonPath('clinics.0.name', 'Google Vet Clinic')
             ->assertJsonMissingPath('nearby_clinics')
             ->assertJsonMissingPath('vet_clinics')
             ->assertJsonMissingPath('structured_data');
     }
 
-    public function test_user_nearby_clinics_returns_clinics_even_without_saved_location(): void
+    public function test_user_nearby_clinics_uses_google_text_search_when_only_city_is_saved(): void
     {
         DB::table('users')->insert([
             'id' => 1389,
+            'name' => 'Pet Parent',
+            'city' => 'Gurgaon',
+            'latitude' => null,
+            'longitude' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $places = Mockery::mock(GooglePlacesLookupService::class);
+        $places->shouldReceive('search')
+            ->once()
+            ->with('clinic', 'Gurgaon', null, null, 5)
+            ->andReturn([
+                'success' => true,
+                'location' => 'Gurgaon',
+                'count' => 1,
+                'source' => 'google_places',
+                'places' => [
+                    ['name' => 'Google City Clinic'],
+                ],
+            ]);
+        $this->app->instance(GooglePlacesLookupService::class, $places);
+
+        $response = $this->getJson('/api/users/nearby-clinics?user_id=1389');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('range_km', null)
+            ->assertJsonPath('source', 'google_places')
+            ->assertJsonPath('clinics.0.name', 'Google City Clinic');
+    }
+
+    public function test_user_nearby_clinics_requires_saved_or_request_location(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1392,
             'name' => 'Pet Parent',
             'city' => null,
             'latitude' => null,
@@ -101,60 +120,11 @@ class UserNearbyClinicsApiTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        DB::table('vet_registerations_temp')->insert([
-            'id' => 27,
-            'name' => 'Available Clinic',
-            'city' => 'Mumbai',
-            'status' => 'active',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $response = $this->getJson('/api/users/nearby-clinics?user_id=1389');
-
-        $response->assertOk()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('count', 1)
-            ->assertJsonPath('clinics.0.name', 'Available Clinic');
-    }
-
-    public function test_user_nearby_clinics_sorts_by_distance_when_coordinates_are_available(): void
-    {
-        DB::table('users')->insert([
-            'id' => 1392,
-            'name' => 'Pet Parent',
-            'city' => null,
-            'latitude' => 28.4595,
-            'longitude' => 77.0266,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('vet_registerations_temp')->insert([
-            [
-                'id' => 28,
-                'name' => 'Far Clinic',
-                'lat' => 28.7041,
-                'lng' => 77.1025,
-                'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'id' => 29,
-                'name' => 'Near Clinic',
-                'lat' => 28.4596,
-                'lng' => 77.0267,
-                'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
 
         $response = $this->getJson('/api/users/nearby-clinics?user_id=1392');
 
-        $response->assertOk()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('clinics.0.name', 'Near Clinic');
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false);
     }
 
     public function test_user_location_can_be_saved_for_later_nearby_clinic_lookup(): void
@@ -210,29 +180,5 @@ class UserNearbyClinicsApiTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonPath('success', false);
-    }
-
-    private function createClinicSchema(): void
-    {
-        Schema::dropIfExists('vet_registerations_temp');
-        Schema::create('vet_registerations_temp', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->nullable();
-            $table->string('clinic_profile')->nullable();
-            $table->string('hospital_profile')->nullable();
-            $table->string('mobile')->nullable();
-            $table->string('city')->nullable();
-            $table->string('address')->nullable();
-            $table->string('formatted_address')->nullable();
-            $table->string('place_id')->nullable();
-            $table->string('business_status')->nullable();
-            $table->decimal('lat', 10, 7)->nullable();
-            $table->decimal('lng', 10, 7)->nullable();
-            $table->boolean('open_now')->nullable();
-            $table->decimal('rating', 3, 1)->nullable();
-            $table->integer('user_ratings_total')->nullable();
-            $table->string('status')->nullable();
-            $table->timestamps();
-        });
     }
 }
