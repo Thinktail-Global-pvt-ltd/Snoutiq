@@ -2506,6 +2506,8 @@ Route::get('/ask/chat-rooms/{session_id}/chats', [SnoutiqSymptomController::clas
 Route::delete('/ask/chat-rooms/{session_id}', [SnoutiqSymptomController::class, 'deleteWebChatRoom']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
 Route::post('/chat/send', [SnoutiqSymptomController::class, 'chatSend']);
+Route::post('/users/location', [PublicController::class, 'updateUserLocation']);
+Route::match(['get', 'post'], '/users/nearby-clinics', [PublicController::class, 'userNearbyClinics']);
 Route::post('/chat/service-bookings', [\App\Http\Controllers\Api\ChatServiceBookingController::class, 'store']);
 Route::post('/symptom-check', [SnoutiqSymptomController::class, 'check']);
 Route::post('/symptom-followup', [SnoutiqSymptomController::class, 'followup']);
