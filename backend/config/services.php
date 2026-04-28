@@ -142,6 +142,9 @@ return [
         'key' => env('CAT_API_KEY', 'live_EcJoIUWAeJuDuodSIODIa2lBKst4Sg3gvWkq7Lcf2BKkW2ZyHDTcmVvylWZsXbuH'),
     ],
     'google_maps' => [
-    'api_key' => env('GOOGLE_MAPS_API_KEY'),
-],
+        'api_key' => env(
+            'GOOGLE_MAPS_API_KEY',
+            env('GOOGLE_API_KEY', env('GOOGLE_PLACES_API_KEY', env('GOOGLE_MAPS_KEY')))
+        ),
+    ],
 ];

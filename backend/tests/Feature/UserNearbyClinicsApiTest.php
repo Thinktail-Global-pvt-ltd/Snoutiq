@@ -127,6 +127,36 @@ class UserNearbyClinicsApiTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
+    public function test_user_nearby_clinics_reports_missing_google_key_as_configuration_error(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1393,
+            'name' => 'Pet Parent',
+            'city' => 'Gurgaon',
+            'latitude' => 28.4595,
+            'longitude' => 77.0266,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $places = Mockery::mock(GooglePlacesLookupService::class);
+        $places->shouldReceive('search')
+            ->once()
+            ->with('clinic', 'Gurgaon', 28.4595, 77.0266, 5)
+            ->andReturn([
+                'success' => false,
+                'error' => 'Google Places API key is missing. Set GOOGLE_API_KEY or GOOGLE_MAPS_API_KEY.',
+            ]);
+        $this->app->instance(GooglePlacesLookupService::class, $places);
+
+        $response = $this->getJson('/api/users/nearby-clinics?user_id=1393');
+
+        $response->assertStatus(503)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('range_km', null)
+            ->assertJsonPath('configuration_required.accepted_env_keys.0', 'GOOGLE_MAPS_API_KEY');
+    }
+
     public function test_user_location_can_be_saved_for_later_nearby_clinic_lookup(): void
     {
         DB::table('users')->insert([

@@ -496,7 +496,11 @@ class GooglePlacesLookupService
 
     private function resolveApiKey(): ?string
     {
-        $apiKey = trim((string) (env('GOOGLE_API_KEY', env('GOOGLE_MAPS_API_KEY', ''))));
+        $apiKey = trim((string) (config('services.google_maps.api_key') ?: ''));
+
+        if ($apiKey === '') {
+            $apiKey = trim((string) (env('GOOGLE_MAPS_API_KEY', env('GOOGLE_API_KEY', env('GOOGLE_PLACES_API_KEY', env('GOOGLE_MAPS_KEY', ''))))));
+        }
 
         if ($apiKey === '' || $apiKey === 'your_google_maps_api_key_here') {
             return null;

@@ -128,22 +128,34 @@ class PublicController extends Controller
         $places = app(GooglePlacesLookupService::class);
         $result = $places->search('clinic', $location, $latitude, $longitude, $limit);
         $hasCoordinates = $latitude !== null && $longitude !== null;
+        $success = (bool) ($result['success'] ?? false);
+        $missingGoogleKey = !$success && str_contains(
+            (string) ($result['error'] ?? ''),
+            'Google Places API key is missing'
+        );
+        $status = $success
+            ? 200
+            : ($missingGoogleKey ? 503 : (($result['requires_location'] ?? false) ? 422 : 502));
 
         return response()->json([
-            'success' => (bool) ($result['success'] ?? false),
+            'success' => $success,
             'user_id' => (int) $user->id,
             'clinics' => $result['places'] ?? [],
             'count' => (int) ($result['count'] ?? 0),
             'source' => $result['source'] ?? null,
             'location' => $result['location'] ?? $location,
-            'range_km' => $hasCoordinates ? 5 : null,
-            'range_note' => $hasCoordinates
+            'range_km' => $success && $hasCoordinates ? 5 : null,
+            'range_note' => !$success ? null : ($hasCoordinates
                 ? 'Google Nearby Search uses a 5 km radius from the saved/requested latitude and longitude.'
-                : 'Google Text Search is used because only a city/location string is available; it does not enforce a fixed km radius.',
-            'message' => ($result['success'] ?? false)
+                : 'Google Text Search is used because only a city/location string is available; it does not enforce a fixed km radius.'),
+            'configuration_required' => $missingGoogleKey ? [
+                'message' => 'Google Places is not configured on this server. Set GOOGLE_MAPS_API_KEY, GOOGLE_API_KEY, or GOOGLE_PLACES_API_KEY and clear Laravel config cache.',
+                'accepted_env_keys' => ['GOOGLE_MAPS_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_PLACES_API_KEY', 'GOOGLE_MAPS_KEY'],
+            ] : null,
+            'message' => $success
                 ? 'Clinics loaded successfully.'
                 : ($result['error'] ?? 'Clinics could not be loaded.'),
-        ], ($result['success'] ?? false) ? 200 : (($result['requires_location'] ?? false) ? 422 : 500));
+        ], $status);
     }
 
     public function updateUserLocation(Request $request)
