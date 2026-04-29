@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class PetConsultTimelineController extends Controller
@@ -74,11 +75,10 @@ class PetConsultTimelineController extends Controller
                 ->map(fn (Collection $items) => $items->first());
         }
 
-        $appointmentTimelineItems = $appointments->map(function (Appointment $appointment) use ($prescriptionByAppointment, $pet) {
-            $payload = $this->mapAppointment($appointment);
-            if (Schema::hasColumn('pets', 'reported_symptom')) {
-                $payload['pet_reported_symptom'] = $pet->reported_symptom ?? null;
-            }
+        $reportedSymptoms = $this->reportedSymptomsForTimeline($appointments, $videoConsultTransactions);
+
+        $appointmentTimelineItems = $appointments->map(function (Appointment $appointment) use ($prescriptionByAppointment, $reportedSymptoms) {
+            $payload = $this->mapAppointment($appointment, $reportedSymptoms['appointments']->get($appointment->id));
 
             $linkedPrescription = $prescriptionByAppointment->get($appointment->id);
             if ($linkedPrescription instanceof Prescription) {
@@ -95,8 +95,11 @@ class PetConsultTimelineController extends Controller
             ];
         });
 
-        $consultTimelineItems = $videoConsultTransactions->map(function (Transaction $transaction) {
-            $payload = $this->mapModel($transaction);
+        $consultTimelineItems = $videoConsultTransactions->map(function (Transaction $transaction) use ($reportedSymptoms) {
+            $payload = $this->withReportedSymptomLog(
+                $this->mapModel($transaction),
+                $reportedSymptoms['transactions']->get($transaction->id)
+            );
 
             return [
                 'source' => 'transactions',
@@ -164,8 +167,8 @@ class PetConsultTimelineController extends Controller
             ],
             'data' => [
                 'pet' => $this->buildPetSummary($pet),
-                'appointments' => $appointments->map(fn (Appointment $appointment) => $this->mapAppointment($appointment))->values(),
-                'video_consultations' => $videoConsultTransactions->map(fn (Transaction $transaction) => $this->mapModel($transaction))->values(),
+                'appointments' => $appointments->map(fn (Appointment $appointment) => $this->mapAppointment($appointment, $reportedSymptoms['appointments']->get($appointment->id)))->values(),
+                'video_consultations' => $videoConsultTransactions->map(fn (Transaction $transaction) => $this->withReportedSymptomLog($this->mapModel($transaction), $reportedSymptoms['transactions']->get($transaction->id)))->values(),
                 'prescriptions' => $prescriptions->map(fn (Prescription $prescription) => $this->mapModel($prescription))->values(),
                 'vaccinations' => $vaccinationTimelineItems->pluck('record')->values(),
                 'deworming' => $dewormingTimelineItems->pluck('record')->values(),
@@ -231,7 +234,6 @@ class PetConsultTimelineController extends Controller
         if (!in_array($transactionScope, ['consult', 'all'], true)) {
             $transactionScope = 'consult';
         }
-
         $appointments = Appointment::query()
             ->where('pet_id', $petId)
             ->orderByDesc('created_at')
@@ -256,6 +258,7 @@ class PetConsultTimelineController extends Controller
         }
 
         $transactions = $transactionsQuery->get();
+        $reportedSymptoms = $this->reportedSymptomsForTimeline($appointments, $transactions);
 
         $prescriptionsQuery = Prescription::query()
             ->where('user_id', $userId);
@@ -271,7 +274,7 @@ class PetConsultTimelineController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $timeline = $this->buildTimeline($appointments, $transactions, $prescriptions);
+        $timeline = $this->buildTimeline($appointments, $transactions, $prescriptions, $reportedSymptoms);
 
         return response()->json([
             'success' => true,
@@ -288,8 +291,8 @@ class PetConsultTimelineController extends Controller
                 'timeline' => $timeline->count(),
             ],
             'data' => [
-                'appointments' => $appointments->map(fn (Appointment $appointment) => $this->mapAppointment($appointment))->values(),
-                'transactions' => $transactions->map(fn (Transaction $transaction) => $this->mapModel($transaction))->values(),
+                'appointments' => $appointments->map(fn (Appointment $appointment) => $this->mapAppointment($appointment, $reportedSymptoms['appointments']->get($appointment->id)))->values(),
+                'transactions' => $transactions->map(fn (Transaction $transaction) => $this->withReportedSymptomLog($this->mapModel($transaction), $reportedSymptoms['transactions']->get($transaction->id)))->values(),
                 'prescriptions' => $prescriptions->map(fn (Prescription $prescription) => $this->mapModel($prescription))->values(),
                 'timeline' => $timeline->values(),
             ],
@@ -312,13 +315,120 @@ class PetConsultTimelineController extends Controller
         return is_numeric($candidate) ? (int) $candidate : null;
     }
 
-    private function mapAppointment(Appointment $appointment): array
+    private function mapAppointment(Appointment $appointment, ?array $reportedSymptomLog = null): array
     {
         $payload = $this->mapModel($appointment);
         $payload['notes_decoded'] = $this->decodeNotes($appointment->notes);
         $payload['patient_user_id_from_notes'] = $this->extractPatientUserId($appointment->notes);
 
+        return $this->withReportedSymptomLog($payload, $reportedSymptomLog);
+    }
+
+    private function withReportedSymptomLog(array $payload, ?array $reportedSymptomLog): array
+    {
+        $payload['pet_reported_symptom'] = $reportedSymptomLog['reported_symptom'] ?? null;
+        $payload['reported_symptom_log_transaction_id'] = $reportedSymptomLog['transaction_id'] ?? null;
+
         return $payload;
+    }
+
+    private function reportedSymptomsForTimeline(Collection $appointments, Collection $transactions): array
+    {
+        return [
+            'appointments' => $this->reportedSymptomsByAppointmentId($appointments),
+            'transactions' => $this->reportedSymptomsByTransactionId($transactions->pluck('id')->all()),
+        ];
+    }
+
+    private function reportedSymptomsByTransactionId(array $transactionIds): Collection
+    {
+        $transactionIds = collect($transactionIds)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if (
+            $transactionIds->isEmpty()
+            || ! Schema::hasTable('reported_symptom_logs')
+            || ! Schema::hasTable('transactions')
+        ) {
+            return collect();
+        }
+
+        return DB::table('reported_symptom_logs as rsl')
+            ->join('transactions as t', 't.id', '=', 'rsl.transaction_id')
+            ->whereIn('t.id', $transactionIds->all())
+            ->select([
+                't.id as transaction_id',
+                'rsl.reported_symptom',
+            ])
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                (int) $row->transaction_id => [
+                    'transaction_id' => (int) $row->transaction_id,
+                    'reported_symptom' => $row->reported_symptom,
+                ],
+            ]);
+    }
+
+    private function reportedSymptomsByAppointmentId(Collection $appointments): Collection
+    {
+        $appointmentIds = $appointments
+            ->pluck('id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if (
+            $appointmentIds->isEmpty()
+            || ! Schema::hasTable('reported_symptom_logs')
+            || ! Schema::hasTable('transactions')
+            || ! Schema::hasTable('appointments')
+            || ! Schema::hasColumn('appointments', 'pet_id')
+            || ! Schema::hasColumn('appointments', 'doctor_id')
+            || ! Schema::hasColumn('appointments', 'vet_registeration_id')
+            || ! Schema::hasColumn('transactions', 'pet_id')
+            || ! Schema::hasColumn('transactions', 'doctor_id')
+            || ! Schema::hasColumn('transactions', 'clinic_id')
+            || ! Schema::hasColumn('transactions', 'type')
+            || ! Schema::hasColumn('transactions', 'metadata')
+        ) {
+            return collect();
+        }
+
+        $appointmentTypes = ['appointment', 'appointments'];
+
+        return DB::table('appointments as a')
+            ->join('transactions as t', function ($join) {
+                $join->on('t.pet_id', '=', 'a.pet_id')
+                    ->on('t.doctor_id', '=', 'a.doctor_id')
+                    ->on('t.clinic_id', '=', 'a.vet_registeration_id');
+            })
+            ->join('reported_symptom_logs as rsl', 'rsl.transaction_id', '=', 't.id')
+            ->whereIn('a.id', $appointmentIds->all())
+            ->where(function ($query) use ($appointmentTypes) {
+                $query->whereIn('t.type', $appointmentTypes)
+                    ->orWhereIn('t.metadata->order_type', $appointmentTypes);
+            })
+            ->orderByDesc('t.created_at')
+            ->orderByDesc('t.id')
+            ->select([
+                'a.id as appointment_id',
+                't.id as transaction_id',
+                'rsl.reported_symptom',
+            ])
+            ->get()
+            ->groupBy(fn ($row) => (int) $row->appointment_id)
+            ->map(function (Collection $rows) {
+                $row = $rows->first();
+
+                return [
+                    'transaction_id' => (int) $row->transaction_id,
+                    'reported_symptom' => $row->reported_symptom,
+                ];
+            });
     }
 
     private function mapModel($model): array
@@ -344,23 +454,26 @@ class PetConsultTimelineController extends Controller
     private function buildTimeline(
         Collection $appointments,
         Collection $transactions,
-        Collection $prescriptions
+        Collection $prescriptions,
+        ?array $reportedSymptoms = null
     ): Collection {
-        $appointmentItems = $appointments->map(function (Appointment $appointment) {
+        $reportedSymptoms ??= $this->reportedSymptomsForTimeline($appointments, $transactions);
+
+        $appointmentItems = $appointments->map(function (Appointment $appointment) use ($reportedSymptoms) {
             return [
                 'source' => 'appointments',
                 'record_id' => $appointment->id,
                 'created_at' => optional($appointment->created_at)->toIso8601String(),
-                'record' => $this->mapAppointment($appointment),
+                'record' => $this->mapAppointment($appointment, $reportedSymptoms['appointments']->get($appointment->id)),
             ];
         });
 
-        $transactionItems = $transactions->map(function (Transaction $transaction) {
+        $transactionItems = $transactions->map(function (Transaction $transaction) use ($reportedSymptoms) {
             return [
                 'source' => 'transactions',
                 'record_id' => $transaction->id,
                 'created_at' => optional($transaction->created_at)->toIso8601String(),
-                'record' => $this->mapModel($transaction),
+                'record' => $this->withReportedSymptomLog($this->mapModel($transaction), $reportedSymptoms['transactions']->get($transaction->id)),
             ];
         });
 
@@ -1828,7 +1941,10 @@ HTML;
                 $reason = $reportedSymptom;
             } elseif ($eventType === 'video_consultation') {
                 $metadata = is_array($record['metadata'] ?? null) ? $record['metadata'] : [];
-                $reason = $this->extractStringFromArray($metadata, ['symptoms', 'reason', 'complaint', 'notes']);
+                $reason = $this->normalizeMixedValue($record['pet_reported_symptom'] ?? null);
+                if ($reason === '') {
+                    $reason = $this->extractStringFromArray($metadata, ['symptoms', 'reason', 'complaint', 'notes']);
+                }
                 $diagnosis = $this->extractStringFromArray($metadata, ['diagnosis', 'diagnosis_summary', 'disease']);
                 $medications = $this->formatMedicationsSummary($metadata['medications'] ?? null);
                 $advice = $this->extractStringFromArray($metadata, ['advice', 'instructions', 'home_care', 'follow_up']);
