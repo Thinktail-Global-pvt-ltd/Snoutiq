@@ -61,13 +61,15 @@ class DoctorEarningsApiTest extends TestCase
         $this->createClinic($clinicId);
         $this->createDoctor($doctorId, $clinicId);
 
-        $this->createTransaction($clinicId, $doctorId, 'FIN-A', 120000, 100000);
-        $this->createTransaction($clinicId, $doctorId, 'FIN-B', 240000, 200000);
+        $this->createTransaction($clinicId, $doctorId, 'FIN-A', 120000, 100000, 'video_consult', 'captured');
+        $this->createTransaction($clinicId, $doctorId, 'FIN-B', 240000, 200000, 'video_consult', 'captured');
+        $this->createTransaction($clinicId, $doctorId, 'FIN-PENDING', 50000, 40000, 'video_consult', 'pending');
 
         $response = $this->getJson("/api/financials?clinic_id={$clinicId}");
 
         $response->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('filters.status', 'captured')
             ->assertJsonPath('kpi.current_payment', 3000)
             ->assertJsonPath('kpi.gst_deduction', 540)
             ->assertJsonPath('kpi.flat_deduction', 300)
@@ -86,6 +88,13 @@ class DoctorEarningsApiTest extends TestCase
         $this->assertSame(360, $transactions[2000]['gst_deduction']);
         $this->assertSame(150, $transactions[2000]['flat_deduction']);
         $this->assertSame(1490, $transactions[2000]['actual_earnings']);
+
+        $allStatusResponse = $this->getJson("/api/financials?clinic_id={$clinicId}&status=all");
+
+        $allStatusResponse->assertOk()
+            ->assertJsonPath('filters.status', 'all')
+            ->assertJsonPath('counts.total', 3)
+            ->assertJsonPath('kpi.current_payment', 3400);
     }
 
     private function createClinic(int $id): void
@@ -119,14 +128,15 @@ class DoctorEarningsApiTest extends TestCase
         string $reference,
         int $grossPaise,
         int $currentPaymentPaise,
-        string $type = 'video_consult'
+        string $type = 'video_consult',
+        string $status = 'completed'
     ): void {
         Transaction::query()->create([
             'clinic_id' => $clinicId,
             'doctor_id' => $doctorId,
             'amount_paise' => $grossPaise,
             'payment_to_doctor_paise' => $currentPaymentPaise,
-            'status' => 'completed',
+            'status' => $status,
             'type' => $type,
             'payment_method' => 'UPI',
             'reference' => $reference,

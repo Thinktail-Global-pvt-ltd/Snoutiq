@@ -34,7 +34,9 @@ class ClinicFinancialsController extends Controller
 
         $fromDate = $this->parseDate($request->input('from'));
         $toDate   = $this->parseDate($request->input('to'));
-        $status   = $this->cleanLower($request->input('status'));
+        $requestedStatus = $this->cleanLower($request->input('status'));
+        $status   = $requestedStatus ?: 'captured';
+        $statusFilter = $status === 'all' ? null : $status;
         $type     = $this->cleanLower($request->input('type'));
         $search   = $this->cleanLower($request->input('search'));
 
@@ -115,8 +117,8 @@ class ClinicFinancialsController extends Controller
         });
 
         // Apply in-memory filters for lightweight searches/labels
-        $filtered = $normalized->filter(function (array $txn) use ($status, $type, $search) {
-            if ($status && $txn['status'] !== $status) {
+        $filtered = $normalized->filter(function (array $txn) use ($statusFilter, $type, $search) {
+            if ($statusFilter && $txn['status'] !== $statusFilter) {
                 return false;
             }
             if ($type && $txn['type'] !== $type) {
@@ -196,7 +198,7 @@ class ClinicFinancialsController extends Controller
             'filters'       => [
                 'from'   => $fromDate?->toDateString(),
                 'to'     => $toDate?->toDateString(),
-                'status' => $status ?: 'all',
+                'status' => $status,
                 'type'   => $type ?: 'all',
                 'search' => $search,
             ],
