@@ -10,6 +10,8 @@ use App\Models\Pet;
 use App\Models\Doctor;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -208,11 +210,13 @@ class PrescriptionShareController extends Controller
         $consultNotes = $this->textToHtml($prescription->visit_notes ?: $prescription->content_html);
         $doctorTreatment = $this->textToHtml($prescription->doctor_treatment ?? null);
         $examNotes = $this->textToHtml($prescription->exam_notes);
-        $diagnosis = $this->textToHtml($prescription->diagnosis);
         $disease = $this->textToHtml($prescription->disease_name);
         $treatment = $this->textToHtml($prescription->treatment_plan);
         $homeCare = $this->textToHtml($prescription->home_care);
         $followUpNotes = $this->textToHtml($prescription->follow_up_notes);
+        $consultSnapshot = $this->resolveConsultSnapshot($prescription);
+        $reportedSymptom = $this->textToHtml($consultSnapshot['reported_symptom'] ?? null);
+        $snapshotDiagnosis = $this->textToHtml($consultSnapshot['diagnosis'] ?? $prescription->diagnosis);
 
         $clinicLine = trim(implode(', ', array_values(array_filter([$clinicAddress, $clinicCity]))));
 
@@ -313,10 +317,11 @@ CSS;
     <div class="section-title">Clinical Notes</div>
     <div class="section-body">
       <table class="meta-table">
+        <tr><td class="key">Reported Symptom</td><td class="value">{$reportedSymptom}</td></tr>
+        <tr><td class="key">Diagnosis</td><td class="value">{$snapshotDiagnosis}</td></tr>
         <tr><td class="key">Notes</td><td class="value">{$consultNotes}</td></tr>
         <tr><td class="key">Doctor Treatment</td><td class="value">{$doctorTreatment}</td></tr>
         <tr><td class="key">Examination</td><td class="value">{$examNotes}</td></tr>
-        <tr><td class="key">Diagnosis</td><td class="value">{$diagnosis}</td></tr>
         <tr><td class="key">Disease</td><td class="value">{$disease}</td></tr>
         <tr><td class="key">Chronic Case</td><td class="value">{$this->e($prescription->is_chronic ? 'Yes' : 'No')}</td></tr>
         <tr><td class="key">Treatment Plan</td><td class="value">{$treatment}</td></tr>
@@ -371,6 +376,102 @@ CSS;
 </body>
 </html>
 HTML;
+    }
+
+    private function resolveConsultSnapshot(Prescription $prescription): array
+    {
+        $fallback = [
+            'reported_symptom' => null,
+            'diagnosis' => $prescription->diagnosis ?? null,
+            'transaction_id' => null,
+        ];
+
+        if (
+            ! Schema::hasTable('transactions')
+            || ! Schema::hasTable('reported_symptom_logs')
+            || ! Schema::hasTable('prescriptions')
+            || ! Schema::hasColumn('transactions', 'channel_name')
+            || ! Schema::hasColumn('prescriptions', 'call_session')
+            || ! Schema::hasColumn('prescriptions', 'diagnosis')
+        ) {
+            return $fallback;
+        }
+
+        $callSession = trim((string) ($prescription->call_session ?? ''));
+        if ($callSession !== '') {
+            $row = DB::table('transactions as t')
+                ->join('reported_symptom_logs as rsl', 'rsl.transaction_id', '=', 't.id')
+                ->join('prescriptions as p', 'p.call_session', '=', 't.channel_name')
+                ->where('p.id', (int) $prescription->id)
+                ->where('t.channel_name', $callSession)
+                ->orderByDesc('t.created_at')
+                ->orderByDesc('t.id')
+                ->select([
+                    't.id as transaction_id',
+                    'rsl.reported_symptom',
+                    'p.diagnosis',
+                ])
+                ->first();
+
+            if ($row) {
+                return [
+                    'reported_symptom' => $row->reported_symptom,
+                    'diagnosis' => $row->diagnosis ?: ($prescription->diagnosis ?? null),
+                    'transaction_id' => (int) $row->transaction_id,
+                ];
+            }
+        }
+
+        if (! $prescription->in_clinic_appointment_id) {
+            return $fallback;
+        }
+
+        if (
+            ! Schema::hasTable('appointments')
+            || ! Schema::hasColumn('appointments', 'pet_id')
+            || ! Schema::hasColumn('appointments', 'doctor_id')
+            || ! Schema::hasColumn('appointments', 'vet_registeration_id')
+            || ! Schema::hasColumn('transactions', 'pet_id')
+            || ! Schema::hasColumn('transactions', 'doctor_id')
+            || ! Schema::hasColumn('transactions', 'clinic_id')
+            || ! Schema::hasColumn('transactions', 'type')
+            || ! Schema::hasColumn('transactions', 'metadata')
+        ) {
+            return $fallback;
+        }
+
+        $appointmentTypes = ['appointment', 'appointments'];
+        $row = DB::table('appointments as a')
+            ->join('transactions as t', function ($join) {
+                $join->on('t.pet_id', '=', 'a.pet_id')
+                    ->on('t.doctor_id', '=', 'a.doctor_id')
+                    ->on('t.clinic_id', '=', 'a.vet_registeration_id');
+            })
+            ->join('reported_symptom_logs as rsl', 'rsl.transaction_id', '=', 't.id')
+            ->leftJoin('prescriptions as p', 'p.call_session', '=', 't.channel_name')
+            ->where('a.id', (int) $prescription->in_clinic_appointment_id)
+            ->where(function ($query) use ($appointmentTypes) {
+                $query->whereIn('t.type', $appointmentTypes)
+                    ->orWhereIn('t.metadata->order_type', $appointmentTypes);
+            })
+            ->orderByDesc('t.created_at')
+            ->orderByDesc('t.id')
+            ->select([
+                't.id as transaction_id',
+                'rsl.reported_symptom',
+                'p.diagnosis',
+            ])
+            ->first();
+
+        if (! $row) {
+            return $fallback;
+        }
+
+        return [
+            'reported_symptom' => $row->reported_symptom,
+            'diagnosis' => $row->diagnosis ?: ($prescription->diagnosis ?? null),
+            'transaction_id' => (int) $row->transaction_id,
+        ];
     }
 
     private function buildMedicationRows($medications): string
