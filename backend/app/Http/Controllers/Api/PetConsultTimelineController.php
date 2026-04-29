@@ -327,6 +327,7 @@ class PetConsultTimelineController extends Controller
     private function withReportedSymptomLog(array $payload, ?array $reportedSymptomLog): array
     {
         $payload['pet_reported_symptom'] = $reportedSymptomLog['reported_symptom'] ?? null;
+        $payload['prescription_diagnosis'] = $reportedSymptomLog['prescription_diagnosis'] ?? null;
         $payload['reported_symptom_log_transaction_id'] = $reportedSymptomLog['transaction_id'] ?? null;
 
         return $payload;
@@ -352,22 +353,30 @@ class PetConsultTimelineController extends Controller
             $transactionIds->isEmpty()
             || ! Schema::hasTable('reported_symptom_logs')
             || ! Schema::hasTable('transactions')
+            || ! Schema::hasColumn('transactions', 'channel_name')
+            || ! Schema::hasTable('prescriptions')
+            || ! Schema::hasColumn('prescriptions', 'call_session')
+            || ! Schema::hasColumn('prescriptions', 'diagnosis')
         ) {
             return collect();
         }
 
         return DB::table('reported_symptom_logs as rsl')
             ->join('transactions as t', 't.id', '=', 'rsl.transaction_id')
+            ->leftJoin('prescriptions as p', 'p.call_session', '=', 't.channel_name')
             ->whereIn('t.id', $transactionIds->all())
             ->select([
                 't.id as transaction_id',
                 'rsl.reported_symptom',
+                'p.diagnosis as prescription_diagnosis',
             ])
             ->get()
+            ->groupBy(fn ($row) => (int) $row->transaction_id)
             ->mapWithKeys(fn ($row) => [
-                (int) $row->transaction_id => [
-                    'transaction_id' => (int) $row->transaction_id,
-                    'reported_symptom' => $row->reported_symptom,
+                (int) $row->first()->transaction_id => [
+                    'transaction_id' => (int) $row->first()->transaction_id,
+                    'reported_symptom' => $row->first()->reported_symptom,
+                    'prescription_diagnosis' => $row->pluck('prescription_diagnosis')->filter()->first(),
                 ],
             ]);
     }
@@ -394,6 +403,10 @@ class PetConsultTimelineController extends Controller
             || ! Schema::hasColumn('transactions', 'clinic_id')
             || ! Schema::hasColumn('transactions', 'type')
             || ! Schema::hasColumn('transactions', 'metadata')
+            || ! Schema::hasColumn('transactions', 'channel_name')
+            || ! Schema::hasTable('prescriptions')
+            || ! Schema::hasColumn('prescriptions', 'call_session')
+            || ! Schema::hasColumn('prescriptions', 'diagnosis')
         ) {
             return collect();
         }
@@ -407,6 +420,7 @@ class PetConsultTimelineController extends Controller
                     ->on('t.clinic_id', '=', 'a.vet_registeration_id');
             })
             ->join('reported_symptom_logs as rsl', 'rsl.transaction_id', '=', 't.id')
+            ->leftJoin('prescriptions as p', 'p.call_session', '=', 't.channel_name')
             ->whereIn('a.id', $appointmentIds->all())
             ->where(function ($query) use ($appointmentTypes) {
                 $query->whereIn('t.type', $appointmentTypes)
@@ -418,6 +432,7 @@ class PetConsultTimelineController extends Controller
                 'a.id as appointment_id',
                 't.id as transaction_id',
                 'rsl.reported_symptom',
+                'p.diagnosis as prescription_diagnosis',
             ])
             ->get()
             ->groupBy(fn ($row) => (int) $row->appointment_id)
@@ -427,6 +442,7 @@ class PetConsultTimelineController extends Controller
                 return [
                     'transaction_id' => (int) $row->transaction_id,
                     'reported_symptom' => $row->reported_symptom,
+                    'prescription_diagnosis' => $rows->pluck('prescription_diagnosis')->filter()->first(),
                 ];
             });
     }
