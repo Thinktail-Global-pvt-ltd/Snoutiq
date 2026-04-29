@@ -13,6 +13,7 @@ use App\Models\CallSession;
 use App\Models\User;
 use App\Models\Pet;
 use App\Models\Prescription;
+use App\Models\ReportedSymptomLog;
 use App\Models\VideoApointment;
 use App\Models\HomeServiceRequiredByPet;
 use App\Models\UserMonthlySubscription;
@@ -426,6 +427,7 @@ class PaymentController extends Controller
             }
 
             $transaction = Transaction::create($transactionPayload);
+            $this->recordReportedSymptomLog($transaction, $petId, $doctorId);
 
             DB::table('users')
                 ->where('id', $userId)
@@ -1241,6 +1243,7 @@ class PaymentController extends Controller
                 $payload['fcm_notification_id'] = $fcmNotificationId;
             }
             $transaction = Transaction::updateOrCreate(['reference' => $orderId], $payload);
+            $this->recordReportedSymptomLog($transaction, $context['pet_id'] ?? null, $doctorId);
 
             $this->updateHomeServiceBookingPaymentState(
                 bookingId: $context['home_service_booking_id'] ?? null,
@@ -1448,6 +1451,38 @@ class PaymentController extends Controller
         } catch (\Throwable $e) {
             report($e);
             return null;
+        }
+    }
+
+    protected function recordReportedSymptomLog(?Transaction $transaction, $petId, $doctorId): void
+    {
+        if (
+            ! $transaction
+            || ! $transaction->id
+            || ! $petId
+            || ! Schema::hasTable('reported_symptom_logs')
+            || ! Schema::hasTable('pets')
+            || ! Schema::hasColumn('pets', 'reported_symptom')
+        ) {
+            return;
+        }
+
+        try {
+            $pet = Pet::query()->find((int) $petId);
+            if (! $pet) {
+                return;
+            }
+
+            ReportedSymptomLog::query()->updateOrCreate(
+                ['transaction_id' => $transaction->id],
+                [
+                    'pet_id' => (int) $petId,
+                    'doctor_id' => is_numeric($doctorId) ? (int) $doctorId : null,
+                    'reported_symptom' => $pet->reported_symptom ?? null,
+                ]
+            );
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 
