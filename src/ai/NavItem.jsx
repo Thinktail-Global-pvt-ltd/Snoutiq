@@ -630,6 +630,9 @@ export default function NavItem({
   const [isRoomsLoading, setIsRoomsLoading] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [isLocationUpdating, setIsLocationUpdating] = useState(false);
+  const [locationNotice, setLocationNotice] = useState("");
 
   const currentUser = authState?.user || {};
   const currentPet =
@@ -1151,6 +1154,80 @@ export default function NavItem({
     });
   };
 
+  const getCurrentBrowserLocation = () =>
+    new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Location is not supported on this browser."));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: Number(position.coords.latitude.toFixed(6)),
+            lng: Number(position.coords.longitude.toFixed(6)),
+          });
+        },
+        reject,
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 5 * 60 * 1000,
+        },
+      );
+    });
+
+  const handleUseCurrentLocation = async () => {
+    if (!hasAuth || !resolvedUserId) {
+      handleLogin();
+      return;
+    }
+
+    if (isLocationUpdating) return;
+
+    setIsLocationUpdating(true);
+    setLocationNotice("");
+
+    try {
+      const coords = await getCurrentBrowserLocation();
+
+      const nextLocation = {
+        label: "Current location",
+        lat: coords.lat,
+        lng: coords.lng,
+        source: "gps",
+      };
+
+      const response = await fetch(`${API_BASE}/users/location`, {
+        method: "POST",
+        headers: createHeaders(token, true),
+        body: JSON.stringify({
+          user_id: resolvedUserId,
+          location: nextLocation.label,
+          lat: nextLocation.lat,
+          lng: nextLocation.lng,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to update location.");
+      }
+
+      setLocationNotice(
+        "Current location selected. You can now ask for nearby clinics.",
+      );
+      setSelectedLocation(nextLocation);
+    } catch {
+      setLocationNotice(
+        "Location permission is off. Please allow location access or continue with saved location.",
+      );
+    } finally {
+      setIsLocationUpdating(false);
+    }
+  };
+
   const sendMessageToApi = async ({ roomToken, inputText }) => {
     const payload = {
       user_id: resolvedUserId,
@@ -1162,7 +1239,10 @@ export default function NavItem({
       pet_name: petDisplayName || undefined,
       pet_breed: petBreed || undefined,
       species: species || undefined,
-      location: location || undefined,
+      location: selectedLocation?.label || location || undefined,
+      lat: selectedLocation?.lat || undefined,
+      lng: selectedLocation?.lng || undefined,
+      location_source: selectedLocation?.source || (location ? "saved" : undefined),
     };
 
     const lowered = inputText.toLowerCase();
@@ -1841,118 +1921,149 @@ export default function NavItem({
               </div>
             </div>
 
-            {canOpenProfileMenu ? (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (!canOpenProfileMenu) return;
-                    setProfileMenuOpen((prev) => !prev);
-                  }}
-                  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-50"
-                >
-                  {petProfileImageUrl ? (
-                    <img
-                      src={petProfileImageUrl}
-                      alt={petDisplayName || ownerDisplayName || "Pet"}
-                      className="h-9 w-9 rounded-full object-cover ring-2 ring-indigo-100"
-                    />
-                  ) : (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
-                      <User size={18} />
-                    </div>
-                  )}
-                  <div className="hidden text-left sm:block">
-                    <div className="max-w-[120px] truncate text-sm font-semibold text-slate-900">
-                      {ownerDisplayName || "Profile"}
-                    </div>
-                    <div className="max-w-[120px] truncate text-xs text-slate-500">
-                      {petDisplayName || "Pet Parent"}
-                    </div>
-                  </div>
-                  <ChevronDown size={16} className="text-slate-500" />
-                </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleUseCurrentLocation}
+                disabled={isLocationUpdating}
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-200 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isLocationUpdating ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <MapPin size={16} />
+                )}
 
-                {profileMenuOpen ? (
-                  <div
-                    className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
-                    onClick={(event) => event.stopPropagation()}
+                <span className="hidden sm:inline">
+                  {isLocationUpdating
+                    ? "Locating..."
+                    : selectedLocation?.source === "gps"
+                      ? "Current location"
+                      : location
+                        ? location
+                        : "Use current location"}
+                </span>
+              </button>
+
+              {canOpenProfileMenu ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (!canOpenProfileMenu) return;
+                      setProfileMenuOpen((prev) => !prev);
+                    }}
+                    className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-50"
                   >
-                    <div className="border-b border-slate-100 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {petProfileImageUrl ? (
-                          <img
-                            src={petProfileImageUrl}
-                            alt={petDisplayName || ownerDisplayName || "Pet"}
-                            className="h-11 w-11 rounded-full object-cover ring-2 ring-indigo-100"
-                          />
-                        ) : (
-                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
-                            <User size={18} />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-slate-900">
-                            {ownerDisplayName || "Profile"}
-                          </div>
-                          <div className="truncate text-xs text-slate-500">
-                            {petDisplayName || "Pet Parent"}
+                    {petProfileImageUrl ? (
+                      <img
+                        src={petProfileImageUrl}
+                        alt={petDisplayName || ownerDisplayName || "Pet"}
+                        className="h-9 w-9 rounded-full object-cover ring-2 ring-indigo-100"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                        <User size={18} />
+                      </div>
+                    )}
+                    <div className="hidden text-left sm:block">
+                      <div className="max-w-[120px] truncate text-sm font-semibold text-slate-900">
+                        {ownerDisplayName || "Profile"}
+                      </div>
+                      <div className="max-w-[120px] truncate text-xs text-slate-500">
+                        {petDisplayName || "Pet Parent"}
+                      </div>
+                    </div>
+                    <ChevronDown size={16} className="text-slate-500" />
+                  </button>
+
+                  {profileMenuOpen ? (
+                    <div
+                      className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="border-b border-slate-100 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {petProfileImageUrl ? (
+                            <img
+                              src={petProfileImageUrl}
+                              alt={petDisplayName || ownerDisplayName || "Pet"}
+                              className="h-11 w-11 rounded-full object-cover ring-2 ring-indigo-100"
+                            />
+                          ) : (
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                              <User size={18} />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-slate-900">
+                              {ownerDisplayName || "Profile"}
+                            </div>
+                            <div className="truncate text-xs text-slate-500">
+                              {petDisplayName || "Pet Parent"}
+                            </div>
                           </div>
                         </div>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={handleViewProfile}
+                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-slate-700 hover:bg-gray-50"
+                      >
+                        <User size={16} />
+                        View Profile
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenAppointmentPage}
+                        disabled={!resolvedPetId}
+                        className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-gray-50 ${
+                          resolvedPetId
+                            ? "text-slate-700"
+                            : "cursor-not-allowed text-slate-400"
+                        }`}
+                      >
+                        <Calendar size={16} />
+                        Appointment
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenFollowupPage}
+                        disabled={!resolvedPetId}
+                        className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-gray-50 ${
+                          resolvedPetId
+                            ? "text-slate-700"
+                            : "cursor-not-allowed text-slate-400"
+                        }`}
+                      >
+                        <MessageSquare size={16} />
+                        Followup
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-3 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <LogOut size={16} />
+                        Logout
+                      </button>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={handleViewProfile}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-slate-700 hover:bg-gray-50"
-                    >
-                      <User size={16} />
-                      View Profile
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleOpenAppointmentPage}
-                      disabled={!resolvedPetId}
-                      className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-gray-50 ${
-                        resolvedPetId
-                          ? "text-slate-700"
-                          : "cursor-not-allowed text-slate-400"
-                      }`}
-                    >
-                      <Calendar size={16} />
-                      Appointment
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleOpenFollowupPage}
-                      disabled={!resolvedPetId}
-                      className={`flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-gray-50 ${
-                        resolvedPetId
-                          ? "text-slate-700"
-                          : "cursor-not-allowed text-slate-400"
-                      }`}
-                    >
-                      <MessageSquare size={16} />
-                      Followup
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-3 text-sm text-red-600 hover:bg-red-50"
-                    >
-                      <LogOut size={16} />
-                      Logout
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
+
+          {locationNotice ? (
+            <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+              {locationNotice}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex-1 overflow-y-auto bg-white p-4">
@@ -2001,7 +2112,7 @@ export default function NavItem({
                   </div>
                 </div>
 
-                <div className="mt-8 grid w-full max-w-4xl gap-4 md:grid-cols-3">
+                {/* <div className="mt-8 grid w-full max-w-4xl gap-4 md:grid-cols-3">
                   {topicCards.map((card) => {
                     const Icon = card.icon;
                     return (
@@ -2023,7 +2134,7 @@ export default function NavItem({
                       </div>
                     );
                   })}
-                </div>
+                </div> */}
 
                 <div className="mt-8 flex w-full max-w-3xl flex-wrap justify-center gap-3">
                   {quickPrompts.map((item) => (
