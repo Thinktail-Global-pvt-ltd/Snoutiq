@@ -2917,6 +2917,9 @@ Route::prefix('receptionist')->group(function () {
 });
 
 Route::post('/vaccination-records/analyze-document', [PetVaccinationRecordController::class, 'analyzeDocument']);
+Route::get('/vaccination-records/pets/{pet}/image', [PetVaccinationRecordController::class, 'petVaccinationImage'])
+    ->whereNumber('pet')
+    ->name('api.vaccination-records.pet-image');
 
 
    // Clinic Reels CRUD routes (for admin panel)

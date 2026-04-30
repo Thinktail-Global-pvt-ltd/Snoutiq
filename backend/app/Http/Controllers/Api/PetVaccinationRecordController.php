@@ -172,9 +172,55 @@ class PetVaccinationRecordController extends Controller
                     'mime_type' => $mimeType,
                     'size' => $documentSize,
                     'vaccination_image_blob_saved' => $vaccinationImageSaved,
+                    'vaccination_image_blob_url' => $vaccinationImageSaved
+                        ? route('api.vaccination-records.pet-image', ['pet' => (int) $data['pet_id']], true)
+                        : null,
                 ],
                 'analysis' => $analysis,
             ],
+        ]);
+    }
+
+    public function petVaccinationImage(int $pet)
+    {
+        if (! $this->vaccinationImageBlobColumnsReady()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'vaccination image blob columns are missing. Please run migrations.',
+            ], 500);
+        }
+
+        $row = DB::table('pets')
+            ->where('id', $pet)
+            ->first([
+                'id',
+                'vaccination_image_blob',
+                'vaccination_image_mime',
+                'vaccination_image_name',
+            ]);
+
+        if (! $row) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found.',
+            ], 404);
+        }
+
+        $blob = $row->vaccination_image_blob;
+        if ($blob === null || $blob === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vaccination image blob not found for this pet.',
+            ], 404);
+        }
+
+        $mime = $row->vaccination_image_mime ?: 'application/octet-stream';
+        $fileName = $row->vaccination_image_name ?: ('pet-' . $row->id . '-vaccination-image');
+
+        return response($blob, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+            'Cache-Control' => 'public, max-age=86400',
         ]);
     }
 
