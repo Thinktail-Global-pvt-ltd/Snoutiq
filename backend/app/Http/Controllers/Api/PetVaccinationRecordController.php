@@ -578,13 +578,27 @@ PROMPT;
             $payload = is_array($decoded) ? $decoded : [];
         }
 
-        $vaccination = [];
-        foreach ($analysis['vaccinations'] ?? [] as $row) {
+        $vaccination = $payload['vaccination'] ?? [];
+        if (! is_array($vaccination)) {
+            $vaccination = [];
+        }
+
+        foreach (($analysis['vaccinations'] ?? []) as $index => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
             $name = trim((string) ($row['vaccine_name'] ?? 'Vaccination'));
-            $key = $name !== '' ? $name : 'Vaccination';
+            $dateGiven = $row['date_given'] ?? null;
+            $key = $this->buildGeminiVaccinationKey($row, $index);
+
             $vaccination[$key] = [
-                'date_given' => $row['date_given'] ?? null,
+                'status' => $dateGiven ? 'done' : 'unknown',
+                'date' => $dateGiven,
+                'last_date' => $dateGiven,
                 'next_due' => $row['next_due'] ?? null,
+                'dose_number' => 'document_' . ((int) $index + 1),
+                'vaccine_name' => $name !== '' ? $name : 'Vaccination',
                 'batch_no' => $row['batch_no'] ?? null,
                 'confidence' => $row['confidence'] ?? null,
                 'source' => 'gemini_document_api',
@@ -602,6 +616,30 @@ PROMPT;
             'dog_disease_payload' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             'updated_at' => now(),
         ]);
+    }
+
+    private function buildGeminiVaccinationKey(array $row, int $index): string
+    {
+        $name = $this->slugForKey((string) ($row['vaccine_name'] ?? 'vaccination'));
+        $date = $this->slugForKey((string) ($row['date_given'] ?? 'unknown_date'));
+        $nextDue = $this->slugForKey((string) ($row['next_due'] ?? 'no_next_due'));
+
+        return sprintf(
+            'gemini|dog|%s|document|%d|%s|%s',
+            $name !== '' ? $name : 'vaccination',
+            $index + 1,
+            $date !== '' ? $date : 'unknown_date',
+            $nextDue !== '' ? $nextDue : 'no_next_due'
+        );
+    }
+
+    private function slugForKey(string $value): string
+    {
+        $value = strtolower(trim($value));
+        $value = preg_replace('/[^a-z0-9]+/', '_', $value) ?? $value;
+        $value = trim($value, '_');
+
+        return $value;
     }
 
     private function normalizeDate(mixed $value): ?string
