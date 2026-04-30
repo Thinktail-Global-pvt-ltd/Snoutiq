@@ -232,7 +232,8 @@ class PetVaccinationRecordController extends Controller
                 'temperature' => 0.1,
                 'topP' => 0.8,
                 'topK' => 32,
-                'maxOutputTokens' => 1400,
+                'maxOutputTokens' => 2400,
+                'responseMimeType' => 'application/json',
             ],
         ], JSON_UNESCAPED_SLASHES);
 
@@ -468,6 +469,7 @@ PROMPT;
     private function decodeGeminiJson(string $text): ?array
     {
         $clean = trim($text);
+        $clean = preg_replace('/^\xEF\xBB\xBF/', '', $clean) ?? $clean;
         $clean = preg_replace('/^```(?:json)?\s*/i', '', $clean) ?? $clean;
         $clean = preg_replace('/\s*```$/', '', $clean) ?? $clean;
 
@@ -476,16 +478,67 @@ PROMPT;
             return $decoded;
         }
 
-        $start = strpos($clean, '{');
-        $end = strrpos($clean, '}');
-        if ($start === false || $end === false || $end <= $start) {
+        $json = $this->extractBalancedJsonObject($clean);
+        if ($json === null) {
             return null;
         }
 
-        $json = substr($clean, $start, $end - $start + 1);
         $decoded = json_decode($json, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        $repaired = preg_replace('/,\s*([}\]])/', '$1', $json) ?? $json;
+        $decoded = json_decode($repaired, true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private function extractBalancedJsonObject(string $text): ?string
+    {
+        $start = strpos($text, '{');
+        if ($start === false) {
+            return null;
+        }
+
+        $depth = 0;
+        $inString = false;
+        $escape = false;
+        $length = strlen($text);
+
+        for ($i = $start; $i < $length; $i++) {
+            $char = $text[$i];
+
+            if ($escape) {
+                $escape = false;
+                continue;
+            }
+
+            if ($char === '\\') {
+                $escape = true;
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = ! $inString;
+                continue;
+            }
+
+            if ($inString) {
+                continue;
+            }
+
+            if ($char === '{') {
+                $depth++;
+            } elseif ($char === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return substr($text, $start, $i - $start + 1);
+                }
+            }
+        }
+
+        return null;
     }
 
     private function storeAnalysisRecord(array $data, array $analysis, ?string $fileName): int
