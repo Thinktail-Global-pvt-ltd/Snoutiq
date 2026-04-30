@@ -482,7 +482,10 @@ class PrescriptionController extends Controller
                 }
             }
             if (array_key_exists('dog_disease_payload', $validated) && Schema::hasColumn('pets', 'dog_disease_payload')) {
-                $petUpdates['dog_disease_payload'] = $this->normalizeJsonPayload($validated['dog_disease_payload']);
+                $petUpdates['dog_disease_payload'] = $this->mergeDogDiseasePayload(
+                    $pet->dog_disease_payload ?? null,
+                    $validated['dog_disease_payload']
+                );
             }
 
             if ($request->hasFile('pet_doc1')) {
@@ -997,6 +1000,24 @@ class PrescriptionController extends Controller
         }
 
         return null;
+    }
+
+    private function mergeDogDiseasePayload($currentValue, $incomingValue): ?string
+    {
+        $incomingPayload = $this->normalizeJsonPayload($incomingValue);
+
+        if ($incomingPayload === null) {
+            $currentPayload = $this->normalizeJsonPayload($currentValue);
+
+            return $currentPayload === null
+                ? null
+                : json_encode($currentPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
+        $currentPayload = $this->normalizeJsonPayload($currentValue) ?? [];
+        $mergedPayload = array_replace_recursive($currentPayload, $incomingPayload);
+
+        return json_encode($mergedPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     private function userPetDoc2BlobUrl(?User $user): ?string
