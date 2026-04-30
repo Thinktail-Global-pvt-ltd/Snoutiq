@@ -2913,7 +2913,10 @@ Route::prefix('receptionist')->group(function () {
     Route::get('/appointments/today', [ReceptionistBookingController::class, 'appointmentsToday']);
     Route::get('/vaccination-records', [PetVaccinationRecordController::class, 'index']);
     Route::post('/vaccination-records', [PetVaccinationRecordController::class, 'store']);
+    Route::post('/vaccination-records/analyze-document', [PetVaccinationRecordController::class, 'analyzeDocument']);
 });
+
+Route::post('/vaccination-records/analyze-document', [PetVaccinationRecordController::class, 'analyzeDocument']);
 
 
    // Clinic Reels CRUD routes (for admin panel)
