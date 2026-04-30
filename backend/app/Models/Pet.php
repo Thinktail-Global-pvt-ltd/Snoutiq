@@ -38,6 +38,11 @@ class Pet extends Model
         'deworming_status',
         'next_deworming_date',
         'vaccination_date',
+        'vaccination_image_blob',
+        'vaccination_image_mime',
+        'vaccination_image_name',
+        'vaccination_image_size',
+        'vaccination_image_uploaded_at',
         'vaccine_reminder_status',
         'neutering_reminder_sent_at',
         'vaccination_upcoming_reminder_sent_at',
@@ -58,6 +63,7 @@ class Pet extends Model
         'last_deworming_date' => 'date',
         'next_deworming_date' => 'date',
         'vaccination_date' => 'date',
+        'vaccination_image_uploaded_at' => 'datetime',
         'vaccine_reminder_status' => 'array',
         'neutering_reminder_sent_at' => 'datetime',
         'vaccination_upcoming_reminder_sent_at' => 'datetime',
@@ -67,6 +73,7 @@ class Pet extends Model
 
     protected $hidden = [
         'pet_doc2_blob',
+        'vaccination_image_blob',
     ];
 
     public function owner(): BelongsTo

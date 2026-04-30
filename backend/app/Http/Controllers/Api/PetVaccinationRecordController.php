@@ -125,13 +125,28 @@ class PetVaccinationRecordController extends Controller
             'mime_type' => ['nullable', 'string', 'max:120'],
             'save_record' => ['nullable', 'boolean'],
             'update_pet_payload' => ['nullable', 'boolean'],
+            'save_vaccination_image' => ['nullable', 'boolean'],
         ]);
 
-        [$base64, $mimeType, $fileName] = $this->resolveDocumentPayload($request, $data);
+        [$base64, $mimeType, $fileName, $documentBlob, $documentSize] = $this->resolveDocumentPayload($request, $data);
         if ($base64 === null) {
             throw ValidationException::withMessages([
                 'document' => ['Upload document/image or provide document_base64.'],
             ]);
+        }
+
+        $vaccinationImageSaved = false;
+        if (! empty($data['pet_id'])
+            && Schema::hasTable('pets')
+            && ($request->boolean('save_vaccination_image') || $request->boolean('update_pet_payload'))) {
+            $vaccinationImageSaved = $this->storeVaccinationImageBlob(
+                (int) $data['pet_id'],
+                (int) ($data['user_id'] ?? 0),
+                $documentBlob,
+                $mimeType,
+                $fileName,
+                $documentSize
+            );
         }
 
         $analysis = $this->analyzeVaccinationDocumentWithGemini($base64, $mimeType);
@@ -155,6 +170,8 @@ class PetVaccinationRecordController extends Controller
                 'document' => [
                     'file_name' => $fileName,
                     'mime_type' => $mimeType,
+                    'size' => $documentSize,
+                    'vaccination_image_blob_saved' => $vaccinationImageSaved,
                 ],
                 'analysis' => $analysis,
             ],
@@ -449,12 +466,14 @@ PROMPT;
                 base64_encode($contents),
                 $file->getClientMimeType() ?: ($file->getMimeType() ?: 'application/octet-stream'),
                 $file->getClientOriginalName(),
+                $contents,
+                $file->getSize(),
             ];
         }
 
         $base64 = trim((string) ($data['document_base64'] ?? ''));
         if ($base64 === '') {
-            return [null, 'application/octet-stream', null];
+            return [null, 'application/octet-stream', null, null, null];
         }
 
         $mime = trim((string) ($data['mime_type'] ?? 'image/jpeg'));
@@ -463,7 +482,15 @@ PROMPT;
             $base64 = $matches[2];
         }
 
-        return [$base64, $mime !== '' ? $mime : 'image/jpeg', null];
+        $blob = base64_decode($base64, true);
+
+        return [
+            $base64,
+            $mime !== '' ? $mime : 'image/jpeg',
+            null,
+            $blob === false ? null : $blob,
+            $blob === false ? null : strlen($blob),
+        ];
     }
 
     private function decodeGeminiJson(string $text): ?array
@@ -539,6 +566,53 @@ PROMPT;
         }
 
         return null;
+    }
+
+    private function storeVaccinationImageBlob(
+        int $petId,
+        int $userId,
+        ?string $blob,
+        string $mimeType,
+        ?string $fileName,
+        ?int $fileSize
+    ): bool {
+        if ($blob === null || $blob === '') {
+            return false;
+        }
+
+        if (! $this->vaccinationImageBlobColumnsReady()) {
+            return false;
+        }
+
+        $pet = DB::table('pets')->where('id', $petId)->first(['id', 'user_id']);
+        if (! $pet) {
+            return false;
+        }
+
+        if ($userId > 0 && ! empty($pet->user_id) && (int) $pet->user_id !== $userId) {
+            return false;
+        }
+
+        DB::table('pets')->where('id', $petId)->update([
+            'vaccination_image_blob' => $blob,
+            'vaccination_image_mime' => $mimeType ?: 'application/octet-stream',
+            'vaccination_image_name' => $fileName,
+            'vaccination_image_size' => $fileSize,
+            'vaccination_image_uploaded_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return true;
+    }
+
+    private function vaccinationImageBlobColumnsReady(): bool
+    {
+        return Schema::hasTable('pets')
+            && Schema::hasColumn('pets', 'vaccination_image_blob')
+            && Schema::hasColumn('pets', 'vaccination_image_mime')
+            && Schema::hasColumn('pets', 'vaccination_image_name')
+            && Schema::hasColumn('pets', 'vaccination_image_size')
+            && Schema::hasColumn('pets', 'vaccination_image_uploaded_at');
     }
 
     private function storeAnalysisRecord(array $data, array $analysis, ?string $fileName): int
