@@ -4392,10 +4392,9 @@ class AdminPanelController extends Controller
     {
         return Transaction::query()
             ->where('type', 'excell_export_campaign')
-            ->whereHas('clinic') // skip rows whose clinic entry was deleted
             ->with([
-                'clinic:id,name',
-                'doctor:id,doctor_name,doctor_email,doctor_mobile',
+                'clinic',
+                'doctor',
                 'user' => function ($query) {
                     $query->with([
                         'pets' => function ($petQuery) {
@@ -4572,6 +4571,13 @@ class AdminPanelController extends Controller
             'Reported Symptom',
         ];
 
+        $transactionFieldExclude = [];
+        $clinicFieldExclude = [];
+        $doctorFieldExclude = [
+            'password',
+            'remember_token',
+            'doctor_image_blob',
+        ];
         $userFieldExclude = [
             'password',
             'remember_token',
@@ -4582,14 +4588,29 @@ class AdminPanelController extends Controller
         ];
         $petFieldExclude = ['pet_doc2_blob'];
 
+        $transactionFieldKeysMap = [];
+        $clinicFieldKeysMap = [];
+        $doctorFieldKeysMap = [];
         $userFieldKeysMap = [];
         $petFieldKeysMap = [];
 
         foreach ($transactions as $transaction) {
             $petRecord = $this->resolveExcellExportPetRecord($transaction);
+            $transactionDetails = $this->formatNonNullAttributesForCsv($transaction, $transactionFieldExclude);
+            $clinicDetails = $this->formatNonNullAttributesForCsv($transaction->clinic, $clinicFieldExclude);
+            $doctorDetails = $this->formatNonNullAttributesForCsv($transaction->doctor, $doctorFieldExclude);
             $userDetails = $this->formatNonNullAttributesForCsv($transaction->user, $userFieldExclude);
             $petDetails = $this->formatNonNullAttributesForCsv($petRecord, $petFieldExclude);
 
+            foreach (array_keys($transactionDetails) as $key) {
+                $transactionFieldKeysMap[$key] = true;
+            }
+            foreach (array_keys($clinicDetails) as $key) {
+                $clinicFieldKeysMap[$key] = true;
+            }
+            foreach (array_keys($doctorDetails) as $key) {
+                $doctorFieldKeysMap[$key] = true;
+            }
             foreach (array_keys($userDetails) as $key) {
                 $userFieldKeysMap[$key] = true;
             }
@@ -4598,18 +4619,40 @@ class AdminPanelController extends Controller
             }
         }
 
+        $transactionFieldKeys = array_keys($transactionFieldKeysMap);
+        $clinicFieldKeys = array_keys($clinicFieldKeysMap);
+        $doctorFieldKeys = array_keys($doctorFieldKeysMap);
         $userFieldKeys = array_keys($userFieldKeysMap);
         $petFieldKeys = array_keys($petFieldKeysMap);
+        sort($transactionFieldKeys);
+        sort($clinicFieldKeys);
+        sort($doctorFieldKeys);
         sort($userFieldKeys);
         sort($petFieldKeys);
 
         $headers = array_merge(
             $baseHeaders,
+            array_map(fn (string $key): string => "Transaction Details: {$key}", $transactionFieldKeys),
+            array_map(fn (string $key): string => "Clinic Details: {$key}", $clinicFieldKeys),
+            array_map(fn (string $key): string => "Doctor Details: {$key}", $doctorFieldKeys),
             array_map(fn (string $key): string => "User Details: {$key}", $userFieldKeys),
             array_map(fn (string $key): string => "Pet Details: {$key}", $petFieldKeys),
         );
 
-        return response()->streamDownload(function () use ($transactions, $headers, $userFieldKeys, $petFieldKeys, $userFieldExclude, $petFieldExclude) {
+        return response()->streamDownload(function () use (
+            $transactions,
+            $headers,
+            $transactionFieldKeys,
+            $clinicFieldKeys,
+            $doctorFieldKeys,
+            $userFieldKeys,
+            $petFieldKeys,
+            $transactionFieldExclude,
+            $clinicFieldExclude,
+            $doctorFieldExclude,
+            $userFieldExclude,
+            $petFieldExclude
+        ) {
             $output = fopen('php://output', 'w');
             fputcsv($output, $headers);
 
@@ -4620,7 +4663,10 @@ class AdminPanelController extends Controller
                 if ($issue === '') {
                     $issue = trim((string) ($petRecord->reported_symptom ?? ''));
                 }
-                $petDob = $this->formatExcellExportPetDob($petRecord->pet_dob ?? $petRecord->dob ?? null);
+                $petDob = $this->formatExcellExportPetDob($petRecord?->pet_dob ?? $petRecord?->dob ?? null);
+                $transactionDetails = $this->formatNonNullAttributesForCsv($transaction, $transactionFieldExclude);
+                $clinicDetails = $this->formatNonNullAttributesForCsv($transaction->clinic, $clinicFieldExclude);
+                $doctorDetails = $this->formatNonNullAttributesForCsv($transaction->doctor, $doctorFieldExclude);
                 $userDetails = $this->formatNonNullAttributesForCsv($transaction->user, $userFieldExclude);
                 $petDetails = $this->formatNonNullAttributesForCsv($petRecord, $petFieldExclude);
 
@@ -4652,6 +4698,15 @@ class AdminPanelController extends Controller
                     $issue !== '' ? $issue : null,
                 ];
 
+                foreach ($transactionFieldKeys as $key) {
+                    $row[] = $transactionDetails[$key] ?? null;
+                }
+                foreach ($clinicFieldKeys as $key) {
+                    $row[] = $clinicDetails[$key] ?? null;
+                }
+                foreach ($doctorFieldKeys as $key) {
+                    $row[] = $doctorDetails[$key] ?? null;
+                }
                 foreach ($userFieldKeys as $key) {
                     $row[] = $userDetails[$key] ?? null;
                 }
