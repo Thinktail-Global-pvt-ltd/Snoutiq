@@ -685,11 +685,15 @@ public function pet_update(Request $request, $id)
                     }
                 }
 
-                // Nested meta (e.g., dog_disease_payload.vaccination)
-                if (!$this->profileValueFilled($value) && isset($field['meta'])) {
+                // Nested meta (e.g., dog_disease_payload.vaccination) must be evaluated
+                // by the nested value, not by the parent JSON object.
+                if (isset($field['meta'])) {
+                    $value = null;
                     $nested = data_get($petSource, "{$field['column']}.{$field['meta']}");
                     if ($this->profileValueFilled($nested)) {
                         $value = $nested;
+                        $usedColumn = "{$field['column']}.{$field['meta']}";
+                    } else {
                         $usedColumn = "{$field['column']}.{$field['meta']}";
                     }
                 }
