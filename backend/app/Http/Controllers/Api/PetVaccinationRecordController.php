@@ -8,7 +8,6 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -177,64 +176,28 @@ class PetVaccinationRecordController extends Controller
 
         $prompt = $this->vaccinationPrompt();
         $models = array_values(array_unique(array_filter([
-            config('services.gemini.chat_model'),
             GeminiConfig::chatModel(),
+            config('services.gemini.chat_model'),
             config('services.gemini.model'),
             GeminiConfig::defaultModel(),
         ])));
+        $warnings = [];
 
         foreach ($models as $model) {
-            $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', $model);
-
-            try {
-                $response = Http::timeout(45)
-                    ->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'X-goog-api-key' => $apiKey,
-                    ])
-                    ->post($endpoint, [
-                        'contents' => [[
-                            'role' => 'user',
-                            'parts' => [
-                                ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
-                                ['text' => $prompt],
-                            ],
-                        ]],
-                        'generationConfig' => [
-                            'temperature' => 0.1,
-                            'topP' => 0.8,
-                            'topK' => 32,
-                            'maxOutputTokens' => 1400,
-                        ],
-                    ]);
-            } catch (\Throwable $e) {
-                Log::warning('pet_vaccination_records.gemini_request_failed', [
-                    'model' => $model,
-                    'error' => $e->getMessage(),
-                ]);
+            $result = $this->callGeminiVisionApiCurl($model, $apiKey, $prompt, $base64, $mimeType);
+            if (! $result['ok']) {
+                $warnings[] = $result['error'];
                 continue;
             }
 
-            if (! $response->successful()) {
-                if ($response->status() === 404) {
-                    continue;
-                }
-
-                Log::warning('pet_vaccination_records.gemini_bad_response', [
-                    'model' => $model,
-                    'status' => $response->status(),
-                    'body' => substr($response->body(), 0, 500),
-                ]);
-
-                continue;
-            }
-
-            $text = (string) $response->json('candidates.0.content.parts.0.text', '');
+            $text = $result['text'];
             $decoded = $this->decodeGeminiJson($text);
             if (is_array($decoded)) {
                 $decoded['model'] = $model;
                 return $decoded;
             }
+
+            $warnings[] = "Gemini {$model} returned non-JSON text: " . substr(trim($text), 0, 180);
         }
 
         return [
@@ -242,8 +205,111 @@ class PetVaccinationRecordController extends Controller
             'vaccinations' => [],
             'next_due_vaccination' => null,
             'status' => 'unknown',
-            'warnings' => ['Gemini could not extract structured vaccination data from this document.'],
+            'warnings' => ! empty($warnings)
+                ? $warnings
+                : ['Gemini could not extract structured vaccination data from this document.'],
         ];
+    }
+
+    private function callGeminiVisionApiCurl(string $model, string $apiKey, string $prompt, string $base64, string $mimeType): array
+    {
+        $url = sprintf(
+            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+            $model,
+            urlencode($apiKey)
+        );
+
+        $payload = json_encode([
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [
+                    ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
+                    ['text' => $prompt],
+                ],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.1,
+                'topP' => 0.8,
+                'topK' => 32,
+                'maxOutputTokens' => 1400,
+            ],
+        ], JSON_UNESCAPED_SLASHES);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_TIMEOUT => 45,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+
+        $resp = curl_exec($ch);
+        if ($resp === false) {
+            $err = curl_error($ch);
+            $info = curl_getinfo($ch);
+            curl_close($ch);
+            Log::warning('pet_vaccination_records.gemini_curl_failed', [
+                'model' => $model,
+                'error' => $err,
+                'info' => $info,
+            ]);
+
+            return [
+                'ok' => false,
+                'text' => '',
+                'error' => "Gemini {$model} cURL error: {$err}",
+            ];
+        }
+
+        $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http < 200 || $http >= 300) {
+            $message = $this->extractGeminiErrorMessage($resp, $http);
+            Log::warning('pet_vaccination_records.gemini_http_failed', [
+                'model' => $model,
+                'status' => $http,
+                'message' => $message,
+                'body' => substr($resp, 0, 500),
+            ]);
+
+            return [
+                'ok' => false,
+                'text' => '',
+                'error' => "Gemini {$model} HTTP {$http}: {$message}",
+            ];
+        }
+
+        $json = json_decode($resp, true);
+        $text = (string) ($json['candidates'][0]['content']['parts'][0]['text'] ?? '');
+        if ($text === '') {
+            return [
+                'ok' => false,
+                'text' => '',
+                'error' => "Gemini {$model} returned an empty response.",
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'text' => $text,
+            'error' => null,
+        ];
+    }
+
+    private function extractGeminiErrorMessage(string $body, int $status): string
+    {
+        $decoded = json_decode($body, true);
+        if (isset($decoded['error']['message']) && $decoded['error']['message'] !== '') {
+            return $decoded['error']['message'];
+        }
+
+        return "HTTP {$status}";
     }
 
     private function vaccinationPrompt(): string
