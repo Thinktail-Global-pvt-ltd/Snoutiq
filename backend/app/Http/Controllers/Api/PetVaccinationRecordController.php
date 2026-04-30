@@ -176,6 +176,7 @@ class PetVaccinationRecordController extends Controller
 
         $prompt = $this->vaccinationPrompt();
         $models = array_values(array_unique(array_filter([
+            'gemini-2.5-flash',
             GeminiConfig::chatModel(),
             config('services.gemini.chat_model'),
             config('services.gemini.model'),
