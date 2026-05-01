@@ -8,6 +8,7 @@ import PetDoctorOnline from "./newflow/PetDoctorOnline";
 
 const CallLab = lazy(() => import("./pages/CallLab"));
 const DoctorReceiver = lazy(() => import("./pages/DoctorReceiver"));
+const VideoCall = lazy(() => import("./pages/VideoCall"));
 const Uiapp = lazy(() => import("./screen/Uiapp"));
 
 const PrivacyPolicy = lazy(() => import("./policies/PrivacyPolicy"));
@@ -21,6 +22,9 @@ const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
 const CallRecordingDemo = lazy(() => import("./pages/CallRecordingDemo"));
 const PatientCallTest = lazy(() => import("./pages/PatientCallTest"));
 const DoctorReceiverTest = lazy(() => import("./pages/DoctorReceiverTest"));
+const RazorpayUpiIntentTest = lazy(() =>
+  import("./pages/RazorpayUpiIntentTest")
+);
 const Home = lazy(() => import("./pages/Home"));
 const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
 const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
@@ -260,12 +264,14 @@ export default function AppRoutes() {
         <Route path="/404" element={<NotFoundPage />} />
 
         <Route path="/patient-call-test" element={<PatientCallTest />} />
+        <Route path="/razorpay-upi-test" element={<RazorpayUpiIntentTest />} />
         <Route
           path="/doctor-receiver-test"
           element={<DoctorReceiverTest />}
         />
         <Route path="/call-lab" element={<CallLab />} />
         <Route path="/doctor-receiver" element={<DoctorReceiver />} />
+        <Route path="/call-page/:channelName" element={<VideoCall />} />
         <Route path="/UI-test" element={<Uiapp />} />
         <Route
           path="/doctor-dashboard/:doctorId"
