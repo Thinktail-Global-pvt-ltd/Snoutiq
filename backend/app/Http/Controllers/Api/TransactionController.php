@@ -36,6 +36,9 @@ class TransactionController extends Controller
             if (Schema::hasColumn('pets', 'pet_doc2_blob')) {
                 $petColumns[] = 'pet_doc2_blob';
             }
+            if (Schema::hasColumn('pets', 'pet_doc2_blob_new')) {
+                $petColumns[] = 'pet_doc2_blob_new';
+            }
             if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
                 $petColumns[] = 'pet_doc2_mime';
             }
@@ -150,6 +153,7 @@ class TransactionController extends Controller
             }
 
             $petBlobUrl = $pet ? $this->petDoc2BlobUrl($pet) : null;
+            $petBlobNewUrl = $pet ? $this->petDoc2BlobNewUrl($pet) : null;
             $petDoc1Url = $pet ? $this->absolutePetDoc2Url($pet->pet_doc1 ?? null) : null;
             $petDoc2Url = $pet ? $this->absolutePetDoc2Url($pet->pet_doc2 ?? null) : null;
             $petPicLinkUrl = $pet ? $this->absolutePetDoc2Url($pet->pic_link ?? null) : null;
@@ -184,6 +188,7 @@ class TransactionController extends Controller
                 'doctor_name' => $tx->doctor->doctor_name ?? null,
                 'device_tokens' => $deviceTokens,
                 'pet_doc2_blob_url' => $petBlobUrl,
+                'pet_doc2_blob_new_url' => $petBlobNewUrl,
                 'pet_image_url' => $petImageUrl,
                 'pet' => $pet ? [
                     'id' => $pet->id,
@@ -194,6 +199,7 @@ class TransactionController extends Controller
                     'weight' => $pet->weight ?? null,
                     'pet_doc2' => $pet->pet_doc2 ?? null,
                     'pet_doc2_blob_url' => $petBlobUrl,
+                    'pet_doc2_blob_new_url' => $petBlobNewUrl,
                     'pet_doc2_url' => $petDoc2Url,
                     'pet_image_url' => $petImageUrl,
                 ] : null,
@@ -565,6 +571,20 @@ class TransactionController extends Controller
         }
 
         return route('api.pets.pet-doc2-blob', ['pet' => $pet->id]);
+    }
+
+    protected function petDoc2BlobNewUrl($pet): ?string
+    {
+        if (! $pet || ! Schema::hasTable('pets') || ! Schema::hasColumn('pets', 'pet_doc2_blob_new')) {
+            return null;
+        }
+
+        $blob = $pet->getRawOriginal('pet_doc2_blob_new');
+        if ($blob === null || $blob === '') {
+            return null;
+        }
+
+        return route('api.pets.pet-doc2-blob-new', ['pet' => $pet->id]);
     }
 
     protected function absolutePetDoc2Url(?string $path): ?string
