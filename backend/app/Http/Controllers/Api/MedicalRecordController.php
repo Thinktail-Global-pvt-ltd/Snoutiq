@@ -597,10 +597,41 @@ class MedicalRecordController extends Controller
                 ->keyBy('id');
         }
 
-        $recordsMapped = $records->map(function (MedicalRecord $record) use ($prescriptions, $latestUserPrescription, $petMap) {
+        $reportedSymptomsByRecordId = collect();
+        $recordIds = $records->pluck('id')->filter()->map(fn ($id) => (int) $id)->values();
+        if (
+            $recordIds->isNotEmpty()
+            && Schema::hasTable('transactions')
+            && Schema::hasTable('reported_symptom_logs')
+            && Schema::hasTable('prescriptions')
+            && Schema::hasColumn('transactions', 'channel_name')
+            && Schema::hasColumn('prescriptions', 'call_session')
+            && Schema::hasColumn('prescriptions', 'medical_record_id')
+        ) {
+            $reportedSymptomsByRecordId = DB::table('prescriptions as p')
+                ->join('transactions as t', 't.channel_name', '=', 'p.call_session')
+                ->join('reported_symptom_logs as rsl', 'rsl.transaction_id', '=', 't.id')
+                ->whereIn('p.medical_record_id', $recordIds->all())
+                ->whereNotNull('p.call_session')
+                ->where('p.call_session', '!=', '')
+                ->orderByDesc('t.created_at')
+                ->orderByDesc('t.id')
+                ->select([
+                    'p.medical_record_id',
+                    'rsl.reported_symptom',
+                ])
+                ->get()
+                ->groupBy(fn ($row) => (int) $row->medical_record_id)
+                ->map(fn ($rows) => $rows->first()->reported_symptom);
+        }
+
+        $recordsMapped = $records->map(function (MedicalRecord $record) use ($prescriptions, $latestUserPrescription, $petMap, $reportedSymptomsByRecordId) {
             $prescription = $prescriptions->get($record->id) ?? $latestUserPrescription;
             $petId = $prescription?->pet_id ? (int) $prescription->pet_id : null;
             $petPayload = $petId ? $petMap->get($petId)?->toArray() : null;
+            if (is_array($petPayload) && $reportedSymptomsByRecordId->has((int) $record->id)) {
+                $petPayload['reported_symptom'] = $reportedSymptomsByRecordId->get((int) $record->id);
+            }
 
             return [
                 'id' => $record->id,
