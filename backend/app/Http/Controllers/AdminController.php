@@ -183,6 +183,7 @@ class AdminController extends Controller
             ->get()
             ->map(function ($pet) {
                 $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
+                $pet->pet_doc2_blob_new_url = $this->petDoc2BlobNewUrl((int) $pet->id);
                 return $pet;
             })
             ->values();
@@ -203,6 +204,7 @@ class AdminController extends Controller
         }
 
         $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
+        $pet->pet_doc2_blob_new_url = $this->petDoc2BlobNewUrl((int) $pet->id);
 
         return response()->json(['status' => 'success', 'data' => $pet]);
     }
@@ -1024,6 +1026,24 @@ class AdminController extends Controller
         return route('api.pets.pet-doc2-blob', ['pet' => $petId]);
     }
 
+    private function petDoc2BlobNewUrl(int $petId): ?string
+    {
+        if (! Schema::hasTable('pets') || ! Schema::hasColumn('pets', 'pet_doc2_blob_new')) {
+            return null;
+        }
+
+        $hasBlob = DB::table('pets')
+            ->where('id', $petId)
+            ->whereNotNull('pet_doc2_blob_new')
+            ->exists();
+
+        if (! $hasBlob) {
+            return null;
+        }
+
+        return route('api.pets.pet-doc2-blob-new', ['pet' => $petId]);
+    }
+
     private function safePetSelectColumns(): array
     {
         if (! Schema::hasTable('pets')) {
@@ -1031,7 +1051,7 @@ class AdminController extends Controller
         }
 
         $columns = Schema::getColumnListing('pets');
-        $columns = array_values(array_filter($columns, fn (string $column) => $column !== 'pet_doc2_blob'));
+        $columns = array_values(array_filter($columns, fn (string $column) => ! str_ends_with($column, '_blob')));
 
         return $columns ?: ['id'];
     }
