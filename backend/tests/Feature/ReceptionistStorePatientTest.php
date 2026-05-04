@@ -18,6 +18,8 @@ class ReceptionistStorePatientTest extends TestCase
         config()->set('services.razorpay.secret', '');
 
         Schema::disableForeignKeyConstraints();
+        Schema::dropIfExists('consultation_share_sessions');
+        Schema::dropIfExists('doctors');
         Schema::dropIfExists('pets');
         Schema::dropIfExists('users');
         Schema::enableForeignKeyConstraints();
@@ -44,6 +46,39 @@ class ReceptionistStorePatientTest extends TestCase
             $table->string('pet_gender')->nullable();
             $table->decimal('weight', 8, 2)->nullable();
             $table->unique(['user_id', 'name', 'breed', 'pet_age', 'pet_gender'], 'uniq_user_pet');
+            $table->timestamps();
+        });
+
+        Schema::create('consultation_share_sessions', function (Blueprint $table) {
+            $table->id();
+            $table->string('session_token', 64)->unique();
+            $table->unsignedBigInteger('clinic_id')->nullable()->index();
+            $table->unsignedBigInteger('doctor_id')->nullable()->index();
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->unsignedBigInteger('pet_id')->nullable()->index();
+            $table->string('parent_name')->nullable();
+            $table->string('parent_phone', 25)->index();
+            $table->string('pet_name')->nullable();
+            $table->string('pet_type', 120)->nullable();
+            $table->string('pet_breed', 120)->nullable();
+            $table->unsignedInteger('amount_paise')->default(49900);
+            $table->unsignedSmallInteger('response_time_minutes')->default(10);
+            $table->string('status', 30)->default('pending')->index();
+            $table->string('razorpay_payment_link_id', 120)->nullable()->index();
+            $table->text('razorpay_payment_link_url')->nullable();
+            $table->string('razorpay_short_code', 120)->nullable();
+            $table->timestamp('initiated_at')->nullable();
+            $table->timestamp('payment_link_sent_at')->nullable();
+            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('last_inbound_message_at')->nullable();
+            $table->json('meta')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('doctors', function (Blueprint $table) {
+            $table->id();
+            $table->string('doctor_name')->nullable();
+            $table->unsignedBigInteger('vet_registeration_id')->nullable()->index();
             $table->timestamps();
         });
     }
@@ -100,7 +135,7 @@ class ReceptionistStorePatientTest extends TestCase
         $this->assertSame('dog', $pet->type);
     }
 
-    public function test_store_patient_replaces_existing_pets_for_the_user_before_insert(): void
+    public function test_store_patient_preserves_existing_pets_for_the_user_before_insert(): void
     {
         $existingUser = User::query()->create([
             'name' => 'Old Name',
@@ -114,12 +149,12 @@ class ReceptionistStorePatientTest extends TestCase
         DB::table('pets')->insert([
             [
                 'user_id' => $existingUser->id,
-                'name' => 'Bruno',
-                'breed' => 'Labrador',
+                'name' => 'Rocky',
+                'breed' => 'Golden Retriever',
                 'type' => 'dog',
-                'pet_age' => 3,
+                'pet_age' => 2,
                 'pet_gender' => 'male',
-                'weight' => 20,
+                'weight' => 18,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -162,13 +197,15 @@ class ReceptionistStorePatientTest extends TestCase
             ->orderBy('id')
             ->get();
 
-        $this->assertCount(1, $pets);
-        $pet = $pets->first();
-        $this->assertSame('Bruno', $pet->name);
-        $this->assertSame('Labrador', $pet->breed);
-        $this->assertSame('dog', $pet->type);
-        $this->assertSame(3, (int) $pet->pet_age);
-        $this->assertSame('male', $pet->pet_gender);
-        $this->assertSame(24.0, (float) $pet->weight);
+        $this->assertCount(3, $pets);
+        $this->assertSame(['Rocky', 'Lucy', 'Bruno'], $pets->pluck('name')->all());
+
+        $newPet = $pets->last();
+        $this->assertSame('Bruno', $newPet->name);
+        $this->assertSame('Labrador', $newPet->breed);
+        $this->assertSame('dog', $newPet->type);
+        $this->assertSame(3, (int) $newPet->pet_age);
+        $this->assertSame('male', $newPet->pet_gender);
+        $this->assertSame(24.0, (float) $newPet->weight);
     }
 }

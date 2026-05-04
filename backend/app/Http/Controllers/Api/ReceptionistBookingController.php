@@ -777,10 +777,6 @@ class ReceptionistBookingController extends Controller
                 $petPayload['updated_at'] = $now;
             }
 
-            DB::table('pets')
-                ->where($userColumn, $user->id)
-                ->delete();
-
             $petId = DB::table('pets')->insertGetId($petPayload);
             $pet = (object) [
                 'id' => $petId,
