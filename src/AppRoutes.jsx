@@ -142,6 +142,9 @@ const PetLifelinePage = lazy(() => import("./ai/PetLifelinePage"));
 const EditPetPage = lazy(() => import("./ai/EditPetPage"));
 const ConsultBookingFlow = lazy(() => import("./ai/ConsultBookingFlow"));
 const InClinicFastBookingFlow = lazy(() => import("./ai/InClinicFastBookingFlow"));
+const HomeVetBookingFlow = lazy(() => import("./ai/HomeVetBookingFlow"));
+const ProtectedBookingRoute = lazy(() => import("./ai/ProtectedBookingRoute"));
+const AppointmentThankYouPage = lazy(() => import("./ai/AppointmentThankYouPage"));
 const AppointmentPage = lazy(() =>
   import("./ai/usePetOverviewCards.jsx").then((module) => ({
     default: module.AppointmentPage,
@@ -181,8 +184,11 @@ export default function AppRoutes() {
         <Route path="/ai" element={<AiRoute />} />
      <Route path="/pet-lifeline/:petId" element={<PetLifelinePage />} />
 <Route path="/profile" element={<EditPetPage />} />
-<Route path="/video-counsult" element={<ConsultBookingFlow />} />
-<Route path="/inclinic-fast-booking" element={<InClinicFastBookingFlow />} />
+<Route path="/video-counsult" element={<ProtectedBookingRoute><ConsultBookingFlow /></ProtectedBookingRoute>} />
+<Route path="/video-consult" element={<ProtectedBookingRoute><ConsultBookingFlow /></ProtectedBookingRoute>} />
+<Route path="/inclinic-fast-booking" element={<ProtectedBookingRoute><InClinicFastBookingFlow /></ProtectedBookingRoute>} />
+<Route path="/vet-at-home-booking" element={<ProtectedBookingRoute><HomeVetBookingFlow /></ProtectedBookingRoute>} />
+<Route path="/appointment-thank-you" element={<AppointmentThankYouPage />} />
 <Route path="/appointment-page" element={<AppointmentPage />} />
 <Route path="/followup-page" element={<FollowupPage />} />
 

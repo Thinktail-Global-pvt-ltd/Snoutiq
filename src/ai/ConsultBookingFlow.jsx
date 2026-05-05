@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { readAiAuthState } from "./AiAuth";
+import { confirmPaymentStart, showBookingError, showBookingWarning } from "./booking/bookingAlerts";
+import { fetchPetOverview } from "./petOverviewService";
 
 const API_BASE = "https://snoutiq.com/backend/api";
 const ENDPOINTS = {
@@ -8,13 +10,14 @@ const ENDPOINTS = {
   createOrder: "/create-order",
   verifyPayment: "/rzp/verify",
   serviceBookings: "/chat/service-bookings",
+  mediaQuestion: "/chat/dog-disease/question",
 };
 
 const DAY_RATE_START_HOUR = 8;
 const DAY_RATE_END_HOUR = 20;
 const STATIC_CONSULTATION_AMOUNT = 599;
 const STATIC_SERVICE_AMOUNT = 0;
-const STATIC_DISCOUNT_AMOUNT = 100;
+const STATIC_DISCOUNT_AMOUNT = 0;
 const GST_RATE = 0.18;
 
 function normalizeText(value) {
@@ -80,6 +83,22 @@ function roundAmount(value) {
 function toInteger(value, fallback = 0) {
   const amount = Math.round(Number(value));
   return Number.isFinite(amount) ? amount : fallback;
+}
+
+function parsePositiveId(...values) {
+  for (const value of values) {
+    const parsed = Number.parseInt(normalizeText(value), 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
+}
+
+function stripEmpty(payload) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(
+      ([, value]) => value !== undefined && value !== null && value !== "",
+    ),
+  );
 }
 
 function pickFirst(...values) {
@@ -374,6 +393,7 @@ export default function ConsultBookingFlow({
   onSuccess,
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const routeState =
     location?.state && typeof location.state === "object" ? location.state : {};
   const authState = useMemo(() => readAiAuthState(), []);
@@ -428,6 +448,18 @@ export default function ConsultBookingFlow({
       routeState?.pet_id,
       routeState?.prescriptionPrefill?.petId,
     ],
+  );
+  const [fallbackPet, setFallbackPet] = useState(null);
+  const effectivePetId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          resolvedPetId,
+          fallbackPet?.id,
+          fallbackPet?.pet_id,
+        ),
+      ),
+    [fallbackPet, resolvedPetId],
   );
 
   const resolvedClinicId = useMemo(
@@ -571,25 +603,31 @@ export default function ConsultBookingFlow({
     petAge: "",
     issue: symptomPrefillText,
     notes: "",
+    consentGiven: false,
   });
+  const [mediaFiles, setMediaFiles] = useState([]);
 
   const [couponCode, setCouponCode] = useState("");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstNumber, setGstNumber] = useState("");
 
   const [createOrderLoading, setCreateOrderLoading] = useState(false);
+  const paymentInFlightRef = useRef(false);
   const [paymentError, setPaymentError] = useState("");
   const [reportedSymptomMessage, setReportedSymptomMessage] = useState("");
   const [couponMessage, setCouponMessage] = useState("");
   const [successState, setSuccessState] = useState(null);
   const [apiResponses, setApiResponses] = useState({
     reportedSymptom: null,
+    serviceBooking: null,
     createOrder: null,
     verifyPayment: null,
+    mediaUpload: null,
   });
 
   const slot = useMemo(() => currentSlot(), []);
-  const consultationAmount = STATIC_CONSULTATION_AMOUNT;
+  const activeDoctorFee = selectedDoctor ? resolveDoctorFee(selectedDoctor, slot) : 0;
+  const consultationAmount = activeDoctorFee || STATIC_CONSULTATION_AMOUNT;
   const serviceAmount = STATIC_SERVICE_AMOUNT;
   const subtotalAmount = useMemo(
     () => roundAmount(consultationAmount + serviceAmount),
@@ -609,6 +647,49 @@ export default function ConsultBookingFlow({
     [gstAmount, taxableAmount],
   );
   const payableAmountInr = useMemo(() => toInteger(payableAmount), [payableAmount]);
+
+  useEffect(() => {
+    if (!resolvedUserId || effectivePetId) return;
+    let active = true;
+
+    async function fetchPets() {
+      try {
+        const response = await fetch(`${apiBase}/users/${encodeURIComponent(resolvedUserId)}/pets`, {
+          method: "GET",
+          headers: getAuthHeaders(resolvedToken, {
+            Accept: "application/json",
+          }),
+        });
+        const data = await readApiBody(response);
+        if (!response.ok) return;
+        const pets = Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.pets)
+            ? data.pets
+            : Array.isArray(data)
+              ? data
+              : [];
+        const pet = pets[0] || null;
+        if (!active || !pet) return;
+        setFallbackPet(pet);
+        setDetails((current) => ({
+          ...current,
+          petName: current.petName || normalizeText(pickFirst(pet?.name, pet?.pet_name)),
+          petType:
+            current.petType ||
+            normalizeText(pickFirst(pet?.pet_type, pet?.species, pet?.type)) ||
+            "dog",
+        }));
+      } catch (_) {
+        // Payment validation handles missing pet context.
+      }
+    }
+
+    fetchPets();
+    return () => {
+      active = false;
+    };
+  }, [apiBase, effectivePetId, resolvedToken, resolvedUserId]);
 
   useEffect(() => {
     let active = true;
@@ -705,19 +786,12 @@ export default function ConsultBookingFlow({
   };
 
   const validateDetails = () => {
-    if (!resolvedUserId || !resolvedPetId) {
+    if (!resolvedUserId || !effectivePetId) {
       return "User/Pet context missing hai. Ask flow se dubara open kijiye.";
     }
     if (!selectedDoctor) return "Please choose a doctor first.";
-    if (!normalizeText(details.ownerName)) return "Owner name required hai.";
-    if (normalizePhone(details.phone).replace(/\D/g, "").length < 10) {
-      return "Valid mobile number required hai.";
-    }
-    if (!normalizeText(details.petName)) return "Pet name required hai.";
     if (!normalizeText(details.issue)) return "Disease / issue details required hain.";
-    if (gstEnabled && normalizeText(gstNumber).length !== 15) {
-      return "GST number 15 characters ka hona chahiye.";
-    }
+    if (!details.consentGiven) return "Please acknowledge consent before payment.";
     return "";
   };
 
@@ -725,6 +799,7 @@ export default function ConsultBookingFlow({
     const error = validateDetails();
     if (error) {
       setPaymentError(error);
+      void showBookingError(error, "Check booking details");
       return;
     }
 
@@ -770,6 +845,8 @@ export default function ConsultBookingFlow({
   };
 
   const handlePayNow = async () => {
+    if (paymentInFlightRef.current) return;
+
     const error = validateDetails();
     if (error) {
       setPaymentError(error);
@@ -778,30 +855,44 @@ export default function ConsultBookingFlow({
 
     if (!selectedDoctor) {
       setPaymentError("Doctor select kijiye.");
+      void showBookingError("Doctor select kijiye.", "Check booking details");
       return;
     }
 
+    const confirmation = await confirmPaymentStart({
+      amount: payableAmountInr,
+      title: "Continue to payment",
+      text: `Pay ${formatCurrency(payableAmountInr)} for video consult.`,
+    });
+    if (!confirmation.isConfirmed) return;
+
+    paymentInFlightRef.current = true;
     setCreateOrderLoading(true);
     setPaymentError("");
     setCouponMessage("");
     setReportedSymptomMessage("");
     setApiResponses({
       reportedSymptom: null,
+      serviceBooking: null,
       createOrder: null,
       verifyPayment: null,
+      mediaUpload: null,
     });
+
+    let paidRazorpayResponse = null;
+    let paidOrderId = "";
 
     try {
       const doctorId = normalizeText(selectedDoctor.doctorId || selectedDoctor.id);
       const clinicId = normalizeText(selectedDoctor.clinicId || resolvedClinicId);
       const userIdNumber = toInteger(resolvedUserId, 0);
-      const petIdNumber = toInteger(resolvedPetId, 0);
+      const petIdNumber = toInteger(effectivePetId, 0);
       const doctorIdNumber = toInteger(doctorId, 0);
       const clinicIdNumber = toInteger(clinicId, 0);
       const symptomText = normalizeText(details.issue);
 
       const reportedSymptomResponse = await fetch(
-        `${apiBase}/users/${encodeURIComponent(resolvedUserId)}/pets/${encodeURIComponent(resolvedPetId)}/reported-symptom`,
+        `${apiBase}/users/${encodeURIComponent(resolvedUserId)}/pets/${encodeURIComponent(effectivePetId)}/reported-symptom`,
         {
           method: "PUT",
           headers: getAuthHeaders(resolvedToken, {
@@ -833,29 +924,76 @@ export default function ConsultBookingFlow({
         setReportedSymptomMessage("Reported symptom updated successfully.");
       }
 
+      const serviceBookingPayload = stripEmpty({
+        user_id: userIdNumber || resolvedUserId,
+        pet_id: petIdNumber || effectivePetId,
+        doctor_name: selectedDoctor.name,
+        doctor_mobile: selectedDoctor.mobile,
+        doctor_email: selectedDoctor.email,
+        doctor_license: normalizeText(
+          selectedDoctor.raw?.doctor_license ||
+            selectedDoctor.raw?.license_number ||
+            selectedDoctor.raw?.license,
+        ),
+        doctor_price: payableAmountInr,
+        clinic_name: selectedDoctor.clinicName,
+        clinic_id: clinicId ? clinicIdNumber || clinicId : undefined,
+        clinic_mobile: normalizePhone(selectedDoctor.raw?.clinic_mobile || selectedDoctor.raw?.clinic_phone || ""),
+        clinic_email: normalizeText(selectedDoctor.raw?.clinic_email || selectedDoctor.raw?.clinicEmail || ""),
+        service_type: "video_consult",
+        appointment_date: new Date().toISOString().slice(0, 10),
+        appointment_time: new Date().toTimeString().slice(0, 8),
+        chat_room_token: normalizeText(routeState?.chat_room_token || authState?.chatRoomToken) || undefined,
+        context_token: normalizeText(routeState?.context_token || routeState?.chat_room_token || authState?.chatRoomToken) || undefined,
+        notes: symptomText,
+      });
+
+      const serviceRes = await fetch(`${apiBase}${endpoints.serviceBookings || ENDPOINTS.serviceBookings}`, {
+        method: "POST",
+        headers: getAuthHeaders(resolvedToken, {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(serviceBookingPayload),
+      });
+      const serviceData = await readApiBody(serviceRes);
+      recordApiResponse("serviceBooking", serviceData);
+      if (!serviceRes.ok || serviceData?.success === false) {
+        throw new Error(serviceData?.message || serviceData?.error || "Service booking failed.");
+      }
+
+      const serviceBookingId = parsePositiveId(
+        serviceData?.data?.id,
+        serviceData?.data?.service_booking_id,
+        serviceData?.service_booking_id,
+        serviceData?.id,
+      );
+      const serviceDoctorId = parsePositiveId(serviceData?.data?.doctor_id, serviceData?.doctor_id) || doctorIdNumber;
+      const serviceClinicId = parsePositiveId(serviceData?.data?.clinic_id, serviceData?.clinic_id) || clinicIdNumber;
+
       const createPayload = {
         amount: payableAmountInr,
         order_type: "video_consult",
         user_id: userIdNumber || resolvedUserId,
-        doctor_id: doctorIdNumber || doctorId,
-        clinic_id: clinicId ? clinicIdNumber || clinicId : undefined,
-        pet_id: petIdNumber || resolvedPetId,
+        doctor_id: serviceDoctorId || doctorId,
+        clinic_id: serviceClinicId || (clinicId ? clinicIdNumber || clinicId : undefined),
+        pet_id: petIdNumber || effectivePetId,
+        service_booking_id: serviceBookingId || undefined,
+        chat_room_token: serviceBookingPayload.chat_room_token,
+        context_token: serviceBookingPayload.context_token,
         call_session_id: normalizeText(resolvedCallSessionId) || undefined,
         channel_name: normalizeText(resolvedChannelName) || undefined,
         coupon_code: normalizeText(couponCode).toUpperCase() || undefined,
-        gst_invoice: gstEnabled ? 1 : undefined,
-        gst_number: gstEnabled ? normalizeText(gstNumber).toUpperCase() : undefined,
+                gst_invoice: undefined,
+                gst_number: undefined,
       };
-      const finalCreatePayload = Object.fromEntries(
-        Object.entries(createPayload).filter(
-          ([, value]) => value !== undefined && value !== null && value !== "",
-        ),
-      );
+      const finalCreatePayload = stripEmpty(createPayload);
 
       const createRes = await fetch(`${apiBase}${endpoints.createOrder || ENDPOINTS.createOrder}`, {
         method: "POST",
         headers: getAuthHeaders(resolvedToken, {
           Accept: "application/json",
+          "Content-Type": "application/json",
         }),
         body: JSON.stringify(finalCreatePayload),
       });
@@ -878,8 +1016,7 @@ export default function ConsultBookingFlow({
       const order = createData?.order || createData?.data?.order || createData?.data || {};
       const razorpayKey =
         normalizeText(createData?.key) ||
-        normalizeText(createData?.data?.key) ||
-        normalizeText(window?.ENV?.RAZORPAY_KEY_ID || "");
+        normalizeText(createData?.data?.key);
 
       const orderId =
         normalizeText(order?.id) ||
@@ -903,29 +1040,31 @@ export default function ConsultBookingFlow({
         razorpayKey,
         serverData: createData,
       });
+      paidRazorpayResponse = razorpayResponse;
+      paidOrderId = orderId;
 
       const verifyPayload = {
         razorpay_order_id: razorpayResponse?.razorpay_order_id || orderId,
         razorpay_payment_id: razorpayResponse?.razorpay_payment_id,
         razorpay_signature: razorpayResponse?.razorpay_signature,
         user_id: userIdNumber || resolvedUserId,
-        doctor_id: doctorIdNumber || doctorId,
-        clinic_id: clinicId ? clinicIdNumber || clinicId : undefined,
-        pet_id: petIdNumber || resolvedPetId,
+        doctor_id: serviceDoctorId || doctorIdNumber || doctorId,
+        clinic_id: serviceClinicId || (clinicId ? clinicIdNumber || clinicId : undefined),
+        pet_id: petIdNumber || effectivePetId,
         order_type: "video_consult",
+        service_booking_id: serviceBookingId || undefined,
+        chat_room_token: serviceBookingPayload.chat_room_token,
+        context_token: serviceBookingPayload.context_token,
         call_session_id: normalizeText(resolvedCallSessionId) || undefined,
         channel_name: normalizeText(resolvedChannelName) || undefined,
       };
-      const finalVerifyPayload = Object.fromEntries(
-        Object.entries(verifyPayload).filter(
-          ([, value]) => value !== undefined && value !== null && value !== "",
-        ),
-      );
+      const finalVerifyPayload = stripEmpty(verifyPayload);
 
       const verifyRes = await fetch(`${apiBase}${endpoints.verifyPayment || ENDPOINTS.verifyPayment}`, {
         method: "POST",
         headers: getAuthHeaders(resolvedToken, {
           Accept: "application/json",
+          "Content-Type": "application/json",
         }),
         body: JSON.stringify(finalVerifyPayload),
       });
@@ -936,58 +1075,122 @@ export default function ConsultBookingFlow({
         throw new Error(verifyData?.message || verifyData?.error || "Payment verify nahi hua.");
       }
 
+      const callSession =
+        verifyData?.call_session ||
+        verifyData?.data?.call_session ||
+        verifyData?.data?.latest_call_session ||
+        verifyData?.latest_call_session ||
+        null;
+      if (callSession && typeof callSession === "object") {
+        try {
+          window.localStorage.setItem("latest_call_session", JSON.stringify(callSession));
+        } catch (_) {
+          // Success should not depend on storage.
+        }
+      }
+
+      let mediaUploadData = null;
+      if (mediaFiles.length) {
+        try {
+          const mediaForm = new FormData();
+          mediaForm.append("user_id", String(userIdNumber || resolvedUserId));
+          mediaForm.append("pet_id", String(petIdNumber || effectivePetId));
+          mediaForm.append("question", symptomText);
+          mediaForm.append("service_type", "video_consult");
+          mediaForm.append("file", mediaFiles[0]);
+          const mediaRes = await fetch(`${apiBase}${endpoints.mediaQuestion || ENDPOINTS.mediaQuestion}`, {
+            method: "POST",
+            headers: resolvedToken ? { Authorization: `Bearer ${resolvedToken}`, Accept: "application/json" } : { Accept: "application/json" },
+            body: mediaForm,
+          });
+          mediaUploadData = await readApiBody(mediaRes);
+          recordApiResponse("mediaUpload", mediaUploadData);
+        } catch (_) {
+          // Optional media sync does not block a verified consult.
+        }
+      }
+
       const successPayload = {
+        bookingType: "video_consult",
         doctorName: selectedDoctor.name,
         paymentId: razorpayResponse?.razorpay_payment_id,
         orderId,
         amount: payableAmountInr,
         issue: details.issue,
+        callSession,
+        petId: effectivePetId,
+        petName: details.petName,
         responses: {
           reportedSymptom: reportedSymptomData,
+          serviceBooking: serviceData,
           createOrder: createData,
           verifyPayment: verifyData,
+          mediaUpload: mediaUploadData,
         },
       };
 
       setSuccessState(successPayload);
       setShowPaymentSheet(false);
       setShowDetailsSheet(false);
+      try {
+        window.localStorage.setItem("snoutiq.lastBookingSuccess", JSON.stringify(successPayload));
+      } catch (_) {
+        // Success navigation does not depend on storage.
+      }
+      try {
+        await fetchPetOverview(effectivePetId, { forceRefresh: true });
+      } catch (_) {
+        // Timeline refresh is best effort.
+      }
 
       if (typeof onSuccess === "function") {
         onSuccess(successPayload);
       }
+      navigate("/appointment-thank-you", { replace: true, state: successPayload });
     } catch (error) {
-      setPaymentError(error?.message || "Payment failed. Please try again.");
+      if (paidRazorpayResponse?.razorpay_payment_id) {
+        try {
+          window.localStorage.setItem(
+            "snoutiq.pendingVideoConsultPayment",
+            JSON.stringify({
+              user_id: resolvedUserId,
+              pet_id: effectivePetId,
+              doctor_id: selectedDoctor?.doctorId || selectedDoctor?.id || "",
+              clinic_id: selectedDoctor?.clinicId || resolvedClinicId || "",
+              order_id: paidRazorpayResponse?.razorpay_order_id || paidOrderId,
+              payment_id: paidRazorpayResponse?.razorpay_payment_id,
+              amount: payableAmountInr,
+              timestamp: new Date().toISOString(),
+            }),
+          );
+        } catch (_) {
+          // User-facing error includes payment id.
+        }
+        setPaymentError(
+          `Payment successful, consult verification pending. Payment ID: ${paidRazorpayResponse.razorpay_payment_id}.`,
+        );
+        void showBookingWarning(
+          `Payment successful, consult verification pending. Payment ID: ${paidRazorpayResponse.razorpay_payment_id}.`,
+        );
+      } else {
+        setPaymentError(error?.message || "Payment failed. Please try again.");
+        void showBookingError(error?.message || "Payment failed. Please try again.");
+      }
     } finally {
       setCreateOrderLoading(false);
+      paymentInFlightRef.current = false;
     }
   };
 
-  const activeDoctorFee = selectedDoctor ? resolveDoctorFee(selectedDoctor, slot) : 0;
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
-          <div className="bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400 px-5 py-6 text-white sm:px-8">
-            <div className="max-w-3xl">
-              <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold tracking-wide">
-                CONSULT FLOW
-              </div>
-              <h1 className="mt-3 text-2xl font-bold sm:text-3xl">Doctor list → Details sheet → Payment flow</h1>
-              <p className="mt-2 text-sm text-blue-50 sm:text-base">
-                User pehle list dekhega, doctor choose karega, phir Razorpay-style bottom sheet me disease/details fill karega,
-                aur uske baad payment sheet se secure payment complete karega.
-              </p>
-            </div>
-          </div>
-
-          <div className="border-b border-slate-100 bg-slate-50 px-5 py-4 sm:px-8">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatPill>{loadingDoctors ? "Loading doctors..." : `${doctors.length} doctors available`}</StatPill>
-              <StatPill>{slot === "day" ? "Day pricing active" : "Night pricing active"}</StatPill>
-              <StatPill>Mobile-first bottom-sheet UX</StatPill>
-            </div>
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-5 py-4 sm:px-8">
+            <h1 className="text-xl font-bold sm:text-2xl">Start Video Consult</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {loadingDoctors ? "Loading doctors..." : `${doctors.length} doctors available`}
+            </p>
           </div>
 
           <div className="px-5 py-6 sm:px-8">
@@ -1038,7 +1241,6 @@ export default function ConsultBookingFlow({
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <h3 className="line-clamp-1 text-lg font-semibold text-slate-900">{doctor.name}</h3>
-                              <p className="mt-1 line-clamp-1 text-sm text-slate-500">{doctor.clinicName || "Clinic"}</p>
                             </div>
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -1054,7 +1256,7 @@ export default function ConsultBookingFlow({
                           <div className="mt-3 flex flex-wrap gap-2">
                             <StatPill>{doctor.specializations[0] || "General Vet"}</StatPill>
                             {doctor.experience > 0 ? <StatPill>{doctor.experience}+ yrs</StatPill> : null}
-                            {doctor.rating > 0 ? <StatPill>{doctor.rating.toFixed(1)} ★</StatPill> : null}
+                            {doctor.rating > 0 ? <StatPill>{doctor.rating.toFixed(1)} rating</StatPill> : null}
                           </div>
                         </div>
                       </div>
@@ -1064,7 +1266,6 @@ export default function ConsultBookingFlow({
                           <span className="text-sm text-slate-500">Consultation fee</span>
                           <span className="text-lg font-bold text-slate-900">{formatCurrency(displayFee)}</span>
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">{doctor.responseTime || "Usually responds quickly"}</div>
                       </div>
 
                       <button
@@ -1089,9 +1290,9 @@ export default function ConsultBookingFlow({
                 <div className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                   PAYMENT SUCCESS
                 </div>
-                <h2 className="mt-3 text-2xl font-bold text-slate-900">Consultation booked successfully</h2>
+                <h2 className="mt-3 text-2xl font-bold text-slate-900">Consult booked successfully</h2>
                 <p className="mt-2 text-sm text-slate-600">
-                  {successState.doctorName} ke saath booking ho gayi hai. Payment ID: {successState.paymentId || "Generated"}
+                  Doctor will connect shortly. Payment ID: {successState.paymentId || "Generated"}
                 </p>
               </div>
 
@@ -1101,16 +1302,6 @@ export default function ConsultBookingFlow({
                 <InfoRow label="Issue" value={successState.issue} />
               </div>
             </div>
-            {successState?.responses ? (
-              <details className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3">
-                <summary className="cursor-pointer text-sm font-semibold text-emerald-800">
-                  Full Backend Responses
-                </summary>
-                <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-white p-3 text-xs text-slate-700">
-                  {JSON.stringify(successState.responses, null, 2)}
-                </pre>
-              </details>
-            ) : null}
           </div>
         ) : null}
       </div>
@@ -1118,11 +1309,11 @@ export default function ConsultBookingFlow({
       <BottomSheet
         open={showDetailsSheet}
         onClose={() => setShowDetailsSheet(false)}
-        title="Tell us the issue"
+        title="Start Video Consult"
         subtitle={
           selectedDoctor
-            ? `${selectedDoctor.name} • Pay ${formatCurrency(payableAmountInr)}`
-            : "Fill details to continue"
+            ? `${selectedDoctor.name} - ${formatCurrency(payableAmountInr)}`
+            : "Describe symptoms"
         }
       >
         {selectedDoctor ? (
@@ -1138,13 +1329,12 @@ export default function ConsultBookingFlow({
                 )}
                 <div>
                   <div className="text-base font-semibold text-slate-900">{selectedDoctor.name}</div>
-                  <div className="text-sm text-slate-500">{selectedDoctor.clinicName}</div>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              <label className="block">
+              <label className="hidden">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Owner name</span>
                 <input
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500"
@@ -1154,7 +1344,7 @@ export default function ConsultBookingFlow({
                 />
               </label>
 
-              <label className="block">
+              <label className="hidden">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Mobile number</span>
                 <input
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500"
@@ -1164,7 +1354,7 @@ export default function ConsultBookingFlow({
                 />
               </label>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="hidden">
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Pet name</span>
                   <input
@@ -1190,17 +1380,7 @@ export default function ConsultBookingFlow({
               </div>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Pet age</span>
-                <input
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500"
-                  value={details.petAge}
-                  onChange={(e) => handleDetailChange("petAge", e.target.value)}
-                  placeholder="Example: 2 years"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Disease / issue</span>
+                <span className="mb-2 block text-sm font-medium text-slate-700">Describe symptoms</span>
                 <textarea
                   rows={4}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500"
@@ -1211,14 +1391,28 @@ export default function ConsultBookingFlow({
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Additional notes</span>
-                <textarea
-                  rows={3}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500"
-                  value={details.notes}
-                  onChange={(e) => handleDetailChange("notes", e.target.value)}
-                  placeholder="Optional notes"
+                <span className="mb-2 block text-sm font-medium text-slate-700">Upload image / report</span>
+                <input
+                  type="file"
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={(event) => setMediaFiles(Array.from(event.target.files || []))}
+                  className="block w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600"
                 />
+                {mediaFiles[0] ? (
+                  <div className="mt-2 text-xs font-medium text-slate-500">{mediaFiles[0].name}</div>
+                ) : null}
+              </label>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={details.consentGiven}
+                  onChange={(e) => handleDetailChange("consentGiven", e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
+                />
+                <span className="text-sm text-slate-700">
+                  I agree to proceed with this video consult booking.
+                </span>
               </label>
             </div>
 
@@ -1242,20 +1436,16 @@ export default function ConsultBookingFlow({
       <BottomSheet
         open={showPaymentSheet}
         onClose={() => setShowPaymentSheet(false)}
-        title="Confirm and pay"
-        subtitle={selectedDoctor ? `${selectedDoctor.name} • Secure Razorpay payment` : "Payment"}
+        title="Confirm consultation"
+        subtitle={selectedDoctor ? `${selectedDoctor.name} - Pay now` : "Payment"}
       >
         {selectedDoctor ? (
           <div className="space-y-4">
-            <div className="rounded-[24px] bg-gradient-to-r from-slate-900 to-slate-800 p-4 text-white">
+            <div className="rounded-[24px] bg-slate-900 p-4 text-white">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm text-slate-300">Payable amount</div>
                   <div className="mt-1 text-3xl font-bold">{formatCurrency(payableAmountInr)}</div>
-                  <div className="mt-2 text-sm text-slate-300">Doctor: {selectedDoctor.name}</div>
-                </div>
-                <div className="rounded-2xl bg-white/10 px-3 py-2 text-xs font-semibold text-white/90">
-                  {slot === "day" ? "Day slot" : "Night slot"}
                 </div>
               </div>
             </div>
@@ -1263,7 +1453,6 @@ export default function ConsultBookingFlow({
             <div className="rounded-[24px] border border-slate-200 p-4">
               <div className="text-sm font-semibold text-slate-900">Booking summary</div>
               <div className="mt-3 divide-y divide-slate-100">
-                <InfoRow label="Pet" value={`${details.petName} • ${details.petType}`} />
                 <InfoRow label="Issue" value={details.issue} />
                 <InfoRow label="Consultation fee" value={formatCurrency(consultationAmount)} />
                 <InfoRow label="Service fee" value={formatCurrency(serviceAmount)} />
@@ -1273,67 +1462,8 @@ export default function ConsultBookingFlow({
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 p-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Coupon code</span>
-                <input
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="Enter coupon code"
-                />
-              </label>
-              {couponMessage ? <div className="mt-2 text-sm text-emerald-700">{couponMessage}</div> : null}
-            </div>
-
-            <div className="rounded-[24px] border border-slate-200 p-4">
-              <label className="flex cursor-pointer items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Need GST invoice?</div>
-                  <div className="text-xs text-slate-500">Enable only if invoice required hai.</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={gstEnabled}
-                  onChange={(e) => setGstEnabled(e.target.checked)}
-                  className="h-5 w-5 rounded border-slate-300 text-blue-600"
-                />
-              </label>
-
-              {gstEnabled ? (
-                <div className="mt-4">
-                  <input
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 uppercase outline-none transition focus:border-blue-500"
-                    value={gstNumber}
-                    onChange={(e) => setGstNumber(e.target.value.toUpperCase().replace(/\s+/g, ""))}
-                    placeholder="Enter GST number"
-                    maxLength={15}
-                  />
-                </div>
-              ) : null}
-            </div>
-
             {paymentError ? (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{paymentError}</div>
-            ) : null}
-
-            {reportedSymptomMessage ? (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                {reportedSymptomMessage}
-              </div>
-            ) : null}
-
-            {apiResponses.reportedSymptom ||
-            apiResponses.createOrder ||
-            apiResponses.verifyPayment ? (
-              <details className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
-                <summary className="cursor-pointer text-sm font-semibold text-slate-800">
-                  Full Backend Responses
-                </summary>
-                <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-white p-3 text-xs text-slate-700">
-                  {JSON.stringify(apiResponses, null, 2)}
-                </pre>
-              </details>
             ) : null}
 
             <div className="flex gap-3 pt-1">

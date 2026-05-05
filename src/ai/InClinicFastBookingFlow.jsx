@@ -1,17 +1,24 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { readAiAuthState } from "./AiAuth";
 import { IN_CLINIC_PRICING } from "../newflow/askBooking/inClinicFlowShared";
+import { confirmPaymentStart, showBookingError, showBookingWarning } from "./booking/bookingAlerts";
+import { fetchPetOverview } from "./petOverviewService";
 
 const API_BASE = "https://snoutiq.com/backend/api";
 
 const DEFAULT_ENDPOINTS = {
-  clinics: "/nearby-plus-featured",
+  clinics: "/users/nearby-clinics",
+  clinicFallback: "/nearby-plus-featured",
   clinicDoctors: null,
   clinicAvailability: "/clinics/:clinicId/doctor-availability?service_type=in_clinic&date=:date",
+  doctorSlotsSummary: "/doctors/:doctorId/slots/summary?date=:date&service_type=in_clinic",
   serviceBookings: "/chat/service-bookings",
   createOrder: "/create-order",
   verifyPayment: "/rzp/verify",
+  submitAppointment: "/appointments/submit",
+  checkByPayment: "/appointments/check-by-payment",
+  mediaQuestion: "/chat/dog-disease/question",
 };
 
 const PAYMENT_PHASES = Object.freeze({
@@ -75,6 +82,16 @@ function formatCurrency(value) {
 function toInteger(value, fallback = 0) {
   const amount = Math.round(Number(value));
   return Number.isFinite(amount) ? amount : fallback;
+}
+
+function parsePositiveId(...values) {
+  for (const value of values) {
+    const text = normalizeText(value);
+    if (!text) continue;
+    const parsed = Number.parseInt(text, 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
 }
 
 function pickFirst(...values) {
@@ -258,6 +275,13 @@ function normalizeClinicRecord(clinic) {
     address: resolveClinicAddress(merged),
     distance: resolveDistance(merged),
     image: normalizeImage(merged?.image || merged?.clinic_image || merged?.photo || merged?.banner),
+    mobile: normalizePhone(merged?.clinic_mobile || merged?.mobile || merged?.phone || ""),
+    email: normalizeText(merged?.clinic_email || merged?.email || ""),
+    city: normalizeText(merged?.clinic_city || merged?.city || ""),
+    pincode: normalizeText(merged?.clinic_pincode || merged?.pincode || ""),
+    lat: pickFirst(merged?.clinic_lat, merged?.lat, merged?.latitude),
+    lng: pickFirst(merged?.clinic_lng, merged?.lng, merged?.longitude),
+    placeId: normalizeText(merged?.clinic_place_id || merged?.place_id || merged?.placeId || ""),
     doctors,
   };
 }
@@ -344,6 +368,12 @@ function buildDateStrip(total = 14) {
 function normalizeSlots(payload) {
   const raw = Array.isArray(payload?.data?.slots)
     ? payload.data.slots
+    : Array.isArray(payload?.data?.available_slots)
+      ? payload.data.available_slots
+      : Array.isArray(payload?.data?.summary?.slots)
+        ? payload.data.summary.slots
+        : Array.isArray(payload?.available_slots)
+          ? payload.available_slots
     : Array.isArray(payload?.slots)
       ? payload.slots
       : Array.isArray(payload?.data)
@@ -373,6 +403,64 @@ function normalizeSlots(payload) {
       };
     })
     .filter(Boolean);
+}
+
+function normalizeDoctorsFromAvailability(payload, clinic) {
+  const raw = Array.isArray(payload?.data?.doctors)
+    ? payload.data.doctors
+    : Array.isArray(payload?.doctors)
+      ? payload.doctors
+      : Array.isArray(payload?.data?.availability)
+        ? payload.data.availability
+        : Array.isArray(payload?.availability)
+          ? payload.availability
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : [];
+
+  const seen = new Set();
+  return raw
+    .map((item) => normalizeDoctorRecord(item?.doctor || item, clinic))
+    .filter((doctor) => {
+      if (!doctor?.id || seen.has(doctor.id)) return false;
+      seen.add(doctor.id);
+      return true;
+    });
+}
+
+function buildStaticSlots(dateValue) {
+  const selected = parseDate(dateValue);
+  const todayIso = toDateOnly(new Date());
+  const selectedIso = toDateOnly(selected || new Date());
+  const now = new Date();
+  const minTodayTime = new Date(now.getTime() + 90 * 60 * 1000);
+
+  return Array.from({ length: 19 }, (_, index) => {
+    const hour = 10 + Math.floor(index / 2);
+    const minute = index % 2 === 0 ? 0 : 30;
+    return { hour, minute };
+  })
+    .filter(({ hour, minute }) => hour < 19 || (hour === 19 && minute === 0))
+    .filter(({ hour, minute }) => {
+      if (selectedIso !== todayIso) return true;
+      const slotDate = new Date(now);
+      slotDate.setHours(hour, minute, 0, 0);
+      return slotDate >= minTodayTime;
+    })
+    .map(({ hour, minute }) => {
+      const label = new Date(1970, 0, 1, hour, minute).toLocaleTimeString("en-IN", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      return {
+        id: `fallback-${hour}-${minute}`,
+        label,
+        value: label,
+        available: true,
+        fallback: true,
+      };
+    });
 }
 
 function StepCard({ step, title, subtitle, open, onEdit, summary, children }) {
@@ -451,6 +539,10 @@ function buildAvailabilityUrl(template, clinicId, date) {
   return template.replace(":clinicId", encodeURIComponent(clinicId)).replace(":date", encodeURIComponent(date));
 }
 
+function buildDoctorSlotsUrl(template, doctorId, date) {
+  return template.replace(":doctorId", encodeURIComponent(doctorId)).replace(":date", encodeURIComponent(date));
+}
+
 function loadRazorpayScript() {
   return new Promise((resolve) => {
     if (window.Razorpay) {
@@ -483,6 +575,12 @@ export default function InClinicFastBookingFlow({
   onSuccess,
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const paymentInFlightRef = useRef(false);
+  const effectiveEndpoints = useMemo(
+    () => ({ ...DEFAULT_ENDPOINTS, ...(endpoints || {}) }),
+    [endpoints],
+  );
   const routeState =
     location?.state && typeof location.state === "object" ? location.state : {};
   const authState = useMemo(() => readAiAuthState(), []);
@@ -532,6 +630,18 @@ export default function InClinicFastBookingFlow({
       routeState?.pet_id,
       routeState?.prescriptionPrefill?.petId,
     ],
+  );
+  const [fallbackPet, setFallbackPet] = useState(null);
+  const effectivePetId = useMemo(
+    () =>
+      normalizeText(
+        pickFirst(
+          resolvedPetId,
+          fallbackPet?.id,
+          fallbackPet?.pet_id,
+        ),
+      ),
+    [fallbackPet, resolvedPetId],
   );
   const requestedClinicId = useMemo(
     () =>
@@ -602,6 +712,7 @@ export default function InClinicFastBookingFlow({
   const [clinics, setClinics] = useState([]);
   const [loadingClinics, setLoadingClinics] = useState(true);
   const [clinicError, setClinicError] = useState("");
+  const [locationUpdating, setLocationUpdating] = useState(false);
 
   const [selectedClinic, setSelectedClinic] = useState(null);
   const [doctors, setDoctors] = useState([]);
@@ -617,11 +728,14 @@ export default function InClinicFastBookingFlow({
   const [localError, setLocalError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [successState, setSuccessState] = useState(null);
-  const [apiResponses, setApiResponses] = useState({
+  const [, setApiResponses] = useState({
     reportedSymptom: null,
     serviceBooking: null,
     createOrder: null,
     verifyPayment: null,
+    appointmentSubmit: null,
+    mediaUpload: null,
+    recoveryCheck: null,
   });
 
   const [form, setForm] = useState({
@@ -667,6 +781,51 @@ export default function InClinicFastBookingFlow({
   const paymentBusy = paymentPhase !== PAYMENT_PHASES.idle;
 
   useEffect(() => {
+    if (!resolvedUserId || effectivePetId) return;
+    let active = true;
+
+    async function fetchPets() {
+      try {
+        const response = await fetch(`${apiBase}/users/${encodeURIComponent(resolvedUserId)}/pets`, {
+          method: "GET",
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+          }),
+        });
+        const data = await readApiBody(response);
+        if (!response.ok) return;
+        const pets = Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.pets)
+            ? data.pets
+            : Array.isArray(data)
+              ? data
+              : [];
+        const pet = pets[0] || null;
+        if (!active || !pet) return;
+        setFallbackPet(pet);
+        setForm((current) => ({
+          ...current,
+          petName:
+            current.petName ||
+            normalizeText(pickFirst(pet?.name, pet?.pet_name)),
+          petType:
+            current.petType ||
+            normalizeText(pickFirst(pet?.pet_type, pet?.species, pet?.type)) ||
+            "dog",
+        }));
+      } catch (_) {
+        // Validation will surface missing pet context before payment.
+      }
+    }
+
+    fetchPets();
+    return () => {
+      active = false;
+    };
+  }, [apiBase, effectivePetId, resolvedToken, resolvedUserId]);
+
+  useEffect(() => {
     let active = true;
 
     async function fetchClinics() {
@@ -675,20 +834,27 @@ export default function InClinicFastBookingFlow({
       setStatusMessage("");
 
       try {
-        const clinicsBasePath = `${apiBase}${endpoints.clinics}`;
-        const querySeparator = clinicsBasePath.includes("?") ? "&" : "?";
-        const clinicsUrl = resolvedUserId
-          ? `${clinicsBasePath}${querySeparator}user_id=${encodeURIComponent(resolvedUserId)}`
-          : clinicsBasePath;
+        const fetchClinicList = async (path) => {
+          const clinicsBasePath = `${apiBase}${path}`;
+          const querySeparator = clinicsBasePath.includes("?") ? "&" : "?";
+          const clinicsUrl = resolvedUserId
+            ? `${clinicsBasePath}${querySeparator}user_id=${encodeURIComponent(resolvedUserId)}`
+            : clinicsBasePath;
 
-        const response = await fetch(clinicsUrl, {
-          method: "GET",
-          headers: getHeaders(resolvedToken, {
-            Accept: "application/json",
-          }),
-        });
+          const response = await fetch(clinicsUrl, {
+            method: "GET",
+            headers: getHeaders(resolvedToken, {
+              Accept: "application/json",
+            }),
+          });
+          const data = await readApiBody(response);
+          return { response, data };
+        };
 
-        const data = await readApiBody(response);
+        let { response, data } = await fetchClinicList(effectiveEndpoints.clinics);
+        if (!response.ok && effectiveEndpoints.clinicFallback) {
+          ({ response, data } = await fetchClinicList(effectiveEndpoints.clinicFallback));
+        }
 
         if (!response.ok) {
           throw new Error(data?.message || "Clinics load nahi hue.");
@@ -726,18 +892,86 @@ export default function InClinicFastBookingFlow({
     };
   }, [
     apiBase,
-    endpoints.clinics,
+    effectiveEndpoints.clinicFallback,
+    effectiveEndpoints.clinics,
     requestedClinicId,
     resolvedToken,
     resolvedUserId,
     suggestedClinicFromRoute,
   ]);
 
+  async function refreshClinics() {
+    setLoadingClinics(true);
+    setClinicError("");
+    try {
+      const clinicsBasePath = `${apiBase}${effectiveEndpoints.clinics}`;
+      const querySeparator = clinicsBasePath.includes("?") ? "&" : "?";
+      const clinicsUrl = resolvedUserId
+        ? `${clinicsBasePath}${querySeparator}user_id=${encodeURIComponent(resolvedUserId)}`
+        : clinicsBasePath;
+      const response = await fetch(clinicsUrl, {
+          method: "GET",
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+          }),
+        });
+      const data = await readApiBody(response);
+      if (!response.ok) throw new Error(data?.message || "Clinics load nahi hue.");
+      const normalized = flattenClinics(data);
+      setClinics(normalized);
+      if (normalized.length && !selectedClinic) setSelectedClinic(normalized[0]);
+    } catch (error) {
+      setClinicError(error?.message || "Clinics load nahi hue.");
+    } finally {
+      setLoadingClinics(false);
+    }
+  }
+
+  async function handleUseCurrentLocation() {
+    if (!resolvedUserId || !navigator.geolocation || locationUpdating) return;
+    setLocationUpdating(true);
+    setLocalError("");
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 5 * 60 * 1000,
+        });
+      });
+
+      const lat = Number(position.coords.latitude.toFixed(6));
+      const lng = Number(position.coords.longitude.toFixed(6));
+      const response = await fetch(`${apiBase}/users/location`, {
+        method: "POST",
+        headers: getHeaders(resolvedToken, {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          user_id: resolvedUserId,
+          location: "Current location",
+          lat,
+          lng,
+        }),
+      });
+      const data = await readApiBody(response);
+      if (!response.ok) throw new Error(data?.message || "Location update failed.");
+      await refreshClinics();
+      setStatusMessage("Current location updated.");
+    } catch (error) {
+      setLocalError(error?.message || "Location permission is off.");
+    } finally {
+      setLocationUpdating(false);
+    }
+  }
+
   useEffect(() => {
     if (!selectedClinic) return;
 
     async function fetchDoctorsIfNeeded() {
-      if (!endpoints.clinicDoctors) {
+      if (!effectiveEndpoints.clinicDoctors) {
         const doctorList = flattenDoctorsFromClinic(selectedClinic);
         setDoctors(doctorList);
         if (requestedDoctorId) {
@@ -754,7 +988,7 @@ export default function InClinicFastBookingFlow({
 
       try {
         const clinicId = resolveClinicId(selectedClinic);
-        const url = `${apiBase}${endpoints.clinicDoctors.replace(":clinicId", clinicId)}`;
+        const url = `${apiBase}${effectiveEndpoints.clinicDoctors.replace(":clinicId", clinicId)}`;
         const response = await fetch(url, {
           headers: getHeaders(resolvedToken, {
             Accept: "application/json",
@@ -795,7 +1029,7 @@ export default function InClinicFastBookingFlow({
     setSelectedTime("");
     setSlots([]);
     fetchDoctorsIfNeeded();
-  }, [apiBase, endpoints.clinicDoctors, requestedDoctorId, resolvedToken, selectedClinic]);
+  }, [apiBase, effectiveEndpoints.clinicDoctors, requestedDoctorId, resolvedToken, selectedClinic]);
 
   useEffect(() => {
     if (!selectedClinic || !selectedDate) return;
@@ -808,7 +1042,7 @@ export default function InClinicFastBookingFlow({
       setSlotsLoading(true);
       setSelectedTime("");
       try {
-        const url = `${apiBase}${buildAvailabilityUrl(endpoints.clinicAvailability, clinicId, selectedDate)}`;
+        const url = `${apiBase}${buildAvailabilityUrl(effectiveEndpoints.clinicAvailability, clinicId, selectedDate)}`;
         const response = await fetch(url, {
           method: "GET",
           headers: getHeaders(resolvedToken, {
@@ -821,13 +1055,23 @@ export default function InClinicFastBookingFlow({
           throw new Error(data?.message || "Slots load nahi hue.");
         }
 
+        const availabilityDoctors = normalizeDoctorsFromAvailability(data, selectedClinic);
+        if (availabilityDoctors.length) {
+          setDoctors(availabilityDoctors);
+          setSelectedDoctor((current) =>
+            current && availabilityDoctors.some((doctor) => doctor.id === current.id)
+              ? current
+              : availabilityDoctors[0],
+          );
+        }
+
         const normalizedSlots = normalizeSlots(data);
         if (!active) return;
-        setSlots(normalizedSlots);
+        setSlots(normalizedSlots.length ? normalizedSlots : buildStaticSlots(selectedDate));
       } catch (error) {
         if (!active) return;
         setLocalError(error?.message || "Slots load nahi hue.");
-        setSlots([]);
+        setSlots(buildStaticSlots(selectedDate));
       } finally {
         if (active) setSlotsLoading(false);
       }
@@ -838,11 +1082,42 @@ export default function InClinicFastBookingFlow({
     return () => {
       active = false;
     };
-  }, [apiBase, endpoints.clinicAvailability, resolvedToken, selectedClinic, selectedDate]);
+  }, [apiBase, effectiveEndpoints.clinicAvailability, resolvedToken, selectedClinic, selectedDate]);
+
+  useEffect(() => {
+    if (!selectedDoctor || !selectedDate || !effectiveEndpoints.doctorSlotsSummary) return;
+    const doctorId = resolveDoctorId(selectedDoctor);
+    if (!doctorId) return;
+
+    let active = true;
+
+    async function fetchDoctorSummary() {
+      try {
+        const url = `${apiBase}${buildDoctorSlotsUrl(effectiveEndpoints.doctorSlotsSummary, doctorId, selectedDate)}`;
+        const response = await fetch(url, {
+          method: "GET",
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+          }),
+        });
+        const data = await readApiBody(response);
+        if (!response.ok) return;
+        const summarySlots = normalizeSlots(data);
+        if (active && summarySlots.length) setSlots(summarySlots);
+      } catch (_) {
+        // Clinic availability remains the source of truth if summary is unavailable.
+      }
+    }
+
+    fetchDoctorSummary();
+    return () => {
+      active = false;
+    };
+  }, [apiBase, effectiveEndpoints.doctorSlotsSummary, resolvedToken, selectedDate, selectedDoctor]);
 
   const clinicSummary = useMemo(() => {
     if (!selectedClinic) return "No clinic selected";
-    return `${selectedClinic.name}${selectedClinic.distance ? ` • ${selectedClinic.distance}` : ""}`;
+    return selectedClinic.name;
   }, [selectedClinic]);
 
   const doctorSummary = useMemo(() => {
@@ -896,17 +1171,12 @@ export default function InClinicFastBookingFlow({
   }
 
   function validateBeforePayment() {
-    if (!resolvedUserId || !resolvedPetId) {
+    if (!resolvedUserId || !effectivePetId) {
       return "User/Pet context missing hai. Ask flow se dubara open kijiye.";
     }
     if (!selectedClinic) return "Please select a clinic.";
     if (!selectedDoctor) return "Please select a doctor.";
     if (!selectedDate || !selectedTime) return "Please select date and slot.";
-    if (!normalizeText(form.ownerName)) return "Owner name required hai.";
-    if (normalizePhone(form.phone).replace(/\D/g, "").length < 10) {
-      return "Valid phone number required hai.";
-    }
-    if (!normalizeText(form.petName)) return "Pet name required hai.";
     if (!normalizeText(form.symptoms)) return "Please describe your pet symptoms.";
     if (!form.consentGiven) return "Please acknowledge the consent checkbox before payment.";
     return "";
@@ -942,13 +1212,24 @@ export default function InClinicFastBookingFlow({
   }
 
   async function handlePayNow() {
+    if (paymentInFlightRef.current) return;
+
     const validationError = validateBeforePayment();
     if (validationError) {
       setLocalError(validationError);
+      void showBookingError(validationError, "Check booking details");
       setExpandedStep(4);
       return;
     }
 
+    const confirmation = await confirmPaymentStart({
+      amount: payableAmount,
+      title: "Continue to payment",
+      text: `Pay ${formatCurrency(payableAmount)} for clinic visit.`,
+    });
+    if (!confirmation.isConfirmed) return;
+
+    paymentInFlightRef.current = true;
     setLocalError("");
     setStatusMessage("");
     setApiResponses({
@@ -956,20 +1237,22 @@ export default function InClinicFastBookingFlow({
       serviceBooking: null,
       createOrder: null,
       verifyPayment: null,
+      appointmentSubmit: null,
+      mediaUpload: null,
+      recoveryCheck: null,
     });
     setPaymentPhase(PAYMENT_PHASES.submitting);
 
+    let paidRazorpayResponse = null;
+    let paidOrderId = "";
+
     try {
       const userIdNumber = toInteger(resolvedUserId, 0);
-      const petIdNumber = toInteger(resolvedPetId, 0);
-      const clinicIdText = normalizeText(resolveClinicId(selectedClinic) || requestedClinicId);
-      const doctorIdText = normalizeText(resolveDoctorId(selectedDoctor) || requestedDoctorId);
-      const clinicIdNumber = toInteger(clinicIdText, 0);
-      const doctorIdNumber = toInteger(doctorIdText, 0);
+      const petIdNumber = toInteger(effectivePetId, 0);
       const symptomText = normalizeText(form.symptoms);
 
       const symptomRes = await fetch(
-        `${apiBase}/users/${encodeURIComponent(resolvedUserId)}/pets/${encodeURIComponent(resolvedPetId)}/reported-symptom`,
+        `${apiBase}/users/${encodeURIComponent(resolvedUserId)}/pets/${encodeURIComponent(effectivePetId)}/reported-symptom`,
         {
           method: "PUT",
           headers: getHeaders(resolvedToken, {
@@ -1002,7 +1285,7 @@ export default function InClinicFastBookingFlow({
 
       const serviceBookingPayload = stripEmpty({
         user_id: userIdNumber || resolvedUserId,
-        pet_id: petIdNumber || resolvedPetId,
+        pet_id: petIdNumber || effectivePetId,
         clinic_name: normalizeText(
           pickFirst(
             selectedClinic?.name,
@@ -1108,7 +1391,7 @@ export default function InClinicFastBookingFlow({
       });
 
       let serviceRes = await fetch(
-        `${apiBase}${endpoints.serviceBookings || DEFAULT_ENDPOINTS.serviceBookings}`,
+        `${apiBase}${effectiveEndpoints.serviceBookings || DEFAULT_ENDPOINTS.serviceBookings}`,
         {
           method: "POST",
           headers: getHeaders(resolvedToken, {
@@ -1128,7 +1411,7 @@ export default function InClinicFastBookingFlow({
         const retryPayload = { ...serviceBookingPayload };
         delete retryPayload.clinic_place_id;
         const retryRes = await fetch(
-          `${apiBase}${endpoints.serviceBookings || DEFAULT_ENDPOINTS.serviceBookings}`,
+          `${apiBase}${effectiveEndpoints.serviceBookings || DEFAULT_ENDPOINTS.serviceBookings}`,
           {
             method: "POST",
             headers: getHeaders(resolvedToken, {
@@ -1155,27 +1438,42 @@ export default function InClinicFastBookingFlow({
           typeof serviceData === "object" &&
           serviceData.success === false)
       ) {
-        setStatusMessage(
-          normalizeText(
-            serviceData?.message ||
-              serviceData?.error ||
-              "Service booking sync failed, but payment can continue.",
-          ) || "Service booking sync failed, but payment can continue.",
+        throw new Error(
+          serviceData?.message ||
+            serviceData?.error ||
+            "Service booking failed. Payment cannot continue.",
         );
-      } else {
-        setStatusMessage("Service booking created. Opening payment...");
       }
+
+      const createdClinicId = parsePositiveId(
+        serviceData?.data?.clinic_id,
+        serviceData?.clinic_id,
+        serviceData?.booking?.clinic_id,
+        serviceData?.data?.booking?.clinic_id,
+      );
+      const createdDoctorId = parsePositiveId(
+        serviceData?.data?.doctor_id,
+        serviceData?.doctor_id,
+        serviceData?.booking?.doctor_id,
+        serviceData?.data?.booking?.doctor_id,
+      );
+
+      if (!createdClinicId || !createdDoctorId) {
+        throw new Error("Service booking response me clinic_id/doctor_id missing hai.");
+      }
+
+      setStatusMessage("Service booking created. Opening payment...");
 
       const createPayload = stripEmpty({
         amount: IN_CLINIC_PRICING.totalAmount,
         order_type: "appointment",
         user_id: userIdNumber || resolvedUserId,
-        doctor_id: doctorIdNumber || doctorIdText,
-        clinic_id: clinicIdNumber || clinicIdText,
-        pet_id: petIdNumber || resolvedPetId,
+        doctor_id: createdDoctorId,
+        clinic_id: createdClinicId,
+        pet_id: petIdNumber || effectivePetId,
       });
 
-      const createRes = await fetch(`${apiBase}${endpoints.createOrder}`, {
+      const createRes = await fetch(`${apiBase}${effectiveEndpoints.createOrder}`, {
         method: "POST",
         headers: getHeaders(resolvedToken, {
           Accept: "application/json",
@@ -1204,6 +1502,8 @@ export default function InClinicFastBookingFlow({
         orderId,
         amountInPaise,
       });
+      paidRazorpayResponse = razorpayResponse;
+      paidOrderId = orderId;
 
       setPaymentPhase(PAYMENT_PHASES.redirecting);
 
@@ -1213,15 +1513,15 @@ export default function InClinicFastBookingFlow({
         razorpay_signature: razorpayResponse?.razorpay_signature,
         order_type: "appointment",
         user_id: userIdNumber || resolvedUserId,
-        pet_id: petIdNumber || resolvedPetId,
-        clinic_id: clinicIdNumber || clinicIdText,
-        doctor_id: doctorIdNumber || doctorIdText,
+        pet_id: petIdNumber || effectivePetId,
+        clinic_id: createdClinicId,
+        doctor_id: createdDoctorId,
         appointment_date: selectedDate,
         appointment_time: parseTimeForApi(selectedTime),
       };
       const finalVerifyPayload = stripEmpty(verifyPayload);
 
-      const verifyRes = await fetch(`${apiBase}${endpoints.verifyPayment}`, {
+      const verifyRes = await fetch(`${apiBase}${effectiveEndpoints.verifyPayment}`, {
         method: "POST",
         headers: getHeaders(resolvedToken, {
           Accept: "application/json",
@@ -1236,61 +1536,252 @@ export default function InClinicFastBookingFlow({
         throw new Error(verifyData?.message || verifyData?.error || "Payment verify nahi hua.");
       }
 
+      const appointmentPayload = stripEmpty({
+        user_id: userIdNumber || resolvedUserId,
+        pet_id: petIdNumber || effectivePetId,
+        clinic_id: createdClinicId,
+        doctor_id: createdDoctorId,
+        service_type: "in_clinic",
+        patient_name: normalizeText(form.ownerName),
+        patient_phone: normalizePhone(form.phone).replace(/\D/g, "").slice(-10),
+        patient_email: normalizeText(form.email),
+        pet_name: normalizeText(form.petName),
+        pet_type: normalizeText(form.petType),
+        date: selectedDate,
+        appointment_date: selectedDate,
+        time_slot: parseTimeForApi(selectedTime),
+        appointment_time: parseTimeForApi(selectedTime),
+        amount: IN_CLINIC_PRICING.totalAmount,
+        currency: IN_CLINIC_PRICING.currency || "INR",
+        order_type: "appointment",
+        payment_status: "paid",
+        razorpay_order_id: razorpayResponse?.razorpay_order_id || orderId,
+        razorpay_payment_id: razorpayResponse?.razorpay_payment_id,
+        razorpay_signature: razorpayResponse?.razorpay_signature,
+        payment_id: razorpayResponse?.razorpay_payment_id,
+        notes: symptomText,
+        symptoms: symptomText,
+        pricing_original_amount: IN_CLINIC_PRICING.originalAmount,
+        pricing_discount_amount: IN_CLINIC_PRICING.discountAmount,
+        pricing_discounted_amount: IN_CLINIC_PRICING.discountedAmount,
+        pricing_gst_amount: IN_CLINIC_PRICING.gstAmount,
+        pricing_total_amount: IN_CLINIC_PRICING.totalAmount,
+        payment_verified: true,
+      });
+
+      let appointmentData = null;
+      try {
+        const appointmentRes = await fetch(`${apiBase}${effectiveEndpoints.submitAppointment}`, {
+          method: "POST",
+          headers: getHeaders(resolvedToken, {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(appointmentPayload),
+        });
+        appointmentData = await readApiBody(appointmentRes);
+        recordApiResponse("appointmentSubmit", appointmentData);
+
+        if (
+          !appointmentRes.ok ||
+          (appointmentData &&
+            typeof appointmentData === "object" &&
+            appointmentData.success === false &&
+            appointmentData.status !== "success")
+        ) {
+          throw new Error(
+            appointmentData?.message ||
+              appointmentData?.error ||
+              "Appointment submit nahi hua.",
+          );
+        }
+      } catch (appointmentError) {
+        const recoveryPayload = stripEmpty({
+          payment_id: razorpayResponse?.razorpay_payment_id,
+          order_id: razorpayResponse?.razorpay_order_id || orderId,
+          user_id: userIdNumber || resolvedUserId,
+          pet_id: petIdNumber || effectivePetId,
+          clinic_id: createdClinicId,
+          doctor_id: createdDoctorId,
+          appointment_date: selectedDate,
+          appointment_time: parseTimeForApi(selectedTime),
+          amount: IN_CLINIC_PRICING.totalAmount,
+          timestamp: new Date().toISOString(),
+        });
+
+        try {
+          window.localStorage.setItem(
+            "snoutiq_pending_inclinic_appointment_recovery",
+            JSON.stringify(recoveryPayload),
+          );
+        } catch (_) {
+          // Recovery API still runs if storage is unavailable.
+        }
+
+        try {
+          const recoveryRes = await fetch(`${apiBase}${effectiveEndpoints.checkByPayment}`, {
+            method: "POST",
+            headers: getHeaders(resolvedToken, {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            }),
+            body: JSON.stringify(recoveryPayload),
+          });
+          const recoveryData = await readApiBody(recoveryRes);
+          recordApiResponse("recoveryCheck", recoveryData);
+        } catch (_) {
+          // User-facing error below includes payment ID for manual recovery.
+        }
+
+        throw new Error(
+          `Payment successful, appointment verification pending. Payment ID: ${razorpayResponse?.razorpay_payment_id || "N/A"}. We are verifying your appointment.`,
+        );
+      }
+
+      let mediaUploadData = null;
+      if (mediaFiles.length) {
+        try {
+          const mediaForm = new FormData();
+          mediaForm.append("user_id", String(userIdNumber || resolvedUserId));
+          mediaForm.append("pet_id", String(petIdNumber || effectivePetId));
+          mediaForm.append("question", symptomText);
+          mediaForm.append("service_type", "in_clinic");
+          mediaForm.append("appointment_date", selectedDate);
+          mediaForm.append("appointment_time", parseTimeForApi(selectedTime));
+          mediaForm.append("file", mediaFiles[0]);
+          const mediaRes = await fetch(`${apiBase}${effectiveEndpoints.mediaQuestion}`, {
+            method: "POST",
+            headers: getHeaders(resolvedToken, {
+              Accept: "application/json",
+            }),
+            body: mediaForm,
+          });
+          mediaUploadData = await readApiBody(mediaRes);
+          recordApiResponse("mediaUpload", mediaUploadData);
+          if (!mediaRes.ok) {
+            setStatusMessage("Appointment booked. Media upload will be synced later.");
+          }
+        } catch (_) {
+          setStatusMessage("Appointment booked. Media upload will be synced later.");
+        }
+      }
+
       const successPayload = {
-        bookingId: verifyData?.appointment?.id || verifyData?.id || createData?.appointment?.id || "N/A",
+        bookingType: "in_clinic",
+        bookingId:
+          appointmentData?.data?.appointment?.id ||
+          appointmentData?.data?.appointment_id ||
+          appointmentData?.appointment_id ||
+          appointmentData?.id ||
+          verifyData?.appointment?.id ||
+          "N/A",
         clinicName: selectedClinic.name,
         doctorName: selectedDoctor.name,
         appointmentDate: selectedDate,
         appointmentTime: selectedTime,
         paymentId: razorpayResponse?.razorpay_payment_id,
         amount: payableAmount,
+        clinicId: createdClinicId,
+        doctorId: createdDoctorId,
+        petId: effectivePetId,
+        petName: form.petName,
+        date: selectedDate,
+        time: selectedTime,
         responses: {
           reportedSymptom: symptomData,
           serviceBooking: serviceData,
           createOrder: createData,
           verifyPayment: verifyData,
+          appointmentSubmit: appointmentData,
+          mediaUpload: mediaUploadData,
         },
       };
 
       setSuccessState(successPayload);
       setPaymentPhase(PAYMENT_PHASES.idle);
 
+      try {
+        window.localStorage.setItem("snoutiq.lastBookingSuccess", JSON.stringify(successPayload));
+      } catch (_) {
+        // Success navigation does not depend on storage.
+      }
+      try {
+        await fetchPetOverview(effectivePetId, { forceRefresh: true });
+      } catch (_) {
+        // Timeline refresh is best effort.
+      }
+
       if (typeof onSuccess === "function") {
         onSuccess(successPayload);
       }
+      navigate("/appointment-thank-you", { replace: true, state: successPayload });
     } catch (error) {
       setPaymentPhase(PAYMENT_PHASES.idle);
-      setLocalError(error?.message || "Payment failed. Please try again.");
+      const message = error?.message || "Payment failed. Please try again.";
+      setLocalError(message);
+      if (paidRazorpayResponse?.razorpay_payment_id) {
+        try {
+          window.localStorage.setItem(
+            "snoutiq.pendingInClinicPayment",
+            JSON.stringify({
+              user_id: resolvedUserId,
+              pet_id: effectivePetId,
+              order_id: paidRazorpayResponse?.razorpay_order_id || paidOrderId,
+              payment_id: paidRazorpayResponse?.razorpay_payment_id,
+              amount: IN_CLINIC_PRICING.totalAmount,
+              timestamp: new Date().toISOString(),
+            }),
+          );
+        } catch (_) {
+          // Alert still includes payment id.
+        }
+        void showBookingWarning(message);
+      } else {
+        void showBookingError(message);
+      }
+    } finally {
+      paymentInFlightRef.current = false;
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
-          <div className="bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500 px-5 py-6 text-white sm:px-8">
-            <div className="max-w-3xl">
-              <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold tracking-wide">
-                IN-CLINIC BOOKING
+    <div className="min-h-screen bg-slate-50 pb-28 text-slate-900 lg:pb-0">
+      <div className="mx-auto max-w-5xl px-3 py-4 sm:px-5 lg:px-6">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-bold sm:text-2xl">Book Clinic Visit</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  Snoutiq AI recommends an in-clinic visit for this case.
+                </p>
               </div>
-              <h1 className="mt-3 text-2xl font-bold sm:text-3xl">Fast clinic booking flow</h1>
-              <p className="mt-2 text-sm text-emerald-50 sm:text-base">
-                Same visit flow ko React JS web ke liye convert kiya gaya hai: clinic select, doctor choose, date/time slot,
-                symptoms fill, media upload, consent aur payment.
-              </p>
+              <div className="hidden">
+                {form.petName || "Selected pet"}
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-5 px-4 py-5 lg:grid-cols-[1.2fr_0.8fr] sm:px-6 lg:px-8">
+          <div className="grid gap-4 px-3 py-4 lg:grid-cols-[1.3fr_0.7fr] sm:px-5 lg:px-6">
             <div className="space-y-4">
               <StepCard
                 step={1}
-                title="Choose clinic"
-                subtitle="Nearest clinics or available clinics list"
+                title="Select clinic"
+                subtitle=""
                 open={expandedStep === 1}
                 onEdit={() => setExpandedStep(1)}
                 summary={clinicSummary}
               >
+                <div className="hidden">
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={locationUpdating || !resolvedUserId}
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {locationUpdating ? "Updating..." : "Use current location"}
+                  </button>
+                </div>
                 {loadingClinics ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     {Array.from({ length: 4 }).map((_, index) => (
@@ -1322,13 +1813,7 @@ export default function InClinicFastBookingFlow({
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="text-base font-semibold text-slate-900">{clinic.name}</div>
-                              <div className="mt-1 text-sm text-slate-500">{clinic.address || "Clinic address"}</div>
                             </div>
-                            {clinic.distance ? (
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                                {clinic.distance}
-                              </span>
-                            ) : null}
                           </div>
                           <div className="mt-4 text-xs font-semibold text-emerald-700">Select clinic</div>
                         </button>
@@ -1341,7 +1826,7 @@ export default function InClinicFastBookingFlow({
               <StepCard
                 step={2}
                 title="Choose doctor"
-                subtitle="Select doctor from selected clinic"
+                subtitle=""
                 open={expandedStep === 2}
                 onEdit={() => setExpandedStep(2)}
                 summary={doctorSummary}
@@ -1408,8 +1893,8 @@ export default function InClinicFastBookingFlow({
 
               <StepCard
                 step={3}
-                title="Choose date and slot"
-                subtitle="Pick available appointment date and time"
+                title="Select date & slot"
+                subtitle=""
                 open={expandedStep === 3}
                 onEdit={() => setExpandedStep(3)}
                 summary={slotSummary}
@@ -1487,14 +1972,14 @@ export default function InClinicFastBookingFlow({
 
               <StepCard
                 step={4}
-                title="Symptoms and payment"
-                subtitle="Share issue, upload reports, then pay"
+                title="Describe symptoms"
+                subtitle=""
                 open={expandedStep === 4}
                 onEdit={() => setExpandedStep(4)}
                 summary={detailsSummary}
               >
                 <div className="grid gap-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="hidden">
                     <label className="block">
                       <span className="mb-2 block text-sm font-medium text-slate-700">Owner name</span>
                       <input
@@ -1515,7 +2000,7 @@ export default function InClinicFastBookingFlow({
                     </label>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="hidden">
                     <label className="block">
                       <span className="mb-2 block text-sm font-medium text-slate-700">Pet name</span>
                       <input
@@ -1586,25 +2071,10 @@ export default function InClinicFastBookingFlow({
                 </div>
               ) : null}
 
-              {apiResponses.reportedSymptom ||
-              apiResponses.serviceBooking ||
-              apiResponses.createOrder ||
-              apiResponses.verifyPayment ? (
-                <details className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-800">
-                    Full Backend Responses
-                  </summary>
-                  <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-white p-3 text-xs text-slate-700">
-                    {JSON.stringify(apiResponses, null, 2)}
-                  </pre>
-                </details>
-              ) : null}
-
-
               {successState ? (
                 <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5">
-                  <div className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Appointment booked</div>
-                  <h2 className="mt-2 text-xl font-bold text-slate-900">Booking successful</h2>
+                  <div className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Appointment booked successfully</div>
+                  <h2 className="mt-2 text-xl font-bold text-slate-900">Appointment booked successfully</h2>
                   <div className="mt-4 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
                     <div><span className="font-semibold">Booking ID:</span> {successState.bookingId}</div>
                     <div><span className="font-semibold">Payment ID:</span> {successState.paymentId}</div>
@@ -1613,21 +2083,11 @@ export default function InClinicFastBookingFlow({
                     <div><span className="font-semibold">Date:</span> {formatDateLabel(successState.appointmentDate)}</div>
                     <div><span className="font-semibold">Time:</span> {successState.appointmentTime}</div>
                   </div>
-                  {successState?.responses ? (
-                    <details className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3">
-                      <summary className="cursor-pointer text-sm font-semibold text-emerald-800">
-                        Full Backend Responses
-                      </summary>
-                      <pre className="mt-3 max-h-72 overflow-auto rounded-2xl bg-white p-3 text-xs text-slate-700">
-                        {JSON.stringify(successState.responses, null, 2)}
-                      </pre>
-                    </details>
-                  ) : null}
                 </div>
               ) : null}
             </div>
 
-            <aside className="lg:sticky lg:top-6 lg:h-fit">
+            <aside className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white p-3 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] lg:sticky lg:inset-auto lg:top-6 lg:h-fit lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
               <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">Booking summary</div>
                 <div className="mt-4 rounded-[24px] bg-slate-900 p-4 text-white">
@@ -1664,7 +2124,7 @@ export default function InClinicFastBookingFlow({
                       ? "Opening Razorpay..."
                       : paymentPhase === PAYMENT_PHASES.redirecting
                         ? "Verifying payment..."
-                        : `Pay ${formatCurrency(payableAmount)}`}
+                        : "Continue to payment"}
                 </button>
               </div>
             </aside>

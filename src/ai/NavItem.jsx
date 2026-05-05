@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { clearAiAuthState } from "./AiAuth";
+import HomeVetBookingFlow from "./HomeVetBookingFlow";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 
 const API_BASE = "https://snoutiq.com/backend/api";
@@ -383,6 +384,7 @@ const isVideoConsultAction = (item) => {
   return (
     type === "video_consult" ||
     type === "video" ||
+    type === "doctor_consult" ||
     deeplink.includes("video-consult") ||
     deeplink.includes("videoconsult") ||
     deeplink.includes("video-call") ||
@@ -390,23 +392,44 @@ const isVideoConsultAction = (item) => {
   );
 };
 
+const isHomeVetAction = (item) => {
+  const deeplink = String(item?.deeplink ?? "").trim().toLowerCase();
+  const type = String(item?.type ?? "").trim().toLowerCase();
+
+  return (
+    type === "vet_at_home" ||
+    type === "home_visit" ||
+    type === "home_vet" ||
+    deeplink.includes("vet-at-home") ||
+    deeplink.includes("home-visit") ||
+    deeplink.includes("home-vet")
+  );
+};
+
 const isClinicBookingAction = (item) => {
   const deeplink = String(item?.deeplink ?? "").trim().toLowerCase();
   const type = String(item?.type ?? "").trim().toLowerCase();
+
+  if (isHomeVetAction(item)) return false;
 
   return (
     type === "clinic" ||
     type === "clinic_booking" ||
     type === "in_clinic" ||
+    type === "govt" ||
+    type === "government" ||
+    type === "emergency" ||
     deeplink.includes("find-clinic") ||
     deeplink.includes("clinic-booking") ||
     deeplink.includes("book-clinic") ||
+    deeplink.includes("nearby-care") ||
+    deeplink.includes("emergency") ||
     deeplink.includes("clinic")
   );
 };
 
 const isDoctorBookingAction = (item) => {
-  if (isVideoConsultAction(item) || isClinicBookingAction(item)) {
+  if (isHomeVetAction(item) || isVideoConsultAction(item) || isClinicBookingAction(item)) {
     return false;
   }
 
@@ -426,11 +449,21 @@ const isDoctorBookingAction = (item) => {
 };
 
 const getActionButtonLabel = (item) => {
-  if (
-    isClinicBookingAction(item) ||
-    isVideoConsultAction(item) ||
-    isDoctorBookingAction(item)
-  ) {
+  if (isHomeVetAction(item)) return "Book Vet at Home";
+
+  if (isClinicBookingAction(item)) {
+    const label = String(item?.label ?? item?.title ?? "").trim().toLowerCase();
+    return label.includes("nearby") || label.includes("find")
+      ? "Find Nearby Care"
+      : "Book Clinic Visit";
+  }
+
+  if (isVideoConsultAction(item)) {
+    const label = String(item?.label ?? item?.title ?? "").trim().toLowerCase();
+    return label.includes("start") ? "Start Video Consult" : "Book Consult";
+  }
+
+  if (isDoctorBookingAction(item)) {
     return "Book Consult";
   }
 
@@ -633,6 +666,7 @@ export default function NavItem({
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [isLocationUpdating, setIsLocationUpdating] = useState(false);
   const [locationNotice, setLocationNotice] = useState("");
+  const [homeVetModalState, setHomeVetModalState] = useState(null);
 
   const currentUser = authState?.user || {};
   const currentPet =
@@ -1032,9 +1066,11 @@ export default function NavItem({
   const handleVideoCall = (button = null) => {
     navigate("/video-counsult", {
       state: {
-        source: isDoctorBookingAction(button) ? "ai_doctor_suggestion" : "ai_video_consult",
+        source: "ai_triage",
         petId: resolvedPetId || null,
+        pet_id: resolvedPetId || null,
         userId: resolvedUserId || null,
+        user_id: resolvedUserId || null,
         doctorId: resolveActionDoctorId(button) || null,
         clinicId: resolveActionClinicId(button) || null,
         doctorName: resolveActionDoctorName(button) || null,
@@ -1042,8 +1078,24 @@ export default function NavItem({
         chat_room_token: activeConversation || null,
         context_token: activeConversation || null,
         symptomText: getLatestUserMessageText() || null,
+        recommendationType: "video_consult",
         actionPayload: button || null,
       },
+    });
+  };
+
+  const handleHomeVetBooking = (button = null) => {
+    setHomeVetModalState({
+      source: "ai_triage",
+      petId: resolvedPetId || null,
+      pet_id: resolvedPetId || null,
+      userId: resolvedUserId || null,
+      user_id: resolvedUserId || null,
+      chat_room_token: activeConversation || null,
+      context_token: activeConversation || null,
+      symptomText: getLatestUserMessageText() || null,
+      recommendationType: "vet_at_home",
+      actionPayload: button || null,
     });
   };
 
@@ -1052,15 +1104,18 @@ export default function NavItem({
 
     navigate("/inclinic-fast-booking", {
       state: {
-        source: normalizedPlace ? "ai_nearby_place" : "ai_clinic_suggestion",
+        source: "ai_triage",
         petId: resolvedPetId || null,
+        pet_id: resolvedPetId || null,
         userId: resolvedUserId || null,
+        user_id: resolvedUserId || null,
         doctorId: resolveActionDoctorId(place) || null,
         clinicId: resolveActionClinicId(place) || null,
         suggestedClinic: normalizedPlace,
         chat_room_token: activeConversation || null,
         context_token: activeConversation || null,
         symptomText: getLatestUserMessageText() || null,
+        recommendationType: "in_clinic",
         actionPayload: place || null,
       },
     });
@@ -1068,7 +1123,11 @@ export default function NavItem({
 
   const handleActionButton = (button) => {
     const deeplink = String(button?.deeplink ?? "").trim().toLowerCase();
-    const type = String(button?.type ?? "").trim().toLowerCase();
+
+    if (isHomeVetAction(button)) {
+      handleHomeVetBooking(button);
+      return;
+    }
 
     if (isVideoConsultAction(button) || isDoctorBookingAction(button)) {
       handleVideoCall(button);
@@ -1077,11 +1136,6 @@ export default function NavItem({
 
     if (isClinicBookingAction(button)) {
       handleBookAppointment(button);
-      return;
-    }
-
-    if (deeplink.includes("vet-at-home") || type === "vet_at_home") {
-      window.location.href = button.deeplink;
       return;
     }
 
@@ -1103,7 +1157,7 @@ export default function NavItem({
     setMessages([]);
     setConversations([]);
     setActiveConversation(null);
-    navigate("/", { replace: true });
+    navigate("/ai", { replace: true });
   };
 
   const handleLogin = () => {
@@ -2228,6 +2282,21 @@ export default function NavItem({
           </div>
         </div>
       </div>
+
+      {homeVetModalState ? (
+        <HomeVetBookingFlow
+          mode="modal"
+          routeStateOverride={homeVetModalState}
+          onClose={() => setHomeVetModalState(null)}
+          onSuccess={(payload) => {
+            setHomeVetModalState(null);
+            navigate("/appointment-thank-you", {
+              replace: true,
+              state: payload,
+            });
+          }}
+        />
+      ) : null}
     </div>
   );
 }
