@@ -72,7 +72,7 @@ class GeminiChatController extends Controller
         $diseaseName = $inference['suggested_disease'] ?? 'Unknown dog disease';
         $category = $inference['category'] ?? 'normal';
 
-        $petDoc2BlobSaved = $this->storeUploadInPetDoc2Blob($request, (int) $data['pet_id'], 'video_calling_upload_file');
+        $petDoc2BlobSaved = $this->storeUploadInPetDoc2BlobNew($request, (int) $data['pet_id'], 'video_calling_upload_file');
 
         DB::update(
             'UPDATE pets SET dog_disease_payload = ?, pet_card_for_ai = ?, updated_at = NOW() WHERE id = ?',
@@ -1470,9 +1470,9 @@ PROMPT;
         return 'uploads/pet_cards/'.$fileName;
     }
 
-    private function storeUploadInPetDoc2Blob(Request $request, int $petId, string $field): bool
+    private function storeUploadInPetDoc2BlobNew(Request $request, int $petId, string $field): bool
     {
-        if (!Schema::hasTable('pets') || !Schema::hasColumn('pets', 'pet_doc2_blob')) {
+        if (!Schema::hasTable('pets') || !Schema::hasColumn('pets', 'pet_doc2_blob_new')) {
             return false;
         }
 
@@ -1503,12 +1503,9 @@ PROMPT;
         }
 
         $updates = [
-            'pet_doc2_blob' => $blob,
+            'pet_doc2_blob_new' => $blob,
             'updated_at' => now(),
         ];
-        if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
-            $updates['pet_doc2_mime'] = $mime ?: 'application/octet-stream';
-        }
 
         return DB::table('pets')->where('id', $petId)->update($updates) > 0;
     }

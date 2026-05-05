@@ -749,6 +749,16 @@ class AdminPanelController extends Controller
                 ->orderByDesc($hasUserCreatedAt ? 'created_at' : 'id')
                 ->get();
         }
+        $existingLeadUserIds = $allUsers
+            ->pluck('id')
+            ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+            ->map(fn ($userId) => (int) $userId)
+            ->flip();
+        $isExistingLeadUserId = static function ($userId) use ($existingLeadUserIds): bool {
+            return is_numeric($userId)
+                && (int) $userId > 0
+                && $existingLeadUserIds->has((int) $userId);
+        };
 
         $hasPetsTable = Schema::hasTable('pets');
         $hasPetBreed = $hasPetsTable && Schema::hasColumn('pets', 'breed');
@@ -1083,6 +1093,9 @@ class AdminPanelController extends Controller
             if ($ownerId === null || $ownerId <= 0) {
                 continue;
             }
+            if (!$isExistingLeadUserId($ownerId)) {
+                continue;
+            }
 
             if (!$targetUsers->has($ownerId)) {
                 $targetUsers->put($ownerId, $initializeLeadUser($owner, $ownerId));
@@ -1104,6 +1117,9 @@ class AdminPanelController extends Controller
             $user = $followUpLead->user;
             $userId = is_numeric($followUpLead->user_id) ? (int) $followUpLead->user_id : null;
             if ($userId === null || $userId <= 0) {
+                continue;
+            }
+            if (!$isExistingLeadUserId($userId)) {
                 continue;
             }
 
@@ -1383,6 +1399,9 @@ class AdminPanelController extends Controller
                         if ($userId <= 0) {
                             continue;
                         }
+                        if (!$isExistingLeadUserId($userId)) {
+                            continue;
+                        }
 
                         if (!$targetUsers->has($userId)) {
                             $targetUsers->put($userId, $initializeLeadUser(null, $userId));
@@ -1566,6 +1585,9 @@ class AdminPanelController extends Controller
                             if ($userId <= 0) {
                                 continue;
                             }
+                            if (!$isExistingLeadUserId($userId)) {
+                                continue;
+                            }
 
                             if (!$targetUsers->has($userId)) {
                                 $targetUsers->put($userId, $initializeLeadUser(null, $userId));
@@ -1682,6 +1704,9 @@ class AdminPanelController extends Controller
 
                     $userId = (int) $userIdRaw;
                     if ($userId <= 0) {
+                        continue;
+                    }
+                    if (!$isExistingLeadUserId($userId)) {
                         continue;
                     }
 
@@ -1822,6 +1847,9 @@ class AdminPanelController extends Controller
 
                         $userId = (int) $userIdRaw;
                         if ($userId <= 0) {
+                            continue;
+                        }
+                        if (!$isExistingLeadUserId($userId)) {
                             continue;
                         }
 
@@ -3087,6 +3115,33 @@ class AdminPanelController extends Controller
             } catch (\Throwable $e) {
                 $captureLeadManagementError('lead_activity_logs', $e);
             }
+        }
+
+        if ($hasUsersTable) {
+            $targetUsers = $targetUsers
+                ->filter(function (array $leadUser, $userId) use ($existingLeadUserIds): bool {
+                    $resolvedUserId = is_numeric($userId)
+                        ? (int) $userId
+                        : (is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0);
+
+                    return $resolvedUserId > 0 && $existingLeadUserIds->has($resolvedUserId);
+                });
+
+            $neuteringLeadCount = $targetUsers
+                ->filter(fn (array $leadUser): bool => (bool) ($leadUser['has_neutering'] ?? false))
+                ->count();
+            $videoFollowUpLeadCount = $targetUsers
+                ->filter(fn (array $leadUser): bool => (bool) ($leadUser['has_video_follow_up'] ?? false))
+                ->count();
+            $videoFollowUpVideoLeadCount = $targetUsers
+                ->filter(fn (array $leadUser): bool => (bool) ($leadUser['has_video_follow_up_video'] ?? false))
+                ->count();
+            $videoFollowUpInClinicLeadCount = $targetUsers
+                ->filter(fn (array $leadUser): bool => (bool) ($leadUser['has_video_follow_up_in_clinic'] ?? false))
+                ->count();
+            $convertedUsersCount = $targetUsers
+                ->filter(fn (array $leadUser): bool => (bool) ($leadUser['conversion_captured'] ?? false))
+                ->count();
         }
 
         $latestRelatedTransactionTimestamp = static function (array $leadUser): string {

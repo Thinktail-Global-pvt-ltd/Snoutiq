@@ -1251,6 +1251,32 @@ public function register(Request $request)
         ]);
     }
 
+    public function petDoc2BlobNew(Pet $pet)
+    {
+        if (! Schema::hasTable('pets') || ! Schema::hasColumn('pets', 'pet_doc2_blob_new')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_doc2_blob_new column is missing. Please add the column first.',
+            ], 500);
+        }
+
+        $blob = $pet->getRawOriginal('pet_doc2_blob_new');
+        if ($blob === null || $blob === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_doc2_blob_new not found for this pet.',
+            ], 404);
+        }
+
+        $mime = $pet->pet_doc2_mime ?: 'application/octet-stream';
+
+        return response($blob, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="pet-' . $pet->id . '-pet-doc2-new"',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
 
     public function register_latest_backup(Request $request)
     {
