@@ -188,7 +188,7 @@ class AdminController extends Controller
             })
             ->values();
 
-        return response()->json(['status' => 'success', 'data' => $pets]);
+        return response()->json(['status' => 'success', 'data' => $pets], 200, [], JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     // get one pet (for edit)
@@ -206,7 +206,7 @@ class AdminController extends Controller
         $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
         $pet->pet_doc2_blob_new_url = $this->petDoc2BlobNewUrl((int) $pet->id);
 
-        return response()->json(['status' => 'success', 'data' => $pet]);
+        return response()->json(['status' => 'success', 'data' => $pet], 200, [], JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     /**
