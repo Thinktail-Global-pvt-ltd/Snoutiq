@@ -146,11 +146,23 @@ class AdminController extends Controller
     public function deleteUserByPhone(Request $request)
     {
         $phone = trim((string) $request->query('phone', ''));
-        if ($phone === '') {
+        $phoneDigits = preg_replace('/\D+/', '', $phone);
+
+        if ($phoneDigits === '') {
             return response()->json(['status' => 'error', 'message' => 'phone is required'], 422);
         }
 
-        $deleted = DB::delete('DELETE FROM users WHERE phone = ?', [$phone]);
+        if (strlen($phoneDigits) !== 10) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'phone must contain exactly 10 digits',
+            ], 422);
+        }
+
+        $deleted = DB::delete(
+            "DELETE FROM users WHERE REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '') LIKE ?",
+            ['%' . $phoneDigits . '%']
+        );
 
         if (!$deleted) {
             return response()->json(['status' => 'error', 'message' => 'User not found'], 404);
@@ -160,6 +172,7 @@ class AdminController extends Controller
             'status' => 'success',
             'message' => 'User deleted',
             'deleted' => $deleted,
+            'phone_digits' => $phoneDigits,
         ]);
     }
 
