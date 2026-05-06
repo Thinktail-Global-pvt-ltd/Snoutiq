@@ -12,13 +12,70 @@ use Illuminate\Support\Facades\Schema;
 use App\Models\Chat;
 use App\Models\ChatRoom;
 use App\Models\Pet;
+use App\Models\PetDocumentAiSummary;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use App\Support\GeminiConfig;
 use App\Services\PetDiseaseInferenceService;
+use Illuminate\Validation\ValidationException;
 
 class GeminiChatController extends Controller
 {
     private const UNIFIED_SESSION_TTL_MIN = 1440; // 24h
+
+    public function summarizeDocument(Request $request)
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'pet_id' => ['required', 'integer', 'exists:pets,id'],
+            'document' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp,txt'],
+        ]);
+
+        $pet = Pet::query()->select('id', 'user_id', 'name', 'breed', 'pet_age', 'pet_gender')->find((int) $data['pet_id']);
+        if (!$pet) {
+            return response()->json(['success' => false, 'message' => 'Pet not found'], 404);
+        }
+        if (!empty($pet->user_id) && (int) $pet->user_id !== (int) $data['user_id']) {
+            return response()->json(['success' => false, 'message' => 'Pet does not belong to user'], 403);
+        }
+
+        [$base64, $mimeType, $fileName, $fileSize] = $this->resolveSummaryDocumentPayload($request);
+        $result = $this->summarizeDocumentWithGemini($base64, $mimeType, $pet);
+
+        if (!$result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gemini could not summarize this document.',
+                'error' => $result['error'],
+            ], 502);
+        }
+
+        $record = PetDocumentAiSummary::create([
+            'user_id' => (int) $data['user_id'],
+            'pet_id' => $data['pet_id'] ?? null,
+            'file_name' => $fileName,
+            'mime_type' => $mimeType,
+            'file_size' => $fileSize,
+            'model' => $result['model'],
+            'output' => $result['summary'],
+            'raw_response' => $result['raw_response'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document summarized successfully.',
+            'data' => [
+                'id' => $record->id,
+                'user_id' => $record->user_id,
+                'pet_id' => $record->pet_id,
+                'file_name' => $record->file_name,
+                'mime_type' => $record->mime_type,
+                'model' => $record->model,
+                'output' => $record->output,
+                'created_at' => optional($record->created_at)->toIso8601String(),
+            ],
+        ], 201);
+    }
 
     /**
      * Dog disease spell-correct/suggestion with similar shape to /chat/send.
@@ -1042,6 +1099,176 @@ PROMPT;
 
         $json = json_decode($resp, true);
         return $json['candidates'][0]['content']['parts'][0]['text'] ?? "No response.";
+    }
+
+    private function resolveSummaryDocumentPayload(Request $request): array
+    {
+        $file = $request->file('document');
+        if (!$file instanceof UploadedFile || !$file->isValid()) {
+            throw ValidationException::withMessages([
+                'document' => [$file?->getErrorMessage() ?: 'Valid document upload is required.'],
+            ]);
+        }
+
+        $contents = $file->get();
+        if ($contents === false || $contents === null || $contents === '') {
+            throw ValidationException::withMessages([
+                'document' => ['Unable to read uploaded document.'],
+            ]);
+        }
+
+        return [
+            base64_encode($contents),
+            $file->getClientMimeType() ?: ($file->getMimeType() ?: 'application/octet-stream'),
+            $file->getClientOriginalName(),
+            $file->getSize(),
+        ];
+    }
+
+    private function summarizeDocumentWithGemini(string $base64, string $mimeType, ?Pet $pet = null): array
+    {
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            return [
+                'ok' => false,
+                'summary' => '',
+                'model' => null,
+                'raw_response' => null,
+                'error' => 'Gemini API key is not configured.',
+            ];
+        }
+
+        $model = 'gemini-2.5-flash';
+        $url = sprintf(
+            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+            $model,
+            urlencode($apiKey)
+        );
+
+        $prompt = $this->documentSummaryPrompt($pet);
+        $payload = json_encode([
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [
+                    ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
+                    ['text' => $prompt],
+                ],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.2,
+                'topP' => 0.8,
+                'topK' => 32,
+                'maxOutputTokens' => 1800,
+            ],
+        ], JSON_UNESCAPED_SLASHES);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_TIMEOUT => 50,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+
+        $resp = curl_exec($ch);
+        if ($resp === false) {
+            $err = curl_error($ch);
+            $info = curl_getinfo($ch);
+            curl_close($ch);
+            Log::warning('pet_document_ai_summaries.gemini_curl_failed', [
+                'model' => $model,
+                'error' => $err,
+                'info' => $info,
+            ]);
+
+            return [
+                'ok' => false,
+                'summary' => '',
+                'model' => $model,
+                'raw_response' => null,
+                'error' => "Gemini {$model} cURL error: {$err}",
+            ];
+        }
+
+        $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http < 200 || $http >= 300) {
+            $message = $this->extractGeminiErrorMessage($resp, $http);
+            Log::warning('pet_document_ai_summaries.gemini_http_failed', [
+                'model' => $model,
+                'status' => $http,
+                'message' => $message,
+                'body' => substr($resp, 0, 500),
+            ]);
+
+            return [
+                'ok' => false,
+                'summary' => '',
+                'model' => $model,
+                'raw_response' => json_decode($resp, true),
+                'error' => "Gemini {$model} HTTP {$http}: {$message}",
+            ];
+        }
+
+        $json = json_decode($resp, true);
+        $text = trim((string) ($json['candidates'][0]['content']['parts'][0]['text'] ?? ''));
+        if ($text === '') {
+            return [
+                'ok' => false,
+                'summary' => '',
+                'model' => $model,
+                'raw_response' => $json,
+                'error' => "Gemini {$model} returned an empty response.",
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'summary' => $text,
+            'model' => $model,
+            'raw_response' => $json,
+            'error' => null,
+        ];
+    }
+
+    private function documentSummaryPrompt(?Pet $pet = null): string
+    {
+        $petContext = $pet
+            ? sprintf(
+                "Pet context: name=%s, breed=%s, age=%s, gender=%s.",
+                $pet->name ?? 'unknown',
+                $pet->breed ?? 'unknown',
+                $pet->pet_age ?? 'unknown',
+                $pet->pet_gender ?? 'unknown'
+            )
+            : 'Pet context: not provided.';
+
+        return <<<PROMPT
+You are a veterinary medical report summarizer for Snoutiq.
+
+{$petContext}
+
+Read the attached report/document and create a clear AI summary for a pet parent and care team.
+
+Output plain text only. Include:
+1. Short overview
+2. Important findings
+3. Diagnosis or suspected condition, if visible
+4. Medicines/treatment/instructions, if visible
+5. Follow-up or next steps, if visible
+6. Missing/unclear information
+
+Rules:
+- Do not invent facts that are not visible in the document.
+- If the document is unreadable or not a medical/veterinary report, say that clearly.
+- Keep the language simple and practical.
+PROMPT;
     }
 
     private function extractGeminiErrorMessage(string $body, int $status): string
