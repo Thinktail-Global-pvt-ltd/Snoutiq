@@ -162,6 +162,113 @@ class AdminPanelController extends Controller
             ->with('status', $statusMessage);
     }
 
+    public function petFeedback(Request $request): View
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'rating' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+        ]);
+
+        $hasTable = Schema::hasTable('pet_feedback');
+        $hasChannelColumn = $hasTable && Schema::hasColumn('pet_feedback', 'channel_name');
+        $search = trim((string) ($filters['q'] ?? ''));
+        $rating = isset($filters['rating']) ? (int) $filters['rating'] : null;
+        $days = (int) ($filters['days'] ?? 30);
+        $perPage = (int) ($filters['per_page'] ?? 25);
+        $from = now()->subDays($days)->startOfDay();
+
+        $summary = [
+            'total' => 0,
+            'avg_rating' => null,
+            'unique_users' => 0,
+            'unique_pets' => 0,
+            'with_comments' => 0,
+        ];
+        $ratingBreakdown = collect();
+        $feedbackRows = collect();
+
+        if ($hasTable) {
+            $query = DB::table('pet_feedback')
+                ->leftJoin('users', 'users.id', '=', 'pet_feedback.user_id')
+                ->leftJoin('pets', 'pets.id', '=', 'pet_feedback.pet_id')
+                ->leftJoin('doctors', 'doctors.id', '=', 'pet_feedback.vet_id')
+                ->where('pet_feedback.created_at', '>=', $from);
+
+            if ($rating) {
+                $query->where('pet_feedback.rating', $rating);
+            }
+
+            if ($search !== '') {
+                $query->where(function ($inner) use ($search, $hasChannelColumn): void {
+                    $inner->where('pet_feedback.feedback', 'like', "%{$search}%")
+                        ->orWhere('pet_feedback.source', 'like', "%{$search}%")
+                        ->orWhere('users.name', 'like', "%{$search}%")
+                        ->orWhere('users.phone', 'like', "%{$search}%")
+                        ->orWhere('pets.name', 'like', "%{$search}%")
+                        ->orWhere('doctors.doctor_name', 'like', "%{$search}%");
+
+                    if ($hasChannelColumn) {
+                        $inner->orWhere('pet_feedback.channel_name', 'like', "%{$search}%");
+                    }
+                });
+            }
+
+            $summary['total'] = (clone $query)->count();
+            $summary['avg_rating'] = (clone $query)->whereNotNull('pet_feedback.rating')->avg('pet_feedback.rating');
+            $summary['unique_users'] = (clone $query)->whereNotNull('pet_feedback.user_id')->distinct('pet_feedback.user_id')->count('pet_feedback.user_id');
+            $summary['unique_pets'] = (clone $query)->whereNotNull('pet_feedback.pet_id')->distinct('pet_feedback.pet_id')->count('pet_feedback.pet_id');
+            $summary['with_comments'] = (clone $query)
+                ->whereNotNull('pet_feedback.feedback')
+                ->where('pet_feedback.feedback', '!=', '')
+                ->count();
+
+            $ratingBreakdown = (clone $query)
+                ->select('pet_feedback.rating', DB::raw('COUNT(*) as total'))
+                ->whereNotNull('pet_feedback.rating')
+                ->groupBy('pet_feedback.rating')
+                ->orderByDesc('pet_feedback.rating')
+                ->get();
+
+            $selectColumns = [
+                'pet_feedback.id',
+                'pet_feedback.pet_id',
+                'pet_feedback.vet_id',
+                'pet_feedback.user_id',
+                'pet_feedback.rating',
+                'pet_feedback.feedback',
+                'pet_feedback.source',
+                'pet_feedback.created_at',
+                'users.name as user_name',
+                'users.phone as user_phone',
+                'pets.name as pet_name',
+                'doctors.doctor_name as doctor_name',
+            ];
+            $selectColumns[] = $hasChannelColumn
+                ? 'pet_feedback.channel_name'
+                : DB::raw('NULL as channel_name');
+
+            $feedbackRows = (clone $query)
+                ->select($selectColumns)
+                ->orderByDesc('pet_feedback.created_at')
+                ->orderByDesc('pet_feedback.id')
+                ->paginate($perPage)
+                ->withQueryString();
+        }
+
+        return view('admin.pet-feedback', [
+            'hasTable' => $hasTable,
+            'summary' => $summary,
+            'ratingBreakdown' => $ratingBreakdown,
+            'feedbackRows' => $feedbackRows,
+            'search' => $search,
+            'rating' => $rating,
+            'days' => $days,
+            'perPage' => $perPage,
+        ]);
+    }
+
     public function usersDataHub(Request $request): View
     {
         $validated = $request->validate([

@@ -120,6 +120,7 @@
             <a href="{{ route('admin.users.data-hub') }}" class="{{ request()->routeIs('admin.users.data-hub') ? 'active' : '' }}">Users Data Hub</a>
             <a href="{{ route('admin.users.bulk-delete') }}" class="{{ request()->routeIs('admin.users.bulk-delete*') ? 'active' : '' }}">User Bulk Delete</a>
             <a href="{{ route('admin.users.profile-completion') }}" class="{{ request()->routeIs('admin.users.profile-completion') ? 'active' : '' }}">User Profile Completion</a>
+            <a href="{{ route('admin.pet-feedback') }}" class="{{ request()->routeIs('admin.pet-feedback') ? 'active' : '' }}">Pet Feedback</a>
             <a href="{{ route('admin.lead-management') }}" class="{{ request()->routeIs('admin.lead-management') ? 'active' : '' }}">Lead Management</a>
             <a href="{{ route('admin.transactions.excell-export') }}" class="{{ request()->routeIs('admin.transactions.excell-export') ? 'active' : '' }}">Campaign Transactions</a>
             <a href="{{ route('admin.transactions.appointments') }}" class="{{ request()->routeIs('admin.transactions.appointments') ? 'active' : '' }}">Change Doctor</a>
