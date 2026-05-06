@@ -3750,6 +3750,138 @@ class AdminPanelController extends Controller
         return view('admin.pincode-heatmap');
     }
 
+    public function pageAnalytics(Request $request): View
+    {
+        $filters = $request->validate([
+            'days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'page' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $days = (int) ($filters['days'] ?? 30);
+        $pageFilter = trim((string) ($filters['page'] ?? ''));
+        $from = now()->subDays($days)->startOfDay();
+
+        $hasVisits = Schema::hasTable('user_page_visits');
+        $hasClicks = Schema::hasTable('user_button_clicks');
+
+        $summary = [
+            'total_visits' => 0,
+            'unique_users' => 0,
+            'completed_visits' => 0,
+            'avg_duration_seconds' => 0,
+            'total_button_clicks' => 0,
+            'window_label' => "Last {$days} days",
+        ];
+        $pageRows = collect();
+        $topButtons = collect();
+        $recentVisits = collect();
+        $pageOptions = collect();
+
+        if ($hasVisits) {
+            $visitBase = DB::table('user_page_visits')
+                ->where('entered_at', '>=', $from);
+
+            if ($pageFilter !== '') {
+                $visitBase->where('page_name', $pageFilter);
+            }
+
+            $summary['total_visits'] = (clone $visitBase)->count();
+            $summary['unique_users'] = (clone $visitBase)->distinct('user_id')->count('user_id');
+            $summary['completed_visits'] = (clone $visitBase)->whereNotNull('exited_at')->count();
+            $summary['avg_duration_seconds'] = (int) round((float) ((clone $visitBase)
+                ->whereNotNull('duration_seconds')
+                ->avg('duration_seconds') ?? 0));
+
+            $pageRows = (clone $visitBase)
+                ->select([
+                    'page_name',
+                    DB::raw('COUNT(*) as visits'),
+                    DB::raw('COUNT(DISTINCT user_id) as users'),
+                    DB::raw('SUM(CASE WHEN exited_at IS NOT NULL THEN 1 ELSE 0 END) as completed_visits'),
+                    DB::raw('COALESCE(AVG(duration_seconds), 0) as avg_duration_seconds'),
+                    DB::raw('COALESCE(SUM(duration_seconds), 0) as total_duration_seconds'),
+                    DB::raw('MAX(entered_at) as last_seen_at'),
+                ])
+                ->groupBy('page_name')
+                ->orderByDesc('visits')
+                ->limit(100)
+                ->get()
+                ->keyBy('page_name');
+
+            $recentVisits = (clone $visitBase)
+                ->leftJoin('users', 'users.id', '=', 'user_page_visits.user_id')
+                ->select([
+                    'user_page_visits.id',
+                    'user_page_visits.user_id',
+                    'users.name as user_name',
+                    'users.phone as user_phone',
+                    'user_page_visits.page_name',
+                    'user_page_visits.route_path',
+                    'user_page_visits.entered_at',
+                    'user_page_visits.exited_at',
+                    'user_page_visits.duration_seconds',
+                ])
+                ->orderByDesc('user_page_visits.entered_at')
+                ->limit(50)
+                ->get();
+
+            $pageOptions = DB::table('user_page_visits')
+                ->select('page_name')
+                ->whereNotNull('page_name')
+                ->groupBy('page_name')
+                ->orderBy('page_name')
+                ->pluck('page_name');
+        }
+
+        if ($hasClicks) {
+            $clickBase = DB::table('user_button_clicks')
+                ->where('clicked_at', '>=', $from);
+
+            if ($pageFilter !== '') {
+                $clickBase->where('page_name', $pageFilter);
+            }
+
+            $summary['total_button_clicks'] = (clone $clickBase)->count();
+
+            $clicksByPage = (clone $clickBase)
+                ->select('page_name', DB::raw('COUNT(*) as clicks'))
+                ->groupBy('page_name')
+                ->pluck('clicks', 'page_name');
+
+            $pageRows = $pageRows->map(function ($row) use ($clicksByPage) {
+                $row->button_clicks = (int) ($clicksByPage[$row->page_name] ?? 0);
+                return $row;
+            });
+
+            $topButtons = (clone $clickBase)
+                ->select([
+                    'page_name',
+                    'button_name',
+                    DB::raw('COUNT(*) as clicks'),
+                    DB::raw('COUNT(DISTINCT user_id) as users'),
+                    DB::raw('MAX(clicked_at) as last_clicked_at'),
+                ])
+                ->groupBy('page_name', 'button_name')
+                ->orderByDesc('clicks')
+                ->limit(50)
+                ->get();
+        }
+
+        $pageRows = $pageRows->values();
+
+        return view('admin.page-analytics', [
+            'summary' => $summary,
+            'pageRows' => $pageRows,
+            'topButtons' => $topButtons,
+            'recentVisits' => $recentVisits,
+            'pageOptions' => $pageOptions,
+            'days' => $days,
+            'pageFilter' => $pageFilter,
+            'hasVisits' => $hasVisits,
+            'hasClicks' => $hasClicks,
+        ]);
+    }
+
     public function consultationLifecycleAnalytics(Request $request): View
     {
         $filters = $request->validate([

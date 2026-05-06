@@ -291,6 +291,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/clinic-report/export', [ClinicDataReportController::class, 'export'])->name('admin.clinic-report.export');
         Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
         Route::get('/analytics/video', [AdminPanelController::class, 'videoAnalytics'])->name('admin.analytics.video');
+        Route::get('/analytics/pages', [AdminPanelController::class, 'pageAnalytics'])->name('admin.analytics.pages');
         Route::get('/analytics/consultation-lifecycle', [AdminPanelController::class, 'consultationLifecycleAnalytics'])->name('admin.analytics.consultation-lifecycle');
         Route::get('/analytics/pincode-heatmap', [AdminPanelController::class, 'pincodeHeatmap'])->name('admin.analytics.pincode-heatmap');
         Route::get('/whatsapp-templates', [AdminPanelController::class, 'whatsappTemplates'])->name('admin.whatsapp.templates');
