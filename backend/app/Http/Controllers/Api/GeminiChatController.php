@@ -43,11 +43,17 @@ class GeminiChatController extends Controller
         $result = $this->summarizeDocumentWithGemini($base64, $mimeType, $pet);
 
         if (!$result['ok']) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gemini could not summarize this document.',
-                'error' => $result['error'],
-            ], 502);
+            $result = [
+                'ok' => true,
+                'summary' => $this->fallbackDocumentSummary($fileName, $mimeType, $pet),
+                'model' => $result['model'] ?? null,
+                'raw_response' => [
+                    'ai_status' => 'fallback',
+                    'warning' => 'Gemini could not summarize this document right now.',
+                    'error' => $result['error'] ?? null,
+                ],
+                'error' => $result['error'] ?? null,
+            ];
         }
 
         $record = PetDocumentAiSummary::create([
@@ -72,6 +78,8 @@ class GeminiChatController extends Controller
                 'mime_type' => $record->mime_type,
                 'model' => $record->model,
                 'output' => $record->output,
+                'ai_status' => $record->raw_response['ai_status'] ?? 'generated',
+                'warning' => $record->raw_response['warning'] ?? null,
                 'created_at' => optional($record->created_at)->toIso8601String(),
             ],
         ], 201);
@@ -1138,14 +1146,47 @@ PROMPT;
             ];
         }
 
-        $model = 'gemini-2.5-flash';
+        $models = array_values(array_unique(array_filter(array_merge([
+            'gemini-2.5-flash',
+            GeminiConfig::chatModel(),
+            config('services.gemini.chat_model'),
+            config('services.gemini.model'),
+            GeminiConfig::defaultModel(),
+        ], GeminiConfig::summaryModels()))));
+        $prompt = $this->documentSummaryPrompt($pet);
+        $errors = [];
+
+        foreach ($models as $model) {
+            $result = $this->callGeminiDocumentSummaryModel($model, $apiKey, $prompt, $base64, $mimeType);
+            if ($result['ok']) {
+                return $result;
+            }
+
+            $errors[] = $result['error'];
+        }
+
+        return [
+            'ok' => false,
+            'summary' => '',
+            'model' => $models[0] ?? null,
+            'raw_response' => null,
+            'error' => implode(' | ', $errors),
+        ];
+    }
+
+    private function callGeminiDocumentSummaryModel(
+        string $model,
+        string $apiKey,
+        string $prompt,
+        string $base64,
+        string $mimeType
+    ): array {
         $url = sprintf(
             'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
             $model,
             urlencode($apiKey)
         );
 
-        $prompt = $this->documentSummaryPrompt($pet);
         $payload = json_encode([
             'contents' => [[
                 'role' => 'user',
@@ -1269,6 +1310,27 @@ Rules:
 - If the document is unreadable or not a medical/veterinary report, say that clearly.
 - Keep the language simple and practical.
 PROMPT;
+    }
+
+    private function fallbackDocumentSummary(?string $fileName, string $mimeType, ?Pet $pet = null): string
+    {
+        $petName = $pet?->name ?: 'your pet';
+        $fileLabel = $fileName ?: 'the uploaded document';
+
+        return implode("\n\n", [
+            'Short overview',
+            "We received {$fileLabel} for {$petName}, but AI summarization is temporarily unavailable right now.",
+            'Important findings',
+            'The document was uploaded successfully, but Gemini could not read and summarize it at this time. Please retry after some time.',
+            'Diagnosis or suspected condition',
+            'Not available from AI because the document could not be processed.',
+            'Medicines/treatment/instructions',
+            'Not available from AI because the document could not be processed.',
+            'Follow-up or next steps',
+            'Please retry the summary request. If this is urgent, share the document directly with a veterinarian.',
+            'Missing/unclear information',
+            "AI processing failed for mime type: {$mimeType}.",
+        ]);
     }
 
     private function extractGeminiErrorMessage(string $body, int $status): string
