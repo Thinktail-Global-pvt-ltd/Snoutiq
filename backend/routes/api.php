@@ -116,6 +116,15 @@ Route::get('/users/{userId}/exists', function (int $userId) {
         'message' => $exists ? 'User exists' : 'User does not exist',
     ]);
 })->whereNumber('userId')->name('api.users.exists');
+Route::get('/doctors/{doctorId}/exists', function (int $doctorId) {
+    $exists = Doctor::query()->whereKey($doctorId)->exists();
+
+    return response()->json([
+        'doctor_id' => $doctorId,
+        'exists' => $exists,
+        'message' => $exists ? 'Doctor exists' : 'Doctor does not exist',
+    ]);
+})->whereNumber('doctorId')->name('api.doctors.exists');
 Route::get('/users/{userId}/document-uploads', [DocumentUploadController::class, 'index'])->name('api.documents.index');
 Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
 Route::post('/whatsapp/temp-send', [WhatsAppMessageController::class, 'tempSend']);
