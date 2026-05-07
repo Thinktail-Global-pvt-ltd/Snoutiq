@@ -107,6 +107,15 @@ Route::post('/button-clicks/analyze', [UserButtonClickController::class, 'analyz
 Route::get('/documents', [MedicalRecordController::class, 'documents'])->name('api.documents.query');
 Route::post('/documents/upload', [DocumentUploadController::class, 'store'])->name('api.documents.upload');
 Route::get('/documents/{uploadId}/blob', [DocumentUploadController::class, 'blob'])->whereNumber('uploadId')->name('api.documents.blob');
+Route::get('/users/{userId}/exists', function (int $userId) {
+    $exists = User::query()->whereKey($userId)->exists();
+
+    return response()->json([
+        'user_id' => $userId,
+        'exists' => $exists,
+        'message' => $exists ? 'User exists' : 'User does not exist',
+    ]);
+})->whereNumber('userId')->name('api.users.exists');
 Route::get('/users/{userId}/document-uploads', [DocumentUploadController::class, 'index'])->name('api.documents.index');
 Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
 Route::post('/whatsapp/temp-send', [WhatsAppMessageController::class, 'tempSend']);
