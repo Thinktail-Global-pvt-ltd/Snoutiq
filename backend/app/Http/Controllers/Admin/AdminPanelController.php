@@ -4079,6 +4079,251 @@ class AdminPanelController extends Controller
         ], $result['sent'] ? 200 : 422);
     }
 
+    public function leadManagementUserFullProfile(User $user): JsonResponse
+    {
+        $userId = (int) $user->id;
+        $petIds = Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id')
+            ? DB::table('pets')
+                ->where('user_id', $userId)
+                ->pluck('id')
+                ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->values()
+                ->all()
+            : [];
+
+        $sections = [
+            $this->buildLeadProfileSection('users', 'Users table', function ($query) use ($userId): void {
+                $query->where('id', $userId);
+            }, 1),
+            $this->buildLeadProfileSection('pets', 'Pets table', function ($query) use ($userId): void {
+                $query->where('user_id', $userId);
+            }, 100),
+            $this->buildLeadProfileSection('transactions', 'Transactions table', function ($query) use ($userId): void {
+                $query->where('user_id', $userId);
+            }, 100),
+            $this->buildLeadProfileSection('prescriptions', 'Prescriptions table', function ($query) use ($userId, $petIds): void {
+                $query->where(function ($inner) use ($userId, $petIds): void {
+                    $inner->where('user_id', $userId);
+                    if (!empty($petIds) && Schema::hasColumn('prescriptions', 'pet_id')) {
+                        $inner->orWhereIn('pet_id', $petIds);
+                    }
+                });
+            }, 100),
+        ];
+
+        return response()->json([
+            'status' => 'success',
+            'user_id' => $userId,
+            'name' => (string) ($user->name ?? 'Unnamed user'),
+            'sections' => array_values(array_filter($sections)),
+        ]);
+    }
+
+    private function buildLeadProfileSection(string $table, string $label, \Closure $scope, int $limit): ?array
+    {
+        if (!Schema::hasTable($table)) {
+            return null;
+        }
+
+        $columns = Schema::getColumnListing($table);
+        if (empty($columns)) {
+            return [
+                'key' => $table,
+                'label' => $label,
+                'rows' => [],
+            ];
+        }
+
+        try {
+            $query = DB::table($table)->select($columns);
+            $scope($query);
+
+            if (in_array('created_at', $columns, true)) {
+                $query->orderByDesc('created_at');
+            }
+            if (in_array('id', $columns, true)) {
+                $query->orderByDesc('id');
+            }
+
+            $rows = $query
+                ->limit($limit)
+                ->get()
+                ->map(fn ($row): array => $this->serializeLeadProfileRow($table, (array) $row))
+                ->values()
+                ->all();
+
+            return [
+                'key' => $table,
+                'label' => $label,
+                'rows' => $rows,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('lead_management.full_profile.section_failed', [
+                'table' => $table,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'key' => $table,
+                'label' => $label,
+                'rows' => [],
+                'error' => 'Could not load this table.',
+            ];
+        }
+    }
+
+    private function serializeLeadProfileRow(string $table, array $row): array
+    {
+        $hiddenFields = [
+            'password',
+            'remember_token',
+            'api_token',
+            'api_token_hash',
+            'google_token',
+            'access_token',
+            'refresh_token',
+        ];
+        $fields = [];
+        $media = [];
+
+        foreach ($row as $column => $value) {
+            $columnKey = strtolower((string) $column);
+            if (in_array($columnKey, $hiddenFields, true)) {
+                $fields[$column] = '[hidden]';
+                continue;
+            }
+
+            if ($this->looksLikeBinaryColumn($columnKey)) {
+                $mime = $this->resolveLeadProfileMime($columnKey, $row);
+                $binary = is_resource($value) ? stream_get_contents($value) : $value;
+                $byteCount = is_string($binary) ? strlen($binary) : 0;
+                $fields[$column] = $byteCount > 0 ? sprintf('[binary %s]', $this->formatBytes($byteCount)) : '';
+
+                if ($byteCount > 0 && is_string($binary) && str_starts_with($mime, 'image/')) {
+                    $media[] = [
+                        'label' => "{$table}.{$column}",
+                        'src' => 'data:'.$mime.';base64,'.base64_encode($binary),
+                        'mime' => $mime,
+                        'size' => $this->formatBytes($byteCount),
+                    ];
+                }
+                continue;
+            }
+
+            $fields[$column] = $this->normalizeLeadProfileValue($value);
+            $mediaItem = $this->resolveLeadProfilePathMedia($table, (string) $column, $value);
+            if ($mediaItem !== null) {
+                $media[] = $mediaItem;
+            }
+        }
+
+        return [
+            'id' => is_numeric($row['id'] ?? null) ? (int) $row['id'] : null,
+            'fields' => $fields,
+            'media' => $media,
+        ];
+    }
+
+    private function looksLikeBinaryColumn(string $column): bool
+    {
+        return str_contains($column, 'blob') || str_contains($column, 'binary');
+    }
+
+    private function resolveLeadProfileMime(string $column, array $row): string
+    {
+        $candidates = [
+            str_replace('_blob', '_mime', $column),
+            str_replace('blob', 'mime', $column),
+            $column.'_mime',
+            'mime',
+            'file_mime',
+            'image_mime',
+        ];
+
+        foreach ($candidates as $candidate) {
+            foreach ($row as $key => $value) {
+                if (strtolower((string) $key) === strtolower($candidate) && is_string($value) && trim($value) !== '') {
+                    return trim($value);
+                }
+            }
+        }
+
+        return 'application/octet-stream';
+    }
+
+    private function normalizeLeadProfileValue($value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+        if (is_array($value) || is_object($value)) {
+            return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '';
+        }
+        if (is_resource($value)) {
+            $contents = stream_get_contents($value);
+            return is_string($contents) ? $contents : '';
+        }
+
+        return trim((string) $value);
+    }
+
+    private function resolveLeadProfilePathMedia(string $table, string $column, $value): ?array
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $columnKey = strtolower($column);
+        if (
+            !str_contains($columnKey, 'image')
+            && !str_contains($columnKey, 'photo')
+            && !str_contains($columnKey, 'picture')
+            && !str_contains($columnKey, 'doc')
+            && !str_contains($columnKey, 'file')
+            && !str_contains($columnKey, 'path')
+        ) {
+            return null;
+        }
+
+        $path = trim($value);
+        $extension = strtolower(pathinfo(parse_url($path, PHP_URL_PATH) ?: $path, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true)) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, 'data:image/')) {
+            $src = $path;
+        } else {
+            $src = asset(ltrim(preg_replace('#^public/#', '', $path) ?? $path, '/'));
+        }
+
+        return [
+            'label' => "{$table}.{$column}",
+            'src' => $src,
+            'mime' => 'image/'.$extension,
+            'size' => '',
+        ];
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes >= 1048576) {
+            return number_format($bytes / 1048576, 1).' MB';
+        }
+        if ($bytes >= 1024) {
+            return number_format($bytes / 1024, 1).' KB';
+        }
+
+        return $bytes.' B';
+    }
+
     public function deleteLeadManagementUser(Request $request, User $user): RedirectResponse
     {
         $filters = array_filter([

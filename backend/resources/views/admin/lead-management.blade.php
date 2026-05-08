@@ -1037,6 +1037,15 @@
         border-radius: 6px;
         margin: 0.25rem 0;
         padding: 0.35rem 0.45rem;
+        align-items: flex-start;
+    }
+
+    .crm-notif-main {
+        display: flex;
+        flex-direction: column;
+        gap: 0.18rem;
+        flex: 1;
+        min-width: 0;
     }
 
     .crm-notif-title {
@@ -1047,6 +1056,22 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .crm-notif-row.ai-push .crm-notif-title {
+        flex: none;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.35;
+    }
+
+    .crm-notif-body {
+        color: #a7f3d0;
+        font-size: 0.68rem;
+        line-height: 1.45;
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 
     .crm-notif-time {
@@ -1156,6 +1181,12 @@
         padding: 1rem;
     }
 
+    .crm-modal.crm-modal-xl {
+        width: min(1120px, 100%);
+        max-height: 88vh;
+        overflow: auto;
+    }
+
     .crm-modal h3 {
         font-size: 1rem;
         color: var(--crm-ink);
@@ -1218,6 +1249,109 @@
         display: flex;
         justify-content: flex-end;
         gap: 0.45rem;
+    }
+
+    .crm-profile-sections {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        margin-top: 0.8rem;
+    }
+
+    .crm-profile-section {
+        border: 1px solid var(--crm-border);
+        border-radius: var(--crm-radius-sm);
+        background: rgba(15, 23, 42, 0.72);
+        overflow: hidden;
+    }
+
+    .crm-profile-section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        padding: 0.7rem 0.8rem;
+        background: rgba(30, 41, 59, 0.45);
+        border-bottom: 1px solid var(--crm-border);
+    }
+
+    .crm-profile-section-title {
+        font-weight: 800;
+        font-size: 0.82rem;
+        color: var(--crm-ink);
+    }
+
+    .crm-profile-row-count {
+        color: var(--crm-ink-3);
+        font-family: 'DM Mono', monospace;
+        font-size: 0.68rem;
+    }
+
+    .crm-profile-row {
+        padding: 0.75rem 0.8rem;
+        border-bottom: 1px solid var(--crm-border);
+    }
+
+    .crm-profile-row:last-child {
+        border-bottom: 0;
+    }
+
+    .crm-profile-fields {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.45rem 0.7rem;
+    }
+
+    .crm-profile-field {
+        min-width: 0;
+        padding: 0.45rem 0.55rem;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 6px;
+        background: rgba(2, 6, 23, 0.28);
+    }
+
+    .crm-profile-key {
+        color: var(--crm-ink-3);
+        font-size: 0.58rem;
+        font-family: 'DM Mono', monospace;
+        overflow-wrap: anywhere;
+    }
+
+    .crm-profile-value {
+        color: var(--crm-ink);
+        font-size: 0.7rem;
+        margin-top: 0.18rem;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    .crm-profile-media {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 0.6rem;
+        margin-top: 0.7rem;
+    }
+
+    .crm-profile-media-item {
+        border: 1px solid rgba(52, 211, 153, 0.24);
+        border-radius: 6px;
+        background: rgba(6, 78, 59, 0.16);
+        padding: 0.45rem;
+    }
+
+    .crm-profile-media-item img {
+        width: 100%;
+        max-height: 190px;
+        object-fit: contain;
+        display: block;
+        border-radius: 4px;
+        background: rgba(2, 6, 23, 0.4);
+    }
+
+    .crm-profile-media-label {
+        color: #a7f3d0;
+        font-size: 0.62rem;
+        margin-top: 0.35rem;
+        overflow-wrap: anywhere;
     }
 
     .crm-modal-btn {
@@ -1770,6 +1904,9 @@
     $logActionRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.log')
         ? route('admin.lead-management.users.log', ['user' => '__USER_ID__'])
         : '';
+    $fullProfileRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.full-profile')
+        ? route('admin.lead-management.users.full-profile', ['user' => '__USER_ID__'])
+        : '';
     $nextActionRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.next-action')
         ? route('admin.lead-management.users.next-action', ['user' => '__USER_ID__'])
         : '';
@@ -2245,6 +2382,19 @@
     </div>
 </div>
 
+<div class="crm-modal-overlay" id="crm-modal-profile" data-modal="profile">
+    <div class="crm-modal crm-modal-xl">
+        <h3>Full User Profile</h3>
+        <p class="crm-modal-sub" id="crmFullProfileSubtitle">Users, pets, transactions, prescriptions, and available photo/blob previews.</p>
+        <div id="crmFullProfileContent" class="crm-profile-sections">
+            <div class="crm-empty">Select a lead to load profile data.</div>
+        </div>
+        <div class="crm-modal-actions">
+            <button type="button" class="crm-modal-btn" data-close-modal="profile">Close</button>
+        </div>
+    </div>
+</div>
+
 <div id="crmToast" class="crm-toast"></div>
 @endsection
 
@@ -2255,6 +2405,7 @@
     const pageMeta = @json($leadPageMeta);
     const deleteRouteTemplate = @json($deleteRouteTemplate);
     const logActionRouteTemplate = @json($logActionRouteTemplate);
+    const fullProfileRouteTemplate = @json($fullProfileRouteTemplate);
     const nextActionRouteTemplate = @json($nextActionRouteTemplate);
     const aiMarketingPushRouteTemplate = @json($aiMarketingPushRouteTemplate);
     const transactionDoctorUpdateRouteTemplate = @json($transactionDoctorUpdateRouteTemplate);
@@ -2359,7 +2510,7 @@
         lost: { label: 'Lost', className: 'crm-status-lost' },
     };
 
-    const modalIds = ['log', 'call', 'txn', 'next', 'pet'];
+    const modalIds = ['log', 'call', 'txn', 'next', 'pet', 'profile'];
     let activeDetailTab = 'profile';
     let searchSubmitTimer = null;
 
@@ -3013,11 +3164,19 @@
             const aiLabel = isAiPush ? '<span class="crm-pill crm-pill-green">AI Push</span>' : '';
             const title = notif.title || notif.type || 'Notification';
             const suffix = notif.bucket_label ? ` · ${notif.bucket_label}` : '';
+            const body = String(notif.text || '').trim();
+            const titleHtml = `<span class="crm-notif-title" title="${escapeHtml(title)}">${escapeHtml(title)}${escapeHtml(suffix)}</span>`;
+            const bodyHtml = isAiPush && body !== ''
+                ? `<span class="crm-notif-body">${escapeHtml(body)}</span>`
+                : '';
             return `
                 <div class="crm-notif-row ${isAiPush ? 'ai-push' : ''}">
                     ${clickedLabel}
                     ${aiLabel}
-                    <span class="crm-notif-title" title="${escapeHtml(title)}">${escapeHtml(title)}${escapeHtml(suffix)}</span>
+                    <span class="crm-notif-main">
+                        ${titleHtml}
+                        ${bodyHtml}
+                    </span>
                     <span class="crm-notif-time">${escapeHtml(formatDateTime(notif.timestamp))}</span>
                 </div>
             `;
@@ -3100,6 +3259,7 @@
                         `).join('')}
                     </select>
                     <button type="button" class="crm-btn primary" data-open-modal="log">+ Log Action</button>
+                    <button type="button" class="crm-btn" data-open-modal="profile">Full Profile</button>
                     ${canSendAiPush ? '<button type="button" class="crm-btn" data-ai-marketing-push>AI Push</button>' : ''}
                     <button type="button" class="crm-btn" data-open-modal="txn">+ Add Service</button>
                     <button type="button" class="crm-btn" data-open-modal="next">Set Next Action</button>
@@ -3503,6 +3663,10 @@
             }
         }
 
+        if (key === 'profile') {
+            loadFullProfileModal();
+        }
+
         modal.classList.add('open');
     }
 
@@ -3550,6 +3714,112 @@
     function buildTransactionRoute(template, transactionId) {
         if (!template) return '';
         return String(template).replace('__TXN_ID__', String(Number(transactionId)));
+    }
+
+    function renderFullProfileRows(section) {
+        const rows = Array.isArray(section?.rows) ? section.rows : [];
+        if (!rows.length) {
+            return '<div class="crm-empty" style="padding: 1rem;">No rows found.</div>';
+        }
+
+        return rows.map((row, index) => {
+            const fields = row && typeof row.fields === 'object' && row.fields !== null ? row.fields : {};
+            const media = Array.isArray(row?.media) ? row.media : [];
+            const fieldHtml = Object.entries(fields).map(([key, value]) => `
+                <div class="crm-profile-field">
+                    <div class="crm-profile-key">${escapeHtml(key)}</div>
+                    <div class="crm-profile-value">${escapeHtml(String(value ?? ''))}</div>
+                </div>
+            `).join('');
+            const mediaHtml = media.length ? `
+                <div class="crm-profile-media">
+                    ${media.map((item) => `
+                        <a class="crm-profile-media-item" href="${escapeHtml(String(item.src || '#'))}" target="_blank" rel="noopener noreferrer">
+                            <img src="${escapeHtml(String(item.src || ''))}" alt="${escapeHtml(String(item.label || 'Profile media'))}">
+                            <div class="crm-profile-media-label">${escapeHtml(String(item.label || 'Image'))}${item.size ? ` · ${escapeHtml(String(item.size))}` : ''}</div>
+                        </a>
+                    `).join('')}
+                </div>
+            ` : '';
+
+            return `
+                <div class="crm-profile-row">
+                    <div class="crm-profile-row-count">Row ${index + 1}${row?.id ? ` · ID ${Number(row.id)}` : ''}</div>
+                    <div class="crm-profile-fields">${fieldHtml || '<div class="crm-empty">No fields available.</div>'}</div>
+                    ${mediaHtml}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderFullProfile(profile) {
+        const contentEl = document.getElementById('crmFullProfileContent');
+        const subtitleEl = document.getElementById('crmFullProfileSubtitle');
+        if (!contentEl) return;
+
+        const sections = Array.isArray(profile?.sections) ? profile.sections : [];
+        if (subtitleEl) {
+            subtitleEl.textContent = `User #${Number(profile?.user_id || 0)} · ${profile?.name || 'Unnamed user'}`;
+        }
+
+        if (!sections.length) {
+            contentEl.innerHTML = '<div class="crm-empty">No profile data available.</div>';
+            return;
+        }
+
+        contentEl.innerHTML = sections.map((section) => `
+            <section class="crm-profile-section">
+                <div class="crm-profile-section-head">
+                    <div class="crm-profile-section-title">${escapeHtml(section.label || section.key || 'Table')}</div>
+                    <div class="crm-profile-row-count">${Number((section.rows || []).length)} rows</div>
+                </div>
+                ${section.error ? `<div class="crm-blocker" style="margin: 0.65rem;">${escapeHtml(section.error)}</div>` : ''}
+                ${renderFullProfileRows(section)}
+            </section>
+        `).join('');
+    }
+
+    async function loadFullProfileModal() {
+        const lead = getSelectedLead();
+        const contentEl = document.getElementById('crmFullProfileContent');
+        const subtitleEl = document.getElementById('crmFullProfileSubtitle');
+        if (!lead || !contentEl) return;
+
+        if (subtitleEl) {
+            subtitleEl.textContent = `Loading full profile for ${lead.name || `User #${Number(lead.id)}`}...`;
+        }
+
+        if (lead.full_profile && typeof lead.full_profile === 'object') {
+            renderFullProfile(lead.full_profile);
+            return;
+        }
+
+        const apiUrl = buildUserRoute(fullProfileRouteTemplate, lead.id);
+        if (!apiUrl) {
+            contentEl.innerHTML = '<div class="crm-empty">Full profile API route is missing.</div>';
+            return;
+        }
+
+        contentEl.innerHTML = '<div class="crm-empty">Loading users, pets, transactions, prescriptions, and media...</div>';
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.status !== 'success') {
+                throw new Error(data.message || 'Failed to load full profile.');
+            }
+
+            lead.full_profile = data;
+            renderFullProfile(data);
+        } catch (error) {
+            contentEl.innerHTML = `<div class="crm-empty">${escapeHtml(error instanceof Error ? error.message : 'Failed to load full profile.')}</div>`;
+        }
     }
 
     function resetFilterFormPage() {

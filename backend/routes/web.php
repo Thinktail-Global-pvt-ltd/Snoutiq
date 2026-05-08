@@ -277,6 +277,8 @@ Route::prefix('admin')->group(function () {
             ->name('admin.lead-management.users.ai-marketing-push');
         Route::get('/lead-management/users/{user}/details', [AdminPanelController::class, 'leadManagementUserDetails'])
             ->name('admin.lead-management.users.details');
+        Route::get('/lead-management/users/{user}/full-profile', [AdminPanelController::class, 'leadManagementUserFullProfile'])
+            ->name('admin.lead-management.users.full-profile');
         Route::delete('/lead-management/users/{user}', [AdminPanelController::class, 'deleteLeadManagementUser'])->name('admin.lead-management.users.delete');
         Route::delete('/lead-management/users/{user}/api', [AdminPanelController::class, 'deleteLeadManagementUserApi'])
             ->name('admin.lead-management.users.delete.api')
