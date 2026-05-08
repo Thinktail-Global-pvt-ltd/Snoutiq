@@ -837,7 +837,7 @@ class AdminPanelController extends Controller
         $leadFilter = strtolower((string) ($filters['lead_filter'] ?? 'all'));
         $searchTerm = trim((string) ($filters['q'] ?? ''));
         $searchActive = $searchTerm !== '';
-        $deferLeadDetails = !$request->boolean('eager_details');
+        $deferLeadDetails = false;
         $leadManagementStartedAt = microtime(true);
         $leadManagementTiming = [];
         $markLeadManagementTiming = static function (string $stage) use (&$leadManagementTiming, $leadManagementStartedAt): void {
@@ -1148,6 +1148,8 @@ class AdminPanelController extends Controller
                 'has_video_follow_up_video' => false,
                 'has_video_follow_up_in_clinic' => false,
                 'has_vaccination_reminder' => false,
+                'all_pet_count' => 0,
+                'all_pet_names' => [],
                 'neutering_pet_count' => 0,
                 'neutering_pet_names' => [],
                 'video_follow_up_count' => 0,
@@ -1229,6 +1231,9 @@ class AdminPanelController extends Controller
                 foreach (($leadUser[$petKey] ?? []) as $petValue) {
                     $searchableValues[] = $petValue;
                 }
+            }
+            foreach (($leadUser['all_pet_names'] ?? []) as $petValue) {
+                $searchableValues[] = $petValue;
             }
 
             $categoryTerms = [];
@@ -3309,6 +3314,47 @@ class AdminPanelController extends Controller
 
                     return $shouldIncludeLeadUser($resolvedUserId) && $isExistingLeadUserId($resolvedUserId);
                 });
+
+            if ($hasPetsTable && $targetUsers->isNotEmpty()) {
+                try {
+                    $leadUserIds = $targetUsers
+                        ->keys()
+                        ->filter(fn ($userId): bool => is_numeric($userId) && (int) $userId > 0)
+                        ->map(fn ($userId): int => (int) $userId)
+                        ->values();
+
+                    if ($leadUserIds->isNotEmpty()) {
+                        $petRows = Pet::query()
+                            ->select(array_unique($petLeadBaseColumns))
+                            ->whereIn('user_id', $leadUserIds->all())
+                            ->orderByDesc($hasPetCreatedAt ? 'created_at' : 'id')
+                            ->orderByDesc('id')
+                            ->get()
+                            ->groupBy(fn (Pet $pet): int => (int) $pet->user_id);
+
+                        foreach ($petRows as $userId => $petsForUser) {
+                            $resolvedUserId = (int) $userId;
+                            if (!$targetUsers->has($resolvedUserId)) {
+                                continue;
+                            }
+
+                            $leadUser = $targetUsers->get($resolvedUserId);
+                            $leadUser['all_pet_count'] = $petsForUser->count();
+                            $leadUser['all_pet_names'] = $petsForUser
+                                ->pluck('name')
+                                ->map(fn ($name): string => trim((string) $name))
+                                ->filter(fn (string $name): bool => $name !== '')
+                                ->unique()
+                                ->values()
+                                ->all();
+
+                            $targetUsers->put($resolvedUserId, $leadUser);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $captureLeadManagementError('all_user_pets', $e);
+                }
+            }
 
             $neuteringLeadCount = $targetUsers
                 ->filter(fn (array $leadUser): bool => (bool) ($leadUser['has_neutering'] ?? false))
