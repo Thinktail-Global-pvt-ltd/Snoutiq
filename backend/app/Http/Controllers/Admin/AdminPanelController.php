@@ -4202,7 +4202,7 @@ class AdminPanelController extends Controller
         $doctorMobile = '';
         if ($latestTransaction && is_numeric($latestTransaction->doctor_id ?? null)) {
             $doctorPhoneColumn = null;
-            foreach (['doctor_mobile', 'mobile', 'phone'] as $candidateColumn) {
+            foreach (['doctors_mobile', 'doctor_mobile'] as $candidateColumn) {
                 if (Schema::hasColumn('doctors', $candidateColumn)) {
                     $doctorPhoneColumn = $candidateColumn;
                     break;
