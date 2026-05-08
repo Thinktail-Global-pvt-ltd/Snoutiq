@@ -653,6 +653,40 @@
         margin-bottom: 0.72rem;
     }
 
+    .crm-call-alert {
+        border: 1px solid rgba(248, 113, 113, 0.38);
+        background: rgba(127, 29, 29, 0.24);
+        color: #fecaca;
+        border-radius: var(--crm-radius-sm);
+        padding: 0.65rem 0.72rem;
+        margin-bottom: 0.72rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.7rem;
+        font-size: 0.72rem;
+        line-height: 1.45;
+    }
+
+    .crm-call-alert strong {
+        color: #fee2e2;
+    }
+
+    .crm-call-alert.done {
+        border-color: rgba(52, 211, 153, 0.34);
+        background: rgba(6, 78, 59, 0.2);
+        color: #a7f3d0;
+    }
+
+    .crm-call-alert.done strong {
+        color: #d1fae5;
+    }
+
+    .crm-call-tag {
+        color: var(--crm-red);
+        font-weight: 700;
+    }
+
     .crm-rev-bar {
         display: flex;
         border: 1px solid var(--crm-border);
@@ -995,6 +1029,14 @@
 
     .crm-notif-row:last-child {
         border-bottom: 0;
+    }
+
+    .crm-notif-row.ai-push {
+        border: 1px solid rgba(52, 211, 153, 0.28);
+        background: rgba(6, 78, 59, 0.18);
+        border-radius: 6px;
+        margin: 0.25rem 0;
+        padding: 0.35rem 0.45rem;
     }
 
     .crm-notif-title {
@@ -1998,6 +2040,7 @@
             <div class="crm-mfield">
                 <label for="crm-log-outcome">Outcome</label>
                 <select id="crm-log-outcome">
+                    <option>Call completed</option>
                     <option>No answer</option>
                     <option>Spoke - interested</option>
                     <option>Spoke - follow-up needed</option>
@@ -2024,6 +2067,41 @@
         <div class="crm-modal-actions">
             <button type="button" class="crm-modal-btn" data-close-modal="log">Cancel</button>
             <button type="button" class="crm-modal-btn primary" id="crmSaveLogAction">Save Action</button>
+        </div>
+    </div>
+</div>
+
+<div class="crm-modal-overlay" id="crm-modal-call" data-modal="call">
+    <div class="crm-modal">
+        <h3>Mark Call Completed</h3>
+        <p class="crm-modal-sub">Record that the 10-day no-payment call was completed manually.</p>
+        <div class="crm-modal-grid">
+            <div class="crm-mfield">
+                <label for="crm-call-outcome">Outcome</label>
+                <select id="crm-call-outcome">
+                    <option>Call completed</option>
+                    <option>Spoke - interested</option>
+                    <option>Spoke - follow-up needed</option>
+                    <option>No answer</option>
+                    <option>Wrong number</option>
+                </select>
+            </div>
+            <div class="crm-mfield">
+                <label for="crm-call-by">Done by</label>
+                <input id="crm-call-by" type="text" value="Admin">
+            </div>
+        </div>
+        <div class="crm-mfield">
+            <label for="crm-call-notes">Notes</label>
+            <textarea id="crm-call-notes" placeholder="Call completed manually for 10-day no-payment follow-up."></textarea>
+        </div>
+        <div class="crm-mfield">
+            <label for="crm-call-datetime">Date & time</label>
+            <input id="crm-call-datetime" type="datetime-local">
+        </div>
+        <div class="crm-modal-actions">
+            <button type="button" class="crm-modal-btn" data-close-modal="call">Cancel</button>
+            <button type="button" class="crm-modal-btn primary" id="crmSaveCallDone">Mark Completed</button>
         </div>
     </div>
 </div>
@@ -2281,7 +2359,7 @@
         lost: { label: 'Lost', className: 'crm-status-lost' },
     };
 
-    const modalIds = ['log', 'txn', 'next', 'pet'];
+    const modalIds = ['log', 'call', 'txn', 'next', 'pet'];
     let activeDetailTab = 'profile';
     let searchSubmitTimer = null;
 
@@ -2544,6 +2622,53 @@
         return l < r ? -1 : 1;
     }
 
+    function hasNoPaymentTransaction(lead) {
+        if (Boolean(lead.conversion_captured) || Boolean(lead.has_captured_payment)) {
+            return false;
+        }
+
+        return !Array.isArray(lead.related_transactions) || Number(lead.related_transactions.length || 0) === 0;
+    }
+
+    function hasCompletedNoPaymentCall(lead) {
+        return (lead.manual_activity || []).some((activity) => {
+            const action = String(activity.action_type || '').toLowerCase();
+            const outcome = String(activity.outcome || '').toLowerCase();
+            const notes = String(activity.notes || '').toLowerCase();
+            const isCall = action.includes('call') || notes.includes('10-day no-payment');
+            const isDone = outcome.includes('completed')
+                || outcome.includes('spoke')
+                || notes.includes('call completed manually');
+            const isNoAnswer = outcome.includes('no answer') || notes.includes('no answer');
+            return isCall && isDone && !isNoAnswer;
+        });
+    }
+
+    function resolveTenDayPaymentCallState(lead) {
+        const createdDate = parseDateValue(lead.created_at || '');
+        const daysSinceCreated = createdDate
+            ? Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)))
+            : 0;
+        const required = daysSinceCreated >= 10 && hasNoPaymentTransaction(lead);
+        const completed = required && hasCompletedNoPaymentCall(lead);
+
+        return {
+            required,
+            completed,
+            daysSinceCreated,
+            message: completed
+                ? 'Call completed manually for this 10-day no-payment lead.'
+                : 'Call now - it has been 10 days without payment.',
+        };
+    }
+
+    function isAiMarketingNotification(notif) {
+        const type = String(notif?.type || '').toLowerCase();
+        return type === 'ai_marketing_no_payment'
+            || type.includes('ai_marketing')
+            || type.includes('marketing_no_payment');
+    }
+
     function getVisibleLeads() {
         const filtered = state.leads
             .filter((lead) => matchesPipeline(lead, state.pipeline))
@@ -2630,9 +2755,13 @@
             const isActive = Number(lead.id) === Number(state.selectedLeadId);
             const statusMeta = statusStyles[String(lead.status_key || '').toLowerCase()] || statusStyles.new;
             const next = resolveNextAction(lead);
+            const callState = resolveTenDayPaymentCallState(lead);
             const cityTag = lead.city ? `<span class="crm-tag">${escapeHtml(lead.city)}</span>` : '';
             const mobileTag = lead.is_mobile_app_user ? '<span class="crm-tag crm-tag-mobile">Mobile app user</span>' : '';
             const notifsTag = `<span class="crm-tag">${Number(lead.all_notifications_count || 0)} notifs</span>`;
+            const callTag = callState.required
+                ? `<span class="crm-tag ${callState.completed ? 'crm-tag-mobile' : ''}">${escapeHtml(callState.completed ? 'Call completed' : 'Call now - 10d no payment')}</span>`
+                : '';
             const followTag = lead.follow_up_type_label ? `<span class="crm-tag">${escapeHtml(lead.follow_up_type_label)}</span>` : '';
             const revenueTag = lead.conversion_captured
                 ? `<span class="crm-rev">Converted</span>`
@@ -2643,6 +2772,9 @@
                 : `${totalPets} pet${totalPets === 1 ? '' : 's'}`;
             const nextPrefix = next.state.key === 'none' ? 'No next action set' : `${escapeHtml(next.type)} ${next.state.key === 'overdue' ? 'overdue' : 'due'}`;
             const nextSuffix = next.state.key === 'none' ? '' : ` - ${escapeHtml(next.label)}`;
+            const callLine = callState.required && !callState.completed
+                ? '<div class="crm-next-line crm-call-tag">Call now - it has been 10 days without payment.</div>'
+                : '';
 
             return `
                 <article class="crm-lead-card ${isActive ? 'active' : ''} ${lead.is_mobile_app_user ? 'mobile-app-user' : ''}" data-lead-id="${Number(lead.id)}">
@@ -2658,11 +2790,13 @@
                     <div class="crm-lead-tags">
                         ${cityTag}
                         ${mobileTag}
+                        ${callTag}
                         ${notifsTag}
                         ${followTag}
                         ${revenueTag}
                     </div>
                     <div class="crm-next-line ${escapeHtml(next.state.css || 'none')}">${escapeHtml(nextPrefix + nextSuffix)}</div>
+                    ${callLine}
                 </article>
             `;
         }).join('');
@@ -2732,6 +2866,22 @@
                 badge: `<span class="crm-pill ${modeLabel ? 'crm-pill-amber' : 'crm-pill-blue'}">${escapeHtml(modeLabel || 'Prescription')}</span>`,
                 timestamp: prescription.created_at || '',
                 icon: '<i class="bi bi-file-earmark-medical"></i>',
+            });
+        });
+
+        (lead.manual_activity || []).forEach((activity) => {
+            const action = String(activity.action_type || 'Action').trim() || 'Action';
+            const outcome = String(activity.outcome || '').trim();
+            const notes = String(activity.notes || '').trim();
+            const isCompletedCall = action.toLowerCase().includes('call')
+                && (outcome.toLowerCase().includes('completed') || notes.toLowerCase().includes('call completed manually'));
+
+            items.push({
+                title: isCompletedCall ? 'Call completed manually' : action,
+                text: [outcome, notes].filter(Boolean).join(' - '),
+                badge: `<span class="crm-pill ${isCompletedCall ? 'crm-pill-green' : 'crm-pill-blue'}">${escapeHtml(outcome || 'Logged')}</span>`,
+                timestamp: activity.event_at || '',
+                icon: isCompletedCall ? '<i class="bi bi-telephone-check"></i>' : '<i class="bi bi-journal-text"></i>',
             });
         });
 
@@ -2827,6 +2977,11 @@
             return String(lead.manual_blocker).trim();
         }
 
+        const callState = resolveTenDayPaymentCallState(lead);
+        if (callState.required && !callState.completed) {
+            return 'Call now - it has been 10 days without payment. Complete manual outreach before sending more push-only follow-ups.';
+        }
+
         if (nextAction.state.key === 'overdue') {
             return 'Follow-up date has passed. Reschedule this lead and assign an owner immediately.';
         }
@@ -2851,14 +3006,17 @@
 
         return rows.map((notif) => {
             const clicked = notif.clicked === true;
+            const isAiPush = isAiMarketingNotification(notif);
             const clickedLabel = clicked
                 ? '<span class="crm-pill crm-pill-green">Clicked</span>'
                 : '<span class="crm-pill crm-pill-red">Not clicked</span>';
+            const aiLabel = isAiPush ? '<span class="crm-pill crm-pill-green">AI Push</span>' : '';
             const title = notif.title || notif.type || 'Notification';
             const suffix = notif.bucket_label ? ` · ${notif.bucket_label}` : '';
             return `
-                <div class="crm-notif-row">
+                <div class="crm-notif-row ${isAiPush ? 'ai-push' : ''}">
                     ${clickedLabel}
+                    ${aiLabel}
                     <span class="crm-notif-title" title="${escapeHtml(title)}">${escapeHtml(title)}${escapeHtml(suffix)}</span>
                     <span class="crm-notif-time">${escapeHtml(formatDateTime(notif.timestamp))}</span>
                 </div>
@@ -2894,6 +3052,7 @@
         const canSendAiPush = Boolean(lead.is_mobile_app_user)
             && Number(daysSinceCreated) >= 10
             && !Boolean(lead.has_captured_payment);
+        const callState = resolveTenDayPaymentCallState(lead);
 
         const deleteActionUrl = String(deleteRouteTemplate || '').replace('__USER_ID__', String(Number(lead.id)));
         const ownerName = lead.name || 'Unnamed user';
@@ -2955,6 +3114,16 @@
                     </form>
                 </div>
             </div>
+
+            ${callState.required ? `
+                <div class="crm-call-alert ${callState.completed ? 'done' : ''}">
+                    <div>
+                        <strong>${callState.completed ? 'Call completed' : 'Call now'}</strong>
+                        <div>${escapeHtml(callState.message)}</div>
+                    </div>
+                    ${callState.completed ? '' : '<button type="button" class="crm-btn danger" data-open-modal="call">Mark Call Done</button>'}
+                </div>
+            ` : ''}
 
             <div class="crm-next-box">
                 <div>
@@ -3028,6 +3197,7 @@
                         <div class="crm-field-row"><span class="crm-fr-label">Vaccination notifications</span><span class="crm-fr-val">${Number(lead.vaccination_notification_count || 0)}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Follow-ups</span><span class="crm-fr-val">${Number(lead.video_follow_up_count || 0)}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Prescription follow-up</span><span class="crm-fr-val">${escapeHtml(lead.prescription_follow_up_date_label || '—')}</span></div>
+                        <div class="crm-field-row"><span class="crm-fr-label">10-day payment call</span><span class="crm-fr-val ${callState.required && !callState.completed ? 'warn' : ''}">${callState.required ? escapeHtml(callState.completed ? 'Completed' : 'Call now') : '—'}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Next action state</span><span class="crm-fr-val">${escapeHtml(nextAction.state.label)}</span></div>
                     </div>
 
@@ -3131,6 +3301,15 @@
             <div class="crm-tab-content ${activeTab === 'notifications' ? 'active' : ''}" data-tab-content="notifications">
                 <div class="crm-card">
                     <div class="crm-card-title">Notification Log — ${Number(totalNotifs)} sent · ${Number(clickedNotifs)} clicked · ${lead.conversion_captured ? 1 : 0} converted</div>
+                    ${callState.required ? `
+                        <div class="crm-call-alert ${callState.completed ? 'done' : ''}">
+                            <div>
+                                <strong>${callState.completed ? 'Manual call done' : 'Call now'}</strong>
+                                <div>${escapeHtml(callState.message)}</div>
+                            </div>
+                            ${callState.completed ? '' : '<button type="button" class="crm-btn danger" data-open-modal="call">Mark Call Done</button>'}
+                        </div>
+                    ` : ''}
                     ${buildNotificationRows(lead)}
                 </div>
             </div>
@@ -3267,6 +3446,20 @@
         if (key === 'log') {
             const datetimeInput = document.getElementById('crm-log-datetime');
             if (datetimeInput) datetimeInput.value = formatDatetimeForInput(new Date());
+        }
+
+        if (key === 'call') {
+            const datetimeInput = document.getElementById('crm-call-datetime');
+            const outcomeInput = document.getElementById('crm-call-outcome');
+            const notesInput = document.getElementById('crm-call-notes');
+            const byInput = document.getElementById('crm-call-by');
+
+            if (datetimeInput) datetimeInput.value = formatDatetimeForInput(new Date());
+            if (outcomeInput) outcomeInput.value = 'Call completed';
+            if (notesInput && !String(notesInput.value || '').trim()) {
+                notesInput.value = 'Call completed manually for 10-day no-payment follow-up.';
+            }
+            if (byInput && !String(byInput.value || '').trim()) byInput.value = 'Admin';
         }
 
         if (key === 'next') {
@@ -3512,6 +3705,7 @@
 
     function attachActionSavers() {
         const saveLogBtn = document.getElementById('crmSaveLogAction');
+        const saveCallBtn = document.getElementById('crmSaveCallDone');
         const saveTxnBtn = document.getElementById('crmSaveTxn');
         const saveNextBtn = document.getElementById('crmSaveNextAction');
         const savePetBtn = document.getElementById('crmSavePet');
@@ -3565,6 +3759,59 @@
                     showToast(error instanceof Error ? error.message : 'Failed to save action log.');
                 } finally {
                     saveLogBtn.disabled = false;
+                }
+            });
+        }
+
+        if (saveCallBtn) {
+            saveCallBtn.addEventListener('click', async () => {
+                const lead = getSelectedLead();
+                if (!lead) return;
+
+                const outcome = String(document.getElementById('crm-call-outcome')?.value || 'Call completed');
+                const notes = String(document.getElementById('crm-call-notes')?.value || '').trim()
+                    || 'Call completed manually for 10-day no-payment follow-up.';
+                const doneBy = String(document.getElementById('crm-call-by')?.value || 'Admin').trim() || 'Admin';
+                const timestamp = String(document.getElementById('crm-call-datetime')?.value || '');
+                const apiUrl = buildUserRoute(logActionRouteTemplate, lead.id);
+                if (!apiUrl) {
+                    showToast('Log API route is missing.');
+                    return;
+                }
+
+                const payload = {
+                    action_type: 'Call made',
+                    outcome,
+                    notes,
+                    action_at: timestamp || null,
+                    done_by: doneBy,
+                };
+
+                saveCallBtn.disabled = true;
+                try {
+                    const data = await postLeadActivity(apiUrl, payload);
+                    const activity = normalizeActivityPayload(data.activity, {
+                        event_type: 'log_action',
+                        action_type: 'Call made',
+                        outcome,
+                        notes,
+                        done_by: doneBy,
+                        event_at: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
+                    });
+
+                    if (!Array.isArray(lead.manual_activity)) {
+                        lead.manual_activity = [];
+                    }
+                    lead.manual_activity.unshift(activity);
+
+                    closeModal('call');
+                    renderLeadList();
+                    renderDetail();
+                    showToast('Call marked completed.');
+                } catch (error) {
+                    showToast(error instanceof Error ? error.message : 'Failed to mark call completed.');
+                } finally {
+                    saveCallBtn.disabled = false;
                 }
             });
         }
