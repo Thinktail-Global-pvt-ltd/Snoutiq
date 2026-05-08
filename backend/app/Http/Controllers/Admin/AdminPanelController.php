@@ -1368,7 +1368,6 @@ class AdminPanelController extends Controller
             && ($fcmHasNotificationType || $supportsNeuteringNotificationJoin);
         $vaccinationReminderType = 'pet_vaccination_upcoming_reminder';
         $vaccinationNotificationTypes = [$vaccinationReminderType, 'vaccination_milestone'];
-        $vaccinationTypePlaceholders = implode(',', array_fill(0, count($vaccinationNotificationTypes), '?'));
         $maxFcmScanRows = min(max($limit * 8, 500), 3000);
         $supportsNotificationRecords = Schema::hasTable('notifications')
             && Schema::hasColumn('notifications', 'user_id');
@@ -1811,10 +1810,7 @@ class AdminPanelController extends Controller
                 }
 
                 if ($fcmHasNotificationType) {
-                    $fcmVaccinationQuery->whereRaw(
-                        "LOWER(TRIM(COALESCE(notification_type, ''))) IN ({$vaccinationTypePlaceholders})",
-                        $vaccinationNotificationTypes
-                    );
+                    $fcmVaccinationQuery->whereIn('notification_type', $vaccinationNotificationTypes);
                 }
 
                 if ($supportsNeuteringNotificationJoin) {
@@ -1949,7 +1945,6 @@ class AdminPanelController extends Controller
 
             // 4) Onboarding/profile completion notifications (user-level).
             $profileNotificationTypes = ['pp_user_created', 'profile_completion'];
-            $profileTypePlaceholders = implode(',', array_fill(0, count($profileNotificationTypes), '?'));
 
             if ($targetUsers->isNotEmpty()) {
                 $leadUserIds = $targetUsers
@@ -1993,10 +1988,7 @@ class AdminPanelController extends Controller
 
                     $fcmProfileQuery->whereIn('user_id', $leadUserIds);
                     if ($fcmHasNotificationType) {
-                        $fcmProfileQuery->whereRaw(
-                            "LOWER(TRIM(COALESCE(notification_type, ''))) IN ({$profileTypePlaceholders})",
-                            $profileNotificationTypes
-                        );
+                        $fcmProfileQuery->whereIn('notification_type', $profileNotificationTypes);
                     }
 
                     $fcmProfileRows = $fcmProfileQuery
