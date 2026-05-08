@@ -836,6 +836,7 @@ class AdminPanelController extends Controller
         $page = max((int) $request->query('page', 1), 1);
         $leadFilter = strtolower((string) ($filters['lead_filter'] ?? 'all'));
         $searchTerm = trim((string) ($filters['q'] ?? ''));
+        $searchActive = $searchTerm !== '';
 
         $hasUsersTable = Schema::hasTable('users');
         $hasUserCity = $hasUsersTable && Schema::hasColumn('users', 'city');
@@ -854,7 +855,7 @@ class AdminPanelController extends Controller
             $allUsersQuery = User::query()
                 ->select($leadUserColumnsWithCreatedAt);
 
-            if ($searchTerm !== '') {
+            if ($searchActive) {
                 $allUsersQuery->where(function (Builder $query) use ($searchTerm, $hasUserCity): void {
                     $query->where('name', 'like', '%' . $searchTerm . '%')
                         ->orWhere('email', 'like', '%' . $searchTerm . '%')
@@ -875,6 +876,22 @@ class AdminPanelController extends Controller
                 ->limit($limit)
                 ->get();
         }
+        $searchMatchedUserIds = $searchActive
+            ? $allUsers
+                ->pluck('id')
+                ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
+                ->map(fn ($userId) => (int) $userId)
+                ->unique()
+                ->values()
+            : collect();
+        $searchMatchedUserIdLookup = $searchMatchedUserIds->flip();
+        $shouldIncludeLeadUser = static function ($userId) use ($searchActive, $searchMatchedUserIdLookup): bool {
+            if (!is_numeric($userId) || (int) $userId <= 0) {
+                return false;
+            }
+
+            return !$searchActive || $searchMatchedUserIdLookup->has((int) $userId);
+        };
         $existingLeadUserIds = $allUsers
             ->pluck('id')
             ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
@@ -975,6 +992,14 @@ class AdminPanelController extends Controller
                         }
                     });
 
+                if ($searchActive) {
+                    if ($searchMatchedUserIds->isNotEmpty()) {
+                        $neuteringBaseQuery->whereIn('user_id', $searchMatchedUserIds->all());
+                    } else {
+                        $neuteringBaseQuery->whereRaw('1 = 0');
+                    }
+                }
+
                 $neuteringLeadCount = (clone $neuteringBaseQuery)->count();
 
                 $neuteringLeads = $neuteringBaseQuery
@@ -1058,6 +1083,14 @@ class AdminPanelController extends Controller
                         '=',
                         'latest_follow_up_prescription_by_session.latest_prescription_id'
                     );
+
+                if ($searchActive) {
+                    if ($searchMatchedUserIds->isNotEmpty()) {
+                        $videoFollowUpBaseQuery->whereIn('transactions.user_id', $searchMatchedUserIds->all());
+                    } else {
+                        $videoFollowUpBaseQuery->whereRaw('1 = 0');
+                    }
+                }
 
                 $videoFollowUpLeadCount = (clone $videoFollowUpBaseQuery)->count('transactions.id');
                 if ($supportsVideoFollowUpModeSplit) {
@@ -1231,7 +1264,7 @@ class AdminPanelController extends Controller
             if ($ownerId === null || $ownerId <= 0) {
                 continue;
             }
-            if (!$isExistingLeadUserId($ownerId)) {
+            if (!$shouldIncludeLeadUser($ownerId) || !$isExistingLeadUserId($ownerId)) {
                 continue;
             }
 
@@ -1257,7 +1290,7 @@ class AdminPanelController extends Controller
             if ($userId === null || $userId <= 0) {
                 continue;
             }
-            if (!$isExistingLeadUserId($userId)) {
+            if (!$shouldIncludeLeadUser($userId) || !$isExistingLeadUserId($userId)) {
                 continue;
             }
 
@@ -1332,7 +1365,7 @@ class AdminPanelController extends Controller
         $vaccinationReminderType = 'pet_vaccination_upcoming_reminder';
         $vaccinationNotificationTypes = [$vaccinationReminderType, 'vaccination_milestone'];
         $vaccinationTypePlaceholders = implode(',', array_fill(0, count($vaccinationNotificationTypes), '?'));
-        $maxFcmScanRows = min(max($limit * 20, 2000), 10000);
+        $maxFcmScanRows = min(max($limit * 8, 500), 3000);
         $supportsNotificationRecords = Schema::hasTable('notifications')
             && Schema::hasColumn('notifications', 'user_id');
         $notificationHasPetId = $supportsNotificationRecords && Schema::hasColumn('notifications', 'pet_id');
@@ -1537,7 +1570,7 @@ class AdminPanelController extends Controller
                         if ($userId <= 0) {
                             continue;
                         }
-                        if (!$isExistingLeadUserId($userId)) {
+                        if (!$shouldIncludeLeadUser($userId) || !$isExistingLeadUserId($userId)) {
                             continue;
                         }
 
@@ -1723,7 +1756,7 @@ class AdminPanelController extends Controller
                             if ($userId <= 0) {
                                 continue;
                             }
-                            if (!$isExistingLeadUserId($userId)) {
+                            if (!$shouldIncludeLeadUser($userId) || !$isExistingLeadUserId($userId)) {
                                 continue;
                             }
 
@@ -1764,6 +1797,14 @@ class AdminPanelController extends Controller
                     ->whereNotNull('user_id')
                     ->where('user_id', '>', 0)
                     ->select(['id', 'user_id']);
+
+                if ($searchActive) {
+                    if ($searchMatchedUserIds->isNotEmpty()) {
+                        $fcmVaccinationQuery->whereIn('user_id', $searchMatchedUserIds->all());
+                    } else {
+                        $fcmVaccinationQuery->whereRaw('1 = 0');
+                    }
+                }
 
                 if ($fcmHasNotificationType) {
                     $fcmVaccinationQuery->whereRaw(
@@ -1844,7 +1885,7 @@ class AdminPanelController extends Controller
                     if ($userId <= 0) {
                         continue;
                     }
-                    if (!$isExistingLeadUserId($userId)) {
+                    if (!$shouldIncludeLeadUser($userId) || !$isExistingLeadUserId($userId)) {
                         continue;
                     }
 
@@ -1987,7 +2028,7 @@ class AdminPanelController extends Controller
                         if ($userId <= 0) {
                             continue;
                         }
-                        if (!$isExistingLeadUserId($userId)) {
+                        if (!$shouldIncludeLeadUser($userId) || !$isExistingLeadUserId($userId)) {
                             continue;
                         }
 
@@ -2467,7 +2508,7 @@ class AdminPanelController extends Controller
                         $prescriptionColumns[] = 'follow_up_type';
                     }
 
-                    $maxPrescriptionRows = min(max($limit * 20, 3000), 12000);
+                    $maxPrescriptionRows = min(max($limit * 8, 500), 3000);
                     $prescriptionRows = Prescription::query()
                         ->select(array_unique($prescriptionColumns))
                         ->whereIn('user_id', $leadUserIds)
@@ -3170,7 +3211,7 @@ class AdminPanelController extends Controller
                         $activityColumns[] = 'created_at';
                     }
 
-                    $maxActivityRows = min(max($limit * 20, 3000), 12000);
+                    $maxActivityRows = min(max($limit * 8, 500), 3000);
                     $activityRows = DB::table('lead_management_activity_logs')
                         ->select(array_unique($activityColumns))
                         ->whereIn('user_id', $leadUserIds)
@@ -3257,12 +3298,12 @@ class AdminPanelController extends Controller
 
         if ($hasUsersTable) {
             $targetUsers = $targetUsers
-                ->filter(function (array $leadUser, $userId) use ($isExistingLeadUserId): bool {
+                ->filter(function (array $leadUser, $userId) use ($isExistingLeadUserId, $shouldIncludeLeadUser): bool {
                     $resolvedUserId = is_numeric($userId)
                         ? (int) $userId
                         : (is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0);
 
-                    return $isExistingLeadUserId($resolvedUserId);
+                    return $shouldIncludeLeadUser($resolvedUserId) && $isExistingLeadUserId($resolvedUserId);
                 });
 
             $neuteringLeadCount = $targetUsers
