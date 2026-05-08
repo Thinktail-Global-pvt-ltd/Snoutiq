@@ -273,6 +273,8 @@ Route::prefix('admin')->group(function () {
             ->name('admin.lead-management.users.log');
         Route::post('/lead-management/users/{user}/next-action', [AdminPanelController::class, 'storeLeadManagementNextAction'])
             ->name('admin.lead-management.users.next-action');
+        Route::post('/lead-management/users/{user}/ai-marketing-push', [AdminPanelController::class, 'sendLeadManagementAiMarketingPush'])
+            ->name('admin.lead-management.users.ai-marketing-push');
         Route::get('/lead-management/users/{user}/details', [AdminPanelController::class, 'leadManagementUserDetails'])
             ->name('admin.lead-management.users.details');
         Route::delete('/lead-management/users/{user}', [AdminPanelController::class, 'deleteLeadManagementUser'])->name('admin.lead-management.users.delete');

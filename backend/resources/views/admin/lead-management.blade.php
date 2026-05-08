@@ -1671,6 +1671,7 @@
                 'has_video_follow_up_in_clinic' => (bool) ($leadUser['has_video_follow_up_in_clinic'] ?? false),
                 'has_vaccination_reminder' => (bool) ($leadUser['has_vaccination_reminder'] ?? false),
                 'is_mobile_app_user' => (bool) ($leadUser['is_mobile_app_user'] ?? false),
+                'has_captured_payment' => (bool) ($leadUser['has_captured_payment'] ?? false),
                 'category_tags' => $categoryTags,
                 'conversion_captured' => (bool) ($leadUser['conversion_captured'] ?? false),
                 'conversion_notification_type' => (string) ($leadUser['conversion_notification_type'] ?? ''),
@@ -1729,6 +1730,9 @@
         : '';
     $nextActionRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.next-action')
         ? route('admin.lead-management.users.next-action', ['user' => '__USER_ID__'])
+        : '';
+    $aiMarketingPushRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.ai-marketing-push')
+        ? route('admin.lead-management.users.ai-marketing-push', ['user' => '__USER_ID__'])
         : '';
     $transactionDoctorUpdateRouteTemplate = route('admin.transactions.appointments.doctor', ['transaction' => '__TXN_ID__']);
 
@@ -2174,6 +2178,7 @@
     const deleteRouteTemplate = @json($deleteRouteTemplate);
     const logActionRouteTemplate = @json($logActionRouteTemplate);
     const nextActionRouteTemplate = @json($nextActionRouteTemplate);
+    const aiMarketingPushRouteTemplate = @json($aiMarketingPushRouteTemplate);
     const transactionDoctorUpdateRouteTemplate = @json($transactionDoctorUpdateRouteTemplate);
     const transactionDoctorOptions = @json($transactionDoctorOptions);
     const csrfToken = @json(csrf_token());
@@ -2886,6 +2891,9 @@
         const daysSinceCreated = createdDate
             ? Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)))
             : '—';
+        const canSendAiPush = Boolean(lead.is_mobile_app_user)
+            && Number(daysSinceCreated) >= 10
+            && !Boolean(lead.has_captured_payment);
 
         const deleteActionUrl = String(deleteRouteTemplate || '').replace('__USER_ID__', String(Number(lead.id)));
         const ownerName = lead.name || 'Unnamed user';
@@ -2933,6 +2941,7 @@
                         `).join('')}
                     </select>
                     <button type="button" class="crm-btn primary" data-open-modal="log">+ Log Action</button>
+                    ${canSendAiPush ? '<button type="button" class="crm-btn" data-ai-marketing-push>AI Push</button>' : ''}
                     <button type="button" class="crm-btn" data-open-modal="txn">+ Add Service</button>
                     <button type="button" class="crm-btn" data-open-modal="next">Set Next Action</button>
                     <form method="POST" action="${escapeHtml(deleteActionUrl)}" class="d-inline-block" onsubmit="return confirm('Delete this user and related data? This action cannot be undone.')">
@@ -3170,6 +3179,66 @@
                 openModal(modalKey);
             });
         });
+
+        const aiPushButton = detailWrapEl.querySelector('[data-ai-marketing-push]');
+        if (aiPushButton) {
+            aiPushButton.addEventListener('click', async () => {
+                const lead = getSelectedLead();
+                if (!lead) return;
+
+                const apiUrl = buildUserRoute(aiMarketingPushRouteTemplate, lead.id);
+                if (!apiUrl) {
+                    showToast('AI push route is missing.');
+                    return;
+                }
+
+                aiPushButton.disabled = true;
+                aiPushButton.textContent = 'Sending...';
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({}),
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || data.status !== 'success') {
+                        throw new Error(data.message || 'Failed to send AI push.');
+                    }
+
+                    const notification = data.notification || {};
+                    if (!Array.isArray(lead.notifications)) {
+                        lead.notifications = [];
+                    }
+                    lead.notifications.unshift({
+                        id: Number(notification.id || 0),
+                        title: String(notification.title || 'Snoutiq update'),
+                        text: String(notification.body || ''),
+                        type: 'ai_marketing_no_payment',
+                        timestamp: String(notification.sent_at || new Date().toISOString()),
+                        clicked: false,
+                        clicked_at: '',
+                        bucket: 'follow_up',
+                        bucket_label: 'Follow-up',
+                        converted: false,
+                    });
+                    lead.all_notifications_count = Number(lead.all_notifications_count || 0) + 1;
+                    showToast(data.message || 'AI marketing push sent.');
+                    renderLeadList();
+                    renderDetail();
+                } catch (error) {
+                    showToast(error instanceof Error ? error.message : 'Failed to send AI push.');
+                } finally {
+                    aiPushButton.disabled = false;
+                    aiPushButton.textContent = 'AI Push';
+                }
+            });
+        }
 
         detailWrapEl.querySelectorAll('[data-update-transaction-doctor]').forEach((button) => {
             button.addEventListener('click', async () => {

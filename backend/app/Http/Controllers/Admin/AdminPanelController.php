@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\TransactionInvoiceController;
+use App\Jobs\SendNotificationJob;
 use App\Models\CustomerTicket;
 use App\Models\Doctor;
 use App\Models\FcmNotification;
@@ -22,11 +23,13 @@ use Illuminate\Contracts\View\View;
 use App\Services\CallAnalyticsService;
 use App\Services\ConsultationBookingWhatsAppService;
 use App\Services\DoctorAvailabilityService;
+use App\Support\GeminiConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -1152,6 +1155,7 @@ class AdminPanelController extends Controller
                 'has_video_follow_up_in_clinic' => false,
                 'has_vaccination_reminder' => false,
                 'is_mobile_app_user' => false,
+                'has_captured_payment' => false,
                 'all_pet_count' => 0,
                 'all_pet_names' => [],
                 'neutering_pet_count' => 0,
@@ -3397,6 +3401,43 @@ class AdminPanelController extends Controller
                 }
             }
 
+            if (
+                $hasTransactionsTable
+                && $hasTransactionUserId
+                && Schema::hasColumn('transactions', 'status')
+                && $targetUsers->isNotEmpty()
+            ) {
+                try {
+                    $leadUserIds = $targetUsers
+                        ->keys()
+                        ->filter(fn ($userId): bool => is_numeric($userId) && (int) $userId > 0)
+                        ->map(fn ($userId): int => (int) $userId)
+                        ->values();
+
+                    if ($leadUserIds->isNotEmpty()) {
+                        $capturedPaymentUserIds = DB::table('transactions')
+                            ->whereIn('user_id', $leadUserIds->all())
+                            ->whereRaw("LOWER(TRIM(COALESCE(status, ''))) = 'captured'")
+                            ->distinct()
+                            ->pluck('user_id')
+                            ->map(fn ($userId): int => (int) $userId)
+                            ->flip();
+
+                        foreach ($leadUserIds as $userId) {
+                            if (!$targetUsers->has($userId)) {
+                                continue;
+                            }
+
+                            $leadUser = $targetUsers->get($userId);
+                            $leadUser['has_captured_payment'] = $capturedPaymentUserIds->has($userId);
+                            $targetUsers->put($userId, $leadUser);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $captureLeadManagementError('captured_payment_users', $e);
+                }
+            }
+
             $neuteringLeadCount = $targetUsers
                 ->filter(fn (array $leadUser): bool => (bool) ($leadUser['has_neutering'] ?? false))
                 ->count();
@@ -4019,6 +4060,232 @@ class AdminPanelController extends Controller
                 'details_loaded' => true,
             ],
         ]);
+    }
+
+    public function sendLeadManagementAiMarketingPush(Request $request, User $user): JsonResponse
+    {
+        $userId = (int) $user->id;
+
+        if (!$user->created_at || $user->created_at->gt(now()->subDays(10))) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User is not older than 10 days yet.',
+            ], 422);
+        }
+
+        if (
+            Schema::hasTable('transactions')
+            && Schema::hasColumn('transactions', 'user_id')
+            && Schema::hasColumn('transactions', 'status')
+            && Transaction::query()
+                ->where('user_id', $userId)
+                ->whereRaw("LOWER(TRIM(COALESCE(status, ''))) = 'captured'")
+                ->exists()
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User already has a captured payment.',
+            ], 422);
+        }
+
+        if (
+            !Schema::hasTable('device_tokens')
+            || !Schema::hasColumn('device_tokens', 'user_id')
+            || !Schema::hasColumn('device_tokens', 'token')
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Device token table is not available.',
+            ], 422);
+        }
+
+        $hasToken = DB::table('device_tokens')
+            ->where('user_id', $userId)
+            ->whereNotNull('token')
+            ->where('token', '!=', '')
+            ->exists();
+
+        if (!$hasToken) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User has no FCM token, so push cannot be sent.',
+            ], 422);
+        }
+
+        $petColumns = ['id', 'user_id', 'name'];
+        foreach (['reported_symptom', 'breed', 'pet_type', 'type'] as $column) {
+            if (Schema::hasColumn('pets', $column)) {
+                $petColumns[] = $column;
+            }
+        }
+
+        $pets = Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id')
+            ? Pet::query()
+                ->select(array_unique($petColumns))
+                ->where('user_id', $userId)
+                ->orderByDesc('id')
+                ->limit(5)
+                ->get()
+            : collect();
+
+        $copy = $this->generateLeadAiMarketingPushCopy($user, $pets);
+
+        try {
+            $notification = Notification::create([
+                'user_id' => $userId,
+                'pet_id' => $pets->first()?->id,
+                'type' => 'ai_marketing_no_payment',
+                'title' => $copy['title'],
+                'body' => $copy['body'],
+                'payload' => [
+                    'type' => 'ai_marketing_no_payment',
+                    'user_id' => (string) $userId,
+                    'pet_id' => (string) ($pets->first()?->id ?? ''),
+                    'pet_names' => $pets->pluck('name')->filter()->values()->all(),
+                    'reported_symptoms' => $pets->pluck('reported_symptom')->filter()->values()->all(),
+                    'deepLink' => 'snoutiq://videocall-appointment',
+                    'deep_link' => 'snoutiq://videocall-appointment',
+                    'deeplink' => 'snoutiq://videocall-appointment',
+                    'source' => 'lead_management_ai_marketing_push',
+                ],
+                'status' => Notification::STATUS_PENDING,
+                'channel' => Notification::CHANNEL_PUSH,
+            ]);
+
+            SendNotificationJob::dispatchSync($notification->id);
+            $notification->refresh();
+
+            return response()->json([
+                'status' => $notification->status === Notification::STATUS_SENT ? 'success' : 'error',
+                'message' => $notification->status === Notification::STATUS_SENT
+                    ? 'AI marketing push sent.'
+                    : 'Push was created but not sent. Check logs/device token.',
+                'notification' => [
+                    'id' => (int) $notification->id,
+                    'title' => (string) $notification->title,
+                    'body' => (string) $notification->body,
+                    'status' => (string) $notification->status,
+                    'sent_at' => optional($notification->sent_at)->toDateTimeString(),
+                ],
+            ], $notification->status === Notification::STATUS_SENT ? 200 : 500);
+        } catch (\Throwable $e) {
+            Log::error('lead_management.ai_marketing_push.failed', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to send AI marketing push: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function generateLeadAiMarketingPushCopy(User $user, Collection $pets): array
+    {
+        $fallbackPetName = trim((string) ($pets->first()?->name ?? 'your pet')) ?: 'your pet';
+        $fallbackSymptom = trim((string) ($pets->pluck('reported_symptom')->filter()->first() ?? 'health concern'));
+        $fallback = [
+            'title' => "A vet can help {$fallbackPetName}",
+            'body' => "Still worried about {$fallbackPetName}'s {$fallbackSymptom}? Book a Snoutiq vet consult and get clear next steps today.",
+        ];
+
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            return $fallback;
+        }
+
+        $petContext = $pets
+            ->map(function (Pet $pet): array {
+                return [
+                    'name' => trim((string) ($pet->name ?? '')),
+                    'reported_symptom' => trim((string) ($pet->reported_symptom ?? '')),
+                    'breed' => trim((string) ($pet->breed ?? '')),
+                    'type' => trim((string) (($pet->pet_type ?? '') ?: ($pet->type ?? ''))),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $prompt = "Create one high-converting FCM push notification for a pet parent who installed Snoutiq but has not paid after 10+ days.\n"
+            ."Use the pet's reported symptom naturally. Be empathetic, specific, and urgent without sounding scary. Do not diagnose. Do not mention discounts.\n"
+            ."Return only JSON with keys title and body. Limits: title <= 45 chars, body <= 135 chars.\n\n"
+            ."User name: ".trim((string) ($user->name ?? 'Pet Parent'))."\n"
+            ."Pets JSON: ".json_encode($petContext, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $model = GeminiConfig::chatModel() ?: GeminiConfig::defaultModel();
+        $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', $model);
+
+        try {
+            $response = Http::timeout(12)
+                ->withHeaders([
+                    'Content-Type' => 'application/json',
+                    'X-goog-api-key' => $apiKey,
+                ])
+                ->post($endpoint, [
+                    'contents' => [[
+                        'parts' => [[
+                            'text' => $prompt,
+                        ]],
+                    ]],
+                    'generationConfig' => [
+                        'temperature' => 0.75,
+                        'maxOutputTokens' => 160,
+                    ],
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('lead_management.ai_marketing_push.gemini_failed', [
+                    'user_id' => $user->id,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return $fallback;
+            }
+
+            $text = trim((string) $response->json('candidates.0.content.parts.0.text'));
+            $decoded = $this->decodeGeminiJsonObject($text);
+            $title = trim((string) ($decoded['title'] ?? ''));
+            $body = trim((string) ($decoded['body'] ?? ''));
+
+            if ($title === '' || $body === '') {
+                return $fallback;
+            }
+
+            return [
+                'title' => mb_substr($title, 0, 45),
+                'body' => mb_substr($body, 0, 135),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('lead_management.ai_marketing_push.gemini_exception', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $fallback;
+        }
+    }
+
+    private function decodeGeminiJsonObject(string $text): array
+    {
+        $clean = trim($text);
+        $clean = preg_replace('/^```(?:json)?\s*/i', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s*```$/', '', $clean) ?? $clean;
+
+        $decoded = json_decode($clean, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        if (preg_match('/\{.*\}/s', $clean, $match)) {
+            $decoded = json_decode($match[0], true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
     }
 
     public function deleteLeadManagementUser(Request $request, User $user): RedirectResponse
