@@ -4201,9 +4201,19 @@ class AdminPanelController extends Controller
             ->first(fn (string $value): bool => $value !== '') ?? '';
         $doctorMobile = '';
         if ($latestTransaction && is_numeric($latestTransaction->doctor_id ?? null)) {
-            $doctorMobile = (string) (Doctor::query()
-                ->where('id', (int) $latestTransaction->doctor_id)
-                ->value('mobile') ?? '');
+            $doctorPhoneColumn = null;
+            foreach (['doctor_mobile', 'mobile', 'phone'] as $candidateColumn) {
+                if (Schema::hasColumn('doctors', $candidateColumn)) {
+                    $doctorPhoneColumn = $candidateColumn;
+                    break;
+                }
+            }
+
+            if ($doctorPhoneColumn !== null) {
+                $doctorMobile = (string) (Doctor::query()
+                    ->where('id', (int) $latestTransaction->doctor_id)
+                    ->value($doctorPhoneColumn) ?? '');
+            }
         }
 
         $sections = [
