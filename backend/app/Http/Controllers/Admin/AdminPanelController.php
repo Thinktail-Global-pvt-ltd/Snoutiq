@@ -838,6 +838,11 @@ class AdminPanelController extends Controller
         $searchTerm = trim((string) ($filters['q'] ?? ''));
         $searchActive = $searchTerm !== '';
         $deferLeadDetails = !$request->boolean('eager_details');
+        $leadManagementStartedAt = microtime(true);
+        $leadManagementTiming = [];
+        $markLeadManagementTiming = static function (string $stage) use (&$leadManagementTiming, $leadManagementStartedAt): void {
+            $leadManagementTiming[$stage] = round((microtime(true) - $leadManagementStartedAt) * 1000, 1);
+        };
 
         $hasUsersTable = Schema::hasTable('users');
         $hasUserCity = $hasUsersTable && Schema::hasColumn('users', 'city');
@@ -1001,8 +1006,6 @@ class AdminPanelController extends Controller
                     }
                 }
 
-                $neuteringLeadCount = (clone $neuteringBaseQuery)->count();
-
                 $neuteringLeads = $neuteringBaseQuery
                     ->select($petColumns)
                     ->with(['owner:' . implode(',', $leadUserBaseColumns)])
@@ -1015,6 +1018,7 @@ class AdminPanelController extends Controller
                 $neuteringLeads = collect();
             }
         }
+        $markLeadManagementTiming('neutering_leads');
 
         $hasTransactionsTable = Schema::hasTable('transactions');
         $hasPrescriptionsTable = Schema::hasTable('prescriptions');
@@ -1054,8 +1058,17 @@ class AdminPanelController extends Controller
                     ->selectRaw('MAX(p.id) as latest_prescription_id, p.call_session as call_session_key')
                     ->whereNotNull('p.call_session')
                     ->where('p.call_session', '!=', '')
-                    ->whereNotNull('p.follow_up_date')
-                    ->groupBy('p.call_session');
+                    ->whereNotNull('p.follow_up_date');
+
+                if ($searchActive) {
+                    if ($searchMatchedUserIds->isNotEmpty()) {
+                        $latestFollowUpPrescriptionBySession->whereIn('p.user_id', $searchMatchedUserIds->all());
+                    } else {
+                        $latestFollowUpPrescriptionBySession->whereRaw('1 = 0');
+                    }
+                }
+
+                $latestFollowUpPrescriptionBySession->groupBy('p.call_session');
 
                 $videoFollowUpBaseQuery = Transaction::query()
                     ->where(function (Builder $query) use ($hasTransactionMetadata): void {
@@ -1093,17 +1106,6 @@ class AdminPanelController extends Controller
                     }
                 }
 
-                $videoFollowUpLeadCount = (clone $videoFollowUpBaseQuery)->count('transactions.id');
-                if ($supportsVideoFollowUpModeSplit) {
-                    $videoFollowUpVideoLeadCount = (clone $videoFollowUpBaseQuery)
-                        ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('video', 'video_consult', 'video_consultation')")
-                        ->count('transactions.id');
-
-                    $videoFollowUpInClinicLeadCount = (clone $videoFollowUpBaseQuery)
-                        ->whereRaw("LOWER(TRIM(COALESCE(lead_prescription.video_inclinic, ''))) IN ('in_clinic', 'inclinic', 'in-clinic', 'clinic')")
-                        ->count('transactions.id');
-                }
-
                 $videoFollowUpRelations = ['user:' . implode(',', $leadUserBaseColumns)];
 
                 $videoFollowUpLeads = $videoFollowUpBaseQuery
@@ -1129,6 +1131,7 @@ class AdminPanelController extends Controller
                 $videoFollowUpLeads = collect();
             }
         }
+        $markLeadManagementTiming('video_follow_up_leads');
 
         $initializeLeadUser = static function (?User $user, int $fallbackUserId = 0): array {
             return [
@@ -2071,6 +2074,7 @@ class AdminPanelController extends Controller
                 $captureLeadManagementError('fcm_notification_joins', $e);
             }
         }
+        $markLeadManagementTiming('fcm_notification_joins');
 
         if (!$deferLeadDetails && $supportsNotificationRecords && $targetUsers->isNotEmpty()) {
             try {
@@ -2197,6 +2201,7 @@ class AdminPanelController extends Controller
                 $captureLeadManagementError('notification_records', $e);
             }
         }
+        $markLeadManagementTiming('notification_records');
 
         if (!$deferLeadDetails && $supportsFcmNotifications && $targetUsers->isNotEmpty()) {
             try {
@@ -2309,6 +2314,7 @@ class AdminPanelController extends Controller
                 $captureLeadManagementError('fcm_notification_logs', $e);
             }
         }
+        $markLeadManagementTiming('fcm_notification_logs');
 
         $targetUsers = $targetUsers->map(function (array $leadUser): array {
             $notifications = collect($leadUser['all_notifications'] ?? [])
@@ -2472,6 +2478,7 @@ class AdminPanelController extends Controller
                 $captureLeadManagementError('lead_user_enrichment', $e);
             }
         }
+        $markLeadManagementTiming('lead_user_enrichment');
 
         if (!$deferLeadDetails && $hasPrescriptionUserId && $targetUsers->isNotEmpty()) {
             try {
@@ -2631,6 +2638,7 @@ class AdminPanelController extends Controller
                 $captureLeadManagementError('related_prescriptions', $e);
             }
         }
+        $markLeadManagementTiming('related_prescriptions');
 
         $hasTransactionUserId = $hasTransactionsTable && Schema::hasColumn('transactions', 'user_id');
         $hasTransactionCreatedAt = $hasTransactionsTable && Schema::hasColumn('transactions', 'created_at');
@@ -3151,6 +3159,7 @@ class AdminPanelController extends Controller
                 $convertedUsersCount = 0;
             }
         }
+        $markLeadManagementTiming('conversion_tracking');
 
         $supportsLeadActivityLogs = Schema::hasTable('lead_management_activity_logs')
             && Schema::hasColumn('lead_management_activity_logs', 'user_id');
@@ -3296,6 +3305,7 @@ class AdminPanelController extends Controller
                 $captureLeadManagementError('lead_activity_logs', $e);
             }
         }
+        $markLeadManagementTiming('lead_activity_logs');
 
         if ($hasUsersTable) {
             $targetUsers = $targetUsers
@@ -3426,6 +3436,19 @@ class AdminPanelController extends Controller
         $vaccinationNotifiedUsersCount = $targetUsers
             ->filter(fn (array $leadUser) => (int) ($leadUser['vaccination_notification_count'] ?? 0) > 0)
             ->count();
+
+        $markLeadManagementTiming('before_view');
+        Log::info('lead-management timings', [
+            'ms' => $leadManagementTiming,
+            'limit' => $limit,
+            'per_page' => $perPage,
+            'page' => $page,
+            'lead_filter' => $leadFilter,
+            'search' => $searchActive,
+            'defer_details' => $deferLeadDetails,
+            'target_users' => $targetUsers->count(),
+            'filtered_users' => $totalFilteredUsers,
+        ]);
 
         return view('admin.lead-management', [
             'filteredTargetUsers' => $filteredTargetUsers,
