@@ -1191,6 +1191,15 @@ class AdminPanelController extends Controller
                 'conversion_transaction_clinic_name' => null,
                 'related_transactions' => [],
                 'related_prescriptions' => [],
+                'monthly_revenue_projection' => [
+                    'month' => now()->format('Y-m'),
+                    'eligible_transactions_count' => 0,
+                    'excel_export_count' => 0,
+                    'video_consult_count' => 0,
+                    'appointments_count' => 0,
+                    'revenue_per_appointment_inr' => 150,
+                    'estimated_revenue_inr' => 0,
+                ],
                 'conversion_lag_minutes' => null,
                 'crm_activity_logs' => [],
                 'crm_next_action' => null,
@@ -3433,6 +3442,71 @@ class AdminPanelController extends Controller
                     }
                 } catch (\Throwable $e) {
                     $captureLeadManagementError('captured_payment_users', $e);
+                }
+            }
+
+            if (
+                $hasTransactionsTable
+                && $hasTransactionUserId
+                && ($hasTransactionType || $hasTransactionStatus)
+                && $targetUsers->isNotEmpty()
+            ) {
+                try {
+                    $leadUserIds = $targetUsers
+                        ->keys()
+                        ->filter(fn ($userId): bool => is_numeric($userId) && (int) $userId > 0)
+                        ->map(fn ($userId): int => (int) $userId)
+                        ->values();
+
+                    if ($leadUserIds->isNotEmpty()) {
+                        $monthlyRevenueTypes = ['excell_export_campaign', 'video_consult', 'appointments', 'appointment'];
+                        $revenueTypeColumn = $hasTransactionType ? 'type' : 'status';
+                        $monthStart = now()->startOfMonth()->toDateTimeString();
+                        $monthEnd = now()->endOfMonth()->toDateTimeString();
+
+                        $revenueRowsQuery = DB::table('transactions')
+                            ->select('user_id')
+                            ->selectRaw("LOWER(TRIM(COALESCE({$revenueTypeColumn}, ''))) as revenue_type")
+                            ->whereIn('user_id', $leadUserIds->all())
+                            ->whereIn(DB::raw("LOWER(TRIM(COALESCE({$revenueTypeColumn}, '')))"), $monthlyRevenueTypes);
+
+                        if ($hasTransactionCreatedAt) {
+                            $revenueRowsQuery
+                                ->where('created_at', '>=', $monthStart)
+                                ->where('created_at', '<=', $monthEnd);
+                        }
+
+                        $monthlyRevenueByUser = $revenueRowsQuery
+                            ->get()
+                            ->groupBy(fn ($row): int => is_numeric($row->user_id ?? null) ? (int) $row->user_id : 0);
+
+                        foreach ($leadUserIds as $userId) {
+                            if (!$targetUsers->has($userId)) {
+                                continue;
+                            }
+
+                            $rows = collect($monthlyRevenueByUser->get($userId, []));
+                            $excelCount = $rows->filter(fn ($row): bool => (string) ($row->revenue_type ?? '') === 'excell_export_campaign')->count();
+                            $videoCount = $rows->filter(fn ($row): bool => (string) ($row->revenue_type ?? '') === 'video_consult')->count();
+                            $appointmentCount = $rows
+                                ->filter(fn ($row): bool => in_array((string) ($row->revenue_type ?? ''), ['appointments', 'appointment'], true))
+                                ->count();
+
+                            $leadUser = $targetUsers->get($userId);
+                            $leadUser['monthly_revenue_projection'] = [
+                                'month' => now()->format('Y-m'),
+                                'eligible_transactions_count' => $rows->count(),
+                                'excel_export_count' => $excelCount,
+                                'video_consult_count' => $videoCount,
+                                'appointments_count' => $appointmentCount,
+                                'revenue_per_appointment_inr' => 150,
+                                'estimated_revenue_inr' => $appointmentCount * 150,
+                            ];
+                            $targetUsers->put($userId, $leadUser);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $captureLeadManagementError('monthly_revenue_projection', $e);
                 }
             }
 
