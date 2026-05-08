@@ -851,9 +851,28 @@ class AdminPanelController extends Controller
 
         $allUsers = collect();
         if ($hasUsersTable) {
-            $allUsers = User::query()
-                ->select($leadUserColumnsWithCreatedAt)
+            $allUsersQuery = User::query()
+                ->select($leadUserColumnsWithCreatedAt);
+
+            if ($searchTerm !== '') {
+                $allUsersQuery->where(function (Builder $query) use ($searchTerm, $hasUserCity): void {
+                    $query->where('name', 'like', '%' . $searchTerm . '%')
+                        ->orWhere('email', 'like', '%' . $searchTerm . '%')
+                        ->orWhere('phone', 'like', '%' . $searchTerm . '%');
+
+                    if (is_numeric($searchTerm)) {
+                        $query->orWhere('id', (int) $searchTerm);
+                    }
+
+                    if ($hasUserCity) {
+                        $query->orWhere('city', 'like', '%' . $searchTerm . '%');
+                    }
+                });
+            }
+
+            $allUsers = $allUsersQuery
                 ->orderByDesc($hasUserCreatedAt ? 'created_at' : 'id')
+                ->limit($limit)
                 ->get();
         }
         $existingLeadUserIds = $allUsers
@@ -861,10 +880,22 @@ class AdminPanelController extends Controller
             ->filter(fn ($userId) => is_numeric($userId) && (int) $userId > 0)
             ->map(fn ($userId) => (int) $userId)
             ->flip();
-        $isExistingLeadUserId = static function ($userId) use ($existingLeadUserIds): bool {
-            return is_numeric($userId)
-                && (int) $userId > 0
-                && $existingLeadUserIds->has((int) $userId);
+        $existingLeadUserIdCache = [];
+        $isExistingLeadUserId = static function ($userId) use ($existingLeadUserIds, &$existingLeadUserIdCache): bool {
+            if (!is_numeric($userId) || (int) $userId <= 0) {
+                return false;
+            }
+
+            $resolvedUserId = (int) $userId;
+            if ($existingLeadUserIds->has($resolvedUserId)) {
+                return true;
+            }
+
+            if (!array_key_exists($resolvedUserId, $existingLeadUserIdCache)) {
+                $existingLeadUserIdCache[$resolvedUserId] = User::query()->whereKey($resolvedUserId)->exists();
+            }
+
+            return (bool) $existingLeadUserIdCache[$resolvedUserId];
         };
 
         $hasPetsTable = Schema::hasTable('pets');
@@ -3226,12 +3257,12 @@ class AdminPanelController extends Controller
 
         if ($hasUsersTable) {
             $targetUsers = $targetUsers
-                ->filter(function (array $leadUser, $userId) use ($existingLeadUserIds): bool {
+                ->filter(function (array $leadUser, $userId) use ($isExistingLeadUserId): bool {
                     $resolvedUserId = is_numeric($userId)
                         ? (int) $userId
                         : (is_numeric($leadUser['id'] ?? null) ? (int) $leadUser['id'] : 0);
 
-                    return $resolvedUserId > 0 && $existingLeadUserIds->has($resolvedUserId);
+                    return $isExistingLeadUserId($resolvedUserId);
                 });
 
             $neuteringLeadCount = $targetUsers
