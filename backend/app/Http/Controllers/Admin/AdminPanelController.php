@@ -3327,28 +3327,6 @@ class AdminPanelController extends Controller
                 ->count();
         }
 
-        $latestRelatedTransactionTimestamp = static function (array $leadUser): string {
-            $timestamps = collect($leadUser['related_transactions'] ?? [])
-                ->pluck('created_at')
-                ->filter(fn ($value) => is_string($value) && trim($value) !== '')
-                ->map(fn ($value) => trim((string) $value))
-                ->values()
-                ->all();
-
-            $conversionTimestamp = trim((string) ($leadUser['conversion_transaction_at'] ?? ''));
-            if ($conversionTimestamp !== '') {
-                $timestamps[] = $conversionTimestamp;
-            }
-
-            if (empty($timestamps)) {
-                return '';
-            }
-
-            rsort($timestamps, SORT_STRING);
-
-            return (string) ($timestamps[0] ?? '');
-        };
-
         $filteredTargetUsers = $targetUsers
             ->values()
             ->filter(function (array $leadUser) use ($leadFilter): bool {
@@ -3366,37 +3344,17 @@ class AdminPanelController extends Controller
                 };
             })
             ->filter(fn (array $leadUser): bool => $matchesLeadSearch($leadUser, $searchTerm))
-            ->sort(function (array $left, array $right) use ($latestRelatedTransactionTimestamp): int {
-                $leftLatestTransaction = $latestRelatedTransactionTimestamp($left);
-                $rightLatestTransaction = $latestRelatedTransactionTimestamp($right);
-                if ($leftLatestTransaction !== $rightLatestTransaction) {
-                    return strcmp((string) $rightLatestTransaction, (string) $leftLatestTransaction);
+            ->sort(function (array $left, array $right): int {
+                $leftCreatedAt = trim((string) ($left['user_created_at'] ?? ''));
+                $rightCreatedAt = trim((string) ($right['user_created_at'] ?? ''));
+                if ($leftCreatedAt !== $rightCreatedAt) {
+                    return strcmp($rightCreatedAt, $leftCreatedAt);
                 }
 
-                $leftDate = $left['next_follow_up_date'] ?? '9999-12-31';
-                $rightDate = $right['next_follow_up_date'] ?? '9999-12-31';
-                if ($leftDate !== $rightDate) {
-                    return strcmp((string) $leftDate, (string) $rightDate);
-                }
-
-                if ((int) $left['video_follow_up_count'] !== (int) $right['video_follow_up_count']) {
-                    return (int) $right['video_follow_up_count'] <=> (int) $left['video_follow_up_count'];
-                }
-
-                if ((int) $left['video_follow_up_video_count'] !== (int) $right['video_follow_up_video_count']) {
-                    return (int) $right['video_follow_up_video_count'] <=> (int) $left['video_follow_up_video_count'];
-                }
-
-                if ((int) $left['video_follow_up_in_clinic_count'] !== (int) $right['video_follow_up_in_clinic_count']) {
-                    return (int) $right['video_follow_up_in_clinic_count'] <=> (int) $left['video_follow_up_in_clinic_count'];
-                }
-
-                if ((int) $left['vaccination_notification_count'] !== (int) $right['vaccination_notification_count']) {
-                    return (int) $right['vaccination_notification_count'] <=> (int) $left['vaccination_notification_count'];
-                }
-
-                if ((int) $left['neutering_pet_count'] !== (int) $right['neutering_pet_count']) {
-                    return (int) $right['neutering_pet_count'] <=> (int) $left['neutering_pet_count'];
+                $leftId = is_numeric($left['id'] ?? null) ? (int) $left['id'] : 0;
+                $rightId = is_numeric($right['id'] ?? null) ? (int) $right['id'] : 0;
+                if ($leftId !== $rightId) {
+                    return $rightId <=> $leftId;
                 }
 
                 return strcmp(
@@ -3714,6 +3672,52 @@ class AdminPanelController extends Controller
 
         $notifications = collect();
         if (Schema::hasTable('fcm_notifications') && Schema::hasColumn('fcm_notifications', 'user_id')) {
+            $fcmHasNotificationType = Schema::hasColumn('fcm_notifications', 'notification_type');
+            $fcmHasStatus = Schema::hasColumn('fcm_notifications', 'status');
+            $fcmHasSentAt = Schema::hasColumn('fcm_notifications', 'sent_at');
+            $fcmHasCreatedAt = Schema::hasColumn('fcm_notifications', 'created_at');
+            $fcmHasClicked = Schema::hasColumn('fcm_notifications', 'clicked');
+            $fcmHasClickedAt = Schema::hasColumn('fcm_notifications', 'clicked_at');
+            $leadNotificationTypes = [
+                'pet_neutering_reminder',
+                'pet_vaccination_upcoming_reminder',
+                'vaccination_milestone',
+                'pp_user_created',
+                'profile_completion',
+            ];
+            $resolveLeadNotificationBucket = static function (string $notificationType, array $payload = []) use ($leadNotificationTypes): ?string {
+                $type = strtolower(trim($notificationType));
+                if ($type === '' || $type === 'unknown') {
+                    $type = strtolower(trim((string) data_get($payload, 'type')));
+                }
+
+                if ($type === 'pet_neutering_reminder') {
+                    return 'neutering';
+                }
+
+                if (in_array($type, ['pet_vaccination_upcoming_reminder', 'vaccination_milestone'], true)) {
+                    return 'vaccination';
+                }
+
+                if ($type === 'pp_user_created') {
+                    return 'onboarding';
+                }
+
+                if ($type === 'profile_completion') {
+                    return 'profile_completion';
+                }
+
+                if (
+                    str_contains($type, 'follow_up')
+                    || str_contains($type, 'follow-up')
+                    || str_contains($type, 'followup')
+                ) {
+                    return 'follow_up';
+                }
+
+                return null;
+            };
+
             $columns = ['id', 'user_id'];
             foreach (['notification_type', 'title', 'notification_text', 'status', 'sent_at', 'created_at', 'clicked', 'clicked_at', 'data_payload', 'call_session'] as $column) {
                 if (Schema::hasColumn('fcm_notifications', $column)) {
@@ -3721,17 +3725,54 @@ class AdminPanelController extends Controller
                 }
             }
 
-            $notifications = FcmNotification::query()
+            $notificationQuery = FcmNotification::query()
                 ->select(array_unique($columns))
-                ->where('user_id', $userId)
-                ->orderByDesc(Schema::hasColumn('fcm_notifications', 'sent_at') ? 'sent_at' : 'id')
+                ->where('user_id', $userId);
+
+            if ($fcmHasNotificationType) {
+                $notificationQuery->where(function ($query) use ($leadNotificationTypes): void {
+                    $query->whereIn('notification_type', $leadNotificationTypes)
+                        ->orWhere('notification_type', 'like', '%follow_up%')
+                        ->orWhere('notification_type', 'like', '%follow-up%')
+                        ->orWhere('notification_type', 'like', '%followup%');
+                });
+            }
+
+            if ($fcmHasStatus || $fcmHasSentAt) {
+                $notificationQuery->where(function ($query) use ($fcmHasStatus, $fcmHasSentAt): void {
+                    if ($fcmHasStatus) {
+                        $query->where('status', 'sent');
+                    }
+
+                    if ($fcmHasSentAt) {
+                        $method = $fcmHasStatus ? 'orWhereNotNull' : 'whereNotNull';
+                        $query->{$method}('sent_at');
+                    }
+                });
+            }
+
+            $notifications = $notificationQuery
+                ->orderByDesc($fcmHasSentAt ? 'sent_at' : 'id')
                 ->orderByDesc('id')
-                ->limit(100)
+                ->limit(200)
                 ->get()
-                ->map(function ($row) use ($normalizeDateTime): array {
+                ->map(function ($row) use ($normalizeDateTime, $resolveLeadNotificationBucket, $fcmHasClicked, $fcmHasClickedAt): ?array {
                     $payload = is_array($row->data_payload ?? null) ? $row->data_payload : [];
                     $type = trim((string) (($row->notification_type ?? '') ?: data_get($payload, 'type') ?: 'unknown'));
                     $timestamp = $normalizeDateTime($row->sent_at ?? null) ?: $normalizeDateTime($row->created_at ?? null);
+                    $bucket = $resolveLeadNotificationBucket($type, $payload);
+
+                    if ($bucket === null) {
+                        return null;
+                    }
+
+                    $bucketLabels = [
+                        'neutering' => 'Neutering',
+                        'vaccination' => 'Vaccination',
+                        'follow_up' => 'Follow-up',
+                        'onboarding' => 'Onboarding',
+                        'profile_completion' => 'Profile Completion',
+                    ];
 
                     return [
                         'id' => (int) ($row->id ?? 0),
@@ -3739,17 +3780,20 @@ class AdminPanelController extends Controller
                         'text' => trim((string) (($row->notification_text ?? '') ?: data_get($payload, 'body') ?: data_get($payload, 'message'))),
                         'type' => $type,
                         'timestamp' => $timestamp,
-                        'clicked' => array_key_exists('clicked', (array) $row) ? (bool) ($row->clicked ?? false) : null,
-                        'clicked_at' => $normalizeDateTime($row->clicked_at ?? null),
-                        'bucket' => str_contains(strtolower($type), 'vaccination') ? 'vaccination' : (str_contains(strtolower($type), 'follow') ? 'follow_up' : (str_contains(strtolower($type), 'neuter') ? 'neutering' : 'other')),
-                        'bucket_label' => str_contains(strtolower($type), 'vaccination') ? 'Vaccination' : (str_contains(strtolower($type), 'follow') ? 'Follow-up' : (str_contains(strtolower($type), 'neuter') ? 'Neutering' : 'Other')),
+                        'clicked' => $fcmHasClicked ? (bool) ($row->clicked ?? false) : null,
+                        'clicked_at' => $fcmHasClickedAt ? $normalizeDateTime($row->clicked_at ?? null) : null,
+                        'bucket' => $bucket,
+                        'bucket_label' => $bucketLabels[$bucket] ?? 'Other',
                         'converted' => false,
                         'conversion_transaction_id' => 0,
                         'conversion_transaction_type' => '',
                         'conversion_transaction_status' => '',
                         'conversion_transaction_at' => '',
                     ];
-                });
+                })
+                ->filter()
+                ->take(100)
+                ->values();
         }
 
         $relatedTransactions = collect();

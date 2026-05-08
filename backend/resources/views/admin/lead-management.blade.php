@@ -1891,11 +1891,11 @@
 
                 <label class="crm-side-filter-label" for="crmSortSelect">Sort by</label>
                 <select id="crmSortSelect" class="crm-select" style="width: 100%;">
+                    <option value="created_desc">Newest user</option>
                     <option value="latest_transaction">Latest transaction</option>
                     <option value="next_action">Next action date</option>
                     <option value="last_updated">Latest notification</option>
                     <option value="highest_activity">Highest activity</option>
-                    <option value="created_desc">Created date</option>
                 </select>
             </div>
         </aside>
@@ -2210,7 +2210,7 @@
         pipeline: 'all',
         service: initialService,
         search: '',
-        sortBy: 'latest_transaction',
+        sortBy: 'created_desc',
         selectedLeadId: leadData.length ? Number(leadData[0].id) : null,
         leads: (leadData || []).map((lead) => {
             const serverActivities = Array.isArray(lead.crm_activity_logs)
