@@ -1366,6 +1366,7 @@ class AdminPanelController extends Controller
         $fcmHasClickedAt = $supportsFcmNotifications && Schema::hasColumn('fcm_notifications', 'clicked_at');
         $supportsVaccinationNotificationJoin = $supportsFcmNotifications
             && ($fcmHasNotificationType || $supportsNeuteringNotificationJoin);
+        $requiresInitialFcmJoin = !$deferLeadDetails || $leadFilter === 'vaccination';
         $vaccinationReminderType = 'pet_vaccination_upcoming_reminder';
         $vaccinationNotificationTypes = [$vaccinationReminderType, 'vaccination_milestone'];
         $maxFcmScanRows = min(max($limit * 8, 500), 3000);
@@ -1475,7 +1476,7 @@ class AdminPanelController extends Controller
             return $fcmHasSentAt && $normalizeDateTime($fcmRow->sent_at) !== null;
         };
 
-        if ($supportsFcmNotifications) {
+        if ($requiresInitialFcmJoin && $supportsFcmNotifications) {
             try {
             // 1) Neutering notifications: data_payload.pet_id -> neutering lead pets.
             if ($supportsNeuteringNotificationJoin && $neuteringLeads->isNotEmpty()) {
