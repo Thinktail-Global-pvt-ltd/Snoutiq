@@ -113,6 +113,34 @@
         letter-spacing: 0.02em;
     }
 
+    .crm-brand-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+    }
+
+    .crm-back-btn {
+        height: 30px;
+        border-radius: var(--crm-radius-sm);
+        border: 1px solid var(--crm-border);
+        color: var(--crm-ink-2);
+        background: var(--crm-surface-2);
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0 0.65rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .crm-back-btn:hover {
+        color: var(--crm-ink);
+        border-color: var(--crm-blue);
+        background: var(--crm-blue-bg);
+    }
+
     .crm-brand-dot {
         width: 9px;
         height: 9px;
@@ -215,6 +243,61 @@
         font-size: 0.74rem;
         padding: 0.4rem 0.55rem;
         margin-bottom: 0.45rem;
+    }
+
+    .crm-page-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        background: rgba(15, 17, 23, 0.96);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.18s ease, visibility 0.18s ease;
+    }
+
+    .crm-page-loader.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    .crm-loader-card {
+        width: min(360px, calc(100vw - 2rem));
+        border: 1px solid var(--crm-border-2);
+        background: var(--crm-surface);
+        border-radius: var(--crm-radius);
+        padding: 1.1rem;
+        text-align: center;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    .crm-loader-spinner {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 3px solid rgba(79, 124, 248, 0.22);
+        border-top-color: var(--crm-blue);
+        margin: 0 auto 0.75rem;
+        animation: crmSpin 0.8s linear infinite;
+    }
+
+    .crm-loader-title {
+        color: var(--crm-ink);
+        font-weight: 800;
+        font-size: 0.95rem;
+    }
+
+    .crm-loader-text {
+        color: var(--crm-ink-2);
+        font-size: 0.72rem;
+        margin-top: 0.22rem;
+    }
+
+    @keyframes crmSpin {
+        to {
+            transform: rotate(360deg);
+        }
     }
 
     .crm-app {
@@ -1955,11 +2038,25 @@
     </div>
 @endif
 
+<div id="crmPageLoader" class="crm-page-loader">
+    <div class="crm-loader-card">
+        <div class="crm-loader-spinner"></div>
+        <div class="crm-loader-title">Loading Lead Management</div>
+        <div class="crm-loader-text">Preparing leads, notifications, and follow-up data.</div>
+    </div>
+</div>
+
 <div class="crm-shell-wrap">
     <div class="crm-topbar">
-        <div class="crm-brand">
-            <span class="crm-brand-dot"></span>
-            Snoutiq CRM
+        <div class="crm-brand-actions">
+            <a class="crm-back-btn" href="https://snoutiq.com/backend/admin/dashboard">
+                <i class="bi bi-arrow-left"></i>
+                Dashboard
+            </a>
+            <div class="crm-brand">
+                <span class="crm-brand-dot"></span>
+                Snoutiq CRM
+            </div>
         </div>
         <div class="crm-top-stats">
             <div class="crm-stat">Visible users: <b>{{ number_format($summary['filtered_users'] ?? 0) }}</b></div>
@@ -2385,7 +2482,7 @@
 <div class="crm-modal-overlay" id="crm-modal-profile" data-modal="profile">
     <div class="crm-modal crm-modal-xl">
         <h3>Full User Profile</h3>
-        <p class="crm-modal-sub" id="crmFullProfileSubtitle">Users, pets, transactions, prescriptions, and available photo/blob previews.</p>
+        <p class="crm-modal-sub" id="crmFullProfileSubtitle">Same curated user, pet, image, transaction, and prescription data shown in the Pet Timeline view.</p>
         <div id="crmFullProfileContent" class="crm-profile-sections">
             <div class="crm-empty">Select a lead to load profile data.</div>
         </div>
@@ -2423,6 +2520,7 @@
     const leadFilterSelect = document.getElementById('lead_filter');
     const searchQueryField = document.getElementById('crmSearchQueryField');
     const toastEl = document.getElementById('crmToast');
+    const pageLoaderEl = document.getElementById('crmPageLoader');
 
     if (!listEl || !detailWrapEl || !detailEmptyEl || !leadCountEl || !searchInput || !sortSelect || !sidebarFilterWrap) {
         return;
@@ -2531,6 +2629,18 @@
         showToast._timer = window.setTimeout(() => {
             toastEl.classList.remove('show');
         }, 2200);
+    }
+
+    function showPageLoader(message = '') {
+        if (!pageLoaderEl) return;
+        const textEl = pageLoaderEl.querySelector('.crm-loader-text');
+        if (textEl && message) textEl.textContent = message;
+        pageLoaderEl.classList.remove('hidden');
+    }
+
+    function hidePageLoader() {
+        if (!pageLoaderEl) return;
+        pageLoaderEl.classList.add('hidden');
     }
 
     function parseDateValue(value) {
@@ -4264,15 +4374,23 @@
 
             leadFilterSelect.value = selectedLeadFilter;
             resetFilterFormPage();
+            showPageLoader('Loading selected lead category.');
             filterForm.submit();
         });
     }
 
     function attachSearchSortHandlers() {
+        if (filterForm) {
+            filterForm.addEventListener('submit', () => {
+                showPageLoader('Loading Lead Management.');
+            });
+        }
+
         if (filterForm && searchQueryField) {
             const submitSearch = () => {
                 searchQueryField.value = String(searchInput.value || '');
                 resetFilterFormPage();
+                showPageLoader('Applying filters and loading matching leads.');
                 filterForm.submit();
             };
 
@@ -4314,6 +4432,7 @@
         attachSearchSortHandlers();
         attachModalHandlers();
         attachActionSavers();
+        window.setTimeout(hidePageLoader, 120);
     }
 
     bootstrap();

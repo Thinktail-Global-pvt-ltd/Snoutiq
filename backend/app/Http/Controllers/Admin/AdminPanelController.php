@@ -4082,34 +4082,136 @@ class AdminPanelController extends Controller
     public function leadManagementUserFullProfile(User $user): JsonResponse
     {
         $userId = (int) $user->id;
-        $petIds = Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id')
-            ? DB::table('pets')
+        $pets = Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id')
+            ? Pet::query()
                 ->where('user_id', $userId)
-                ->pluck('id')
-                ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
-                ->map(fn ($id): int => (int) $id)
-                ->values()
-                ->all()
-            : [];
+                ->orderByDesc(Schema::hasColumn('pets', 'created_at') ? 'created_at' : 'id')
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get()
+            : collect();
+        $petIds = $pets
+            ->pluck('id')
+            ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        $transactions = Schema::hasTable('transactions') && Schema::hasColumn('transactions', 'user_id')
+            ? Transaction::query()
+                ->where('user_id', $userId)
+                ->orderByDesc(Schema::hasColumn('transactions', 'created_at') ? 'created_at' : 'id')
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get()
+            : collect();
+
+        $prescriptions = Schema::hasTable('prescriptions') && Schema::hasColumn('prescriptions', 'user_id')
+            ? Prescription::query()
+                ->where(function (Builder $query) use ($userId, $petIds): void {
+                    $query->where('user_id', $userId);
+                    if (!empty($petIds) && Schema::hasColumn('prescriptions', 'pet_id')) {
+                        $query->orWhereIn('pet_id', $petIds);
+                    }
+                })
+                ->orderByDesc(Schema::hasColumn('prescriptions', 'created_at') ? 'created_at' : 'id')
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get()
+            : collect();
+
+        $latestTransaction = $transactions->first();
+        $primaryPet = $pets->first();
+        $reportedSymptom = $pets
+            ->map(fn ($pet): string => trim((string) ($pet->reported_symptom ?? '')))
+            ->first(fn (string $value): bool => $value !== '') ?? '';
+        $doctorMobile = '';
+        if ($latestTransaction && is_numeric($latestTransaction->doctor_id ?? null)) {
+            $doctorMobile = (string) (Doctor::query()
+                ->where('id', (int) $latestTransaction->doctor_id)
+                ->value('mobile') ?? '');
+        }
 
         $sections = [
-            $this->buildLeadProfileSection('users', 'Users table', function ($query) use ($userId): void {
-                $query->where('id', $userId);
-            }, 1),
-            $this->buildLeadProfileSection('pets', 'Pets table', function ($query) use ($userId): void {
-                $query->where('user_id', $userId);
-            }, 100),
-            $this->buildLeadProfileSection('transactions', 'Transactions table', function ($query) use ($userId): void {
-                $query->where('user_id', $userId);
-            }, 100),
-            $this->buildLeadProfileSection('prescriptions', 'Prescriptions table', function ($query) use ($userId, $petIds): void {
-                $query->where(function ($inner) use ($userId, $petIds): void {
-                    $inner->where('user_id', $userId);
-                    if (!empty($petIds) && Schema::hasColumn('prescriptions', 'pet_id')) {
-                        $inner->orWhereIn('pet_id', $petIds);
-                    }
-                });
-            }, 100),
+            [
+                'key' => 'overview',
+                'label' => 'Pet Timeline',
+                'rows' => [[
+                    'id' => $latestTransaction && is_numeric($latestTransaction->id ?? null) ? (int) $latestTransaction->id : null,
+                    'fields' => array_filter([
+                        'Transaction' => $latestTransaction && is_numeric($latestTransaction->id ?? null) ? '#'.(int) $latestTransaction->id : '',
+                        'Pet ID' => $primaryPet && is_numeric($primaryPet->id ?? null) ? (string) (int) $primaryPet->id : '',
+                        'User ID' => (string) $userId,
+                        'Appointments' => '0',
+                        'Transactions' => (string) $transactions->count(),
+                        'Prescriptions' => (string) $prescriptions->count(),
+                        'Doctor Mobile' => $doctorMobile !== '' ? $doctorMobile : 'N/A',
+                        'User Phone' => trim((string) ($user->phone ?? '')) !== '' ? (string) $user->phone : 'N/A',
+                        'User City' => trim((string) ($user->city ?? '')) !== '' ? (string) $user->city : 'N/A',
+                        'Reported Symptom' => $reportedSymptom !== '' ? $reportedSymptom : 'N/A',
+                    ], static fn ($value): bool => $value !== ''),
+                    'media' => [],
+                ]],
+            ],
+            [
+                'key' => 'users',
+                'label' => 'User Table (Non-null Fields)',
+                'rows' => [[
+                    'id' => $userId,
+                    'fields' => $this->formatLeadProfileVisibleAttributes($user, [
+                        'password',
+                        'remember_token',
+                        'api_token_hash',
+                        'google_token',
+                        'pet_doc2_blob',
+                        'pet_doc2_mime',
+                    ]),
+                    'media' => [],
+                ]],
+            ],
+            [
+                'key' => 'pets',
+                'label' => 'Pet Table (Non-null Fields)',
+                'rows' => $pets
+                    ->map(fn (Pet $pet): array => [
+                        'id' => is_numeric($pet->id ?? null) ? (int) $pet->id : null,
+                        'fields' => $this->formatLeadProfileVisibleAttributes($pet, ['pet_doc2_blob']),
+                        'media' => $this->buildLeadProfilePetMedia($pet),
+                    ])
+                    ->values()
+                    ->all(),
+            ],
+            [
+                'key' => 'timeline',
+                'label' => 'Timeline',
+                'rows' => $transactions
+                    ->map(function (Transaction $transaction): array {
+                        $amountPaise = is_numeric($transaction->amount_paise ?? null) ? (int) $transaction->amount_paise : 0;
+                        return [
+                            'id' => is_numeric($transaction->id ?? null) ? (int) $transaction->id : null,
+                            'fields' => [
+                                'Source' => 'Transaction',
+                                'Status' => trim((string) ($transaction->status ?? 'n/a')),
+                                'Type' => trim((string) ($transaction->type ?? 'n/a')),
+                                'Amount' => '₹'.number_format($amountPaise / 100, 2),
+                                'Created At' => (string) ($transaction->created_at ?? ''),
+                            ],
+                            'media' => [],
+                        ];
+                    })
+                    ->merge($prescriptions->map(fn (Prescription $prescription): array => [
+                        'id' => is_numeric($prescription->id ?? null) ? (int) $prescription->id : null,
+                        'fields' => array_filter([
+                            'Source' => 'Prescription',
+                            'Doctor ID' => is_numeric($prescription->doctor_id ?? null) ? (string) (int) $prescription->doctor_id : '',
+                            'Prescription ID' => '#'.(int) ($prescription->id ?? 0),
+                            'Created At' => (string) ($prescription->created_at ?? ''),
+                        ], static fn ($value): bool => $value !== ''),
+                        'media' => [],
+                    ]))
+                    ->values()
+                    ->all(),
+            ],
         ];
 
         return response()->json([
@@ -4120,158 +4222,77 @@ class AdminPanelController extends Controller
         ]);
     }
 
-    private function buildLeadProfileSection(string $table, string $label, \Closure $scope, int $limit): ?array
+    private function formatLeadProfileVisibleAttributes($model, array $exclude = []): array
     {
-        if (!Schema::hasTable($table)) {
-            return null;
+        if (!$model || !method_exists($model, 'getAttributes')) {
+            return [];
         }
 
-        $columns = Schema::getColumnListing($table);
-        if (empty($columns)) {
-            return [
-                'key' => $table,
-                'label' => $label,
-                'rows' => [],
-            ];
-        }
+        $excluded = array_flip($exclude);
+        $result = [];
 
-        try {
-            $query = DB::table($table)->select($columns);
-            $scope($query);
-
-            if (in_array('created_at', $columns, true)) {
-                $query->orderByDesc('created_at');
+        foreach ($model->getAttributes() as $key => $value) {
+            if (isset($excluded[$key])) {
+                continue;
             }
-            if (in_array('id', $columns, true)) {
-                $query->orderByDesc('id');
+            if ($value === null) {
+                continue;
+            }
+            if (is_string($value) && trim($value) === '') {
+                continue;
+            }
+            if (is_array($value) && empty($value)) {
+                continue;
             }
 
-            $rows = $query
-                ->limit($limit)
-                ->get()
-                ->map(fn ($row): array => $this->serializeLeadProfileRow($table, (array) $row))
-                ->values()
-                ->all();
+            if (is_bool($value)) {
+                $result[$key] = $value ? 'Yes' : 'No';
+                continue;
+            }
+            if (is_array($value) || is_object($value)) {
+                $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $result[$key] = $json !== false ? $json : (string) $value;
+                continue;
+            }
+            if (is_resource($value)) {
+                $contents = stream_get_contents($value);
+                $result[$key] = is_string($contents) ? $contents : '';
+                continue;
+            }
 
-            return [
-                'key' => $table,
-                'label' => $label,
-                'rows' => $rows,
-            ];
-        } catch (\Throwable $e) {
-            Log::warning('lead_management.full_profile.section_failed', [
-                'table' => $table,
-                'message' => $e->getMessage(),
-            ]);
-
-            return [
-                'key' => $table,
-                'label' => $label,
-                'rows' => [],
-                'error' => 'Could not load this table.',
-            ];
+            $result[$key] = (string) $value;
         }
+
+        return $result;
     }
 
-    private function serializeLeadProfileRow(string $table, array $row): array
+    private function buildLeadProfilePetMedia(Pet $pet): array
     {
-        $hiddenFields = [
-            'password',
-            'remember_token',
-            'api_token',
-            'api_token_hash',
-            'google_token',
-            'access_token',
-            'refresh_token',
-        ];
-        $fields = [];
         $media = [];
+        $petId = is_numeric($pet->id ?? null) ? (int) $pet->id : 0;
+        $blob = $pet->getAttribute('pet_doc2_blob');
+        if ($petId > 0 && is_string($blob) && $blob !== '') {
+            $media[] = [
+                'label' => 'Pet Image Preview',
+                'src' => route('api.pets.pet-doc2-blob', ['pet' => $petId], true),
+                'mime' => (string) ($pet->pet_doc2_mime ?? ''),
+                'size' => '',
+            ];
+        }
 
-        foreach ($row as $column => $value) {
-            $columnKey = strtolower((string) $column);
-            if (in_array($columnKey, $hiddenFields, true)) {
-                $fields[$column] = '[hidden]';
+        foreach (['pet_doc2', 'pet_doc1', 'pic_link'] as $column) {
+            $value = trim((string) ($pet->{$column} ?? ''));
+            if ($value === '') {
                 continue;
             }
 
-            if ($this->looksLikeBinaryColumn($columnKey)) {
-                $mime = $this->resolveLeadProfileMime($columnKey, $row);
-                $binary = is_resource($value) ? stream_get_contents($value) : $value;
-                $byteCount = is_string($binary) ? strlen($binary) : 0;
-                $fields[$column] = $byteCount > 0 ? sprintf('[binary %s]', $this->formatBytes($byteCount)) : '';
-
-                if ($byteCount > 0 && is_string($binary) && str_starts_with($mime, 'image/')) {
-                    $media[] = [
-                        'label' => "{$table}.{$column}",
-                        'src' => 'data:'.$mime.';base64,'.base64_encode($binary),
-                        'mime' => $mime,
-                        'size' => $this->formatBytes($byteCount),
-                    ];
-                }
-                continue;
-            }
-
-            $fields[$column] = $this->normalizeLeadProfileValue($value);
-            $mediaItem = $this->resolveLeadProfilePathMedia($table, (string) $column, $value);
+            $mediaItem = $this->resolveLeadProfilePathMedia('pets', $column, $value);
             if ($mediaItem !== null) {
                 $media[] = $mediaItem;
             }
         }
 
-        return [
-            'id' => is_numeric($row['id'] ?? null) ? (int) $row['id'] : null,
-            'fields' => $fields,
-            'media' => $media,
-        ];
-    }
-
-    private function looksLikeBinaryColumn(string $column): bool
-    {
-        return str_contains($column, 'blob') || str_contains($column, 'binary');
-    }
-
-    private function resolveLeadProfileMime(string $column, array $row): string
-    {
-        $candidates = [
-            str_replace('_blob', '_mime', $column),
-            str_replace('blob', 'mime', $column),
-            $column.'_mime',
-            'mime',
-            'file_mime',
-            'image_mime',
-        ];
-
-        foreach ($candidates as $candidate) {
-            foreach ($row as $key => $value) {
-                if (strtolower((string) $key) === strtolower($candidate) && is_string($value) && trim($value) !== '') {
-                    return trim($value);
-                }
-            }
-        }
-
-        return 'application/octet-stream';
-    }
-
-    private function normalizeLeadProfileValue($value): string
-    {
-        if ($value === null) {
-            return '';
-        }
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format('Y-m-d H:i:s');
-        }
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-        if (is_array($value) || is_object($value)) {
-            return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '';
-        }
-        if (is_resource($value)) {
-            $contents = stream_get_contents($value);
-            return is_string($contents) ? $contents : '';
-        }
-
-        return trim((string) $value);
+        return $media;
     }
 
     private function resolveLeadProfilePathMedia(string $table, string $column, $value): ?array
@@ -4310,18 +4331,6 @@ class AdminPanelController extends Controller
             'mime' => 'image/'.$extension,
             'size' => '',
         ];
-    }
-
-    private function formatBytes(int $bytes): string
-    {
-        if ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 1).' MB';
-        }
-        if ($bytes >= 1024) {
-            return number_format($bytes / 1024, 1).' KB';
-        }
-
-        return $bytes.' B';
     }
 
     public function deleteLeadManagementUser(Request $request, User $user): RedirectResponse
