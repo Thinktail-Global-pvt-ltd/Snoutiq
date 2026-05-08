@@ -1197,7 +1197,7 @@ class AdminPanelController extends Controller
                     'excel_export_count' => 0,
                     'video_consult_count' => 0,
                     'appointments_count' => 0,
-                    'revenue_per_appointment_inr' => 150,
+                    'revenue_per_transaction_inr' => 150,
                     'estimated_revenue_inr' => 0,
                 ],
                 'conversion_lag_minutes' => null,
@@ -3499,8 +3499,8 @@ class AdminPanelController extends Controller
                                 'excel_export_count' => $excelCount,
                                 'video_consult_count' => $videoCount,
                                 'appointments_count' => $appointmentCount,
-                                'revenue_per_appointment_inr' => 150,
-                                'estimated_revenue_inr' => $appointmentCount * 150,
+                                'revenue_per_transaction_inr' => 150,
+                                'estimated_revenue_inr' => $rows->count() * 150,
                             ];
                             $targetUsers->put($userId, $leadUser);
                         }

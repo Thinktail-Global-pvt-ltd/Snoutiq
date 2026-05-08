@@ -1959,7 +1959,11 @@
                         'excel_export_count' => (int) ($leadUser['monthly_revenue_projection']['excel_export_count'] ?? 0),
                         'video_consult_count' => (int) ($leadUser['monthly_revenue_projection']['video_consult_count'] ?? 0),
                         'appointments_count' => (int) ($leadUser['monthly_revenue_projection']['appointments_count'] ?? 0),
-                        'revenue_per_appointment_inr' => (int) ($leadUser['monthly_revenue_projection']['revenue_per_appointment_inr'] ?? 150),
+                        'revenue_per_transaction_inr' => (int) (
+                            $leadUser['monthly_revenue_projection']['revenue_per_transaction_inr']
+                            ?? $leadUser['monthly_revenue_projection']['revenue_per_appointment_inr']
+                            ?? 150
+                        ),
                         'estimated_revenue_inr' => (int) ($leadUser['monthly_revenue_projection']['estimated_revenue_inr'] ?? 0),
                     ]
                     : [
@@ -1968,7 +1972,7 @@
                         'excel_export_count' => 0,
                         'video_consult_count' => 0,
                         'appointments_count' => 0,
-                        'revenue_per_appointment_inr' => 150,
+                        'revenue_per_transaction_inr' => 150,
                         'estimated_revenue_inr' => 0,
                     ],
                 'related_transactions' => $relatedTransactions,
@@ -3515,7 +3519,8 @@
                         <div class="crm-card-title">Monthly User Revenue</div>
                         <div class="crm-field-row"><span class="crm-fr-label">Month</span><span class="crm-fr-val">${escapeHtml(monthlyRevenue.month || '—')}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Revenue/user</span><span class="crm-fr-val ok">${escapeHtml(formatInr(monthlyRevenue.estimated_revenue_inr || 0))}</span></div>
-                        <div class="crm-field-row"><span class="crm-fr-label">Appointments x ₹150</span><span class="crm-fr-val">${Number(monthlyRevenue.appointments_count || 0)} x ${escapeHtml(formatInr(monthlyRevenue.revenue_per_appointment_inr || 150))}</span></div>
+                        <div class="crm-field-row"><span class="crm-fr-label">Eligible txns x ₹150</span><span class="crm-fr-val">${Number(monthlyRevenue.eligible_transactions_count || 0)} x ${escapeHtml(formatInr(monthlyRevenue.revenue_per_transaction_inr || 150))}</span></div>
+                        <div class="crm-field-row"><span class="crm-fr-label">Appointments</span><span class="crm-fr-val">${Number(monthlyRevenue.appointments_count || 0)}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Excel export txns</span><span class="crm-fr-val">${Number(monthlyRevenue.excel_export_count || 0)}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Video consult txns</span><span class="crm-fr-val">${Number(monthlyRevenue.video_consult_count || 0)}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Eligible txns</span><span class="crm-fr-val">${Number(monthlyRevenue.eligible_transactions_count || 0)}</span></div>
@@ -3524,7 +3529,7 @@
                     <div class="crm-card">
                         <div class="crm-card-title">Revenue Rule</div>
                         <div class="crm-note-box">
-                            Monthly revenue is calculated from this user's current-month transactions where type is excell_export_campaign, video_consult, or appointments. Revenue/user = appointments count x ₹150.
+                            Monthly revenue is calculated from this user's current-month transactions where type is excell_export_campaign, video_consult, or appointments. Revenue/user = eligible transactions x ₹150.
                         </div>
                     </div>
                 </div>
