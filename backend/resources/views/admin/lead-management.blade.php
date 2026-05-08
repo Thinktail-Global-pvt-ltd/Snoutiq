@@ -1715,6 +1715,9 @@
     $nextActionRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.next-action')
         ? route('admin.lead-management.users.next-action', ['user' => '__USER_ID__'])
         : '';
+    $leadDetailsRouteTemplate = \Illuminate\Support\Facades\Route::has('admin.lead-management.users.details')
+        ? route('admin.lead-management.users.details', ['user' => '__USER_ID__'])
+        : '';
     $transactionDoctorUpdateRouteTemplate = route('admin.transactions.appointments.doctor', ['transaction' => '__TXN_ID__']);
 
     $paginationWindow = [];
@@ -2159,6 +2162,7 @@
     const deleteRouteTemplate = @json($deleteRouteTemplate);
     const logActionRouteTemplate = @json($logActionRouteTemplate);
     const nextActionRouteTemplate = @json($nextActionRouteTemplate);
+    const leadDetailsRouteTemplate = @json($leadDetailsRouteTemplate);
     const transactionDoctorUpdateRouteTemplate = @json($transactionDoctorUpdateRouteTemplate);
     const transactionDoctorOptions = @json($transactionDoctorOptions);
     const csrfToken = @json(csrf_token());
@@ -2242,6 +2246,8 @@
 
             return {
                 ...lead,
+                details_loaded: false,
+                details_loading: false,
                 manual_activity: serverActivities,
                 manual_services: [],
                 manual_next_action: serverNextAction,
@@ -2387,6 +2393,84 @@
     function getSelectedLead() {
         if (state.selectedLeadId === null) return null;
         return getLeadById(state.selectedLeadId);
+    }
+
+    function normalizeServerActivity(activity) {
+        return {
+            id: Number(activity?.id || 0),
+            event_type: String(activity?.event_type || 'log_action').toLowerCase(),
+            action_type: String(activity?.action_type || ''),
+            outcome: String(activity?.outcome || ''),
+            notes: String(activity?.notes || ''),
+            event_at: String(activity?.event_at || ''),
+            due_date: String(activity?.due_date || ''),
+            assigned_to: String(activity?.assigned_to || ''),
+            blocker: String(activity?.blocker || ''),
+            done_by: String(activity?.done_by || ''),
+            created_by: String(activity?.created_by || ''),
+        };
+    }
+
+    function mergeLeadDetails(lead, details) {
+        if (!lead || !details || typeof details !== 'object') return;
+
+        lead.notifications = Array.isArray(details.notifications) ? details.notifications : lead.notifications || [];
+        lead.all_notifications_count = Number(details.all_notifications_count ?? lead.all_notifications_count ?? 0);
+        lead.clicked_notifications_count = Number(details.clicked_notifications_count ?? lead.clicked_notifications_count ?? 0);
+        lead.related_transactions = Array.isArray(details.related_transactions) ? details.related_transactions : lead.related_transactions || [];
+        lead.related_prescriptions = Array.isArray(details.related_prescriptions) ? details.related_prescriptions : lead.related_prescriptions || [];
+
+        if (Array.isArray(details.crm_activity_logs)) {
+            lead.manual_activity = details.crm_activity_logs
+                .map(normalizeServerActivity)
+                .sort((left, right) => String(right.event_at || '').localeCompare(String(left.event_at || '')));
+        }
+
+        if (details.crm_next_action && typeof details.crm_next_action === 'object') {
+            lead.manual_next_action = {
+                id: Number(details.crm_next_action.id || 0),
+                action: String(details.crm_next_action.action || ''),
+                details: String(details.crm_next_action.details || ''),
+                date: String(details.crm_next_action.due_date || ''),
+                assignee: String(details.crm_next_action.assigned_to || ''),
+                blocker: String(details.crm_next_action.blocker || ''),
+                done_by: String(details.crm_next_action.done_by || ''),
+                event_at: String(details.crm_next_action.event_at || ''),
+            };
+            lead.manual_blocker = lead.manual_next_action.blocker || lead.manual_blocker || '';
+        }
+
+        lead.details_loaded = true;
+        lead.details_loading = false;
+    }
+
+    async function ensureLeadDetailsLoaded(lead) {
+        if (!lead || lead.details_loaded || lead.details_loading || !leadDetailsRouteTemplate) return;
+
+        lead.details_loading = true;
+        const url = String(leadDetailsRouteTemplate).replace('__USER_ID__', String(Number(lead.id)));
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.status !== 'success') {
+                throw new Error(payload.message || 'Failed to load lead details.');
+            }
+
+            mergeLeadDetails(lead, payload.lead || {});
+            if (Number(state.selectedLeadId) === Number(lead.id)) {
+                renderLeadList();
+                renderDetail();
+            }
+        } catch (error) {
+            lead.details_loading = false;
+            showToast(error?.message || 'Failed to load lead details.');
+        }
     }
 
     function resolveNextAction(lead) {
@@ -2851,6 +2935,8 @@
             return;
         }
 
+        ensureLeadDetailsLoaded(lead);
+
         const nextAction = resolveNextAction(lead);
         const statusMeta = statusStyles[String(lead.status_key || '').toLowerCase()] || statusStyles.new;
         const timelineItems = buildTimelineItems(lead);
@@ -2937,6 +3023,7 @@
                 </div>
             </div>
 
+            ${lead.details_loading ? '<div class="crm-next-box"><div><div class="crm-next-title">Loading lead details</div><div class="crm-next-text">Timeline, services, and notifications are loading for this lead.</div></div></div>' : ''}
             ${blockerText ? `<div class="crm-blocker"><b>Blocker:</b> ${escapeHtml(blockerText)}</div>` : ''}
 
             <div class="crm-rev-bar">

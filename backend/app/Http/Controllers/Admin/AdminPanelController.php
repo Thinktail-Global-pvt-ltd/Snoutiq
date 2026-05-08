@@ -837,6 +837,7 @@ class AdminPanelController extends Controller
         $leadFilter = strtolower((string) ($filters['lead_filter'] ?? 'all'));
         $searchTerm = trim((string) ($filters['q'] ?? ''));
         $searchActive = $searchTerm !== '';
+        $deferLeadDetails = !$request->boolean('eager_details');
 
         $hasUsersTable = Schema::hasTable('users');
         $hasUserCity = $hasUsersTable && Schema::hasColumn('users', 'city');
@@ -2071,7 +2072,7 @@ class AdminPanelController extends Controller
             }
         }
 
-        if ($supportsNotificationRecords && $targetUsers->isNotEmpty()) {
+        if (!$deferLeadDetails && $supportsNotificationRecords && $targetUsers->isNotEmpty()) {
             try {
                 $leadUserIds = $targetUsers
                     ->keys()
@@ -2197,7 +2198,7 @@ class AdminPanelController extends Controller
             }
         }
 
-        if ($supportsFcmNotifications && $targetUsers->isNotEmpty()) {
+        if (!$deferLeadDetails && $supportsFcmNotifications && $targetUsers->isNotEmpty()) {
             try {
                 $leadUserIds = $targetUsers
                     ->keys()
@@ -2472,7 +2473,7 @@ class AdminPanelController extends Controller
             }
         }
 
-        if ($hasPrescriptionUserId && $targetUsers->isNotEmpty()) {
+        if (!$deferLeadDetails && $hasPrescriptionUserId && $targetUsers->isNotEmpty()) {
             try {
                 $leadUserIds = $targetUsers
                     ->keys()
@@ -2644,7 +2645,7 @@ class AdminPanelController extends Controller
         $supportsConversionTracking = $hasTransactionUserId && $hasTransactionCreatedAt;
         $convertedUsersCount = 0;
 
-        if ($supportsConversionTracking && $targetUsers->isNotEmpty()) {
+        if (!$deferLeadDetails && $supportsConversionTracking && $targetUsers->isNotEmpty()) {
             try {
                 $leadUserIds = $targetUsers
                     ->keys()
@@ -3154,7 +3155,7 @@ class AdminPanelController extends Controller
         $supportsLeadActivityLogs = Schema::hasTable('lead_management_activity_logs')
             && Schema::hasColumn('lead_management_activity_logs', 'user_id');
 
-        if ($supportsLeadActivityLogs && $targetUsers->isNotEmpty()) {
+        if (!$deferLeadDetails && $supportsLeadActivityLogs && $targetUsers->isNotEmpty()) {
             try {
                 $leadUserIds = $targetUsers
                     ->keys()
@@ -3667,6 +3668,210 @@ class AdminPanelController extends Controller
             'done_by' => trim((string) ($row->done_by ?? '')),
             'created_by' => trim((string) ($row->created_by ?? '')),
         ];
+    }
+
+    public function leadManagementUserDetails(User $user): JsonResponse
+    {
+        $userId = (int) $user->id;
+        $normalizeDateTime = static function ($value): ?string {
+            if (empty($value)) {
+                return null;
+            }
+
+            try {
+                return \Illuminate\Support\Carbon::parse($value)->toDateTimeString();
+            } catch (\Throwable $e) {
+                return null;
+            }
+        };
+        $normalizeDate = static function ($value): ?string {
+            if (empty($value)) {
+                return null;
+            }
+
+            try {
+                return \Illuminate\Support\Carbon::parse($value)->toDateString();
+            } catch (\Throwable $e) {
+                return (string) $value;
+            }
+        };
+
+        $notifications = collect();
+        if (Schema::hasTable('fcm_notifications') && Schema::hasColumn('fcm_notifications', 'user_id')) {
+            $columns = ['id', 'user_id'];
+            foreach (['notification_type', 'title', 'notification_text', 'status', 'sent_at', 'created_at', 'clicked', 'clicked_at', 'data_payload', 'call_session'] as $column) {
+                if (Schema::hasColumn('fcm_notifications', $column)) {
+                    $columns[] = $column;
+                }
+            }
+
+            $notifications = FcmNotification::query()
+                ->select(array_unique($columns))
+                ->where('user_id', $userId)
+                ->orderByDesc(Schema::hasColumn('fcm_notifications', 'sent_at') ? 'sent_at' : 'id')
+                ->orderByDesc('id')
+                ->limit(100)
+                ->get()
+                ->map(function ($row) use ($normalizeDateTime): array {
+                    $payload = is_array($row->data_payload ?? null) ? $row->data_payload : [];
+                    $type = trim((string) (($row->notification_type ?? '') ?: data_get($payload, 'type') ?: 'unknown'));
+                    $timestamp = $normalizeDateTime($row->sent_at ?? null) ?: $normalizeDateTime($row->created_at ?? null);
+
+                    return [
+                        'id' => (int) ($row->id ?? 0),
+                        'title' => trim((string) (($row->title ?? '') ?: data_get($payload, 'title'))),
+                        'text' => trim((string) (($row->notification_text ?? '') ?: data_get($payload, 'body') ?: data_get($payload, 'message'))),
+                        'type' => $type,
+                        'timestamp' => $timestamp,
+                        'clicked' => array_key_exists('clicked', (array) $row) ? (bool) ($row->clicked ?? false) : null,
+                        'clicked_at' => $normalizeDateTime($row->clicked_at ?? null),
+                        'bucket' => str_contains(strtolower($type), 'vaccination') ? 'vaccination' : (str_contains(strtolower($type), 'follow') ? 'follow_up' : (str_contains(strtolower($type), 'neuter') ? 'neutering' : 'other')),
+                        'bucket_label' => str_contains(strtolower($type), 'vaccination') ? 'Vaccination' : (str_contains(strtolower($type), 'follow') ? 'Follow-up' : (str_contains(strtolower($type), 'neuter') ? 'Neutering' : 'Other')),
+                        'converted' => false,
+                        'conversion_transaction_id' => 0,
+                        'conversion_transaction_type' => '',
+                        'conversion_transaction_status' => '',
+                        'conversion_transaction_at' => '',
+                    ];
+                });
+        }
+
+        $relatedTransactions = collect();
+        if (Schema::hasTable('transactions') && Schema::hasColumn('transactions', 'user_id')) {
+            $columns = ['id', 'user_id'];
+            foreach (['created_at', 'type', 'status', 'amount_paise', 'pet_id', 'doctor_id', 'clinic_id'] as $column) {
+                if (Schema::hasColumn('transactions', $column)) {
+                    $columns[] = $column;
+                }
+            }
+
+            $rows = Transaction::query()
+                ->select(array_unique($columns))
+                ->where('user_id', $userId)
+                ->orderByDesc(Schema::hasColumn('transactions', 'created_at') ? 'created_at' : 'id')
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get();
+
+            $doctorNames = Schema::hasColumn('transactions', 'doctor_id')
+                ? Doctor::query()->whereIn('id', $rows->pluck('doctor_id')->filter()->unique()->all())->pluck('doctor_name', 'id')
+                : collect();
+            $clinicNames = Schema::hasColumn('transactions', 'clinic_id')
+                ? VetRegisterationTemp::query()->whereIn('id', $rows->pluck('clinic_id')->filter()->unique()->all())->pluck('name', 'id')
+                : collect();
+            $petNames = Schema::hasColumn('transactions', 'pet_id')
+                ? Pet::query()->whereIn('id', $rows->pluck('pet_id')->filter()->unique()->all())->pluck('name', 'id')
+                : collect();
+
+            $relatedTransactions = $rows->map(function ($row) use ($normalizeDateTime, $doctorNames, $clinicNames, $petNames): array {
+                $doctorId = is_numeric($row->doctor_id ?? null) ? (int) $row->doctor_id : null;
+                $clinicId = is_numeric($row->clinic_id ?? null) ? (int) $row->clinic_id : null;
+                $petId = is_numeric($row->pet_id ?? null) ? (int) $row->pet_id : null;
+
+                return [
+                    'id' => (int) ($row->id ?? 0),
+                    'created_at' => $normalizeDateTime($row->created_at ?? null),
+                    'type' => trim((string) ($row->type ?? '')),
+                    'status' => trim((string) ($row->status ?? '')),
+                    'amount_paise' => is_numeric($row->amount_paise ?? null) ? (int) $row->amount_paise : null,
+                    'pet_id' => $petId,
+                    'pet_name' => $petId ? (string) ($petNames[$petId] ?? '') : '',
+                    'doctor_id' => $doctorId,
+                    'doctor_name' => $doctorId ? (string) ($doctorNames[$doctorId] ?? '') : '',
+                    'clinic_id' => $clinicId,
+                    'clinic_name' => $clinicId ? (string) ($clinicNames[$clinicId] ?? '') : '',
+                    'can_reassign_doctor' => true,
+                ];
+            });
+        }
+
+        $relatedPrescriptions = collect();
+        if (Schema::hasTable('prescriptions') && Schema::hasColumn('prescriptions', 'user_id')) {
+            $columns = ['id', 'user_id'];
+            foreach (['created_at', 'doctor_id', 'pet_id', 'diagnosis', 'disease_name', 'video_inclinic', 'follow_up_date', 'follow_up_type'] as $column) {
+                if (Schema::hasColumn('prescriptions', $column)) {
+                    $columns[] = $column;
+                }
+            }
+
+            $rows = Prescription::query()
+                ->select(array_unique($columns))
+                ->where('user_id', $userId)
+                ->orderByDesc(Schema::hasColumn('prescriptions', 'created_at') ? 'created_at' : 'id')
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get();
+
+            $doctorNames = Schema::hasColumn('prescriptions', 'doctor_id')
+                ? Doctor::query()->whereIn('id', $rows->pluck('doctor_id')->filter()->unique()->all())->pluck('doctor_name', 'id')
+                : collect();
+            $petNames = Schema::hasColumn('prescriptions', 'pet_id')
+                ? Pet::query()->whereIn('id', $rows->pluck('pet_id')->filter()->unique()->all())->pluck('name', 'id')
+                : collect();
+
+            $relatedPrescriptions = $rows->map(function ($row) use ($normalizeDateTime, $normalizeDate, $doctorNames, $petNames): array {
+                $doctorId = is_numeric($row->doctor_id ?? null) ? (int) $row->doctor_id : null;
+                $petId = is_numeric($row->pet_id ?? null) ? (int) $row->pet_id : null;
+
+                return [
+                    'id' => (int) ($row->id ?? 0),
+                    'created_at' => $normalizeDateTime($row->created_at ?? null),
+                    'doctor_id' => $doctorId,
+                    'doctor_name' => $doctorId ? (string) ($doctorNames[$doctorId] ?? '') : '',
+                    'pet_id' => $petId,
+                    'pet_name' => $petId ? (string) ($petNames[$petId] ?? '') : '',
+                    'diagnosis' => trim((string) ($row->diagnosis ?? '')),
+                    'disease_name' => trim((string) ($row->disease_name ?? '')),
+                    'video_inclinic' => trim((string) ($row->video_inclinic ?? '')),
+                    'follow_up_date' => $normalizeDate($row->follow_up_date ?? null),
+                    'follow_up_type' => trim((string) ($row->follow_up_type ?? '')),
+                ];
+            });
+        }
+
+        $activityLogs = collect();
+        $nextAction = null;
+        if (Schema::hasTable('lead_management_activity_logs') && Schema::hasColumn('lead_management_activity_logs', 'user_id')) {
+            $activityLogs = DB::table('lead_management_activity_logs')
+                ->where('user_id', $userId)
+                ->orderByDesc(Schema::hasColumn('lead_management_activity_logs', 'event_at') ? 'event_at' : 'id')
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get()
+                ->map(fn ($row): array => $this->serializeLeadManagementActivity($row));
+
+            $nextRaw = $activityLogs
+                ->first(fn (array $row): bool => strtolower((string) ($row['event_type'] ?? '')) === 'next_action');
+            if ($nextRaw) {
+                $nextAction = [
+                    'id' => (int) ($nextRaw['id'] ?? 0),
+                    'action' => (string) ($nextRaw['action_type'] ?? ''),
+                    'details' => (string) ($nextRaw['notes'] ?? ''),
+                    'due_date' => (string) ($nextRaw['due_date'] ?? ''),
+                    'assigned_to' => (string) ($nextRaw['assigned_to'] ?? ''),
+                    'blocker' => (string) ($nextRaw['blocker'] ?? ''),
+                    'done_by' => (string) ($nextRaw['done_by'] ?? ''),
+                    'event_at' => (string) ($nextRaw['event_at'] ?? ''),
+                ];
+            }
+        }
+
+        $clickedCount = $notifications->filter(fn (array $row): bool => ($row['clicked'] ?? null) === true)->count();
+
+        return response()->json([
+            'status' => 'success',
+            'lead' => [
+                'id' => $userId,
+                'notifications' => $notifications->values()->all(),
+                'all_notifications_count' => $notifications->count(),
+                'clicked_notifications_count' => $clickedCount,
+                'related_transactions' => $relatedTransactions->values()->all(),
+                'related_prescriptions' => $relatedPrescriptions->values()->all(),
+                'crm_activity_logs' => $activityLogs->values()->all(),
+                'crm_next_action' => $nextAction,
+                'details_loaded' => true,
+            ],
+        ]);
     }
 
     public function deleteLeadManagementUser(Request $request, User $user): RedirectResponse
