@@ -847,6 +847,9 @@ class AdminPanelController extends Controller
         $hasUsersTable = Schema::hasTable('users');
         $hasUserCity = $hasUsersTable && Schema::hasColumn('users', 'city');
         $hasUserCreatedAt = $hasUsersTable && Schema::hasColumn('users', 'created_at');
+        $hasDeviceTokensTable = Schema::hasTable('device_tokens');
+        $hasDeviceTokenUserId = $hasDeviceTokensTable && Schema::hasColumn('device_tokens', 'user_id');
+        $hasDeviceTokenToken = $hasDeviceTokensTable && Schema::hasColumn('device_tokens', 'token');
         $leadUserBaseColumns = ['id', 'name', 'email', 'phone'];
         if ($hasUserCity) {
             $leadUserBaseColumns[] = 'city';
@@ -1148,6 +1151,7 @@ class AdminPanelController extends Controller
                 'has_video_follow_up_video' => false,
                 'has_video_follow_up_in_clinic' => false,
                 'has_vaccination_reminder' => false,
+                'is_mobile_app_user' => false,
                 'all_pet_count' => 0,
                 'all_pet_names' => [],
                 'neutering_pet_count' => 0,
@@ -1251,6 +1255,10 @@ class AdminPanelController extends Controller
             }
             if (!empty($leadUser['has_vaccination_reminder'])) {
                 $categoryTerms[] = 'vaccination';
+            }
+            if (!empty($leadUser['is_mobile_app_user'])) {
+                $categoryTerms[] = 'mobile app';
+                $categoryTerms[] = 'app user';
             }
 
             $searchableValues = array_merge($searchableValues, $categoryTerms);
@@ -3353,6 +3361,39 @@ class AdminPanelController extends Controller
                     }
                 } catch (\Throwable $e) {
                     $captureLeadManagementError('all_user_pets', $e);
+                }
+            }
+
+            if ($hasDeviceTokenUserId && $hasDeviceTokenToken && $targetUsers->isNotEmpty()) {
+                try {
+                    $leadUserIds = $targetUsers
+                        ->keys()
+                        ->filter(fn ($userId): bool => is_numeric($userId) && (int) $userId > 0)
+                        ->map(fn ($userId): int => (int) $userId)
+                        ->values();
+
+                    if ($leadUserIds->isNotEmpty()) {
+                        $mobileAppUserIds = DB::table('device_tokens')
+                            ->whereIn('user_id', $leadUserIds->all())
+                            ->whereNotNull('token')
+                            ->where('token', '!=', '')
+                            ->distinct()
+                            ->pluck('user_id')
+                            ->map(fn ($userId): int => (int) $userId)
+                            ->flip();
+
+                        foreach ($leadUserIds as $userId) {
+                            if (!$targetUsers->has($userId)) {
+                                continue;
+                            }
+
+                            $leadUser = $targetUsers->get($userId);
+                            $leadUser['is_mobile_app_user'] = $mobileAppUserIds->has($userId);
+                            $targetUsers->put($userId, $leadUser);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $captureLeadManagementError('mobile_app_users', $e);
                 }
             }
 

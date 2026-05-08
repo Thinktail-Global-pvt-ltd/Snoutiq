@@ -374,6 +374,10 @@
         padding-left: 0.84rem;
     }
 
+    .crm-lead-card.mobile-app-user {
+        box-shadow: inset 3px 0 0 rgba(52, 211, 153, 0.82);
+    }
+
     .crm-lead-urgent {
         position: absolute;
         right: 0.8rem;
@@ -452,6 +456,13 @@
         font-family: 'DM Mono', monospace;
         font-size: 0.6rem;
         padding: 0.13rem 0.36rem;
+    }
+
+    .crm-tag-mobile {
+        background: var(--crm-green-bg);
+        color: var(--crm-green);
+        border: 1px solid rgba(52, 211, 153, 0.34);
+        font-weight: 700;
     }
 
     .crm-rev {
@@ -1659,6 +1670,7 @@
                 'has_video_follow_up_video' => (bool) ($leadUser['has_video_follow_up_video'] ?? false),
                 'has_video_follow_up_in_clinic' => (bool) ($leadUser['has_video_follow_up_in_clinic'] ?? false),
                 'has_vaccination_reminder' => (bool) ($leadUser['has_vaccination_reminder'] ?? false),
+                'is_mobile_app_user' => (bool) ($leadUser['is_mobile_app_user'] ?? false),
                 'category_tags' => $categoryTags,
                 'conversion_captured' => (bool) ($leadUser['conversion_captured'] ?? false),
                 'conversion_notification_type' => (string) ($leadUser['conversion_notification_type'] ?? ''),
@@ -2614,6 +2626,7 @@
             const statusMeta = statusStyles[String(lead.status_key || '').toLowerCase()] || statusStyles.new;
             const next = resolveNextAction(lead);
             const cityTag = lead.city ? `<span class="crm-tag">${escapeHtml(lead.city)}</span>` : '';
+            const mobileTag = lead.is_mobile_app_user ? '<span class="crm-tag crm-tag-mobile">Mobile app user</span>' : '';
             const notifsTag = `<span class="crm-tag">${Number(lead.all_notifications_count || 0)} notifs</span>`;
             const followTag = lead.follow_up_type_label ? `<span class="crm-tag">${escapeHtml(lead.follow_up_type_label)}</span>` : '';
             const revenueTag = lead.conversion_captured
@@ -2627,7 +2640,7 @@
             const nextSuffix = next.state.key === 'none' ? '' : ` - ${escapeHtml(next.label)}`;
 
             return `
-                <article class="crm-lead-card ${isActive ? 'active' : ''}" data-lead-id="${Number(lead.id)}">
+                <article class="crm-lead-card ${isActive ? 'active' : ''} ${lead.is_mobile_app_user ? 'mobile-app-user' : ''}" data-lead-id="${Number(lead.id)}">
                     ${next.state.key === 'overdue' ? '<span class="crm-lead-urgent"></span>' : ''}
                     <div class="crm-lead-top">
                         <div>
@@ -2639,6 +2652,7 @@
                     <div class="crm-lead-pet">${escapeHtml(primaryPet)}</div>
                     <div class="crm-lead-tags">
                         ${cityTag}
+                        ${mobileTag}
                         ${notifsTag}
                         ${followTag}
                         ${revenueTag}
