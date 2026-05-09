@@ -1123,6 +1123,15 @@
         align-items: flex-start;
     }
 
+    .crm-notif-row.call-complete {
+        border: 1px solid rgba(52, 211, 153, 0.34);
+        background: rgba(6, 78, 59, 0.2);
+        border-radius: 6px;
+        margin: 0.25rem 0;
+        padding: 0.35rem 0.45rem;
+        align-items: flex-start;
+    }
+
     .crm-notif-main {
         display: flex;
         flex-direction: column;
@@ -1147,6 +1156,15 @@
         overflow: visible;
         text-overflow: clip;
         line-height: 1.35;
+    }
+
+    .crm-notif-row.call-complete .crm-notif-title {
+        flex: none;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.35;
+        color: #d1fae5;
     }
 
     .crm-notif-body {
@@ -2937,6 +2955,20 @@
         });
     }
 
+    function getCompletedCallActivities(lead) {
+        return (lead.manual_activity || []).filter((activity) => {
+            const action = String(activity.action_type || '').toLowerCase();
+            const outcome = String(activity.outcome || '').toLowerCase();
+            const notes = String(activity.notes || '').toLowerCase();
+            const isCall = action.includes('call') || notes.includes('10-day no-payment');
+            const isDone = outcome.includes('completed')
+                || outcome.includes('spoke')
+                || notes.includes('call completed manually');
+            const isNoAnswer = outcome.includes('no answer') || notes.includes('no answer');
+            return isCall && isDone && !isNoAnswer;
+        });
+    }
+
     function resolveTenDayPaymentCallState(lead) {
         const createdDate = parseDateValue(lead.created_at || '');
         const daysSinceCreated = createdDate
@@ -3291,7 +3323,25 @@
     }
 
     function buildNotificationRows(lead) {
-        const rows = (lead.notifications || []).slice(0, 25);
+        const callRows = getCompletedCallActivities(lead).map((activity) => ({
+            id: `call-${Number(activity.id || 0)}`,
+            title: 'Call completed manually',
+            text: [activity.outcome, activity.notes].filter(Boolean).join(' - '),
+            type: 'manual_call_completed',
+            timestamp: String(activity.event_at || activity.created_at || ''),
+            clicked: true,
+            bucket_label: 'Manual Call',
+            is_manual_call_completed: true,
+        }));
+        const rows = [...callRows, ...(lead.notifications || [])]
+            .sort((left, right) => {
+                const leftDate = parseDateValue(left.timestamp || '');
+                const rightDate = parseDateValue(right.timestamp || '');
+                const leftTs = leftDate ? leftDate.getTime() : 0;
+                const rightTs = rightDate ? rightDate.getTime() : 0;
+                return rightTs - leftTs;
+            })
+            .slice(0, 25);
 
         if (!rows.length) {
             return '<div class="crm-empty">No notifications available for this lead.</div>';
@@ -3300,21 +3350,24 @@
         return rows.map((notif) => {
             const clicked = notif.clicked === true;
             const isAiPush = isAiMarketingNotification(notif);
+            const isManualCall = Boolean(notif.is_manual_call_completed);
             const clickedLabel = clicked
                 ? '<span class="crm-pill crm-pill-green">Clicked</span>'
                 : '<span class="crm-pill crm-pill-red">Not clicked</span>';
             const aiLabel = isAiPush ? '<span class="crm-pill crm-pill-green">AI Push</span>' : '';
+            const callLabel = isManualCall ? '<span class="crm-pill crm-pill-green">Call completed</span>' : '';
             const title = notif.title || notif.type || 'Notification';
             const suffix = notif.bucket_label ? ` · ${notif.bucket_label}` : '';
             const body = String(notif.text || '').trim();
             const titleHtml = `<span class="crm-notif-title" title="${escapeHtml(title)}">${escapeHtml(title)}${escapeHtml(suffix)}</span>`;
-            const bodyHtml = isAiPush && body !== ''
+            const bodyHtml = (isAiPush || isManualCall) && body !== ''
                 ? `<span class="crm-notif-body">${escapeHtml(body)}</span>`
                 : '';
             return `
-                <div class="crm-notif-row ${isAiPush ? 'ai-push' : ''}">
+                <div class="crm-notif-row ${isAiPush ? 'ai-push' : ''} ${isManualCall ? 'call-complete' : ''}">
                     ${clickedLabel}
                     ${aiLabel}
+                    ${callLabel}
                     <span class="crm-notif-main">
                         ${titleHtml}
                         ${bodyHtml}

@@ -10,6 +10,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class DoctorFollowUpUserController extends Controller
@@ -189,13 +190,41 @@ class DoctorFollowUpUserController extends Controller
             return [];
         }
 
-        return Pet::query()
+        return DB::table('pets')
             ->whereIn('user_id', $userIds)
             ->orderBy('name')
             ->get()
             ->groupBy('user_id')
-            ->map(fn ($pets) => $pets->map(fn (Pet $pet) => $pet->toArray())->values()->all())
+            ->map(fn ($pets) => $pets
+                ->map(fn ($pet): array => $this->serializePetTableRow((array) $pet))
+                ->values()
+                ->all())
             ->all();
+    }
+
+    private function serializePetTableRow(array $row): array
+    {
+        foreach ($row as $column => $value) {
+            if ($value === null) {
+                continue;
+            }
+
+            $columnName = strtolower((string) $column);
+            if (str_contains($columnName, 'blob') || str_contains($columnName, 'binary')) {
+                $binary = is_resource($value) ? stream_get_contents($value) : $value;
+                $row[$column] = is_string($binary) && $binary !== ''
+                    ? base64_encode($binary)
+                    : '';
+                continue;
+            }
+
+            if (is_resource($value)) {
+                $contents = stream_get_contents($value);
+                $row[$column] = is_string($contents) ? $contents : '';
+            }
+        }
+
+        return $row;
     }
 
     private function totalEarningsSum(int $doctorId): float|int
