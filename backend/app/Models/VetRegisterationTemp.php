@@ -90,6 +90,8 @@ class VetRegisterationTemp extends Model
         'password',
         'hospital_profile',
         'clinic_profile',
+        'clinic_image',
+        'clinic_video',
         'employee_id',
         'place_id',
         'business_status',
@@ -125,6 +127,11 @@ class VetRegisterationTemp extends Model
         'draft_expires_at' => 'datetime',
         'claimed_at' => 'datetime',
         'website_gallery' => 'array',
+    ];
+
+    protected $hidden = [
+        'clinic_image',
+        'clinic_video',
     ];
 
     public function doctors()

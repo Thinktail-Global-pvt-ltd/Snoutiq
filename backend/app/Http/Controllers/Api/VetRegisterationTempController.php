@@ -118,6 +118,8 @@ class VetRegisterationTempController extends Controller
                 // Image fields
                 'hospital_profile' => 'nullable',
                 'clinic_profile'   => 'nullable',
+                'clinic_image'     => 'nullable',
+                'clinic_video'     => 'nullable',
 
                 // Doctors array
                 'doctors'                  => 'nullable|array',
@@ -171,6 +173,34 @@ class VetRegisterationTempController extends Controller
                     File::put(public_path('photo/') . $fileName, base64_decode($img));
                     $data[$field] = 'photo/' . $fileName;
                 }
+            }
+
+            foreach (['clinic_image', 'clinic_video'] as $field) {
+                if ($request->hasFile($field)) {
+                    $data[$field] = $request->file($field)->get();
+                    continue;
+                }
+
+                if (! $request->filled($field)) {
+                    unset($data[$field]);
+                    continue;
+                }
+
+                $value = (string) $request->input($field);
+                if (! preg_match('/^data:([^;]+);base64,(.*)$/s', $value, $matches)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $field => 'The '.$field.' field must be a file upload or a base64 data URI.',
+                    ]);
+                }
+
+                $binary = base64_decode(str_replace(' ', '+', $matches[2]), true);
+                if ($binary === false) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        $field => 'The '.$field.' field contains invalid base64 data.',
+                    ]);
+                }
+
+                $data[$field] = $binary;
             }
 
             if ($request->hasFile('license_document')) {
