@@ -7,7 +7,7 @@ use App\Models\ClinicSpecializedPackage;
 use App\Models\Doctor;
 use App\Models\GroomerService;
 use App\Models\GroomerServiceCategory;
-use App\Models\HomeServiceRequiredByPet;
+use App\Models\VetAtHomeService;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +40,11 @@ class ClinicFullOnboardingController extends Controller
             ->get();
 
         $specializedPackages = ClinicSpecializedPackage::query()
+            ->where('clinic_id', (int) $clinic->id)
+            ->orderBy('doctor_id')
+            ->get();
+
+        $vetAtHomeServices = VetAtHomeService::query()
             ->where('clinic_id', (int) $clinic->id)
             ->orderBy('doctor_id')
             ->get();
@@ -84,6 +89,7 @@ class ClinicFullOnboardingController extends Controller
                 'doctors' => $doctors,
                 'services' => $services,
                 'specialized_packages' => $specializedPackages,
+                'vet_at_home_services' => $vetAtHomeServices,
                 'clinic_availability' => $clinicAvailability,
                 'video_schedules' => $videoSchedules,
             ],
@@ -157,32 +163,13 @@ class ClinicFullOnboardingController extends Controller
             'video_schedule.availability.*.avg_consultation_mins' => ['nullable', 'integer'],
             'video_schedule.availability.*.max_bookings_per_hour' => ['nullable', 'integer'],
 
-            'home_service_required_by_pet' => ['nullable', 'array'],
-            'home_service_required_by_pet.user_id' => ['required_with:home_service_required_by_pet', 'integer', 'exists:users,id'],
-            'home_service_required_by_pet.pet_id' => ['nullable', 'integer', 'exists:pets,id'],
-            'home_service_required_by_pet.latest_completed_step' => ['nullable', 'integer', 'min:1', 'max:3'],
-            'home_service_required_by_pet.owner_name' => ['nullable', 'string', 'max:255'],
-            'home_service_required_by_pet.owner_phone' => ['nullable', 'string', 'max:30'],
-            'home_service_required_by_pet.pet_type' => ['nullable', 'string', 'max:50'],
-            'home_service_required_by_pet.area' => ['nullable', 'string', 'max:255'],
-            'home_service_required_by_pet.reason_for_visit' => ['nullable', 'string', 'max:255'],
-            'home_service_required_by_pet.date_of_visit' => ['nullable', 'date'],
-            'home_service_required_by_pet.time_of_visit' => ['nullable', 'date_format:H:i'],
-            'home_service_required_by_pet.concern_description' => ['nullable', 'string'],
-            'home_service_required_by_pet.symptoms' => ['nullable', 'array'],
-            'home_service_required_by_pet.symptoms.*' => ['string', 'max:120'],
-            'home_service_required_by_pet.vaccination_status' => ['nullable', 'string', 'max:255'],
-            'home_service_required_by_pet.last_deworming' => ['nullable', 'string', 'max:255'],
-            'home_service_required_by_pet.past_illnesses_or_surgeries' => ['nullable', 'string'],
-            'home_service_required_by_pet.current_medications' => ['nullable', 'string'],
-            'home_service_required_by_pet.known_allergies' => ['nullable', 'string'],
-            'home_service_required_by_pet.vet_notes' => ['nullable', 'string'],
-            'home_service_required_by_pet.payment_status' => ['nullable', 'string', 'max:20'],
-            'home_service_required_by_pet.amount_payable' => ['nullable', 'numeric', 'min:0'],
-            'home_service_required_by_pet.amount_paid' => ['nullable', 'numeric', 'min:0'],
-            'home_service_required_by_pet.payment_provider' => ['nullable', 'string', 'max:255'],
-            'home_service_required_by_pet.payment_reference' => ['nullable', 'string', 'max:255'],
-            'home_service_required_by_pet.booking_reference' => ['nullable', 'string', 'max:255', 'unique:home_service_required_by_pet,booking_reference'],
+            'vet_at_home_service' => ['nullable', 'array'],
+            'vet_at_home_service.doctor_index' => ['nullable', 'integer', 'min:0'],
+            'vet_at_home_service.is_enabled' => ['nullable', 'boolean'],
+            'vet_at_home_service.service_hours' => ['nullable', 'string', 'max:255'],
+            'vet_at_home_service.response_time' => ['nullable', 'string', 'max:255'],
+            'vet_at_home_service.base_payout' => ['nullable', 'numeric', 'min:0'],
+            'vet_at_home_service.protocol_label' => ['nullable', 'string', 'max:255'],
 
             'dog_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
             'cat_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
@@ -197,16 +184,16 @@ class ClinicFullOnboardingController extends Controller
             $specializedPackage = $this->createSpecializedPackage((int) $clinic->id, $doctors, $data);
             $clinicAvailabilityCount = $this->createClinicAvailability($doctors, $data['clinic_availability'] ?? []);
             $videoAvailabilityCount = $this->createVideoAvailability($doctors, $data['video_schedule'] ?? null);
-            $homeServiceRequiredByPet = $this->createHomeServiceRequiredByPet($data['home_service_required_by_pet'] ?? null);
+            $vetAtHomeService = $this->createVetAtHomeService((int) $clinic->id, $doctors, $data['vet_at_home_service'] ?? null);
 
             return [
                 'clinic' => $clinic->fresh(),
                 'doctors' => $doctors,
                 'services' => $services,
                 'specialized_package' => $specializedPackage,
+                'vet_at_home_service' => $vetAtHomeService,
                 'clinic_availability_rows' => $clinicAvailabilityCount,
                 'video_availability_rows' => $videoAvailabilityCount,
-                'home_service_required_by_pet' => $homeServiceRequiredByPet,
             ];
         });
 
@@ -403,61 +390,31 @@ class ClinicFullOnboardingController extends Controller
         return count($insertRows);
     }
 
-    private function createHomeServiceRequiredByPet(?array $homeServiceData): ?HomeServiceRequiredByPet
+    private function createVetAtHomeService(int $clinicId, $doctors, ?array $serviceData): ?VetAtHomeService
     {
-        if (empty($homeServiceData)) {
+        if (empty($serviceData)) {
             return null;
         }
 
-        $data = collect($homeServiceData)->only([
-            'user_id',
-            'pet_id',
-            'latest_completed_step',
-            'owner_name',
-            'owner_phone',
-            'pet_type',
-            'area',
-            'reason_for_visit',
-            'date_of_visit',
-            'time_of_visit',
-            'concern_description',
-            'symptoms',
-            'vaccination_status',
-            'last_deworming',
-            'past_illnesses_or_surgeries',
-            'current_medications',
-            'known_allergies',
-            'vet_notes',
-            'payment_status',
-            'amount_payable',
-            'amount_paid',
-            'payment_provider',
-            'payment_reference',
-            'booking_reference',
-        ])->toArray();
-
-        $data['latest_completed_step'] = $data['latest_completed_step'] ?? 1;
-        $data['payment_status'] = $data['payment_status'] ?? 'pending';
-        $data['booking_reference'] = $data['booking_reference'] ?? 'HSV-'.Str::upper(Str::random(10));
-
-        if (! empty($data['time_of_visit']) && preg_match('/^\d{2}:\d{2}$/', (string) $data['time_of_visit'])) {
-            $data['time_of_visit'] .= ':00';
+        $doctor = null;
+        if (array_key_exists('doctor_index', $serviceData)) {
+            $doctor = $doctors->get((int) $serviceData['doctor_index']);
+            if (! $doctor) {
+                throw ValidationException::withMessages([
+                    'vet_at_home_service.doctor_index' => ['The selected doctor index does not exist in doctors array.'],
+                ]);
+            }
         }
 
-        if (! empty($data['date_of_visit']) || ! empty($data['time_of_visit'])) {
-            $data['latest_completed_step'] = max((int) $data['latest_completed_step'], 2);
-            $data['step2_completed_at'] = now();
-        }
-
-        if ((int) $data['latest_completed_step'] >= 1) {
-            $data['step1_completed_at'] = now();
-        }
-        if ((int) $data['latest_completed_step'] >= 3) {
-            $data['step3_completed_at'] = now();
-            $data['confirmed_at'] = now();
-        }
-
-        return HomeServiceRequiredByPet::create($data);
+        return VetAtHomeService::create([
+            'clinic_id' => $clinicId,
+            'doctor_id' => $doctor?->id,
+            'is_enabled' => (bool) ($serviceData['is_enabled'] ?? false),
+            'service_hours' => $serviceData['service_hours'] ?? null,
+            'response_time' => $serviceData['response_time'] ?? null,
+            'base_payout' => $serviceData['base_payout'] ?? null,
+            'protocol_label' => $serviceData['protocol_label'] ?? 'Doorstep Protocol',
+        ]);
     }
 
     private function createVideoAvailability($doctors, ?array $videoSchedule): int
