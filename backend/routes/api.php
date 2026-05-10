@@ -2609,6 +2609,8 @@ Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
 
 Route::post('/vet-registerations/store', [VetRegisterationTempController::class, 'store']);
 Route::post('/vet-registerations/store-full', [ClinicFullOnboardingController::class, 'store']);
+Route::get('/vet-registerations/full', [ClinicFullOnboardingController::class, 'index']);
+Route::get('/vet-registerations/{clinicId}/full', [ClinicFullOnboardingController::class, 'show'])->whereNumber('clinicId');
 Route::get('/vet-registerations/{vet}', [VetRegisterationTempController::class, 'show']);
 
 Route::get('/ai-stats', function (Request $Request) {

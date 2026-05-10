@@ -17,6 +17,29 @@ use Illuminate\Validation\ValidationException;
 
 class ClinicFullOnboardingController extends Controller
 {
+    public function index(Request $request)
+    {
+        $filters = $request->validate([
+            'from_date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $perPage = (int) $request->query('per_page', 25);
+        $perPage = max(1, min($perPage, 100));
+        $fromDate = $filters['from_date'] ?? '2026-05-10';
+
+        $clinics = VetRegisterationTemp::query()
+            ->where('created_at', '>=', $fromDate.' 00:00:00')
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+
+        $clinics->getCollection()->transform(fn (VetRegisterationTemp $clinic) => $this->fullPayloadForClinic($clinic));
+
+        return response()->json([
+            'success' => true,
+            'data' => $clinics,
+        ]);
+    }
+
     public function show(Request $request, string $clinicId)
     {
         $clinic = VetRegisterationTemp::query()->find((int) $clinicId);
@@ -27,6 +50,14 @@ class ClinicFullOnboardingController extends Controller
             ], 404);
         }
 
+        return response()->json([
+            'success' => true,
+            'data' => $this->fullPayloadForClinic($clinic),
+        ]);
+    }
+
+    private function fullPayloadForClinic(VetRegisterationTemp $clinic): array
+    {
         $doctors = Doctor::query()
             ->where('vet_registeration_id', (int) $clinic->id)
             ->orderBy('id')
@@ -82,18 +113,15 @@ class ClinicFullOnboardingController extends Controller
                 })
                 ->values();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'clinic' => $clinic,
-                'doctors' => $doctors,
-                'services' => $services,
-                'specialized_packages' => $specializedPackages,
-                'vet_at_home_services' => $vetAtHomeServices,
-                'clinic_availability' => $clinicAvailability,
-                'video_schedules' => $videoSchedules,
-            ],
-        ]);
+        return [
+            'clinic' => $clinic,
+            'doctors' => $doctors,
+            'services' => $services,
+            'specialized_packages' => $specializedPackages,
+            'vet_at_home_services' => $vetAtHomeServices,
+            'clinic_availability' => $clinicAvailability,
+            'video_schedules' => $videoSchedules,
+        ];
     }
 
     public function store(Request $request)

@@ -4651,6 +4651,80 @@ class AdminPanelController extends Controller
         return view('admin.vet-registrations', compact('clinics'));
     }
 
+    public function fullOnboardingEntries(Request $request): View
+    {
+        $filters = $request->validate([
+            'from_date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $fromDate = $filters['from_date'] ?? '2026-05-10';
+
+        $clinics = VetRegisterationTemp::query()
+            ->with('doctors')
+            ->where('created_at', '>=', $fromDate.' 00:00:00')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $clinicIds = $clinics->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $doctorIds = $clinics
+            ->flatMap(fn (VetRegisterationTemp $clinic) => $clinic->doctors->pluck('id'))
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $servicesByClinic = empty($clinicIds)
+            ? collect()
+            : DB::table('groomer_services')
+                ->whereIn('user_id', $clinicIds)
+                ->orderBy('id')
+                ->get()
+                ->groupBy('user_id');
+
+        $packagesByClinic = Schema::hasTable('clinic_specialized_packages') && !empty($clinicIds)
+            ? DB::table('clinic_specialized_packages')
+                ->whereIn('clinic_id', $clinicIds)
+                ->orderBy('doctor_id')
+                ->get()
+                ->groupBy('clinic_id')
+            : collect();
+
+        $vetAtHomeByClinic = Schema::hasTable('vet_at_home_services') && !empty($clinicIds)
+            ? DB::table('vet_at_home_services')
+                ->whereIn('clinic_id', $clinicIds)
+                ->orderBy('doctor_id')
+                ->get()
+                ->groupBy('clinic_id')
+            : collect();
+
+        $clinicAvailabilityByDoctor = Schema::hasTable('doctor_availability') && !empty($doctorIds)
+            ? DB::table('doctor_availability')
+                ->whereIn('doctor_id', $doctorIds)
+                ->orderBy('service_type')
+                ->orderBy('day_of_week')
+                ->orderBy('start_time')
+                ->get()
+                ->groupBy('doctor_id')
+            : collect();
+
+        $videoAvailabilityByDoctor = Schema::hasTable('doctor_video_availability') && !empty($doctorIds)
+            ? DB::table('doctor_video_availability')
+                ->whereIn('doctor_id', $doctorIds)
+                ->where('is_active', 1)
+                ->orderBy('day_of_week')
+                ->orderBy('start_time')
+                ->get()
+                ->groupBy('doctor_id')
+            : collect();
+
+        return view('admin.full-onboarding-entries', compact(
+            'clinics',
+            'servicesByClinic',
+            'packagesByClinic',
+            'vetAtHomeByClinic',
+            'clinicAvailabilityByDoctor',
+            'videoAvailabilityByDoctor',
+            'fromDate'
+        ));
+    }
+
     public function videoAnalytics(): View
     {
         $overviewMetrics = $this->callAnalyticsService->lifecycleOverview();

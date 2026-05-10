@@ -293,6 +293,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/doctors/{doctor}/image', [AdminPanelController::class, 'updateDoctorImage'])->name('admin.doctors.image');
         Route::get('/online-doctors', [AdminPanelController::class, 'onlineDoctors'])->name('admin.online-doctors');
     Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
+        Route::get('/full-onboarding', [AdminPanelController::class, 'fullOnboardingEntries'])->name('admin.full-onboarding');
         Route::get('/vet-registration-report', VetRegistrationReportPageController::class)->name('admin.vet-registration-report');
         Route::get('/clinic-report', [ClinicDataReportController::class, 'index'])->name('admin.clinic-report');
         Route::get('/clinic-report/export', [ClinicDataReportController::class, 'export'])->name('admin.clinic-report.export');
