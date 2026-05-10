@@ -60,6 +60,29 @@ class ClinicFullOnboardingController extends Controller
             'specialized_package.dog_neutering_price' => ['nullable', 'numeric', 'min:0'],
             'specialized_package.cat_neutering_price' => ['nullable', 'numeric', 'min:0'],
 
+            'clinic_availability' => ['nullable', 'array'],
+            'clinic_availability.*.service_type' => ['nullable', 'string', 'in:video,in_clinic,home_visit'],
+            'clinic_availability.*.day_of_week' => ['required_with:clinic_availability', 'integer', 'min:0', 'max:6'],
+            'clinic_availability.*.start_time' => ['required_with:clinic_availability'],
+            'clinic_availability.*.end_time' => ['required_with:clinic_availability'],
+            'clinic_availability.*.break_start' => ['nullable'],
+            'clinic_availability.*.break_end' => ['nullable'],
+            'clinic_availability.*.avg_consultation_mins' => ['nullable', 'integer'],
+            'clinic_availability.*.max_bookings_per_hour' => ['nullable', 'integer'],
+
+            'video_schedule' => ['nullable', 'array'],
+            'video_schedule.doctor_index' => ['nullable', 'integer', 'min:0'],
+            'video_schedule.day_rate' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+            'video_schedule.night_rate' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+            'video_schedule.availability' => ['nullable', 'array'],
+            'video_schedule.availability.*.day_of_week' => ['required_with:video_schedule.availability', 'integer', 'min:0', 'max:6'],
+            'video_schedule.availability.*.start_time' => ['required_with:video_schedule.availability'],
+            'video_schedule.availability.*.end_time' => ['required_with:video_schedule.availability'],
+            'video_schedule.availability.*.break_start' => ['nullable'],
+            'video_schedule.availability.*.break_end' => ['nullable'],
+            'video_schedule.availability.*.avg_consultation_mins' => ['nullable', 'integer'],
+            'video_schedule.availability.*.max_bookings_per_hour' => ['nullable', 'integer'],
+
             'dog_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
             'cat_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
             'dog_neutering_price' => ['nullable', 'numeric', 'min:0'],
@@ -71,12 +94,16 @@ class ClinicFullOnboardingController extends Controller
             $doctors = $this->createDoctors($clinic, $data['doctors']);
             $services = $this->createServices((int) $clinic->id, $data['services'] ?? []);
             $specializedPackage = $this->createSpecializedPackage((int) $clinic->id, $doctors, $data);
+            $clinicAvailabilityCount = $this->createClinicAvailability($doctors, $data['clinic_availability'] ?? []);
+            $videoAvailabilityCount = $this->createVideoAvailability($doctors, $data['video_schedule'] ?? null);
 
             return [
                 'clinic' => $clinic->fresh(),
                 'doctors' => $doctors,
                 'services' => $services,
                 'specialized_package' => $specializedPackage,
+                'clinic_availability_rows' => $clinicAvailabilityCount,
+                'video_availability_rows' => $videoAvailabilityCount,
             ];
         });
 
@@ -237,6 +264,88 @@ class ClinicFullOnboardingController extends Controller
             'dog_neutering_price' => $package['dog_neutering_price'] ?? null,
             'cat_neutering_price' => $package['cat_neutering_price'] ?? null,
         ]);
+    }
+
+    private function createClinicAvailability($doctors, array $availabilityRows): int
+    {
+        if (empty($availabilityRows)) {
+            return 0;
+        }
+
+        $doctorIds = $doctors->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (empty($doctorIds)) {
+            return 0;
+        }
+
+        $insertRows = [];
+        foreach ($doctorIds as $doctorId) {
+            foreach ($availabilityRows as $row) {
+                $insertRows[] = [
+                    'doctor_id' => $doctorId,
+                    'service_type' => $row['service_type'] ?? 'in_clinic',
+                    'day_of_week' => $row['day_of_week'],
+                    'start_time' => $row['start_time'],
+                    'end_time' => $row['end_time'],
+                    'break_start' => $row['break_start'] ?? null,
+                    'break_end' => $row['break_end'] ?? null,
+                    'avg_consultation_mins' => $row['avg_consultation_mins'] ?? 20,
+                    'max_bookings_per_hour' => $row['max_bookings_per_hour'] ?? 3,
+                    'is_active' => 1,
+                ];
+            }
+        }
+
+        DB::table('doctor_availability')->insert($insertRows);
+
+        return count($insertRows);
+    }
+
+    private function createVideoAvailability($doctors, ?array $videoSchedule): int
+    {
+        $availabilityRows = $videoSchedule['availability'] ?? [];
+        if (empty($videoSchedule) || empty($availabilityRows)) {
+            return 0;
+        }
+
+        $doctorIndex = (int) ($videoSchedule['doctor_index'] ?? 0);
+        $doctor = $doctors->get($doctorIndex);
+        if (! $doctor) {
+            throw ValidationException::withMessages([
+                'video_schedule.doctor_index' => ['The selected doctor index does not exist in doctors array.'],
+            ]);
+        }
+
+        $rateUpdates = [];
+        if (array_key_exists('day_rate', $videoSchedule)) {
+            $rateUpdates['video_day_rate'] = $videoSchedule['day_rate'] === null ? null : (float) $videoSchedule['day_rate'];
+        }
+        if (array_key_exists('night_rate', $videoSchedule)) {
+            $rateUpdates['video_night_rate'] = $videoSchedule['night_rate'] === null ? null : (float) $videoSchedule['night_rate'];
+        }
+        if (! empty($rateUpdates)) {
+            DB::table('doctors')->where('id', (int) $doctor->id)->update($rateUpdates);
+        }
+
+        $insertRows = [];
+        foreach ($availabilityRows as $row) {
+            $insertRows[] = [
+                'doctor_id' => (int) $doctor->id,
+                'day_of_week' => $row['day_of_week'],
+                'start_time' => $row['start_time'],
+                'end_time' => $row['end_time'],
+                'break_start' => $row['break_start'] ?? null,
+                'break_end' => $row['break_end'] ?? null,
+                'avg_consultation_mins' => $row['avg_consultation_mins'] ?? 20,
+                'max_bookings_per_hour' => $row['max_bookings_per_hour'] ?? 3,
+                'is_active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::table('doctor_video_availability')->insert($insertRows);
+
+        return count($insertRows);
     }
 
     private function decodeBlobInput(Request $request, string $field): ?string
