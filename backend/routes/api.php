@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Http\Controllers\Api\DashboardProfileController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\ClinicServicePresetController;
+use App\Http\Controllers\Api\ClinicSpecializedPackageController;
 use App\Http\Controllers\Api\VetRegistrationReportController;
 use App\Http\Controllers\Api\DoctorCsvExportController;
 use App\Http\Controllers\Api\DoctorChatController;
@@ -2915,6 +2916,8 @@ Route::post('groomer/service', [GroomerServiceController::class, 'store']);
 
 Route::get('/clinic-service-presets', [ClinicServicePresetController::class, 'index']);
 Route::post('/clinic-service-presets', [ClinicServicePresetController::class, 'store']);
+Route::get('/clinic-specialized-packages', [ClinicSpecializedPackageController::class, 'show']);
+Route::post('/clinic-specialized-packages', [ClinicSpecializedPackageController::class, 'upsert']);
 
 Route::prefix('staff')->group(function () {
     Route::get('/', [StaffController::class, 'index']);
