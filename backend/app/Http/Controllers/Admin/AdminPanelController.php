@@ -4656,11 +4656,11 @@ class AdminPanelController extends Controller
         $filters = $request->validate([
             'from_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
-        $fromDate = $filters['from_date'] ?? '2026-05-10';
+        $fromDate = $filters['from_date'] ?? null;
 
         $clinics = VetRegisterationTemp::query()
             ->with('doctors')
-            ->where('created_at', '>=', $fromDate.' 00:00:00')
+            ->when($fromDate, fn ($query) => $query->where('created_at', '>=', $fromDate.' 00:00:00'))
             ->orderByDesc('created_at')
             ->get();
 

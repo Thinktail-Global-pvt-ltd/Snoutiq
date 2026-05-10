@@ -16,7 +16,9 @@
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
                     <div>
                         <h2 class="h5 mb-1">Full onboarding data</h2>
-                        <p class="text-muted mb-0">Clinic registrations from {{ \Illuminate\Support\Carbon::parse($fromDate)->format('d M Y') }} with doctors, services, packages, clinic hours, video hours, and vet-at-home settings.</p>
+                        <p class="text-muted mb-0">
+                            Clinic registrations{{ $fromDate ? ' from '.\Illuminate\Support\Carbon::parse($fromDate)->format('d M Y') : '' }} with doctors, services, packages, clinic hours, video hours, and vet-at-home settings. Recent clinics appear first.
+                        </p>
                     </div>
                     <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
                         <form method="GET" action="{{ route('admin.full-onboarding') }}" class="d-flex gap-2">
