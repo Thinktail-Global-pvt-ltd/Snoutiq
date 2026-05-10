@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Http\Controllers\Api\DashboardProfileController;
 use App\Http\Controllers\Api\MedicalRecordController;
+use App\Http\Controllers\Api\ClinicFullOnboardingController;
 use App\Http\Controllers\Api\ClinicServicePresetController;
 use App\Http\Controllers\Api\ClinicSpecializedPackageController;
 use App\Http\Controllers\Api\VetRegistrationReportController;
@@ -2607,6 +2608,7 @@ Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'de
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
 
 Route::post('/vet-registerations/store', [VetRegisterationTempController::class, 'store']);
+Route::post('/vet-registerations/store-full', [ClinicFullOnboardingController::class, 'store']);
 Route::get('/vet-registerations/{vet}', [VetRegisterationTempController::class, 'show']);
 
 Route::get('/ai-stats', function (Request $Request) {
