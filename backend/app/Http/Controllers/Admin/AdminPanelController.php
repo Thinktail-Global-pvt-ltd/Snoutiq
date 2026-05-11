@@ -4716,6 +4716,98 @@ class AdminPanelController extends Controller
                 ->groupBy('doctor_id')
             : collect();
 
+        $transactionsByClinic = collect();
+        if (Schema::hasTable('transactions') && (!empty($clinicIds) || !empty($doctorIds))) {
+            $transactionCategoryValues = [
+                'video_consult',
+                'appointment',
+                'appointments',
+                'excell_export_campaign',
+                'excel_export_campaign',
+            ];
+            $hasClinicColumn = Schema::hasColumn('transactions', 'clinic_id');
+            $hasDoctorColumn = Schema::hasColumn('transactions', 'doctor_id');
+            $hasStatusColumn = Schema::hasColumn('transactions', 'status');
+            $hasTypeColumn = Schema::hasColumn('transactions', 'type');
+            $hasMetadataColumn = Schema::hasColumn('transactions', 'metadata');
+            $doctorClinicLookup = [];
+            foreach ($clinics as $clinic) {
+                foreach ($clinic->doctors as $doctor) {
+                    $doctorClinicLookup[(int) $doctor->id] = (int) $clinic->id;
+                }
+            }
+            $clinicIdLookup = array_fill_keys($clinicIds, true);
+
+            if ($hasClinicColumn || $hasDoctorColumn) {
+                $transactions = Transaction::query()
+                    ->with([
+                        'doctor:id,vet_registeration_id,doctor_name,doctor_mobile',
+                        'user:id,name,email,phone',
+                    ])
+                    ->where(function (Builder $query) use ($clinicIds, $doctorIds, $hasClinicColumn, $hasDoctorColumn): void {
+                        $hasMatchCondition = false;
+
+                        if ($hasClinicColumn && !empty($clinicIds)) {
+                            $query->whereIn('clinic_id', $clinicIds);
+                            $hasMatchCondition = true;
+                        }
+
+                        if ($hasDoctorColumn && !empty($doctorIds)) {
+                            $method = $hasMatchCondition ? 'orWhereIn' : 'whereIn';
+                            $query->{$method}('doctor_id', $doctorIds);
+                        }
+                    })
+                    ->where(function (Builder $query) use ($transactionCategoryValues, $hasStatusColumn, $hasTypeColumn, $hasMetadataColumn): void {
+                        $hasCategoryCondition = false;
+
+                        if ($hasStatusColumn) {
+                            $query->whereIn('status', $transactionCategoryValues);
+                            $hasCategoryCondition = true;
+                        }
+
+                        if ($hasTypeColumn) {
+                            $method = $hasCategoryCondition ? 'orWhereIn' : 'whereIn';
+                            $query->{$method}('type', $transactionCategoryValues);
+                            $hasCategoryCondition = true;
+                        }
+
+                        if ($hasMetadataColumn) {
+                            $method = $hasCategoryCondition ? 'orWhereIn' : 'whereIn';
+                            $query->{$method}('metadata->order_type', $transactionCategoryValues);
+                        }
+                    })
+                    ->orderByDesc('created_at')
+                    ->get();
+
+                $transactionsByClinic = $transactions->reduce(
+                    function (Collection $grouped, Transaction $transaction) use ($clinicIdLookup, $doctorClinicLookup): Collection {
+                        $matchedClinicIds = [];
+                        $transactionClinicId = (int) ($transaction->clinic_id ?? 0);
+                        $transactionDoctorId = (int) ($transaction->doctor_id ?? 0);
+
+                        if ($transactionClinicId > 0 && isset($clinicIdLookup[$transactionClinicId])) {
+                            $matchedClinicIds[] = $transactionClinicId;
+                        }
+
+                        if ($transactionDoctorId > 0 && isset($doctorClinicLookup[$transactionDoctorId])) {
+                            $matchedClinicIds[] = $doctorClinicLookup[$transactionDoctorId];
+                        }
+
+                        foreach (array_unique($matchedClinicIds) as $clinicId) {
+                            if (! $grouped->has($clinicId)) {
+                                $grouped->put($clinicId, collect());
+                            }
+
+                            $grouped->get($clinicId)->push($transaction);
+                        }
+
+                        return $grouped;
+                    },
+                    collect()
+                );
+            }
+        }
+
         return view('admin.full-onboarding-entries', compact(
             'clinics',
             'servicesByClinic',
@@ -4723,6 +4815,7 @@ class AdminPanelController extends Controller
             'vetAtHomeByClinic',
             'clinicAvailabilityByDoctor',
             'videoAvailabilityByDoctor',
+            'transactionsByClinic',
             'dateFilter',
             'fromDate'
         ));

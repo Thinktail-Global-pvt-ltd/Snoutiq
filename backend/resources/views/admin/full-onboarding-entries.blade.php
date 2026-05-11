@@ -5,7 +5,39 @@
 @php
     $dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     $fmtMoney = static fn ($value) => $value === null ? '—' : '₹'.number_format((float) $value, 2);
+    $fmtPaise = static fn ($value) => '₹'.number_format(((int) ($value ?? 0)) / 100, 2);
     $fmtTime = static fn ($value) => $value ? substr((string) $value, 0, 5) : '—';
+    $normalizeTransactionKind = static function ($value): ?string {
+        $value = strtolower(trim((string) $value));
+        return match ($value) {
+            'video_consult', 'video_consultation', 'video_call' => 'video_consult',
+            'appointment', 'appointments' => 'appointment',
+            'excell_export_campaign', 'excel_export_campaign' => 'excell_export_campaign',
+            default => null,
+        };
+    };
+    $transactionKind = static function ($transaction) use ($normalizeTransactionKind): ?string {
+        return $normalizeTransactionKind($transaction->status ?? null)
+            ?? $normalizeTransactionKind($transaction->type ?? null)
+            ?? $normalizeTransactionKind(data_get($transaction->metadata ?? [], 'order_type'));
+    };
+    $transactionLabels = static fn (?string $kind): array => match ($kind) {
+        'video_consult' => ['In app call', 'Video consult'],
+        'appointment' => ['In clinic'],
+        'excell_export_campaign' => ['Web', 'Video call'],
+        default => ['—'],
+    };
+    $fmtDateTime = static function ($value): string {
+        if (!$value) {
+            return '—';
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->format('d M Y, h:i A');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
+    };
 @endphp
 
 @section('content')
@@ -49,6 +81,7 @@
                                 $clinicServices = $servicesByClinic->get($clinic->id, collect());
                                 $packages = $packagesByClinic->get($clinic->id, collect());
                                 $homeServices = $vetAtHomeByClinic->get($clinic->id, collect());
+                                $clinicTransactions = $transactionsByClinic->get($clinic->id, collect());
                                 $doctorNameById = $clinic->doctors->keyBy('id');
                             @endphp
                             <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
@@ -74,6 +107,29 @@
                                                     <div class="fw-semibold">{{ $clinic->name ?? '—' }}</div>
                                                     <div class="small text-muted">{{ $clinic->mobile ?? 'No mobile' }} · {{ $clinic->email ?? 'No email' }}</div>
                                                     <div class="small text-muted">{{ $clinic->city ?? '—' }} {{ $clinic->pincode ? '· '.$clinic->pincode : '' }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="p-3 bg-light rounded h-100">
+                                                    <div class="text-uppercase small text-muted fw-semibold mb-2">Clinic Media</div>
+                                                    @if(!empty($clinic->clinic_image))
+                                                        <img
+                                                            src="{{ route('clinics.media.image', $clinic->id) }}"
+                                                            alt="{{ $clinic->name ?? 'Clinic' }} image"
+                                                            class="img-fluid rounded border mb-2"
+                                                            style="max-height: 140px; object-fit: cover;"
+                                                        >
+                                                    @else
+                                                        <div class="small text-muted mb-2">No clinic image blob.</div>
+                                                    @endif
+
+                                                    @if(!empty($clinic->clinic_video))
+                                                        <video class="w-100 rounded border" style="max-height: 180px;" controls preload="metadata">
+                                                            <source src="{{ route('clinics.media.video', $clinic->id) }}" type="video/mp4">
+                                                        </video>
+                                                    @else
+                                                        <div class="small text-muted">No clinic video blob.</div>
+                                                    @endif
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
@@ -163,6 +219,72 @@
                                                     @endforeach
                                                 </tbody>
                                             </table>
+                                        </div>
+
+                                        <div class="p-3 bg-light rounded mb-3">
+                                            <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+                                                <div>
+                                                    <div class="text-uppercase small text-muted fw-semibold">Transactions</div>
+                                                    <div class="small text-muted">
+                                                        Rows matched by clinic id or doctor id for video consult, appointment, and Excel export campaign categories.
+                                                    </div>
+                                                </div>
+                                                <div class="small fw-semibold text-muted">
+                                                    {{ number_format($clinicTransactions->count()) }} records
+                                                </div>
+                                            </div>
+
+                                            @if($clinicTransactions->isEmpty())
+                                                <span class="text-muted small">No matching transactions found.</span>
+                                            @else
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm align-middle mb-0">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>ID</th>
+                                                                <th>Date</th>
+                                                                <th>Customer</th>
+                                                                <th>Doctor</th>
+                                                                <th>Shown As</th>
+                                                                <th>Status / Type</th>
+                                                                <th>Amount</th>
+                                                                <th>Reference</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach($clinicTransactions as $transaction)
+                                                                @php
+                                                                    $kind = $transactionKind($transaction);
+                                                                    $labels = $transactionLabels($kind);
+                                                                @endphp
+                                                                <tr>
+                                                                    <td class="fw-semibold">#{{ $transaction->id }}</td>
+                                                                    <td class="small text-muted">{{ $fmtDateTime($transaction->created_at ?? null) }}</td>
+                                                                    <td>
+                                                                        <div class="small fw-semibold">{{ $transaction->user->name ?? '—' }}</div>
+                                                                        <div class="small text-muted">{{ $transaction->user->phone ?? $transaction->user->email ?? '—' }}</div>
+                                                                    </td>
+                                                                    <td>
+                                                                        <div class="small fw-semibold">{{ $transaction->doctor->doctor_name ?? '—' }}</div>
+                                                                        <div class="small text-muted">#{{ $transaction->doctor_id ?? '—' }}</div>
+                                                                    </td>
+                                                                    <td>
+                                                                        @foreach($labels as $label)
+                                                                            <span class="badge text-bg-primary-subtle text-primary-emphasis me-1">{{ $label }}</span>
+                                                                        @endforeach
+                                                                    </td>
+                                                                    <td class="small">
+                                                                        <div>Status: <span class="text-muted">{{ $transaction->status ?? '—' }}</span></div>
+                                                                        <div>Type: <span class="text-muted">{{ $transaction->type ?? data_get($transaction->metadata ?? [], 'order_type', '—') }}</span></div>
+                                                                    </td>
+                                                                    <td class="small fw-semibold">{{ $fmtPaise($transaction->amount_paise ?? 0) }}</td>
+                                                                    <td class="small text-muted">{{ $transaction->reference ?? '—' }}</td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <div class="small text-muted">
