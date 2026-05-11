@@ -4757,17 +4757,12 @@ class AdminPanelController extends Controller
                             $query->{$method}('doctor_id', $doctorIds);
                         }
                     })
-                    ->where(function (Builder $query) use ($transactionCategoryValues, $hasStatusColumn, $hasTypeColumn, $hasMetadataColumn): void {
+                    ->when($hasStatusColumn, fn (Builder $query) => $query->where('status', 'captured'))
+                    ->where(function (Builder $query) use ($transactionCategoryValues, $hasTypeColumn, $hasMetadataColumn): void {
                         $hasCategoryCondition = false;
 
-                        if ($hasStatusColumn) {
-                            $query->whereIn('status', $transactionCategoryValues);
-                            $hasCategoryCondition = true;
-                        }
-
                         if ($hasTypeColumn) {
-                            $method = $hasCategoryCondition ? 'orWhereIn' : 'whereIn';
-                            $query->{$method}('type', $transactionCategoryValues);
+                            $query->whereIn('type', $transactionCategoryValues);
                             $hasCategoryCondition = true;
                         }
 

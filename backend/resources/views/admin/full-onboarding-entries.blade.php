@@ -21,6 +21,48 @@
             ?? $normalizeTransactionKind($transaction->type ?? null)
             ?? $normalizeTransactionKind(data_get($transaction->metadata ?? [], 'order_type'));
     };
+    $firstFilled = static function (array $values): ?string {
+        foreach ($values as $value) {
+            $value = trim((string) $value);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    };
+    $transactionUserName = static fn ($transaction): string => $firstFilled([
+        $transaction->user->name ?? null,
+        data_get($transaction->metadata ?? [], 'user_name'),
+        data_get($transaction->metadata ?? [], 'customer_name'),
+        data_get($transaction->metadata ?? [], 'parent_name'),
+        data_get($transaction->metadata ?? [], 'pet_parent_name'),
+        data_get($transaction->metadata ?? [], 'notes.user_name'),
+        data_get($transaction->metadata ?? [], 'notes.customer_name'),
+        data_get($transaction->metadata ?? [], 'notes.parent_name'),
+        data_get($transaction->metadata ?? [], 'notes.pet_parent_name'),
+    ]) ?? '—';
+    $transactionUserContact = static fn ($transaction): string => $firstFilled([
+        $transaction->user->phone ?? null,
+        $transaction->user->email ?? null,
+        data_get($transaction->metadata ?? [], 'phone'),
+        data_get($transaction->metadata ?? [], 'user_phone'),
+        data_get($transaction->metadata ?? [], 'customer_phone'),
+        data_get($transaction->metadata ?? [], 'email'),
+        data_get($transaction->metadata ?? [], 'user_email'),
+        data_get($transaction->metadata ?? [], 'notes.phone'),
+        data_get($transaction->metadata ?? [], 'notes.user_phone'),
+        data_get($transaction->metadata ?? [], 'notes.customer_phone'),
+        data_get($transaction->metadata ?? [], 'notes.email'),
+        data_get($transaction->metadata ?? [], 'notes.user_email'),
+    ]) ?? '—';
+    $transactionDoctorName = static fn ($transaction): string => $firstFilled([
+        $transaction->doctor->doctor_name ?? null,
+        data_get($transaction->metadata ?? [], 'doctor_name'),
+        data_get($transaction->metadata ?? [], 'doctor.name'),
+        data_get($transaction->metadata ?? [], 'notes.doctor_name'),
+        data_get($transaction->metadata ?? [], 'notes.doctor.name'),
+    ]) ?? ((int) ($transaction->doctor_id ?? 0) > 0 ? 'Doctor #'.$transaction->doctor_id : '—');
     $transactionLabels = static fn (?string $kind): array => match ($kind) {
         'video_consult' => ['In app call', 'Video consult'],
         'appointment' => ['In clinic'],
@@ -226,7 +268,7 @@
                                                 <div>
                                                     <div class="text-uppercase small text-muted fw-semibold">Transactions</div>
                                                     <div class="small text-muted">
-                                                        Rows matched by clinic id or doctor id for video consult, appointment, and Excel export campaign categories.
+                                                        Captured rows matched by clinic id or doctor id for video consult, appointment, and Excel export campaign categories.
                                                     </div>
                                                 </div>
                                                 <div class="small fw-semibold text-muted">
@@ -248,7 +290,6 @@
                                                                 <th>Shown As</th>
                                                                 <th>Status / Type</th>
                                                                 <th>Amount</th>
-                                                                <th>Reference</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -256,16 +297,19 @@
                                                                 @php
                                                                     $kind = $transactionKind($transaction);
                                                                     $labels = $transactionLabels($kind);
+                                                                    $userName = $transactionUserName($transaction);
+                                                                    $userContact = $transactionUserContact($transaction);
+                                                                    $doctorName = $transactionDoctorName($transaction);
                                                                 @endphp
                                                                 <tr>
                                                                     <td class="fw-semibold">#{{ $transaction->id }}</td>
                                                                     <td class="small text-muted">{{ $fmtDateTime($transaction->created_at ?? null) }}</td>
                                                                     <td>
-                                                                        <div class="small fw-semibold">{{ $transaction->user->name ?? '—' }}</div>
-                                                                        <div class="small text-muted">{{ $transaction->user->phone ?? $transaction->user->email ?? '—' }}</div>
+                                                                        <div class="small fw-semibold">{{ $userName }}</div>
+                                                                        <div class="small text-muted">{{ $userContact }}</div>
                                                                     </td>
                                                                     <td>
-                                                                        <div class="small fw-semibold">{{ $transaction->doctor->doctor_name ?? '—' }}</div>
+                                                                        <div class="small fw-semibold">{{ $doctorName }}</div>
                                                                         <div class="small text-muted">#{{ $transaction->doctor_id ?? '—' }}</div>
                                                                     </td>
                                                                     <td>
@@ -278,7 +322,6 @@
                                                                         <div>Type: <span class="text-muted">{{ $transaction->type ?? data_get($transaction->metadata ?? [], 'order_type', '—') }}</span></div>
                                                                     </td>
                                                                     <td class="small fw-semibold">{{ $fmtPaise($transaction->amount_paise ?? 0) }}</td>
-                                                                    <td class="small text-muted">{{ $transaction->reference ?? '—' }}</td>
                                                                 </tr>
                                                             @endforeach
                                                         </tbody>
