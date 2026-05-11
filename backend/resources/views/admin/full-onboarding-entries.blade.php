@@ -22,12 +22,20 @@
                     </div>
                     <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
                         <form method="GET" action="{{ route('admin.full-onboarding') }}" class="d-flex gap-2">
-                            <input type="date" name="from_date" value="{{ $fromDate }}" class="form-control form-control-sm">
+                            <select name="date_filter" class="form-select form-select-sm" onchange="this.form.querySelector('[name=from_date]').disabled = this.value === 'all'">
+                                <option value="from_date" @selected($dateFilter !== 'all')>From date</option>
+                                <option value="all" @selected($dateFilter === 'all')>All</option>
+                            </select>
+                            <input type="date" name="from_date" value="{{ $fromDate ?? '2026-05-10' }}" class="form-control form-control-sm" @disabled($dateFilter === 'all')>
                             <button type="submit" class="btn btn-sm btn-dark">Filter</button>
                         </form>
                         <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">{{ number_format($clinics->count()) }} clinics</span>
                     </div>
                 </div>
+
+                @if(session('status'))
+                    <div class="alert alert-success">{{ session('status') }}</div>
+                @endif
 
                 @if($clinics->isEmpty())
                     <div class="text-center text-muted py-5">
@@ -158,8 +166,19 @@
                                         </div>
 
                                         <div class="small text-muted">
-                                            Full API:
-                                            <code>{{ url('/api/vet-registerations/'.$clinic->id.'/full') }}</code>
+                                            <div class="d-flex flex-column flex-md-row gap-2 justify-content-between align-items-md-center">
+                                                <div>
+                                                    Full API:
+                                                    <code>{{ url('/api/vet-registerations/'.$clinic->id.'/full') }}</code>
+                                                </div>
+                                                <form method="POST" action="{{ route('admin.full-onboarding.delete', ['clinic' => $clinic->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" onsubmit="return confirm('Delete this full onboarding entry and related data?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-trash"></i> Delete
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

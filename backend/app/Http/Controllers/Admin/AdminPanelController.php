@@ -4654,9 +4654,11 @@ class AdminPanelController extends Controller
     public function fullOnboardingEntries(Request $request): View
     {
         $filters = $request->validate([
+            'date_filter' => ['nullable', 'string', 'in:from_date,all'],
             'from_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
-        $fromDate = $filters['from_date'] ?? null;
+        $dateFilter = $filters['date_filter'] ?? 'from_date';
+        $fromDate = $dateFilter === 'all' ? null : ($filters['from_date'] ?? '2026-05-10');
 
         $clinics = VetRegisterationTemp::query()
             ->with('doctors')
@@ -4721,8 +4723,44 @@ class AdminPanelController extends Controller
             'vetAtHomeByClinic',
             'clinicAvailabilityByDoctor',
             'videoAvailabilityByDoctor',
+            'dateFilter',
             'fromDate'
         ));
+    }
+
+    public function deleteFullOnboardingEntry(VetRegisterationTemp $clinic): RedirectResponse
+    {
+        DB::transaction(function () use ($clinic): void {
+            $doctorIds = Doctor::query()
+                ->where('vet_registeration_id', $clinic->id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            DB::table('groomer_services')->where('user_id', $clinic->id)->delete();
+
+            if (Schema::hasTable('clinic_specialized_packages')) {
+                DB::table('clinic_specialized_packages')->where('clinic_id', $clinic->id)->delete();
+            }
+
+            if (Schema::hasTable('vet_at_home_services')) {
+                DB::table('vet_at_home_services')->where('clinic_id', $clinic->id)->delete();
+            }
+
+            if (!empty($doctorIds) && Schema::hasTable('doctor_availability')) {
+                DB::table('doctor_availability')->whereIn('doctor_id', $doctorIds)->delete();
+            }
+
+            if (!empty($doctorIds) && Schema::hasTable('doctor_video_availability')) {
+                DB::table('doctor_video_availability')->whereIn('doctor_id', $doctorIds)->delete();
+            }
+
+            $clinic->delete();
+        });
+
+        return redirect()
+            ->route('admin.full-onboarding', request()->only(['date_filter', 'from_date']))
+            ->with('status', 'Full onboarding entry deleted.');
     }
 
     public function videoAnalytics(): View
