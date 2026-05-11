@@ -948,7 +948,7 @@ Route::post('/doctor/otp/request', function (Request $request, WhatsAppService $
     $doctor = Doctor::whereRaw("REGEXP_REPLACE(doctor_mobile, '[^0-9]', '') = ?", [$phone])->first()
         ?: Doctor::where('doctor_mobile', $payload['phone'])->first();
     if (! $doctor) {
-        return response()->json(['success' => false, 'message' => 'Doctor not found'], 404);
+        return response()->json(['success' => false, 'message' => 'Doctor not found, please register first.'], 404);
     }
 
     $otp = (string) random_int(100000, 999999);
@@ -1039,6 +1039,55 @@ Route::post('/doctor/otp/request-any', function (Request $request, WhatsAppServi
         'otp' => config('app.debug') ? $otp : 'hidden',
     ]);
 })->name('doctor.otp.request-any');
+
+Route::post('/doctor-clinic/phone-exists', function (Request $request) {
+    $payload = $request->validate([
+        'phone' => ['required', 'string'],
+    ]);
+
+    $phone = preg_replace('/\\D+/', '', $payload['phone']);
+    if (strlen($phone) === 12 && str_starts_with($phone, '91')) {
+        $phone = substr($phone, -10);
+    } elseif (strlen($phone) === 11 && str_starts_with($phone, '0')) {
+        $phone = substr($phone, 1);
+    }
+
+    if ($phone === '' || strlen($phone) < 10) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid phone',
+        ], 422);
+    }
+
+    $doctor = Doctor::query()
+        ->whereRaw("REGEXP_REPLACE(doctor_mobile, '[^0-9]', '') = ?", [$phone])
+        ->orWhere('doctor_mobile', $payload['phone'])
+        ->first();
+
+    $clinic = VetRegisterationTemp::query()
+        ->whereRaw("REGEXP_REPLACE(mobile, '[^0-9]', '') = ?", [$phone])
+        ->orWhere('mobile', $payload['phone'])
+        ->first();
+
+    return response()->json([
+        'success' => true,
+        'phone' => $phone,
+        'exists' => (bool) ($doctor || $clinic),
+        'doctor_exists' => (bool) $doctor,
+        'clinic_exists' => (bool) $clinic,
+        'doctor' => $doctor ? [
+            'id' => $doctor->id,
+            'vet_registeration_id' => $doctor->vet_registeration_id,
+            'doctor_name' => $doctor->doctor_name,
+            'doctor_mobile' => $doctor->doctor_mobile,
+        ] : null,
+        'clinic' => $clinic ? [
+            'id' => $clinic->id,
+            'name' => $clinic->name,
+            'mobile' => $clinic->mobile,
+        ] : null,
+    ]);
+})->name('doctor_clinic.phone_exists');
 
 // Doctor OTP: verify
 Route::post('/doctor/otp/verify', function (Request $request) {
