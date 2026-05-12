@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use App\Models\Chat;
 use App\Models\ChatRoom;
+use App\Models\DocumentAiAnalysis;
 use App\Models\Pet;
 use App\Models\PetDocumentAiSummary;
 use Illuminate\Http\UploadedFile;
@@ -90,8 +91,8 @@ class GeminiChatController extends Controller
         $data = $request->validate([
             'question' => ['nullable', 'string', 'max:4000'],
             'prompt' => ['nullable', 'string', 'max:4000'],
-            'user_id' => ['nullable', 'integer'],
-            'pet_id' => ['nullable', 'integer'],
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'pet_id' => ['required', 'integer', 'exists:pets,id'],
             'pet_name' => ['nullable', 'string', 'max:255'],
             'pet_type' => ['nullable', 'string', 'max:120'],
             'pet_breed' => ['nullable', 'string', 'max:255'],
@@ -99,7 +100,7 @@ class GeminiChatController extends Controller
             'pet_gender' => ['nullable', 'string', 'max:120'],
         ]);
 
-        [$base64, $mimeType, $fileName, $fileSize] = $this->resolveSummaryDocumentPayload($request, 'document', 20480);
+        [$base64, $mimeType, $fileName, $fileSize, $documentBlob] = $this->resolveSummaryDocumentPayload($request, 'document', 20480);
 
         $prompt = $this->documentAnalysisPrompt(
             trim((string) ($data['question'] ?? $data['prompt'] ?? '')),
@@ -121,10 +122,23 @@ class GeminiChatController extends Controller
             ], 502);
         }
 
+        $analysisRecord = $this->storeDocumentAnalysis(
+            $data,
+            $fileName,
+            $mimeType,
+            $fileSize,
+            $documentBlob,
+            $prompt,
+            $result
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Document processed successfully.',
             'data' => [
+                'id' => $analysisRecord?->id,
+                'user_id' => $analysisRecord?->user_id,
+                'pet_id' => $analysisRecord?->pet_id,
                 'file_name' => $fileName,
                 'mime_type' => $mimeType,
                 'file_size' => $fileSize,
@@ -1196,7 +1210,42 @@ PROMPT;
             $file->getClientMimeType() ?: ($file->getMimeType() ?: 'application/octet-stream'),
             $file->getClientOriginalName(),
             $fileSize,
+            $contents,
         ];
+    }
+
+    private function storeDocumentAnalysis(
+        array $data,
+        ?string $fileName,
+        string $mimeType,
+        int $fileSize,
+        string $documentBlob,
+        string $prompt,
+        array $result
+    ): ?DocumentAiAnalysis {
+        if (! Schema::hasTable('document_ai_analyses')
+            || ! Schema::hasColumn('document_ai_analyses', 'document_blob')) {
+            Log::warning('document_ai_analyses.table_missing', [
+                'file_name' => $fileName,
+                'user_id' => $data['user_id'] ?? null,
+                'pet_id' => $data['pet_id'] ?? null,
+            ]);
+
+            return null;
+        }
+
+        return DocumentAiAnalysis::create([
+            'user_id' => $data['user_id'] ?? null,
+            'pet_id' => $data['pet_id'] ?? null,
+            'file_name' => $fileName,
+            'mime_type' => $mimeType,
+            'file_size' => $fileSize,
+            'document_blob' => $documentBlob,
+            'model' => $result['model'] ?? null,
+            'prompt' => $prompt,
+            'summary' => $result['summary'] ?? '',
+            'raw_response' => $result['raw_response'] ?? null,
+        ]);
     }
 
     private function summarizeDocumentWithGemini(string $base64, string $mimeType, ?Pet $pet = null): array
