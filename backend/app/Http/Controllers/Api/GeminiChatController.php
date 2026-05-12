@@ -85,6 +85,56 @@ class GeminiChatController extends Controller
         ], 201);
     }
 
+    public function analyzeDocument(Request $request)
+    {
+        $data = $request->validate([
+            'question' => ['nullable', 'string', 'max:4000'],
+            'prompt' => ['nullable', 'string', 'max:4000'],
+            'user_id' => ['nullable', 'integer'],
+            'pet_id' => ['nullable', 'integer'],
+            'pet_name' => ['nullable', 'string', 'max:255'],
+            'pet_type' => ['nullable', 'string', 'max:120'],
+            'pet_breed' => ['nullable', 'string', 'max:255'],
+            'pet_age' => ['nullable', 'string', 'max:120'],
+            'pet_gender' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        [$base64, $mimeType, $fileName, $fileSize] = $this->resolveSummaryDocumentPayload($request, 'document', 20480);
+
+        $prompt = $this->documentAnalysisPrompt(
+            trim((string) ($data['question'] ?? $data['prompt'] ?? '')),
+            $data
+        );
+        $result = $this->analyzeDocumentWithGemini($base64, $mimeType, $prompt);
+
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gemini could not process this document.',
+                'error' => $result['error'],
+                'data' => [
+                    'file_name' => $fileName,
+                    'mime_type' => $mimeType,
+                    'file_size' => $fileSize,
+                    'model' => $result['model'],
+                ],
+            ], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document processed successfully.',
+            'data' => [
+                'file_name' => $fileName,
+                'mime_type' => $mimeType,
+                'file_size' => $fileSize,
+                'model' => $result['model'],
+                'output' => $result['summary'],
+                'raw_response' => $result['raw_response'],
+            ],
+        ]);
+    }
+
     /**
      * Dog disease spell-correct/suggestion with similar shape to /chat/send.
      */
@@ -1109,19 +1159,35 @@ PROMPT;
         return $json['candidates'][0]['content']['parts'][0]['text'] ?? "No response.";
     }
 
-    private function resolveSummaryDocumentPayload(Request $request): array
+    private function resolveSummaryDocumentPayload(Request $request, string $field = 'document', int $maxKilobytes = 10240): array
     {
-        $file = $request->file('document');
+        $file = $request->file($field);
         if (!$file instanceof UploadedFile || !$file->isValid()) {
+            $message = $file instanceof UploadedFile
+                ? ($file->getErrorMessage() ?: 'The document failed to upload.')
+                : 'The document field is required. Upload it as multipart form-data with key "document" and type File.';
+
+            $postMax = ini_get('post_max_size') ?: null;
+            $uploadMax = ini_get('upload_max_filesize') ?: null;
+
             throw ValidationException::withMessages([
-                'document' => [$file?->getErrorMessage() ?: 'Valid document upload is required.'],
+                $field => [
+                    trim($message.' Server limits: post_max_size='.($postMax ?: 'unknown').', upload_max_filesize='.($uploadMax ?: 'unknown').'.'),
+                ],
+            ]);
+        }
+
+        $fileSize = (int) ($file->getSize() ?? 0);
+        if ($fileSize > $maxKilobytes * 1024) {
+            throw ValidationException::withMessages([
+                $field => ['The document must not be greater than '.$maxKilobytes.' kilobytes.'],
             ]);
         }
 
         $contents = $file->get();
         if ($contents === false || $contents === null || $contents === '') {
             throw ValidationException::withMessages([
-                'document' => ['Unable to read uploaded document.'],
+                $field => ['Unable to read uploaded document.'],
             ]);
         }
 
@@ -1129,7 +1195,7 @@ PROMPT;
             base64_encode($contents),
             $file->getClientMimeType() ?: ($file->getMimeType() ?: 'application/octet-stream'),
             $file->getClientOriginalName(),
-            $file->getSize(),
+            $fileSize,
         ];
     }
 
@@ -1154,6 +1220,46 @@ PROMPT;
             GeminiConfig::defaultModel(),
         ], GeminiConfig::summaryModels()))));
         $prompt = $this->documentSummaryPrompt($pet);
+        $errors = [];
+
+        foreach ($models as $model) {
+            $result = $this->callGeminiDocumentSummaryModel($model, $apiKey, $prompt, $base64, $mimeType);
+            if ($result['ok']) {
+                return $result;
+            }
+
+            $errors[] = $result['error'];
+        }
+
+        return [
+            'ok' => false,
+            'summary' => '',
+            'model' => $models[0] ?? null,
+            'raw_response' => null,
+            'error' => implode(' | ', $errors),
+        ];
+    }
+
+    private function analyzeDocumentWithGemini(string $base64, string $mimeType, string $prompt): array
+    {
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            return [
+                'ok' => false,
+                'summary' => '',
+                'model' => null,
+                'raw_response' => null,
+                'error' => 'Gemini API key is not configured.',
+            ];
+        }
+
+        $models = array_values(array_unique(array_filter([
+            'gemini-2.5-flash',
+            GeminiConfig::chatModel(),
+            config('services.gemini.chat_model'),
+            config('services.gemini.model'),
+            GeminiConfig::defaultModel(),
+        ])));
         $errors = [];
 
         foreach ($models as $model) {
@@ -1309,6 +1415,45 @@ Rules:
 - Do not invent facts that are not visible in the document.
 - If the document is unreadable or not a medical/veterinary report, say that clearly.
 - Keep the language simple and practical.
+PROMPT;
+    }
+
+    private function documentAnalysisPrompt(string $question, array $context = []): string
+    {
+        $question = $question !== ''
+            ? $question
+            : 'Read this document and summarize the important information clearly.';
+
+        $petContext = array_filter([
+            'user_id' => $context['user_id'] ?? null,
+            'pet_id' => $context['pet_id'] ?? null,
+            'pet_name' => $context['pet_name'] ?? null,
+            'pet_type' => $context['pet_type'] ?? null,
+            'pet_breed' => $context['pet_breed'] ?? null,
+            'pet_age' => $context['pet_age'] ?? null,
+            'pet_gender' => $context['pet_gender'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
+        $petContextText = empty($petContext)
+            ? 'No extra pet/user context was provided.'
+            : json_encode($petContext, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return <<<PROMPT
+You are Snoutiq's veterinary document assistant.
+
+Context:
+{$petContextText}
+
+User request:
+{$question}
+
+Read the attached document/image and answer the user request.
+
+Rules:
+- Use only information visible in the document plus the optional context above.
+- Do not invent diagnosis, medicines, values, dates, or doctor instructions.
+- If the file is unreadable or unrelated to veterinary/medical care, say that clearly.
+- Keep the answer practical and easy to understand.
+- Output plain text only.
 PROMPT;
     }
 

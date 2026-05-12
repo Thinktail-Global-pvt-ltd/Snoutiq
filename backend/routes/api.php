@@ -2588,6 +2588,7 @@ Route::post('/symptom-followup', [SnoutiqSymptomController::class, 'followup']);
 Route::post('/symptom-answer', [SnoutiqSymptomController::class, 'answer']);
 Route::get('/symptom-session/{session_id}', [SnoutiqSymptomController::class, 'session']);
 Route::post('/symptom-session/{session_id}/reset', [SnoutiqSymptomController::class, 'resetSession']);
+Route::post('/chat/document-analyze', [GeminiChatController::class, 'analyzeDocument']);
 Route::post('/chat/document-summary', [GeminiChatController::class, 'summarizeDocument']);
 Route::post('/chat/dog-disease', [GeminiChatController::class, 'dogDisease']);
 Route::match(['put', 'post'], '/chat/dog-disease/question', [GeminiChatController::class, 'updateDogDiseaseQuestion']);
