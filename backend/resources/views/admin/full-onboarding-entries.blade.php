@@ -156,7 +156,7 @@
                                                     <div class="text-uppercase small text-muted fw-semibold mb-2">Clinic Media</div>
                                                     @if(!empty($clinic->clinic_image))
                                                         <img
-                                                            src="{{ route('clinics.media.image', $clinic->id) }}"
+                                                            src="{{ url('/clinics/'.$clinic->id.'/media/image') }}"
                                                             alt="{{ $clinic->name ?? 'Clinic' }} image"
                                                             class="img-fluid rounded border mb-2"
                                                             style="max-height: 140px; object-fit: cover;"
@@ -167,7 +167,7 @@
 
                                                     @if(!empty($clinic->clinic_video))
                                                         <video class="w-100 rounded border" style="max-height: 180px;" controls preload="metadata">
-                                                            <source src="{{ route('clinics.media.video', $clinic->id) }}" type="video/mp4">
+                                                            <source src="{{ url('/clinics/'.$clinic->id.'/media/video') }}" type="video/mp4">
                                                         </video>
                                                     @else
                                                         <div class="small text-muted">No clinic video blob.</div>

@@ -39,6 +39,8 @@ use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Http\Controllers\Api\DashboardProfileController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\ClinicFullOnboardingController;
+use App\Http\Controllers\Api\ClinicMediaUploadController;
+use App\Http\Controllers\Api\ClinicOnboardingExtrasController;
 use App\Http\Controllers\Api\ClinicServicePresetController;
 use App\Http\Controllers\Api\ClinicSpecializedPackageController;
 use App\Http\Controllers\Api\VetAtHomeServiceController;
@@ -2662,6 +2664,7 @@ Route::post('/vet-registerations/store', [VetRegisterationTempController::class,
 Route::post('/vet-registerations/store-full', [ClinicFullOnboardingController::class, 'store']);
 Route::get('/vet-registerations/full', [ClinicFullOnboardingController::class, 'index']);
 Route::get('/vet-registerations/{clinicId}/full', [ClinicFullOnboardingController::class, 'show'])->whereNumber('clinicId');
+Route::post('/vet-registerations/{clinic}/media', [ClinicMediaUploadController::class, 'store'])->whereNumber('clinic');
 Route::get('/vet-registerations/{vet}', [VetRegisterationTempController::class, 'show']);
 
 Route::get('/ai-stats', function (Request $Request) {
@@ -2971,6 +2974,7 @@ Route::post('groomer/service', [GroomerServiceController::class, 'store']);
 
 Route::get('/clinic-service-presets', [ClinicServicePresetController::class, 'index']);
 Route::post('/clinic-service-presets', [ClinicServicePresetController::class, 'store']);
+Route::post('/clinic-onboarding-extras', [ClinicOnboardingExtrasController::class, 'upsert']);
 Route::get('/clinic-specialized-packages', [ClinicSpecializedPackageController::class, 'show']);
 Route::post('/clinic-specialized-packages', [ClinicSpecializedPackageController::class, 'upsert']);
 Route::get('/vet-at-home-services', [VetAtHomeServiceController::class, 'show']);
