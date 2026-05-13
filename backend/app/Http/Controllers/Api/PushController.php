@@ -9,6 +9,7 @@ use App\Models\Call;
 use App\Models\CallSession;
 use App\Models\Doctor;
 use App\Models\DeviceToken;
+use App\Exceptions\StaleFcmTokenException;
 use App\Services\Push\FcmService;
 use App\Support\DeviceTokenOwnerResolver;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
-use Kreait\Firebase\Exception\MessagingException;
 use Throwable;
 
 class PushController extends Controller
@@ -276,7 +276,11 @@ class PushController extends Controller
                 'sent' => true,
                 'success' => true,
             ]);
-        } catch (MessagingException $e) {
+        } catch (Throwable $e) {
+            if ($e instanceof StaleFcmTokenException) {
+                return $this->staleFcmTokenResponse($e);
+            }
+
             \Log::error('FCM test push failed', [
                 'token' => $validated['token'] ?? null,
                 'user_id' => Auth::id(),
@@ -286,17 +290,6 @@ class PushController extends Controller
             if ($response = $this->firebaseAuthFailureResponse($e)) {
                 return $response;
             }
-
-            return response()->json([
-                'error' => 'FCM send failed',
-                'details' => $e->getMessage(),
-            ], 500);
-        } catch (Throwable $e) {
-            \Log::error('FCM test push failed', [
-                'token' => $validated['token'] ?? null,
-                'user_id' => Auth::id(),
-                'error' => $e->getMessage(),
-            ]);
 
             return response()->json([
                 'error' => 'FCM send failed',
@@ -421,7 +414,11 @@ class PushController extends Controller
                 'sent' => true,
                 'success' => true,
             ]);
-        } catch (MessagingException $e) {
+        } catch (Throwable $e) {
+            if ($e instanceof StaleFcmTokenException) {
+                return $this->staleFcmTokenResponse($e);
+            }
+
             \Log::error('FCM rich push failed', [
                 'token' => $validated['token'] ?? null,
                 'user_id' => Auth::id(),
@@ -431,17 +428,6 @@ class PushController extends Controller
             if ($response = $this->firebaseAuthFailureResponse($e)) {
                 return $response;
             }
-
-            return response()->json([
-                'error' => 'FCM send failed',
-                'details' => $e->getMessage(),
-            ], 500);
-        } catch (Throwable $e) {
-            \Log::error('FCM rich push failed', [
-                'token' => $validated['token'] ?? null,
-                'user_id' => Auth::id(),
-                'error' => $e->getMessage(),
-            ]);
 
             return response()->json([
                 'error' => 'FCM send failed',
@@ -457,9 +443,9 @@ class PushController extends Controller
             'title' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
             'force' => ['nullable', 'boolean'],
-            'delivery_mode' => ['nullable', 'string', Rule::in(['hybrid', 'data_only', 'notification_only'])],
+            'delivery_mode' => ['nullable', 'string', Rule::in(['hybrid', 'data_only', 'notification_only', 'alert'])],
             'data' => ['nullable', 'array'],
-            'data.delivery_mode' => ['nullable', 'string', Rule::in(['hybrid', 'data_only', 'notification_only'])],
+            'data.delivery_mode' => ['nullable', 'string', Rule::in(['hybrid', 'data_only', 'notification_only', 'alert'])],
             'data.call_id' => ['nullable', 'string'],
             'data.doctor_id' => ['nullable'],
             'data.patient_id' => ['nullable'],
@@ -495,6 +481,9 @@ class PushController extends Controller
         $channelName = $dataBlock['channel_name'] ?? $validated['channel_name'] ?? null;
         $expiresAt = $dataBlock['expires_at'] ?? $validated['expires_at'] ?? null;
         $deliveryMode = $this->resolveRingDeliveryMode($request);
+        if (in_array($deliveryMode, ['data_only', 'hybrid'], true)) {
+            $deliveryMode = 'alert';
+        }
 
         $validator = validator([
             'call_id' => $callId,
@@ -654,8 +643,9 @@ class PushController extends Controller
         }
 
         $channelName = $channelName ?: "agora_channel_{$callId}";
-        $title = $validated['title'] ?? 'Snoutiq Incoming Call';
-        $body = $validated['body'] ?? 'Incoming call alert';
+        $channelForClient = $channelName ?: (string) $channel;
+        $title = $validated['title'] ?? 'Incoming Video Call';
+        $body = $validated['body'] ?? ($doctorName ? "{$doctorName} is calling you" : 'Incoming call alert');
 
         $data = [
             'type' => 'incoming_call',
@@ -670,13 +660,22 @@ class PushController extends Controller
             'doctor_name' => $doctorName ?? '',
             'doctorName' => $doctorName ?? '',
             'callerName' => $doctorName ?? '',
-            'channel' => (string) $channel,
+            'channel' => (string) $channelForClient,
             'channel_name' => (string) $channelName,
+            'channelName' => (string) $channelName,
+            'call_mode' => (string) ($request->input('data.call_mode') ?? $request->input('call_mode') ?? 'video'),
             'expires_at' => (string) $expiresAtMs,
             'delivery_mode' => $deliveryMode,
             'deliveryMode' => $deliveryMode,
             'data_only' => $deliveryMode === 'data_only' ? '1' : '0',
         ];
+
+        $responsePayload = $deliveryMode === 'alert'
+            ? $this->buildIncomingCallAlertPayload($token, $title, $body, $data)
+            : null;
+        $sendPayload = $responsePayload !== null
+            ? $this->buildIncomingCallFcmSendPayload($token, $title, $body, $data)
+            : null;
 
         $tokenLast8 = strlen($token) >= 8 ? substr($token, -8) : $token;
         $includesNotification = $deliveryMode !== 'data_only';
@@ -696,7 +695,11 @@ class PushController extends Controller
         ]);
 
         try {
-            $push->sendToToken($token, $title, $body, $data);
+            if ($sendPayload !== null) {
+                $push->sendRawMessagePayload($sendPayload, $token);
+            } else {
+                $push->sendToToken($token, $title, $body, $data);
+            }
             \Log::info('FCM ring push success', [
                 'call_id' => $callId,
                 'doctor_id' => $doctorId,
@@ -705,6 +708,10 @@ class PushController extends Controller
                 'includes_notification' => $includesNotification,
             ]);
         } catch (Throwable $e) {
+            if ($e instanceof StaleFcmTokenException) {
+                return $this->staleFcmTokenResponse($e);
+            }
+
             \Log::error('FCM ring push failed', [
                 'call_id' => $callId,
                 'doctor_id' => $doctorId,
@@ -713,6 +720,10 @@ class PushController extends Controller
                 'includes_notification' => $includesNotification,
                 'error' => $e->getMessage(),
             ]);
+
+            if ($response = $this->firebaseAuthFailureResponse($e)) {
+                return $response;
+            }
 
             return response()->json([
                 'success' => false,
@@ -724,6 +735,8 @@ class PushController extends Controller
         return response()->json([
             'success' => true,
             'data' => $data,
+            'delivery_mode' => $deliveryMode,
+            'apns_alert' => $responsePayload !== null,
         ]);
     }
 
@@ -805,7 +818,19 @@ class PushController extends Controller
             ],
         ]);
 
-        $push->sendToToken($token, $title, $body, $data);
+        try {
+            $push->sendToToken($token, $title, $body, $data);
+        } catch (Throwable $e) {
+            if ($e instanceof StaleFcmTokenException) {
+                return $this->staleFcmTokenResponse($e);
+            }
+
+            if ($response = $this->firebaseAuthFailureResponse($e)) {
+                return $response;
+            }
+
+            throw $e;
+        }
         // Compatibility stop push for clients that only listen to incoming_call payloads.
         $compatStopData = array_merge($data, [
             'type' => 'incoming_call',
@@ -1153,6 +1178,102 @@ class PushController extends Controller
         return trim(trim($token), "\"'");
     }
 
+    /**
+     * @param array<string,string> $data
+     * @return array<string,mixed>
+     */
+    private function buildIncomingCallAlertPayload(string $token, string $title, string $body, array $data): array
+    {
+        $callId = (string) ($data['call_id'] ?? '');
+
+        return [
+            'token' => $token,
+            'notification' => [
+                'title' => $title,
+                'body' => $body,
+            ],
+            'android' => [
+                'priority' => 'HIGH',
+                'ttl' => '30s',
+                'notification' => [
+                    'channel_id' => 'incoming_calls_v1',
+                    'notification_priority' => 'PRIORITY_MAX',
+                    'visibility' => 'PUBLIC',
+                    'sound' => 'default',
+                    'default_sound' => true,
+                    'default_vibrate_timings' => true,
+                    'tag' => "incoming_call_{$callId}",
+                ],
+            ],
+            'data' => [
+                'type' => (string) ($data['type'] ?? 'incoming_call'),
+                'call_id' => $callId,
+                'callId' => (string) ($data['callId'] ?? $callId),
+                'call_session_id' => (string) ($data['call_session_id'] ?? ''),
+                'callSessionId' => (string) ($data['callSessionId'] ?? $data['call_session_id'] ?? ''),
+                'channel' => (string) ($data['channel_name'] ?? $data['channel'] ?? ''),
+                'channel_name' => (string) ($data['channel_name'] ?? $data['channel'] ?? ''),
+                'channelName' => (string) ($data['channelName'] ?? $data['channel_name'] ?? $data['channel'] ?? ''),
+                'doctor_id' => (string) ($data['doctor_id'] ?? ''),
+                'doctorId' => (string) ($data['doctorId'] ?? $data['doctor_id'] ?? ''),
+                'patient_id' => (string) ($data['patient_id'] ?? ''),
+                'patientId' => (string) ($data['patientId'] ?? $data['patient_id'] ?? ''),
+                'doctor_name' => (string) ($data['doctor_name'] ?? ''),
+                'doctorName' => (string) ($data['doctorName'] ?? $data['doctor_name'] ?? ''),
+                'callerName' => (string) ($data['callerName'] ?? $data['doctorName'] ?? $data['doctor_name'] ?? ''),
+                'call_mode' => (string) ($data['call_mode'] ?? 'video'),
+                'delivery_mode' => 'alert',
+                'deliveryMode' => 'alert',
+                'data_only' => '0',
+                'expires_at' => (string) ($data['expires_at'] ?? ''),
+            ],
+            'apns' => [
+                'headers' => [
+                    'apns-priority' => '10',
+                    'apns-push-type' => 'alert',
+                ],
+                'payload' => [
+                    'aps' => [
+                        'alert' => [
+                            'title' => $title,
+                            'body' => $body,
+                        ],
+                        'sound' => 'default',
+                        'category' => 'INCOMING_CALL',
+                        'interruption-level' => 'time-sensitive',
+                        'thread-id' => "incoming_call_{$callId}",
+                        'mutable-content' => 1,
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string,string> $data
+     * @return array<string,mixed>
+     */
+    private function buildIncomingCallFcmSendPayload(string $token, string $title, string $body, array $data): array
+    {
+        $payload = $this->buildIncomingCallAlertPayload($token, $title, $body, $data);
+
+        $payload['android'] = [
+            'priority' => 'HIGH',
+            'ttl' => '30s',
+            'notification' => [
+                'channel_id' => 'incoming_calls_v1',
+                'notification_priority' => 'PRIORITY_MAX',
+                'visibility' => 'PUBLIC',
+                'sound' => 'default',
+                'default_sound' => true,
+                'default_vibrate_timings' => true,
+                'tag' => (string) data_get($payload, 'android.notification.tag', ''),
+            ],
+        ];
+
+        return $payload;
+    }
+
     private function resolveRingDeliveryMode(Request $request): string
     {
         $mode = $request->input('delivery_mode')
@@ -1160,7 +1281,7 @@ class PushController extends Controller
 
         if (is_string($mode)) {
             $normalizedMode = strtolower(trim($mode));
-            if (in_array($normalizedMode, ['hybrid', 'data_only', 'notification_only'], true)) {
+            if (in_array($normalizedMode, ['hybrid', 'data_only', 'notification_only', 'alert'], true)) {
                 return $normalizedMode;
             }
         }
@@ -1320,6 +1441,15 @@ class PushController extends Controller
             'details' => implode(' ', $details),
             'diagnostics' => $diagnostics,
         ], 503);
+    }
+
+    private function staleFcmTokenResponse(StaleFcmTokenException $e): JsonResponse
+    {
+        return response()->json([
+            'error' => 'FCM token no longer valid',
+            'message' => 'Firebase reported that this device token is no longer registered. Register a fresh token and retry.',
+            'stale_token' => true,
+        ], 410);
     }
 
     /**

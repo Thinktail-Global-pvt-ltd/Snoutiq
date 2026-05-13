@@ -1187,10 +1187,11 @@ class PaymentController extends Controller
         }
 
         $transactionType = $this->resolveTransactionType($notes);
-        $payoutBreakup = $this->buildExcelExportPayoutBreakup(
+        $payoutBreakup = $this->buildTransactionPayoutBreakup(
             grossPaise: (int) ($order['amount'] ?? 0),
             transactionType: $transactionType,
-            notes: $notes
+            notes: $notes,
+            doctorId: $this->toNullableInt($doctorId)
         );
         $payoutColumns = $this->transactionPayoutColumnMap();
 
@@ -1293,11 +1294,20 @@ class PaymentController extends Controller
         } elseif ($request->filled('notification_id') && is_numeric($request->input('notification_id'))) {
             $fcmNotificationId = (int) $request->input('notification_id');
         }
+        $paymentId = trim((string) ($payment->razorpay_payment_id ?? ''));
+        $orderId = trim((string) ($payment->razorpay_order_id ?? ''));
+        $candidateReferences = collect([$paymentId, $orderId])
+            ->filter(fn ($value) => $value !== '')
+            ->values()
+            ->all();
+
         $transactionType = $this->resolveTransactionType($notes);
-        $payoutBreakup = $this->buildExcelExportPayoutBreakup(
+        $payoutBreakup = $this->buildTransactionPayoutBreakup(
             grossPaise: (int) ($amount ?? 0),
             transactionType: $transactionType,
-            notes: $notes
+            notes: $notes,
+            doctorId: $this->toNullableInt($doctorId),
+            excludeReferences: $candidateReferences
         );
         $payoutColumns = $this->transactionPayoutColumnMap();
 
@@ -1363,15 +1373,7 @@ class PaymentController extends Controller
                 $payload['fcm_notification_id'] = $fcmNotificationId;
             }
 
-            $transaction = DB::transaction(function () use ($payment, $payload, $amountPaise, $transactionStatus): Transaction {
-                $paymentId = trim((string) ($payment->razorpay_payment_id ?? ''));
-                $orderId = trim((string) ($payment->razorpay_order_id ?? ''));
-
-                $candidateReferences = collect([$paymentId, $orderId])
-                    ->filter(fn ($value) => $value !== '')
-                    ->values()
-                    ->all();
-
+            $transaction = DB::transaction(function () use ($payload, $amountPaise, $transactionStatus, $candidateReferences): Transaction {
                 $matchedTransactions = Transaction::query()
                     ->when(!empty($candidateReferences), function ($query) use ($candidateReferences) {
                         $query->where(function ($inner) use ($candidateReferences) {
@@ -1517,6 +1519,30 @@ class PaymentController extends Controller
         ];
     }
 
+    protected function buildTransactionPayoutBreakup(
+        int $grossPaise,
+        string $transactionType,
+        array $notes = [],
+        ?int $doctorId = null,
+        array $excludeReferences = []
+    ): ?array {
+        $normalizedType = strtolower(trim($transactionType));
+
+        if ($normalizedType === 'excell_export_campaign') {
+            return $this->buildExcelExportPayoutBreakup($grossPaise, $transactionType, $notes);
+        }
+
+        if (in_array($normalizedType, ['appointment', 'appointments'], true)) {
+            return $this->buildAppointmentPayoutBreakup(
+                grossPaise: $grossPaise,
+                doctorId: $doctorId,
+                excludeReferences: $excludeReferences
+            );
+        }
+
+        return null;
+    }
+
     protected function buildExcelExportPayoutBreakup(int $grossPaise, string $transactionType, array $notes = []): ?array
     {
         if (strtolower(trim($transactionType)) !== 'excell_export_campaign') {
@@ -1540,6 +1566,64 @@ class PaymentController extends Controller
             'payment_to_snoutiq_paise' => $snoutiqSharePaise,
             'payment_to_doctor_paise' => $doctorSharePaise,
         ];
+    }
+
+    protected function buildAppointmentPayoutBreakup(int $grossPaise, ?int $doctorId, array $excludeReferences = []): ?array
+    {
+        if (!$doctorId || $doctorId <= 0) {
+            return null;
+        }
+
+        $grossPaise = max(0, (int) $grossPaise);
+        $priorPaymentCount = $this->countPriorAppointmentPaymentsForDoctor($doctorId, $excludeReferences);
+        $paymentSequence = $priorPaymentCount + 1;
+        $snoutiqPercent = match ($paymentSequence) {
+            1 => 50,
+            2 => 40,
+            default => 30,
+        };
+        $doctorPercent = 100 - $snoutiqPercent;
+        $snoutiqSharePaise = (int) round($grossPaise * ($snoutiqPercent / 100));
+        $doctorSharePaise = max(0, $grossPaise - $snoutiqSharePaise);
+
+        return [
+            'actual_amount_paid_by_consumer_paise' => $grossPaise,
+            'payment_sequence_for_doctor' => $paymentSequence,
+            'doctor_id' => $doctorId,
+            'payment_to_snoutiq_percent' => $snoutiqPercent,
+            'payment_to_doctor_percent' => $doctorPercent,
+            'payment_to_snoutiq_paise' => $snoutiqSharePaise,
+            'payment_to_doctor_paise' => $doctorSharePaise,
+        ];
+    }
+
+    protected function countPriorAppointmentPaymentsForDoctor(int $doctorId, array $excludeReferences = []): int
+    {
+        if (!Schema::hasTable('transactions')) {
+            return 0;
+        }
+
+        $excludeReferences = collect($excludeReferences)
+            ->map(fn ($reference) => trim((string) $reference))
+            ->filter(fn (string $reference) => $reference !== '')
+            ->unique()
+            ->values()
+            ->all();
+        $appointmentTypes = ['appointment', 'appointments'];
+        $ignoredStatuses = ['failed', 'cancelled', 'canceled', 'refunded'];
+
+        return (int) Transaction::query()
+            ->where('doctor_id', $doctorId)
+            ->where('amount_paise', '>', 0)
+            ->whereNotIn('status', $ignoredStatuses)
+            ->where(function ($query) use ($appointmentTypes) {
+                $query->whereIn('type', $appointmentTypes)
+                    ->orWhereIn('metadata->order_type', $appointmentTypes);
+            })
+            ->when(!empty($excludeReferences), function ($query) use ($excludeReferences) {
+                $query->whereNotIn('reference', $excludeReferences);
+            })
+            ->count();
     }
 
     protected function resolveExcelDoctorSharePaise(int $amountBeforeGstPaise, int $grossPaise): int
