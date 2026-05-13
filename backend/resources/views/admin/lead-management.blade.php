@@ -548,6 +548,13 @@
         font-weight: 700;
     }
 
+    .crm-tag-payment-pending {
+        background: var(--crm-amber-bg);
+        color: var(--crm-amber);
+        border: 1px solid rgba(251, 191, 36, 0.36);
+        font-weight: 700;
+    }
+
     .crm-rev {
         margin-left: auto;
         color: var(--crm-green);
@@ -1883,6 +1890,10 @@
                 ->filter(fn (array $row): bool => (int) ($row['id'] ?? 0) > 0)
                 ->values()
                 ->all();
+            $hasPendingPayment = collect($relatedTransactions)
+                ->contains(function (array $transaction): bool {
+                    return strtolower(trim((string) ($transaction['status'] ?? ''))) !== 'captured';
+                });
             $relatedPrescriptions = collect($leadUser['related_prescriptions'] ?? [])
                 ->map(function ($item): array {
                     $row = is_array($item) ? $item : [];
@@ -1949,6 +1960,7 @@
                 'has_vaccination_reminder' => (bool) ($leadUser['has_vaccination_reminder'] ?? false),
                 'is_mobile_app_user' => (bool) ($leadUser['is_mobile_app_user'] ?? false),
                 'has_captured_payment' => (bool) ($leadUser['has_captured_payment'] ?? false),
+                'has_pending_payment' => $hasPendingPayment,
                 'category_tags' => $categoryTags,
                 'conversion_captured' => (bool) ($leadUser['conversion_captured'] ?? false),
                 'conversion_notification_type' => (string) ($leadUser['conversion_notification_type'] ?? ''),
@@ -3083,6 +3095,7 @@
             const callState = resolveTenDayPaymentCallState(lead);
             const cityTag = lead.city ? `<span class="crm-tag">${escapeHtml(lead.city)}</span>` : '';
             const mobileTag = lead.is_mobile_app_user ? '<span class="crm-tag crm-tag-mobile">Mobile app user</span>' : '';
+            const pendingPaymentTag = lead.has_pending_payment ? '<span class="crm-tag crm-tag-payment-pending">Pending payment</span>' : '';
             const notifsTag = `<span class="crm-tag">${Number(lead.all_notifications_count || 0)} notifs</span>`;
             const callTag = callState.required
                 ? `<span class="crm-tag ${callState.completed ? 'crm-tag-mobile' : ''}">${escapeHtml(callState.completed ? 'Call completed' : 'Call now - 10d no payment')}</span>`
@@ -3115,6 +3128,7 @@
                     <div class="crm-lead-tags">
                         ${cityTag}
                         ${mobileTag}
+                        ${pendingPaymentTag}
                         ${callTag}
                         ${notifsTag}
                         ${followTag}
