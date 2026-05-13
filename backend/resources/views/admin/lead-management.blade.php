@@ -1020,10 +1020,33 @@
 
     .crm-service-head-actions {
         display: flex;
-        align-items: flex-start;
-        gap: 0.4rem;
+        align-items: center;
+        gap: 0.5rem;
         flex-wrap: wrap;
         justify-content: flex-end;
+    }
+
+    .crm-invoice-link {
+        height: 24px;
+        border-radius: 5px;
+        border: 1px solid rgba(79, 124, 248, 0.52);
+        background: rgba(79, 124, 248, 0.08);
+        color: #d8e1ff;
+        font-size: 0.66rem;
+        font-weight: 700;
+        line-height: 1;
+        padding: 0 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.28rem;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .crm-invoice-link:hover {
+        color: #fff;
+        border-color: var(--crm-blue);
+        background: var(--crm-blue-bg);
     }
 
     .crm-service-title {
@@ -3652,11 +3675,12 @@
                                 <div class="crm-service-amount">${escapeHtml(svc.amount || '₹0')}</div>
                                 ${svc.canGenerateInvoice && svc.invoiceUrl ? `
                                     <a
-                                        class="crm-btn"
+                                        class="crm-invoice-link"
                                         href="${escapeHtml(svc.invoiceUrl)}"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
+                                        <i class="bi bi-receipt"></i>
                                         Generate Invoice
                                     </a>
                                 ` : ''}
