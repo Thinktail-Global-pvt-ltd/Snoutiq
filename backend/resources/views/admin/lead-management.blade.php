@@ -1018,6 +1018,14 @@
         gap: 0.5rem;
     }
 
+    .crm-service-head-actions {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
     .crm-service-title {
         font-size: 0.74rem;
         font-weight: 600;
@@ -2050,6 +2058,7 @@
         ? route('admin.lead-management.users.ai-marketing-push', ['user' => '__USER_ID__'])
         : '';
     $transactionDoctorUpdateRouteTemplate = route('admin.transactions.appointments.doctor', ['transaction' => '__TXN_ID__']);
+    $transactionInvoiceRouteTemplate = url('/api/transactions/__TXN_ID__/invoice/pdf');
 
     $paginationWindow = [];
     if ($filteredTargetUsers instanceof \Illuminate\Pagination\LengthAwarePaginator && $filteredTargetUsers->total() > 0) {
@@ -2559,6 +2568,7 @@
     const nextActionRouteTemplate = @json($nextActionRouteTemplate);
     const aiMarketingPushRouteTemplate = @json($aiMarketingPushRouteTemplate);
     const transactionDoctorUpdateRouteTemplate = @json($transactionDoctorUpdateRouteTemplate);
+    const transactionInvoiceRouteTemplate = @json($transactionInvoiceRouteTemplate);
     const transactionDoctorOptions = @json($transactionDoctorOptions);
     const csrfToken = @json(csrf_token());
 
@@ -3252,6 +3262,8 @@
                 transactionClinicId: Number(lead.conversion_transaction_clinic_id || 0) || null,
                 transactionClinicName: String(lead.conversion_transaction_clinic_name || ''),
                 canReassignDoctor: Boolean(lead.conversion_transaction_doctor_reassignable),
+                canGenerateInvoice: isSuccessfulTransactionStatus(lead.conversion_transaction_status),
+                invoiceUrl: buildTransactionRoute(transactionInvoiceRouteTemplate, Number(lead.conversion_transaction_id || 0)),
                 isAttributedConversion: true,
                 tags: [
                     lead.conversion_transaction_type || 'Unknown type',
@@ -3287,6 +3299,8 @@
                 transactionClinicId: Number(txn.clinic_id || 0) || null,
                 transactionClinicName: String(txn.clinic_name || ''),
                 canReassignDoctor: Boolean(txn.can_reassign_doctor),
+                canGenerateInvoice: isSuccessfulTransactionStatus(transactionStatus),
+                invoiceUrl: buildTransactionRoute(transactionInvoiceRouteTemplate, transactionId),
                 isAttributedConversion: Boolean(existing?.isAttributedConversion),
                 tags: [...new Set(mergedTags)],
             });
@@ -3634,7 +3648,19 @@
                     <div class="crm-service-card">
                         <div class="crm-service-head">
                             <div class="crm-service-title">${escapeHtml(svc.title)}</div>
-                            <div class="crm-service-amount">${escapeHtml(svc.amount || '₹0')}</div>
+                            <div class="crm-service-head-actions">
+                                <div class="crm-service-amount">${escapeHtml(svc.amount || '₹0')}</div>
+                                ${svc.canGenerateInvoice && svc.invoiceUrl ? `
+                                    <a
+                                        class="crm-btn"
+                                        href="${escapeHtml(svc.invoiceUrl)}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Generate Invoice
+                                    </a>
+                                ` : ''}
+                            </div>
                         </div>
                         <div class="crm-service-meta">
                             ${(svc.tags || []).map((tag) => `<span class="crm-service-tag">${escapeHtml(tag)}</span>`).join('')}
