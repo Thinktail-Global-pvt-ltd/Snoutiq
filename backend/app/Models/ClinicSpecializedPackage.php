@@ -13,6 +13,14 @@ class ClinicSpecializedPackage extends Model
         'cat_vaccination_package_price',
         'dog_neutering_price',
         'cat_neutering_price',
+        'dog_vaccination_male_package_price',
+        'dog_vaccination_female_package_price',
+        'cat_vaccination_male_package_price',
+        'cat_vaccination_female_package_price',
+        'dog_neutering_male_price',
+        'dog_neutering_female_price',
+        'cat_neutering_male_price',
+        'cat_neutering_female_price',
     ];
 
     protected $casts = [
@@ -20,6 +28,14 @@ class ClinicSpecializedPackage extends Model
         'cat_vaccination_package_price' => 'decimal:2',
         'dog_neutering_price' => 'decimal:2',
         'cat_neutering_price' => 'decimal:2',
+        'dog_vaccination_male_package_price' => 'decimal:2',
+        'dog_vaccination_female_package_price' => 'decimal:2',
+        'cat_vaccination_male_package_price' => 'decimal:2',
+        'cat_vaccination_female_package_price' => 'decimal:2',
+        'dog_neutering_male_price' => 'decimal:2',
+        'dog_neutering_female_price' => 'decimal:2',
+        'cat_neutering_male_price' => 'decimal:2',
+        'cat_neutering_female_price' => 'decimal:2',
     ];
 
     public function clinic()

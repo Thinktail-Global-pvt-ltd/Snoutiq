@@ -37,6 +37,14 @@ class ClinicSpecializedPackageController extends Controller
             'cat_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
             'dog_neutering_price' => ['nullable', 'numeric', 'min:0'],
             'cat_neutering_price' => ['nullable', 'numeric', 'min:0'],
+            'dog_vaccination_male_package_price' => ['nullable', 'numeric', 'min:0'],
+            'dog_vaccination_female_package_price' => ['nullable', 'numeric', 'min:0'],
+            'cat_vaccination_male_package_price' => ['nullable', 'numeric', 'min:0'],
+            'cat_vaccination_female_package_price' => ['nullable', 'numeric', 'min:0'],
+            'dog_neutering_male_price' => ['nullable', 'numeric', 'min:0'],
+            'dog_neutering_female_price' => ['nullable', 'numeric', 'min:0'],
+            'cat_neutering_male_price' => ['nullable', 'numeric', 'min:0'],
+            'cat_neutering_female_price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $doctorClinicId = Doctor::query()
@@ -59,6 +67,14 @@ class ClinicSpecializedPackageController extends Controller
                 'cat_vaccination_package_price' => $data['cat_vaccination_package_price'] ?? null,
                 'dog_neutering_price' => $data['dog_neutering_price'] ?? null,
                 'cat_neutering_price' => $data['cat_neutering_price'] ?? null,
+                'dog_vaccination_male_package_price' => $data['dog_vaccination_male_package_price'] ?? $data['dog_vaccination_package_price'] ?? null,
+                'dog_vaccination_female_package_price' => $data['dog_vaccination_female_package_price'] ?? $data['dog_vaccination_package_price'] ?? null,
+                'cat_vaccination_male_package_price' => $data['cat_vaccination_male_package_price'] ?? $data['cat_vaccination_package_price'] ?? null,
+                'cat_vaccination_female_package_price' => $data['cat_vaccination_female_package_price'] ?? $data['cat_vaccination_package_price'] ?? null,
+                'dog_neutering_male_price' => $data['dog_neutering_male_price'] ?? $data['dog_neutering_price'] ?? null,
+                'dog_neutering_female_price' => $data['dog_neutering_female_price'] ?? $data['dog_neutering_price'] ?? null,
+                'cat_neutering_male_price' => $data['cat_neutering_male_price'] ?? $data['cat_neutering_price'] ?? null,
+                'cat_neutering_female_price' => $data['cat_neutering_female_price'] ?? $data['cat_neutering_price'] ?? null,
             ]
         );
 

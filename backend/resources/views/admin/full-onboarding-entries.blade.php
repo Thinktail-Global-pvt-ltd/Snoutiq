@@ -249,10 +249,14 @@
                                                             </td>
                                                             <td style="min-width: 220px;">
                                                                 @forelse($doctorPackages as $package)
-                                                                    <div class="small">Dog vaccine: {{ $fmtMoney($package->dog_vaccination_package_price) }}</div>
-                                                                    <div class="small">Cat vaccine: {{ $fmtMoney($package->cat_vaccination_package_price) }}</div>
-                                                                    <div class="small">Dog neuter: {{ $fmtMoney($package->dog_neutering_price) }}</div>
-                                                                    <div class="small">Cat neuter: {{ $fmtMoney($package->cat_neutering_price) }}</div>
+                                                                    <div class="small">Dog vaccine male: {{ $fmtMoney($package->dog_vaccination_male_package_price ?? $package->dog_vaccination_package_price) }}</div>
+                                                                    <div class="small">Dog vaccine female: {{ $fmtMoney($package->dog_vaccination_female_package_price ?? $package->dog_vaccination_package_price) }}</div>
+                                                                    <div class="small">Cat vaccine male: {{ $fmtMoney($package->cat_vaccination_male_package_price ?? $package->cat_vaccination_package_price) }}</div>
+                                                                    <div class="small">Cat vaccine female: {{ $fmtMoney($package->cat_vaccination_female_package_price ?? $package->cat_vaccination_package_price) }}</div>
+                                                                    <div class="small">Dog neuter male: {{ $fmtMoney($package->dog_neutering_male_price ?? $package->dog_neutering_price) }}</div>
+                                                                    <div class="small">Dog neuter female: {{ $fmtMoney($package->dog_neutering_female_price ?? $package->dog_neutering_price) }}</div>
+                                                                    <div class="small">Cat neuter male: {{ $fmtMoney($package->cat_neutering_male_price ?? $package->cat_neutering_price) }}</div>
+                                                                    <div class="small">Cat neuter female: {{ $fmtMoney($package->cat_neutering_female_price ?? $package->cat_neutering_price) }}</div>
                                                                 @empty
                                                                     <span class="text-muted small">—</span>
                                                                 @endforelse
