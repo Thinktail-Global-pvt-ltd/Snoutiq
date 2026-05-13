@@ -507,6 +507,9 @@ class ClinicFullOnboardingController extends Controller
         if (array_key_exists('night_rate', $videoSchedule)) {
             $rateUpdates['video_night_rate'] = $videoSchedule['night_rate'] === null ? null : (float) $videoSchedule['night_rate'];
         }
+        if (Schema::hasColumn('doctors', 'exported_from_excell')) {
+            $rateUpdates['exported_from_excell'] = 1;
+        }
         if (! empty($rateUpdates)) {
             DB::table('doctors')->where('id', (int) $doctor->id)->update($rateUpdates);
         }

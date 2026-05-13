@@ -40,6 +40,17 @@ class ClinicOnboardingExtrasController extends Controller
             'base_payout' => ['nullable', 'numeric', 'min:0'],
             'protocol_label' => ['nullable', 'string', 'max:255'],
 
+            'video_day_rate' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+            'video_night_rate' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+            'video_availability' => ['nullable', 'array'],
+            'video_availability.*.day_of_week' => ['required_with:video_availability', 'integer', 'min:0', 'max:6'],
+            'video_availability.*.start_time' => ['required_with:video_availability'],
+            'video_availability.*.end_time' => ['required_with:video_availability'],
+            'video_availability.*.break_start' => ['nullable'],
+            'video_availability.*.break_end' => ['nullable'],
+            'video_availability.*.avg_consultation_mins' => ['nullable', 'integer'],
+            'video_availability.*.max_bookings_per_hour' => ['nullable', 'integer'],
+
             'clinic_image' => ['nullable'],
             'clinic_video' => ['nullable'],
         ]);
@@ -107,11 +118,13 @@ class ClinicOnboardingExtrasController extends Controller
                 $clinic->forceFill($mediaUpdates)->save();
             }
 
+            $videoAvailabilityCount = $this->syncVideoAvailability($data);
             $freshClinic = $clinic->fresh();
 
             return [
                 'package' => $package,
                 'vet_at_home_service' => $vetAtHome,
+                'video_availability_rows' => $videoAvailabilityCount,
                 'media' => [
                     'clinic_id' => $freshClinic->id,
                     'updated_fields' => array_keys($mediaUpdates),
@@ -126,6 +139,59 @@ class ClinicOnboardingExtrasController extends Controller
             'message' => 'Clinic onboarding extras saved successfully.',
             'data' => $result,
         ]);
+    }
+
+    private function syncVideoAvailability(array $data): int
+    {
+        $availabilityRows = $data['video_availability'] ?? [];
+        if (empty($availabilityRows)) {
+            return 0;
+        }
+
+        $doctorId = (int) $data['doctor_id'];
+        $doctorUpdates = [];
+
+        if (array_key_exists('video_day_rate', $data)) {
+            $doctorUpdates['video_day_rate'] = $data['video_day_rate'] === null ? null : (float) $data['video_day_rate'];
+        }
+        if (array_key_exists('video_night_rate', $data)) {
+            $doctorUpdates['video_night_rate'] = $data['video_night_rate'] === null ? null : (float) $data['video_night_rate'];
+        }
+        if (Schema::hasColumn('doctors', 'exported_from_excell')) {
+            $doctorUpdates['exported_from_excell'] = 1;
+        }
+        if (! empty($doctorUpdates)) {
+            DB::table('doctors')->where('id', $doctorId)->update($doctorUpdates);
+        }
+
+        if (! Schema::hasTable('doctor_video_availability')) {
+            return 0;
+        }
+
+        DB::table('doctor_video_availability')
+            ->where('doctor_id', $doctorId)
+            ->delete();
+
+        $insertRows = [];
+        foreach ($availabilityRows as $row) {
+            $insertRows[] = [
+                'doctor_id' => $doctorId,
+                'day_of_week' => $row['day_of_week'],
+                'start_time' => $row['start_time'],
+                'end_time' => $row['end_time'],
+                'break_start' => $row['break_start'] ?? null,
+                'break_end' => $row['break_end'] ?? null,
+                'avg_consultation_mins' => $row['avg_consultation_mins'] ?? 20,
+                'max_bookings_per_hour' => $row['max_bookings_per_hour'] ?? 3,
+                'is_active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::table('doctor_video_availability')->insert($insertRows);
+
+        return count($insertRows);
     }
 
     private function decodeBlobInput(Request $request, string $field): ?string
