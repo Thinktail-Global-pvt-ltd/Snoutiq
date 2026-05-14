@@ -2,10 +2,14 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\Api\PushController;
+use App\Models\DeviceToken;
 use App\Models\FcmNotification;
 use App\Models\HealthPulseEntry;
 use App\Models\Pet;
 use App\Services\Push\FcmService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class HealthPulseNotificationService
@@ -14,7 +18,7 @@ class HealthPulseNotificationService
     {
     }
 
-    public function sendAiFlagNotification(Pet $pet, HealthPulseEntry $entry): bool
+    public function sendAiFlagNotification(Pet $pet, HealthPulseEntry $entry, ?string $explicitToken = null): bool
     {
         if (!in_array($entry->ai_flag_level, ['Watch', 'Alert'], true)) {
             return false;
@@ -26,7 +30,7 @@ class HealthPulseNotificationService
             ? "{$petName}'s pulse has signs worth a vet check if they continue."
             : "{$petName}'s pulse has a change worth monitoring.";
 
-        $this->sendPush(
+        return $this->sendPush(
             userId: (int) $entry->user_id,
             petId: (int) $entry->pet_id,
             type: $type,
@@ -38,10 +42,9 @@ class HealthPulseNotificationService
                 'entry_date' => $entry->entry_date?->toDateString(),
                 'flag_level' => $entry->ai_flag_level,
                 'screen' => 'health_pulse',
-            ]
+            ],
+            explicitToken: $explicitToken
         );
-
-        return true;
     }
 
     public function sendReminder(Pet $pet, string $trigger, string $title, string $body): bool
@@ -50,7 +53,7 @@ class HealthPulseNotificationService
             return false;
         }
 
-        $this->sendPush(
+        return $this->sendPush(
             userId: (int) $pet->user_id,
             petId: (int) $pet->id,
             type: 'health_pulse_reminder',
@@ -62,12 +65,17 @@ class HealthPulseNotificationService
                 'screen' => 'health_pulse',
             ]
         );
-
-        return true;
     }
 
-    private function sendPush(int $userId, int $petId, string $type, string $title, string $body, array $payload): void
-    {
+    private function sendPush(
+        int $userId,
+        int $petId,
+        string $type,
+        string $title,
+        string $body,
+        array $payload,
+        ?string $explicitToken = null
+    ): bool {
         $data = array_merge($payload, [
             'type' => $type,
             'notification_type' => $type,
@@ -75,7 +83,55 @@ class HealthPulseNotificationService
             'user_id' => (string) $userId,
         ]);
 
-        $this->fcm->notifyUser($userId, $title, $body, $data);
+        $tokens = $this->tokensForUser($userId, $explicitToken);
+        if (empty($tokens)) {
+            Log::warning('health_pulse.push_skipped_no_tokens', [
+                'user_id' => $userId,
+                'pet_id' => $petId,
+                'type' => $type,
+            ]);
+
+            return false;
+        }
+
+        $sent = 0;
+        foreach ($tokens as $token) {
+            $request = Request::create('/api/push/test', 'POST', [
+                'token' => $token,
+                'title' => $title,
+                'body' => $body,
+                'data' => $data,
+            ]);
+
+            try {
+                app(PushController::class)->testToToken($request, $this->fcm);
+                $sent++;
+            } catch (\Throwable $e) {
+                Log::warning('health_pulse.push_failed', [
+                    'user_id' => $userId,
+                    'pet_id' => $petId,
+                    'type' => $type,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $sent > 0;
+    }
+
+    private function tokensForUser(int $userId, ?string $explicitToken): array
+    {
+        $explicitToken = trim((string) $explicitToken);
+        if ($explicitToken !== '') {
+            return [$explicitToken];
+        }
+
+        return DeviceToken::query()
+            ->where('user_id', $userId)
+            ->pluck('token')
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function reminderAlreadySent(int $userId, int $petId, string $trigger): bool

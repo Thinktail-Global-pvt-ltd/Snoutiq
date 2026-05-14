@@ -52,6 +52,7 @@ class PetDailyCareController extends Controller
             'health_pulse.poop_issue' => ['nullable'],
             'health_pulse.digestion_note' => ['nullable', 'string', 'max:255'],
             'health_pulse.poop_note' => ['nullable', 'string', 'max:255'],
+            'health_pulse.fcm_token' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.task_key' => ['nullable', 'string', 'max:100'],
             'items.*.title' => ['required', 'string', 'max:255'],

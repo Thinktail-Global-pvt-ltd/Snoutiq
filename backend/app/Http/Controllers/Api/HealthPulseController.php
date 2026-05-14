@@ -51,7 +51,7 @@ class HealthPulseController extends Controller
             'ai_analyzed_at' => now(),
         ])->save();
 
-        $this->notifications->sendAiFlagNotification($pet, $entry);
+        $this->notifications->sendAiFlagNotification($pet, $entry, $payload['fcm_token'] ?? null);
 
         return response()->json([
             'success' => true,
@@ -194,6 +194,7 @@ class HealthPulseController extends Controller
             'poop_issue' => ['nullable'],
             'digestion_note' => ['nullable', 'string', 'max:255'],
             'poop_note' => ['nullable', 'string', 'max:255'],
+            'fcm_token' => ['nullable', 'string', 'max:500'],
         ])->validate();
 
         return $payload;
