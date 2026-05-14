@@ -2,18 +2,22 @@
 
 namespace App\Services;
 
-use App\Jobs\SendNotificationJob;
+use App\Models\FcmNotification;
 use App\Models\HealthPulseEntry;
-use App\Models\Notification;
 use App\Models\Pet;
+use App\Services\Push\FcmService;
 use Illuminate\Support\Facades\Schema;
 
 class HealthPulseNotificationService
 {
-    public function sendAiFlagNotification(Pet $pet, HealthPulseEntry $entry): ?Notification
+    public function __construct(private readonly FcmService $fcm)
     {
-        if (!Schema::hasTable('notifications') || !in_array($entry->ai_flag_level, ['Watch', 'Alert'], true)) {
-            return null;
+    }
+
+    public function sendAiFlagNotification(Pet $pet, HealthPulseEntry $entry): bool
+    {
+        if (!in_array($entry->ai_flag_level, ['Watch', 'Alert'], true)) {
+            return false;
         }
 
         $petName = $pet->name ?: 'Your pet';
@@ -22,7 +26,7 @@ class HealthPulseNotificationService
             ? "{$petName}'s pulse has signs worth a vet check if they continue."
             : "{$petName}'s pulse has a change worth monitoring.";
 
-        return $this->queuePush(
+        $this->sendPush(
             userId: (int) $entry->user_id,
             petId: (int) $entry->pet_id,
             type: $type,
@@ -36,26 +40,17 @@ class HealthPulseNotificationService
                 'screen' => 'health_pulse',
             ]
         );
+
+        return true;
     }
 
-    public function sendReminder(Pet $pet, string $trigger, string $title, string $body): ?Notification
+    public function sendReminder(Pet $pet, string $trigger, string $title, string $body): bool
     {
-        if (!Schema::hasTable('notifications')) {
-            return null;
+        if ($this->reminderAlreadySent((int) $pet->user_id, (int) $pet->id, $trigger)) {
+            return false;
         }
 
-        $exists = Notification::query()
-            ->where('user_id', $pet->user_id)
-            ->where('pet_id', $pet->id)
-            ->where('type', 'health_pulse_reminder')
-            ->where('payload->trigger', $trigger)
-            ->exists();
-
-        if ($exists) {
-            return null;
-        }
-
-        return $this->queuePush(
+        $this->sendPush(
             userId: (int) $pet->user_id,
             petId: (int) $pet->id,
             type: 'health_pulse_reminder',
@@ -67,23 +62,33 @@ class HealthPulseNotificationService
                 'screen' => 'health_pulse',
             ]
         );
+
+        return true;
     }
 
-    private function queuePush(int $userId, int $petId, string $type, string $title, string $body, array $payload): Notification
+    private function sendPush(int $userId, int $petId, string $type, string $title, string $body, array $payload): void
     {
-        $notification = Notification::create([
-            'user_id' => $userId,
-            'pet_id' => $petId,
+        $data = array_merge($payload, [
             'type' => $type,
-            'title' => $title,
-            'body' => $body,
-            'payload' => $payload,
-            'status' => Notification::STATUS_PENDING,
-            'channel' => Notification::CHANNEL_PUSH,
+            'notification_type' => $type,
+            'pet_id' => (string) $petId,
+            'user_id' => (string) $userId,
         ]);
 
-        SendNotificationJob::dispatch($notification->id);
+        $this->fcm->notifyUser($userId, $title, $body, $data);
+    }
 
-        return $notification;
+    private function reminderAlreadySent(int $userId, int $petId, string $trigger): bool
+    {
+        if (!Schema::hasTable('fcm_notifications')) {
+            return false;
+        }
+
+        return FcmNotification::query()
+            ->where('user_id', $userId)
+            ->where('notification_type', 'health_pulse_reminder')
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(data_payload, '$.pet_id')) = ?", [(string) $petId])
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(data_payload, '$.trigger')) = ?", [$trigger])
+            ->exists();
     }
 }
