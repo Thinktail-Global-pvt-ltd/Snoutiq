@@ -95,8 +95,8 @@ class PublicCapturedTransactionsPageTest extends TestCase
         ]);
 
         DB::table('transactions')->insert([
-            ['id' => 10, 'user_id' => 10, 'amount_paise' => 58900, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_green', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 11, 'user_id' => 11, 'amount_paise' => 64800, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_red', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 10, 'user_id' => 10, 'amount_paise' => 58900, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_green', 'created_at' => '2026-03-31 23:59:59', 'updated_at' => now()],
+            ['id' => 11, 'user_id' => 11, 'amount_paise' => 64800, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_red', 'created_at' => '2026-04-01 00:00:00', 'updated_at' => now()],
         ]);
 
         $greenResponse = $this->get('/captured-transactions/10/invoice');
@@ -108,6 +108,6 @@ class PublicCapturedTransactionsPageTest extends TestCase
 
         $redResponse->assertOk();
         $redResponse->assertHeader('Content-Type', 'application/pdf');
-        $redResponse->assertHeader('Content-Disposition', 'attachment; filename="0000-001-11.pdf"');
+        $redResponse->assertHeader('Content-Disposition', 'attachment; filename="0000-002-11.pdf"');
     }
 }

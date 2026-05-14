@@ -19,7 +19,7 @@ class PublicCapturedTransactionInvoiceController extends Controller
         abort_unless($match !== null, 404);
 
         $breakup = $this->resolveInvoiceBreakup((int) ($transaction->amount_paise ?? 0), $match);
-        $invoiceNumber = '0000-001-' . $transaction->id;
+        $invoiceNumber = $this->formatInvoiceNumber($transaction);
         $invoiceDate = optional($transaction->created_at)->timezone('Asia/Kolkata')->format('F j, Y')
             ?: now('Asia/Kolkata')->format('F j, Y');
 
@@ -241,6 +241,10 @@ class PublicCapturedTransactionInvoiceController extends Controller
             padding: 13px 12px;
             border-bottom: 2px solid #1f2937;
         }
+        .items th:first-child,
+        .items td:first-child {
+            text-align: left;
+        }
         .items td {
             padding: 19px 12px 28px;
             border-bottom: 2px solid #1f2937;
@@ -415,6 +419,19 @@ class PublicCapturedTransactionInvoiceController extends Controller
         }
 
         return 'data:' . $mime . ';base64,' . base64_encode($data);
+    }
+
+    private function formatInvoiceNumber(Transaction $transaction): string
+    {
+        $invoiceDate = $transaction->created_at
+            ? $transaction->created_at->copy()->timezone('Asia/Kolkata')
+            : now('Asia/Kolkata');
+
+        $series = $invoiceDate->greaterThanOrEqualTo(
+            \Carbon\CarbonImmutable::create(2026, 4, 1, 0, 0, 0, 'Asia/Kolkata')
+        ) ? '002' : '001';
+
+        return '0000-' . $series . '-' . $transaction->id;
     }
 
     private function formatInr(int $paise): string
