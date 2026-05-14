@@ -3061,6 +3061,14 @@ Route::get('/pets/{petId}/overview', [\App\Http\Controllers\Api\PetOverviewContr
 Route::put('/pets/{petId}',         [AdminController::class, 'updatePet']);
 Route::delete('/pets/{petId}',      [AdminController::class, 'deletePet']);
 
+Route::prefix('v1/pulse')->group(function () {
+    Route::post('/entry', [\App\Http\Controllers\Api\HealthPulseController::class, 'store']);
+    Route::get('/entries/{petId}', [\App\Http\Controllers\Api\HealthPulseController::class, 'entries'])->whereNumber('petId');
+    Route::get('/today/{petId}', [\App\Http\Controllers\Api\HealthPulseController::class, 'today'])->whereNumber('petId');
+    Route::get('/streak/{petId}', [\App\Http\Controllers\Api\HealthPulseController::class, 'streak'])->whereNumber('petId');
+    Route::get('/report/{petId}', [\App\Http\Controllers\Api\HealthPulseController::class, 'report'])->whereNumber('petId');
+});
+
 
 Route::post('/doctor/availability', [GroomerCalenderController::class,'doctor_availability_store']);
 Route::get('/doctor/availability/suggestions', [GroomerCalenderController::class,'doctor_availability_suggestions']);

@@ -36,6 +36,22 @@ class PetDailyCareController extends Controller
             'care_date' => ['nullable', 'date'],
             'replace_for_date' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
+            'health_pulse' => ['nullable', 'array'],
+            'health_pulse.entry_date' => ['nullable', 'date'],
+            'health_pulse.care_date' => ['nullable', 'date'],
+            'health_pulse.food' => ['nullable', 'string', 'max:40'],
+            'health_pulse.appetite' => ['nullable', 'string', 'max:40'],
+            'health_pulse.food_intake' => ['nullable', 'string', 'max:40'],
+            'health_pulse.energy' => ['nullable', 'string', 'max:40'],
+            'health_pulse.energy_level' => ['nullable', 'string', 'max:40'],
+            'health_pulse.water' => ['nullable', 'string', 'max:40'],
+            'health_pulse.water_intake' => ['nullable', 'string', 'max:40'],
+            'health_pulse.symptoms' => ['nullable', 'string'],
+            'health_pulse.digestion_issue' => ['nullable'],
+            'health_pulse.digestion' => ['nullable'],
+            'health_pulse.poop_issue' => ['nullable'],
+            'health_pulse.digestion_note' => ['nullable', 'string', 'max:255'],
+            'health_pulse.poop_note' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.task_key' => ['nullable', 'string', 'max:100'],
             'items.*.title' => ['required', 'string', 'max:255'],
@@ -98,10 +114,18 @@ class PetDailyCareController extends Controller
                 ->delete();
         });
 
+        $pulseEntry = null;
+        if (!empty($payload['health_pulse']) && is_array($payload['health_pulse'])) {
+            $pulseEntry = app(HealthPulseController::class)->saveFromDailyCare($pet, $payload['health_pulse'], $careDate);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Daily care saved successfully.',
-            'data' => $this->formatCarePayload($petId, $userId, $careDate, $items, $dailyNotes),
+            'data' => array_merge(
+                $this->formatCarePayload($petId, $userId, $careDate, $items, $dailyNotes),
+                ['health_pulse_entry_id' => $pulseEntry?->id]
+            ),
         ]);
     }
 

@@ -14,6 +14,7 @@ use App\Console\Commands\SendProfileCompletionReminders;
 use App\Console\Commands\SendUserCreatedReminders;
 use App\Console\Commands\SendUserContinuityReminders;
 use App\Console\Commands\SendLeadAiMarketingPushes;
+use App\Console\Commands\SendHealthPulseReminders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +32,7 @@ class Kernel extends ConsoleKernel
         SendUserCreatedReminders::class,
         SendUserContinuityReminders::class,
         SendLeadAiMarketingPushes::class,
+        SendHealthPulseReminders::class,
     ];
 
     protected function schedule(Schedule $schedule): void
@@ -129,6 +131,11 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('vaccines:send-reminders')
             ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('health-pulse:send-reminders')
+            ->timezone('Asia/Kolkata')
+            ->hourly()
             ->withoutOverlapping();
 
         $schedule->command('socket:expire-calls')
