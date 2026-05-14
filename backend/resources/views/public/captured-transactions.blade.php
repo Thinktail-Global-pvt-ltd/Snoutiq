@@ -60,19 +60,37 @@
 @php
     $formatInr = static fn ($paise) => number_format(((int) ($paise ?? 0)) / 100, 2);
     $priceTolerancePaise = 200;
-    $expectedPricePaiseOptions = [49900, 39900];
-    $resolveExpectedPricePaise = static function ($amountPaise) use ($expectedPricePaiseOptions, $priceTolerancePaise) {
+    $gstIncludedPricePaiseOptions = [49900, 76600];
+    $gstNotAddedPricePaiseOptions = [64800, 37100, 66600, 48900, 65000, 50000, 40000, 39900, 60000];
+    $resolvePriceMatch = static function ($amountPaise) use ($gstIncludedPricePaiseOptions, $gstNotAddedPricePaiseOptions, $priceTolerancePaise) {
         $amountPaise = (int) ($amountPaise ?? 0);
+        $bestMatch = null;
 
-        foreach ($expectedPricePaiseOptions as $expectedPricePaise) {
-            if (abs($amountPaise - $expectedPricePaise) <= $priceTolerancePaise) {
-                return $expectedPricePaise;
+        foreach ([
+            'included' => $gstIncludedPricePaiseOptions,
+            'not_added' => $gstNotAddedPricePaiseOptions,
+        ] as $gstMode => $expectedPricePaiseOptions) {
+            foreach ($expectedPricePaiseOptions as $expectedPricePaise) {
+                $deltaPaise = abs($amountPaise - $expectedPricePaise);
+
+                if ($deltaPaise > $priceTolerancePaise) {
+                    continue;
+                }
+
+                if ($bestMatch === null || $deltaPaise < $bestMatch['absolute_delta_paise']) {
+                    $bestMatch = [
+                        'expected_paise' => $expectedPricePaise,
+                        'gst_mode' => $gstMode,
+                        'absolute_delta_paise' => $deltaPaise,
+                    ];
+                }
             }
         }
 
-        return null;
+        return $bestMatch;
     };
-    $gstPaiseFor = static fn ($amountPaise) => (int) round(((int) $amountPaise) * 18 / 118);
+    $inclusiveGstPaiseFor = static fn ($amountPaise) => (int) round(((int) $amountPaise) * 18 / 118);
+    $additionalGstPaiseFor = static fn ($amountPaise) => (int) round(((int) $amountPaise) * 18 / 100);
 @endphp
 
 <section class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
@@ -80,7 +98,7 @@
         <h2 class="h5 mb-1">Captured transactions above ₹1</h2>
         <p class="text-muted mb-0">
             Public report for <code>transactions.status = captured</code>, <code>amount_paise != 100</code>, and users that still exist in <code>users</code>.
-            Rows within ₹2 of ₹499 or ₹399 are marked green, with GST calculated at 18%.
+            Recognized price rows are marked green with GST details at 18%.
         </p>
     </div>
     <div class="d-flex align-items-center gap-2">
@@ -150,10 +168,24 @@
                         <tbody>
                             @foreach($transactions as $transaction)
                                 @php
-                                    $expectedPricePaise = $resolveExpectedPricePaise($transaction->amount_paise);
-                                    $isExpectedPriceMatch = $expectedPricePaise !== null;
-                                    $gstPaise = $isExpectedPriceMatch ? $gstPaiseFor($expectedPricePaise) : null;
-                                    $taxablePaise = $isExpectedPriceMatch ? $expectedPricePaise - $gstPaise : null;
+                                    $priceMatch = $resolvePriceMatch($transaction->amount_paise);
+                                    $expectedPricePaise = $priceMatch['expected_paise'] ?? null;
+                                    $gstMode = $priceMatch['gst_mode'] ?? null;
+                                    $isExpectedPriceMatch = $priceMatch !== null;
+                                    $gstPaise = null;
+                                    $taxablePaise = null;
+                                    $grossWithGstPaise = null;
+
+                                    if ($gstMode === 'included') {
+                                        $gstPaise = $inclusiveGstPaiseFor($expectedPricePaise);
+                                        $taxablePaise = $expectedPricePaise - $gstPaise;
+                                        $grossWithGstPaise = $expectedPricePaise;
+                                    } elseif ($gstMode === 'not_added') {
+                                        $taxablePaise = $expectedPricePaise;
+                                        $gstPaise = $additionalGstPaiseFor($expectedPricePaise);
+                                        $grossWithGstPaise = $expectedPricePaise + $gstPaise;
+                                    }
+
                                     $deltaPaise = $isExpectedPriceMatch ? (int) $transaction->amount_paise - $expectedPricePaise : null;
                                 @endphp
                                 <tr class="{{ $isExpectedPriceMatch ? 'price-match-row' : '' }}">
@@ -166,13 +198,17 @@
                                         @if($isExpectedPriceMatch)
                                             <div class="price-breakdown">
                                                 <span class="badge text-bg-success mb-1">Matched ₹{{ $formatInr($expectedPricePaise) }}</span>
+                                                <div class="small fw-semibold">
+                                                    {{ $gstMode === 'included' ? 'GST included' : 'GST not added' }}
+                                                </div>
                                                 <div class="small text-muted">Tolerance: ±₹2</div>
                                                 <div class="small">Base: ₹{{ $formatInr($taxablePaise) }}</div>
                                                 <div class="small">GST @ 18%: ₹{{ $formatInr($gstPaise) }}</div>
+                                                <div class="small">Amount with GST: ₹{{ $formatInr($grossWithGstPaise) }}</div>
                                                 <div class="small">Delta: {{ $deltaPaise >= 0 ? '+' : '-' }}₹{{ $formatInr(abs($deltaPaise)) }}</div>
                                             </div>
                                         @else
-                                            <span class="text-muted">No ₹399/₹499 match</span>
+                                            <span class="text-muted">No configured price match</span>
                                         @endif
                                     </td>
                                     <td data-label="User">
