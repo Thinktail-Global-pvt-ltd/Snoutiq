@@ -69,7 +69,8 @@ class PublicCapturedTransactionsPageTest extends TestCase
         $response->assertSee('GST not added');
         $response->assertSee('GST included');
         $response->assertSee('Amount with GST');
-        $response->assertSee('price-match-row');
+        $response->assertSee('gst-included-row');
+        $response->assertSee('gst-not-added-row');
         $response->assertDontSee('pay_one_rupee');
         $response->assertDontSee('pay_pending');
         $response->assertDontSee('pay_missing_user');

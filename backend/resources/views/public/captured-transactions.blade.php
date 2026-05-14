@@ -10,8 +10,11 @@
     .public-transactions-table th {
         vertical-align: top;
     }
-    .public-transactions-table tr.price-match-row > * {
+    .public-transactions-table tr.gst-included-row > * {
         background-color: #dcfce7;
+    }
+    .public-transactions-table tr.gst-not-added-row > * {
+        background-color: #fee2e2;
     }
     .price-breakdown {
         line-height: 1.35;
@@ -98,7 +101,7 @@
         <h2 class="h5 mb-1">Captured transactions above ₹1</h2>
         <p class="text-muted mb-0">
             Public report for <code>transactions.status = captured</code>, <code>amount_paise != 100</code>, and users that still exist in <code>users</code>.
-            Recognized price rows are marked green with GST details at 18%.
+            GST-included rows are marked green. Rows where GST was not added are marked red.
         </p>
     </div>
     <div class="d-flex align-items-center gap-2">
@@ -187,8 +190,13 @@
                                     }
 
                                     $deltaPaise = $isExpectedPriceMatch ? (int) $transaction->amount_paise - $expectedPricePaise : null;
+                                    $rowClass = match ($gstMode) {
+                                        'included' => 'gst-included-row',
+                                        'not_added' => 'gst-not-added-row',
+                                        default => '',
+                                    };
                                 @endphp
-                                <tr class="{{ $isExpectedPriceMatch ? 'price-match-row' : '' }}">
+                                <tr class="{{ $rowClass }}">
                                     <td data-label="ID">#{{ $transaction->id }}</td>
                                     <td data-label="Created">
                                         {{ optional($transaction->created_at)->timezone('Asia/Kolkata')->format('d M Y, h:i A') ?? 'N/A' }}
@@ -197,14 +205,16 @@
                                     <td data-label="Expected / GST">
                                         @if($isExpectedPriceMatch)
                                             <div class="price-breakdown">
-                                                <span class="badge text-bg-success mb-1">Matched ₹{{ $formatInr($expectedPricePaise) }}</span>
+                                                <span class="badge {{ $gstMode === 'included' ? 'text-bg-success' : 'text-bg-danger' }} mb-1">Matched ₹{{ $formatInr($expectedPricePaise) }}</span>
                                                 <div class="small fw-semibold">
                                                     {{ $gstMode === 'included' ? 'GST included' : 'GST not added' }}
                                                 </div>
                                                 <div class="small text-muted">Tolerance: ±₹2</div>
-                                                <div class="small">Base: ₹{{ $formatInr($taxablePaise) }}</div>
-                                                <div class="small">GST @ 18%: ₹{{ $formatInr($gstPaise) }}</div>
-                                                <div class="small">Amount with GST: ₹{{ $formatInr($grossWithGstPaise) }}</div>
+                                                @if($gstMode === 'included')
+                                                    <div class="small">Base: ₹{{ $formatInr($taxablePaise) }}</div>
+                                                    <div class="small">GST @ 18%: ₹{{ $formatInr($gstPaise) }}</div>
+                                                    <div class="small">Amount with GST: ₹{{ $formatInr($grossWithGstPaise) }}</div>
+                                                @endif
                                                 <div class="small">Delta: {{ $deltaPaise >= 0 ? '+' : '-' }}₹{{ $formatInr(abs($deltaPaise)) }}</div>
                                             </div>
                                         @else
