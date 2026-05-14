@@ -150,9 +150,14 @@
                     <h3 class="h6 mb-1">Transaction list</h3>
                     <p class="text-muted mb-0">Sorted newest first.</p>
                 </div>
-                @if(method_exists($transactions, 'total'))
-                    <span class="badge text-bg-light">{{ number_format($transactions->total()) }} records</span>
-                @endif
+                <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                    <button type="button" id="downloadAllInvoices" class="btn btn-sm btn-success">
+                        Download all invoices
+                    </button>
+                    @if(method_exists($transactions, 'total'))
+                        <span class="badge text-bg-light">{{ number_format($transactions->total()) }} records</span>
+                    @endif
+                </div>
             </div>
 
             @if($transactions->isEmpty())
@@ -262,7 +267,7 @@
                                                 </a>
                                                 <a
                                                     href="{{ route('captured-transactions.invoice', ['transaction' => $transaction->id, 'download' => 1]) }}"
-                                                    class="btn btn-sm btn-dark"
+                                                    class="btn btn-sm btn-dark invoice-download-link"
                                                 >
                                                     Download
                                                 </a>
@@ -285,3 +290,52 @@
     </section>
 @endif
 @endsection
+
+@push('scripts')
+<script>
+(() => {
+    const button = document.getElementById('downloadAllInvoices');
+    if (!button) return;
+
+    const originalLabel = button.textContent;
+    const delayMs = 900;
+
+    button.addEventListener('click', () => {
+        const links = Array.from(document.querySelectorAll('.invoice-download-link'))
+            .map((link) => link.href)
+            .filter(Boolean);
+
+        if (links.length === 0) {
+            button.textContent = 'No invoices found';
+            setTimeout(() => {
+                button.textContent = originalLabel;
+            }, 1400);
+            return;
+        }
+
+        button.disabled = true;
+
+        links.forEach((href, index) => {
+            setTimeout(() => {
+                const anchor = document.createElement('a');
+                anchor.href = href;
+                anchor.download = '';
+                anchor.style.display = 'none';
+                document.body.appendChild(anchor);
+                anchor.click();
+                anchor.remove();
+
+                button.textContent = `Downloading ${index + 1}/${links.length}`;
+
+                if (index === links.length - 1) {
+                    setTimeout(() => {
+                        button.disabled = false;
+                        button.textContent = originalLabel;
+                    }, delayMs);
+                }
+            }, index * delayMs);
+        });
+    });
+})();
+</script>
+@endpush

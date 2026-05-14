@@ -81,6 +81,8 @@ class PublicCapturedTransactionsPageTest extends TestCase
         $response->assertSee('gst-not-added-row');
         $response->assertSee('Preview');
         $response->assertSee('Download');
+        $response->assertSee('Download all invoices');
+        $response->assertSee('invoice-download-link');
         $response->assertSee('/captured-transactions/1/invoice', false);
         $response->assertDontSee('pay_one_rupee');
         $response->assertDontSee('pay_pending');
