@@ -104,10 +104,10 @@ class PublicCapturedTransactionsPageTest extends TestCase
 
         $greenResponse->assertOk();
         $greenResponse->assertHeader('Content-Type', 'application/pdf');
-        $greenResponse->assertHeader('Content-Disposition', 'inline; filename="pub-txn-10.pdf"');
+        $greenResponse->assertHeader('Content-Disposition', 'inline; filename="0000-001-10.pdf"');
 
         $redResponse->assertOk();
         $redResponse->assertHeader('Content-Type', 'application/pdf');
-        $redResponse->assertHeader('Content-Disposition', 'attachment; filename="pub-txn-11.pdf"');
+        $redResponse->assertHeader('Content-Disposition', 'attachment; filename="0000-001-11.pdf"');
     }
 }

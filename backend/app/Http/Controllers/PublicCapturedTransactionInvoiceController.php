@@ -19,9 +19,9 @@ class PublicCapturedTransactionInvoiceController extends Controller
         abort_unless($match !== null, 404);
 
         $breakup = $this->resolveInvoiceBreakup((int) ($transaction->amount_paise ?? 0), $match);
-        $invoiceNumber = 'PUB-TXN-' . $transaction->id;
-        $invoiceDate = optional($transaction->created_at)->timezone('Asia/Kolkata')->format('d M Y')
-            ?: now('Asia/Kolkata')->format('d M Y');
+        $invoiceNumber = '0000-001-' . $transaction->id;
+        $invoiceDate = optional($transaction->created_at)->timezone('Asia/Kolkata')->format('F j, Y')
+            ?: now('Asia/Kolkata')->format('F j, Y');
 
         $html = $this->buildInvoiceHtml($transaction, $invoiceNumber, $invoiceDate, $breakup);
         $pdf = $this->renderPdf($html);
@@ -118,85 +118,372 @@ class PublicCapturedTransactionInvoiceController extends Controller
 
     private function buildInvoiceHtml(Transaction $transaction, string $invoiceNumber, string $invoiceDate, array $breakup): string
     {
-        $format = fn (int $paise): string => number_format($paise / 100, 2);
+        $format = fn (int $paise): string => $this->formatInr($paise);
         $user = $transaction->user;
-        $customerName = trim((string) ($user->name ?? 'Customer')) ?: 'Customer';
-        $customerPhone = trim((string) ($user->phone ?? ''));
-        $customerEmail = trim((string) ($user->email ?? ''));
-        $serviceLabel = trim((string) ($transaction->type ?? 'Service')) ?: 'Service';
+        $customerName = strtoupper(trim((string) ($user->name ?? 'PET PARENT NAME')) ?: 'PET PARENT NAME');
+        $customerPhone = trim((string) ($user->phone ?? '')) ?: 'N/A';
+        $serviceLabel = 'Online Vet Consultation';
+        $paymentMethod = trim((string) ($transaction->payment_method ?? 'Upi')) ?: 'Upi';
+        $paymentMethod = ucfirst(strtolower($paymentMethod));
+        $cgstPaise = (int) round(((int) $breakup['gst_paise']) / 2);
+        $sgstPaise = max(((int) $breakup['gst_paise']) - $cgstPaise, 0);
+        $logoDataUri = $this->imageDataUri(public_path('invoice-assets/thinktail-logo-crop.png'));
+        $signatureDataUri = $this->imageDataUri(public_path('invoice-assets/thinktail-signature-crop.png'));
+        $totalInWords = ucfirst($this->numberToWords((int) round(((int) $breakup['gross_paise']) / 100))) . ' rupees';
+        $logoHtml = $logoDataUri !== null
+            ? '<img class="logo" src="' . $logoDataUri . '" alt="SnoutIQ">'
+            : '<div class="logo-text">SNOUTIQ</div>';
+        $signatureHtml = $signatureDataUri !== null
+            ? '<img class="signature" src="' . $signatureDataUri . '" alt="Signature">'
+            : '<div class="signature-spacer"></div>';
 
         return '<!doctype html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
-        body { font-family: DejaVu Sans, sans-serif; color: #111827; font-size: 13px; }
-        .invoice { padding: 28px; }
-        .header { display: table; width: 100%; margin-bottom: 28px; }
-        .header > div { display: table-cell; vertical-align: top; }
+        @page { margin: 0; size: A4 portrait; }
+        body {
+            margin: 0;
+            background: #f4f6f8;
+            font-family: DejaVu Sans, sans-serif;
+            color: #171c2b;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .page {
+            padding: 54px 46px;
+        }
+        .invoice {
+            background: #fff;
+            border: 1px solid #d7dde6;
+            padding: 36px 38px 34px;
+            min-height: 760px;
+        }
+        .top {
+            display: table;
+            width: 100%;
+            border-bottom: 2px solid #1f2937;
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+        }
+        .top > div {
+            display: table-cell;
+            vertical-align: middle;
+        }
+        .logo {
+            width: 178px;
+            height: auto;
+        }
+        .logo-text {
+            font-size: 34px;
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+        .title {
+            text-align: right;
+            font-size: 33px;
+            font-weight: 800;
+            letter-spacing: 3px;
+        }
+        .company {
+            display: table;
+            width: 100%;
+            border-bottom: 2px solid #1f2937;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .company > div {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        .company-right {
+            padding-left: 34px;
+        }
+        .bold { font-weight: 800; }
+        .bill {
+            display: table;
+            width: 100%;
+            border-bottom: 2px solid #1f2937;
+            padding-bottom: 18px;
+            margin-bottom: 0;
+        }
+        .bill > div {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        .bill-right {
+            padding-left: 4px;
+        }
+        .customer {
+            font-size: 21px;
+            font-weight: 800;
+            margin: 4px 0 8px;
+        }
+        .invoice-meta-line {
+            display: inline-block;
+            min-width: 122px;
+            border-bottom: 1px solid #1f2937;
+            height: 8px;
+        }
+        .items {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 0 20px;
+        }
+        .items th {
+            background: #f7f8fa;
+            font-size: 15px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 13px 12px;
+            border-bottom: 2px solid #1f2937;
+        }
+        .items td {
+            padding: 19px 12px 28px;
+            border-bottom: 2px solid #1f2937;
+            font-size: 14px;
+        }
         .right { text-align: right; }
-        h1 { margin: 0; font-size: 28px; letter-spacing: 1px; }
-        .muted { color: #6b7280; }
-        .box { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin-bottom: 18px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { padding: 11px; border-bottom: 1px solid #e5e7eb; text-align: left; }
-        th { background: #f9fafb; font-weight: 700; }
-        .amount { text-align: right; }
-        .total td { font-size: 15px; font-weight: 700; border-bottom: 0; }
-        .badge { display: inline-block; padding: 5px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-weight: 700; }
+        .bottom {
+            display: table;
+            width: 100%;
+        }
+        .bottom > div {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        .summary {
+            margin-left: 28px;
+        }
+        .summary-row {
+            display: table;
+            width: 100%;
+            margin-bottom: 6px;
+        }
+        .summary-row > div {
+            display: table-cell;
+        }
+        .summary-row .amount {
+            text-align: right;
+            white-space: nowrap;
+        }
+        .summary-total {
+            border-top: 2px solid #1f2937;
+            padding-top: 8px;
+            margin-top: 8px;
+            font-weight: 800;
+            font-size: 15px;
+        }
+        .words-title {
+            margin-top: 10px;
+            font-weight: 800;
+        }
+        .thanks {
+            margin-top: 56px;
+            font-size: 20px;
+            font-weight: 800;
+        }
+        .signature-block {
+            margin-top: 42px;
+            margin-left: 32px;
+        }
+        .signature {
+            width: 150px;
+            height: auto;
+            display: block;
+            margin-left: 22px;
+            margin-bottom: 4px;
+        }
+        .signature-spacer {
+            height: 55px;
+        }
+        .signatory {
+            font-size: 11px;
+            font-weight: 800;
+        }
     </style>
 </head>
 <body>
+<div class="page">
 <div class="invoice">
-    <div class="header">
+    <div class="top">
         <div>
-            <h1>Invoice</h1>
-            <div class="muted">SnoutIQ</div>
+            ' . $logoHtml . '
         </div>
-        <div class="right">
-            <div><strong>Invoice No:</strong> ' . $this->e($invoiceNumber) . '</div>
-            <div><strong>Date:</strong> ' . $this->e($invoiceDate) . '</div>
-            <div><strong>Transaction:</strong> #' . $this->e((string) $transaction->id) . '</div>
+        <div class="title">INVOICE</div>
+    </div>
+
+    <div class="company">
+        <div>
+            <div><span class="bold">Address:</span> THINKTAIL GLOBAL PRIVATE LIMITED</div>
+            <div>Plot No.20/HIA/20, Sector-63, Noida, Noida,</div>
+            <div>Gautam Buddha Nagar- 201301, Uttar Pradesh</div>
+        </div>
+        <div class="company-right">
+            <div><span class="bold">GSTIN :</span> 06AALCT9891J1ZG</div>
+            <div><span class="bold">PAN:</span> AALCT9891J</div>
+            <div><span class="bold">Phone:</span> +91 8588007466</div>
         </div>
     </div>
 
-    <div class="box">
-        <strong>Invoice to</strong><br>
-        ' . $this->e($customerName) . '<br>
-        ' . ($customerPhone !== '' ? $this->e($customerPhone) . '<br>' : '') . '
-        ' . ($customerEmail !== '' ? $this->e($customerEmail) . '<br>' : '') . '
+    <div class="bill">
+        <div>
+            <div class="bold">Invoice to :</div>
+            <div class="customer">' . $this->e($customerName) . '</div>
+            <div><span class="bold">Phone:</span> ' . $this->e($customerPhone) . '</div>
+            <div><span class="bold">Place of Supply:</span> Gurugram</div>
+        </div>
+        <div class="bill-right">
+            <div><span class="bold">Invoice No :</span> ' . $this->e($invoiceNumber) . '</div>
+            <div><span class="bold">Date :</span> ' . $this->e($invoiceDate) . '</div>
+            <div class="invoice-meta-line"></div>
+        </div>
     </div>
 
-    <div class="box">
-        <span class="badge">' . $this->e($breakup['mode']) . '</span>
-        <div class="muted" style="margin-top: 8px;">Paid amount: INR ' . $format((int) $breakup['paid_paise']) . '</div>
-    </div>
-
-    <table>
+    <table class="items">
         <thead>
             <tr>
-                <th>Description</th>
-                <th class="amount">Amount</th>
+                <th>Service</th>
+                <th class="right">Total</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>' . $this->e($serviceLabel) . ' - Actual amount</td>
-                <td class="amount">INR ' . $format((int) $breakup['base_paise']) . '</td>
-            </tr>
-            <tr>
-                <td>GST @ 18%</td>
-                <td class="amount">INR ' . $format((int) $breakup['gst_paise']) . '</td>
-            </tr>
-            <tr class="total">
-                <td>Total</td>
-                <td class="amount">INR ' . $format((int) $breakup['gross_paise']) . '</td>
+                <td>' . $this->e($serviceLabel) . '</td>
+                <td class="right">INR ' . $format((int) $breakup['gross_paise']) . '</td>
             </tr>
         </tbody>
     </table>
+
+    <div class="bottom">
+        <div>
+            <div class="bold">Payment Method :</div>
+            <div style="margin-top: 10px;">' . $this->e($paymentMethod) . '</div>
+            <div class="thanks">Thank you for purchase!</div>
+        </div>
+        <div>
+            <div class="summary">
+                <div class="summary-row">
+                    <div>Taxable Amount</div>
+                    <div class="amount">INR ' . $format((int) $breakup['base_paise']) . '</div>
+                </div>
+                <div class="summary-row">
+                    <div>CGST @9%</div>
+                    <div class="amount">INR ' . $format($cgstPaise) . '</div>
+                </div>
+                <div class="summary-row">
+                    <div>SGST @9%</div>
+                    <div class="amount">INR ' . $format($sgstPaise) . '</div>
+                </div>
+                <div class="summary-row summary-total">
+                    <div>Total :</div>
+                    <div class="amount">INR ' . $format((int) $breakup['gross_paise']) . '</div>
+                </div>
+                <div class="words-title">Total Amount (in words)</div>
+                <div>' . $this->e($totalInWords) . '</div>
+            </div>
+
+            <div class="signature-block">
+                ' . $signatureHtml . '
+                <div class="signatory">AUTHORISED SIGNATORY FOR</div>
+                <div>Thinktail Global pvt. ltd.</div>
+                <div>(Snoutiq)</div>
+            </div>
+        </div>
+    </div>
+</div>
 </div>
 </body>
 </html>';
+    }
+
+    private function imageDataUri(string $path): ?string
+    {
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $mime = mime_content_type($path) ?: 'image/png';
+        $data = file_get_contents($path);
+
+        if ($data === false) {
+            return null;
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode($data);
+    }
+
+    private function formatInr(int $paise): string
+    {
+        $amount = $paise / 100;
+
+        if ($paise % 100 === 0) {
+            return number_format($amount, 0);
+        }
+
+        return rtrim(rtrim(number_format($amount, 2), '0'), '.');
+    }
+
+    private function numberToWords(int $number): string
+    {
+        if ($number === 0) {
+            return 'zero';
+        }
+
+        $ones = [
+            0 => '',
+            1 => 'one',
+            2 => 'two',
+            3 => 'three',
+            4 => 'four',
+            5 => 'five',
+            6 => 'six',
+            7 => 'seven',
+            8 => 'eight',
+            9 => 'nine',
+            10 => 'ten',
+            11 => 'eleven',
+            12 => 'twelve',
+            13 => 'thirteen',
+            14 => 'fourteen',
+            15 => 'fifteen',
+            16 => 'sixteen',
+            17 => 'seventeen',
+            18 => 'eighteen',
+            19 => 'nineteen',
+        ];
+        $tens = [
+            2 => 'twenty',
+            3 => 'thirty',
+            4 => 'forty',
+            5 => 'fifty',
+            6 => 'sixty',
+            7 => 'seventy',
+            8 => 'eighty',
+            9 => 'ninety',
+        ];
+
+        if ($number < 20) {
+            return $ones[$number];
+        }
+
+        if ($number < 100) {
+            return trim($tens[intdiv($number, 10)] . ' ' . $ones[$number % 10]);
+        }
+
+        if ($number < 1000) {
+            return trim($ones[intdiv($number, 100)] . ' hundred ' . $this->numberToWords($number % 100));
+        }
+
+        if ($number < 100000) {
+            return trim($this->numberToWords(intdiv($number, 1000)) . ' thousand ' . $this->numberToWords($number % 1000));
+        }
+
+        return (string) $number;
     }
 
     private function renderPdf(string $html): string
