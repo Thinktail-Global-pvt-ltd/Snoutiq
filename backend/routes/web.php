@@ -119,6 +119,9 @@ Route::get('/vet-clinic-connections/export', [VetClinicConnectionsExportControll
     ->name('vet-clinic-connections.export');
 Route::get('/captured-transactions', PublicCapturedTransactionsController::class)
     ->name('captured-transactions.public');
+Route::get('/captured-transactions/{transaction}/invoice', \App\Http\Controllers\PublicCapturedTransactionInvoiceController::class)
+    ->whereNumber('transaction')
+    ->name('captured-transactions.invoice');
 
 Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');

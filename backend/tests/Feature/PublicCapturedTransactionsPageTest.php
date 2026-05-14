@@ -79,8 +79,35 @@ class PublicCapturedTransactionsPageTest extends TestCase
         $response->assertSee('Amount with GST');
         $response->assertSee('gst-included-row');
         $response->assertSee('gst-not-added-row');
+        $response->assertSee('Preview');
+        $response->assertSee('Download');
+        $response->assertSee('/captured-transactions/1/invoice', false);
         $response->assertDontSee('pay_one_rupee');
         $response->assertDontSee('pay_pending');
         $response->assertDontSee('pay_missing_user');
+    }
+
+    public function test_invoice_preview_streams_pdf_for_green_and_red_rows(): void
+    {
+        DB::table('users')->insert([
+            ['id' => 10, 'name' => 'Green User', 'email' => 'green@example.com', 'phone' => '9999999999', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 11, 'name' => 'Red User', 'email' => 'red@example.com', 'phone' => '8888888888', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('transactions')->insert([
+            ['id' => 10, 'user_id' => 10, 'amount_paise' => 58900, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_green', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 11, 'user_id' => 11, 'amount_paise' => 64800, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_red', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $greenResponse = $this->get('/captured-transactions/10/invoice');
+        $redResponse = $this->get('/captured-transactions/11/invoice?download=1');
+
+        $greenResponse->assertOk();
+        $greenResponse->assertHeader('Content-Type', 'application/pdf');
+        $greenResponse->assertHeader('Content-Disposition', 'inline; filename="pub-txn-10.pdf"');
+
+        $redResponse->assertOk();
+        $redResponse->assertHeader('Content-Type', 'application/pdf');
+        $redResponse->assertHeader('Content-Disposition', 'attachment; filename="pub-txn-11.pdf"');
     }
 }

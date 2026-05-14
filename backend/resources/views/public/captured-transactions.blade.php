@@ -173,6 +173,7 @@
                                 <th>Type</th>
                                 <th>Reference</th>
                                 <th>Payment Method</th>
+                                <th>Invoice</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -248,6 +249,28 @@
                                     <td data-label="Type">{{ $transaction->type ?: 'N/A' }}</td>
                                     <td data-label="Reference">{{ $transaction->reference ?: 'N/A' }}</td>
                                     <td data-label="Payment Method">{{ $transaction->payment_method ?: 'N/A' }}</td>
+                                    <td data-label="Invoice">
+                                        @if($isExpectedPriceMatch)
+                                            <div class="d-flex flex-column gap-1">
+                                                <a
+                                                    href="{{ route('captured-transactions.invoice', $transaction) }}"
+                                                    class="btn btn-sm btn-outline-dark"
+                                                    target="_blank"
+                                                    rel="noopener"
+                                                >
+                                                    Preview
+                                                </a>
+                                                <a
+                                                    href="{{ route('captured-transactions.invoice', ['transaction' => $transaction->id, 'download' => 1]) }}"
+                                                    class="btn btn-sm btn-dark"
+                                                >
+                                                    Download
+                                                </a>
+                                            </div>
+                                        @else
+                                            <span class="text-muted">N/A</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
