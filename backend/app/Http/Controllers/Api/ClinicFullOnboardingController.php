@@ -114,7 +114,7 @@ class ClinicFullOnboardingController extends Controller
                 ->values();
 
         return [
-            'clinic' => $clinic,
+            'clinic' => $this->clinicPayloadWithMediaUrls($clinic),
             'doctors' => $doctors,
             'services' => $services,
             'specialized_packages' => $specializedPackages,
@@ -122,6 +122,20 @@ class ClinicFullOnboardingController extends Controller
             'clinic_availability' => $clinicAvailability,
             'video_schedules' => $videoSchedules,
         ];
+    }
+
+    private function clinicPayloadWithMediaUrls(VetRegisterationTemp $clinic): array
+    {
+        $payload = $clinic->toArray();
+
+        $payload['clinic_image_url'] = ! empty($clinic->clinic_image)
+            ? route('clinics.media.image', ['clinic' => $clinic->id])
+            : null;
+        $payload['clinic_video_url'] = ! empty($clinic->clinic_video)
+            ? route('clinics.media.video', ['clinic' => $clinic->id])
+            : null;
+
+        return $payload;
     }
 
     public function store(Request $request)
