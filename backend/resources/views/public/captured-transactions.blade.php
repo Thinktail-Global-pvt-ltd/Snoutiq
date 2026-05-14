@@ -10,6 +10,12 @@
     .public-transactions-table th {
         vertical-align: top;
     }
+    .public-transactions-table tr.price-match-row > * {
+        background-color: #dcfce7;
+    }
+    .price-breakdown {
+        line-height: 1.35;
+    }
 
     @media (max-width: 767.98px) {
         .public-transactions-table thead {
@@ -53,6 +59,20 @@
 @section('content')
 @php
     $formatInr = static fn ($paise) => number_format(((int) ($paise ?? 0)) / 100, 2);
+    $priceTolerancePaise = 200;
+    $expectedPricePaiseOptions = [49900, 39900];
+    $resolveExpectedPricePaise = static function ($amountPaise) use ($expectedPricePaiseOptions, $priceTolerancePaise) {
+        $amountPaise = (int) ($amountPaise ?? 0);
+
+        foreach ($expectedPricePaiseOptions as $expectedPricePaise) {
+            if (abs($amountPaise - $expectedPricePaise) <= $priceTolerancePaise) {
+                return $expectedPricePaise;
+            }
+        }
+
+        return null;
+    };
+    $gstPaiseFor = static fn ($amountPaise) => (int) round(((int) $amountPaise) * 18 / 118);
 @endphp
 
 <section class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
@@ -60,6 +80,7 @@
         <h2 class="h5 mb-1">Captured transactions above ₹1</h2>
         <p class="text-muted mb-0">
             Public report for <code>transactions.status = captured</code>, <code>amount_paise != 100</code>, and users that still exist in <code>users</code>.
+            Rows within ₹2 of ₹499 or ₹399 are marked green, with GST calculated at 18%.
         </p>
     </div>
     <div class="d-flex align-items-center gap-2">
@@ -119,6 +140,7 @@
                                 <th>ID</th>
                                 <th>Created</th>
                                 <th>Amount</th>
+                                <th>Expected / GST</th>
                                 <th>User</th>
                                 <th>Type</th>
                                 <th>Reference</th>
@@ -127,12 +149,32 @@
                         </thead>
                         <tbody>
                             @foreach($transactions as $transaction)
-                                <tr>
+                                @php
+                                    $expectedPricePaise = $resolveExpectedPricePaise($transaction->amount_paise);
+                                    $isExpectedPriceMatch = $expectedPricePaise !== null;
+                                    $gstPaise = $isExpectedPriceMatch ? $gstPaiseFor($expectedPricePaise) : null;
+                                    $taxablePaise = $isExpectedPriceMatch ? $expectedPricePaise - $gstPaise : null;
+                                    $deltaPaise = $isExpectedPriceMatch ? (int) $transaction->amount_paise - $expectedPricePaise : null;
+                                @endphp
+                                <tr class="{{ $isExpectedPriceMatch ? 'price-match-row' : '' }}">
                                     <td data-label="ID">#{{ $transaction->id }}</td>
                                     <td data-label="Created">
                                         {{ optional($transaction->created_at)->timezone('Asia/Kolkata')->format('d M Y, h:i A') ?? 'N/A' }}
                                     </td>
                                     <td data-label="Amount" class="fw-semibold">₹{{ $formatInr($transaction->amount_paise) }}</td>
+                                    <td data-label="Expected / GST">
+                                        @if($isExpectedPriceMatch)
+                                            <div class="price-breakdown">
+                                                <span class="badge text-bg-success mb-1">Matched ₹{{ $formatInr($expectedPricePaise) }}</span>
+                                                <div class="small text-muted">Tolerance: ±₹2</div>
+                                                <div class="small">Base: ₹{{ $formatInr($taxablePaise) }}</div>
+                                                <div class="small">GST @ 18%: ₹{{ $formatInr($gstPaise) }}</div>
+                                                <div class="small">Delta: {{ $deltaPaise >= 0 ? '+' : '-' }}₹{{ $formatInr(abs($deltaPaise)) }}</div>
+                                            </div>
+                                        @else
+                                            <span class="text-muted">No ₹399/₹499 match</span>
+                                        @endif
+                                    </td>
                                     <td data-label="User">
                                         <div class="fw-semibold">
                                             {{ $transaction->user->name ?? 'User #' . $transaction->user_id }}

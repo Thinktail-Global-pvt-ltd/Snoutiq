@@ -44,6 +44,7 @@ class PublicCapturedTransactionsPageTest extends TestCase
             ['id' => 10, 'name' => 'Shown User', 'email' => 'shown@example.com', 'phone' => '9999999999', 'created_at' => now(), 'updated_at' => now()],
             ['id' => 11, 'name' => 'One Rupee User', 'email' => null, 'phone' => null, 'created_at' => now(), 'updated_at' => now()],
             ['id' => 12, 'name' => 'Pending User', 'email' => null, 'phone' => null, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 13, 'name' => 'Near 399 User', 'email' => null, 'phone' => null, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
         DB::table('transactions')->insert([
@@ -51,6 +52,7 @@ class PublicCapturedTransactionsPageTest extends TestCase
             ['id' => 2, 'user_id' => 11, 'amount_paise' => 100, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_one_rupee', 'created_at' => now(), 'updated_at' => now()],
             ['id' => 3, 'user_id' => 12, 'amount_paise' => 49900, 'status' => 'pending', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_pending', 'created_at' => now(), 'updated_at' => now()],
             ['id' => 4, 'user_id' => 999, 'amount_paise' => 49900, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_missing_user', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 5, 'user_id' => 13, 'amount_paise' => 40100, 'status' => 'captured', 'type' => 'video_consult', 'payment_method' => 'upi', 'reference' => 'pay_near_399', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
         $response = $this->get('/captured-transactions');
@@ -58,6 +60,10 @@ class PublicCapturedTransactionsPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Shown User');
         $response->assertSee('pay_shown');
+        $response->assertSee('Matched ₹499.00');
+        $response->assertSee('Matched ₹399.00');
+        $response->assertSee('GST @ 18%');
+        $response->assertSee('price-match-row');
         $response->assertDontSee('pay_one_rupee');
         $response->assertDontSee('pay_pending');
         $response->assertDontSee('pay_missing_user');
