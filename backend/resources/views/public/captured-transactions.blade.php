@@ -63,9 +63,13 @@
 @php
     $formatInr = static fn ($paise) => number_format(((int) ($paise ?? 0)) / 100, 2);
     $priceTolerancePaise = 200;
-    $gstIncludedPricePaiseOptions = [49900, 76600];
+    $gstIncludedPricePaiseOptions = [49900, 76600, 47100, 58900];
+    $gstIncludedBaseOverridesPaise = [
+        47100 => 39900,
+        58900 => 49900,
+    ];
     $gstNotAddedPricePaiseOptions = [64800, 37100, 66600, 48900, 65000, 50000, 40000, 39900, 60000];
-    $resolvePriceMatch = static function ($amountPaise) use ($gstIncludedPricePaiseOptions, $gstNotAddedPricePaiseOptions, $priceTolerancePaise) {
+    $resolvePriceMatch = static function ($amountPaise) use ($gstIncludedPricePaiseOptions, $gstIncludedBaseOverridesPaise, $gstNotAddedPricePaiseOptions, $priceTolerancePaise) {
         $amountPaise = (int) ($amountPaise ?? 0);
         $bestMatch = null;
 
@@ -84,6 +88,9 @@
                     $bestMatch = [
                         'expected_paise' => $expectedPricePaise,
                         'gst_mode' => $gstMode,
+                        'base_override_paise' => $gstMode === 'included'
+                            ? ($gstIncludedBaseOverridesPaise[$expectedPricePaise] ?? null)
+                            : null,
                         'absolute_delta_paise' => $deltaPaise,
                     ];
                 }
@@ -174,14 +181,17 @@
                                     $priceMatch = $resolvePriceMatch($transaction->amount_paise);
                                     $expectedPricePaise = $priceMatch['expected_paise'] ?? null;
                                     $gstMode = $priceMatch['gst_mode'] ?? null;
+                                    $baseOverridePaise = $priceMatch['base_override_paise'] ?? null;
                                     $isExpectedPriceMatch = $priceMatch !== null;
                                     $gstPaise = null;
                                     $taxablePaise = null;
                                     $grossWithGstPaise = null;
 
                                     if ($gstMode === 'included') {
-                                        $gstPaise = $inclusiveGstPaiseFor($expectedPricePaise);
-                                        $taxablePaise = $expectedPricePaise - $gstPaise;
+                                        $taxablePaise = $baseOverridePaise !== null
+                                            ? (int) $baseOverridePaise
+                                            : $expectedPricePaise - $inclusiveGstPaiseFor($expectedPricePaise);
+                                        $gstPaise = $expectedPricePaise - $taxablePaise;
                                         $grossWithGstPaise = $expectedPricePaise;
                                     } elseif ($gstMode === 'not_added') {
                                         $taxablePaise = $expectedPricePaise;
