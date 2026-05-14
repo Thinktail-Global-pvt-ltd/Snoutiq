@@ -7,6 +7,7 @@ use App\Models\DeviceToken;
 use App\Models\FcmNotification;
 use App\Models\HealthPulseEntry;
 use App\Models\Pet;
+use App\Models\User;
 use App\Services\Push\FcmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,8 +19,12 @@ class HealthPulseNotificationService
     {
     }
 
-    public function sendAiFlagNotification(Pet $pet, HealthPulseEntry $entry, ?string $explicitToken = null): bool
-    {
+    public function sendAiFlagNotification(
+        Pet $pet,
+        HealthPulseEntry $entry,
+        ?string $explicitToken = null,
+        ?string $userName = null
+    ): bool {
         if (!in_array($entry->ai_flag_level, ['Watch', 'Alert'], true)) {
             return false;
         }
@@ -43,7 +48,8 @@ class HealthPulseNotificationService
                 'flag_level' => $entry->ai_flag_level,
                 'screen' => 'health_pulse',
             ],
-            explicitToken: $explicitToken
+            explicitToken: $explicitToken,
+            userName: $userName
         );
     }
 
@@ -74,7 +80,8 @@ class HealthPulseNotificationService
         string $title,
         string $body,
         array $payload,
-        ?string $explicitToken = null
+        ?string $explicitToken = null,
+        ?string $userName = null
     ): bool {
         $data = array_merge($payload, [
             'type' => $type,
@@ -83,7 +90,7 @@ class HealthPulseNotificationService
             'user_id' => (string) $userId,
         ]);
 
-        $tokens = $this->tokensForUser($userId, $explicitToken);
+        $tokens = $this->tokensForUser($userId, $explicitToken, $userName);
         if (empty($tokens)) {
             Log::warning('health_pulse.push_skipped_no_tokens', [
                 'user_id' => $userId,
@@ -119,19 +126,58 @@ class HealthPulseNotificationService
         return $sent > 0;
     }
 
-    private function tokensForUser(int $userId, ?string $explicitToken): array
+    private function tokensForUser(int $userId, ?string $explicitToken, ?string $userName = null): array
     {
         $explicitToken = trim((string) $explicitToken);
         if ($explicitToken !== '') {
             return [$explicitToken];
         }
 
-        return DeviceToken::query()
+        $tokens = DeviceToken::query()
             ->where('user_id', $userId)
             ->pluck('token')
             ->filter()
             ->values()
             ->all();
+
+        if (!empty($tokens)) {
+            return $tokens;
+        }
+
+        $resolvedUserId = $this->resolveUserIdByName($userName);
+        if ($resolvedUserId === null || $resolvedUserId === $userId) {
+            return [];
+        }
+
+        return DeviceToken::query()
+            ->where('user_id', $resolvedUserId)
+            ->pluck('token')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function resolveUserIdByName(?string $userName): ?int
+    {
+        $userName = trim((string) $userName);
+        if ($userName === '' || !Schema::hasTable('users')) {
+            return null;
+        }
+
+        $query = User::query();
+        if (Schema::hasColumn('users', 'name')) {
+            $query->where('name', $userName);
+        }
+        if (Schema::hasColumn('users', 'email')) {
+            $query->orWhere('email', $userName);
+        }
+        if (Schema::hasColumn('users', 'phone')) {
+            $query->orWhere('phone', $userName);
+        }
+
+        $userId = $query->value('id');
+
+        return is_numeric($userId) ? (int) $userId : null;
     }
 
     private function reminderAlreadySent(int $userId, int $petId, string $trigger): bool
