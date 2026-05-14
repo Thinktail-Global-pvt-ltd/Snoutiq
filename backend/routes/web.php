@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\VetLandingController;
+use App\Http\Controllers\ClinicMediaController;
 use App\Http\Controllers\Admin\AdminOnboardingStatusPageController;
 use App\Http\Controllers\Admin\AdminVideoSlotOverviewController;
 use App\Models\Doctor;
@@ -122,6 +123,12 @@ Route::get('/captured-transactions', PublicCapturedTransactionsController::class
 Route::get('/captured-transactions/{transaction}/invoice', \App\Http\Controllers\PublicCapturedTransactionInvoiceController::class)
     ->whereNumber('transaction')
     ->name('captured-transactions.invoice');
+Route::get('/clinics/{clinic}/media/image', [ClinicMediaController::class, 'image'])
+    ->whereNumber('clinic')
+    ->name('clinics.media.image');
+Route::get('/clinics/{clinic}/media/video', [ClinicMediaController::class, 'video'])
+    ->whereNumber('clinic')
+    ->name('clinics.media.video');
 
 Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
