@@ -52,6 +52,7 @@ use App\Http\Controllers\Admin\VetUserConnectionReportPageController;
 use App\Http\Controllers\Admin\VetClinicConnectionsExportController;
 use App\Http\Controllers\ClinicWebsiteContentController;
 use App\Services\RagSnouticSymptomService;
+use App\Http\Controllers\PublicCapturedTransactionsController;
 
 
 // Public routes
@@ -116,6 +117,8 @@ Route::get('/vet-pet-connections/{vet}', [VetPetConnectionsPageController::class
     ->name('vet-pet-connections.details');
 Route::get('/vet-clinic-connections/export', [VetClinicConnectionsExportController::class, 'export'])
     ->name('vet-clinic-connections.export');
+Route::get('/captured-transactions', PublicCapturedTransactionsController::class)
+    ->name('captured-transactions.public');
 
 Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');

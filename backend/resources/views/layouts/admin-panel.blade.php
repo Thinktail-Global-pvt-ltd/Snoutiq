@@ -152,7 +152,7 @@
                 <h1 class="h4 mb-0">@yield('page-title', 'Admin Dashboard')</h1>
             </div>
             <div class="header-meta">
-                <span class="badge text-bg-dark">Admin access</span>
+                <span class="badge text-bg-dark">@yield('access-badge', 'Admin access')</span>
                 <small>{{ now()->format('d M Y') }}</small>
             </div>
         </header>
