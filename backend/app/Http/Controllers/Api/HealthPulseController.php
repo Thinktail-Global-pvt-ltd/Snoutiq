@@ -31,9 +31,9 @@ class HealthPulseController extends Controller
             ['pet_id' => $pet->id, 'entry_date' => $entryDate],
             [
                 'user_id' => $pet->user_id,
-                'food' => $this->normalizeSignal($payload['food'] ?? $payload['appetite'] ?? $payload['food_intake']),
-                'energy' => $this->normalizeSignal($payload['energy'] ?? $payload['energy_level']),
-                'water' => $this->normalizeSignal($payload['water'] ?? $payload['water_intake']),
+                'food' => $this->normalizeSignal($this->firstPayloadValue($payload, ['food', 'appetite', 'food_intake'])),
+                'energy' => $this->normalizeSignal($this->firstPayloadValue($payload, ['energy', 'energy_level'])),
+                'water' => $this->normalizeSignal($this->firstPayloadValue($payload, ['water', 'water_intake'])),
                 'symptoms' => $this->optionalText($payload['symptoms'] ?? null),
                 'digestion_issue' => $this->toBool($payload['digestion_issue'] ?? $payload['digestion'] ?? $payload['poop_issue'] ?? false),
                 'digestion_note' => $this->optionalText($payload['digestion_note'] ?? $payload['poop_note'] ?? null),
@@ -336,6 +336,17 @@ class HealthPulseController extends Controller
         $text = trim((string) $value);
 
         return $text === '' ? null : substr($text, 0, 40);
+    }
+
+    private function firstPayloadValue(array $payload, array $keys)
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $payload)) {
+                return $payload[$key];
+            }
+        }
+
+        return null;
     }
 
     private function optionalText($value): ?string
