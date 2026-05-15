@@ -53,9 +53,9 @@ class HealthPulseNotificationService
         );
     }
 
-    public function sendReminder(Pet $pet, string $trigger, string $title, string $body): bool
+    public function sendReminder(Pet $pet, string $trigger, string $title, string $body, bool $allowRepeat = false): bool
     {
-        if ($this->reminderAlreadySent((int) $pet->user_id, (int) $pet->id, $trigger)) {
+        if (!$allowRepeat && $this->reminderAlreadySent((int) $pet->user_id, (int) $pet->id, $trigger)) {
             return false;
         }
 

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
 
 class SendHealthPulseReminders extends Command
 {
-    protected $signature = 'health-pulse:send-reminders {--pet_id=} {--dry}';
+    protected $signature = 'health-pulse:send-reminders {--pet_id=} {--dry} {--repeat}';
     protected $description = 'Send Daily Health Pulse reminder pushes for missing or lapsed entries.';
 
     public function __construct(private readonly HealthPulseNotificationService $notifications)
@@ -32,6 +32,7 @@ class SendHealthPulseReminders extends Command
         $today = $now->toDateString();
         $forcedPetId = $this->option('pet_id');
         $dry = (bool) $this->option('dry');
+        $repeat = (bool) $this->option('repeat');
         $sent = 0;
 
         $pets = Pet::query()
@@ -41,20 +42,36 @@ class SendHealthPulseReminders extends Command
             ->limit($forcedPetId ? 1 : 1000)
             ->get();
 
+        if ($pets->isEmpty()) {
+            $this->warn('No matching pets found.');
+        }
+
         foreach ($pets as $pet) {
-            if ($this->hasEntryOn((int) $pet->id, $today)) {
+            $hasTodayEntry = $this->hasEntryOn((int) $pet->id, $today);
+            if ($hasTodayEntry && !$forcedPetId) {
                 continue;
             }
 
-            foreach ($this->triggersForPet($pet, $now, $hour, (bool) $forcedPetId) as $trigger) {
+            if ($hasTodayEntry && $forcedPetId) {
+                $this->warn("pet {$pet->id} has today's entry; continuing because --pet_id is test mode.");
+            }
+
+            $triggers = $this->triggersForPet($pet, $now, $hour, (bool) $forcedPetId);
+            if (empty($triggers)) {
+                $this->warn("No reminder triggers matched for pet {$pet->id}.");
+            }
+
+            foreach ($triggers as $trigger) {
                 if (!$dry) {
-                    $notification = $this->notifications->sendReminder(
+                    $delivered = $this->notifications->sendReminder(
                         $pet,
                         $trigger['key'],
                         $trigger['title'],
-                        $trigger['body']
+                        $trigger['body'],
+                        $repeat
                     );
-                    if ($notification === null) {
+                    if (!$delivered) {
+                        $this->warn("{$trigger['key']} -> pet {$pet->id} skipped or failed. Check device_tokens and fcm_notifications.");
                         continue;
                     }
                 }
@@ -68,6 +85,7 @@ class SendHealthPulseReminders extends Command
             'hour_ist' => $hour,
             'forced_pet_id' => $forcedPetId,
             'dry' => $dry,
+            'repeat' => $repeat,
         ]);
 
         return self::SUCCESS;
