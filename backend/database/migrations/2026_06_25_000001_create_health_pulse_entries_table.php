@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('energy', 40)->nullable();
             $table->string('water', 40)->nullable();
             $table->text('symptoms')->nullable();
-            $table->boolean('digestion_issue')->default(false);
+            $table->boolean('digestion_issue')->nullable();
             $table->string('digestion_note', 255)->nullable();
             $table->string('ai_flag_level', 20)->default('None');
             $table->text('ai_short_summary')->nullable();

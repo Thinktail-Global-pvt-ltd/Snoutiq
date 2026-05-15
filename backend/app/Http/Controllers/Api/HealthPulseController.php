@@ -35,7 +35,7 @@ class HealthPulseController extends Controller
                 'energy' => $this->normalizeSignal($this->firstPayloadValue($payload, ['energy', 'energy_level'])),
                 'water' => $this->normalizeSignal($this->firstPayloadValue($payload, ['water', 'water_intake'])),
                 'symptoms' => $this->optionalText($payload['symptoms'] ?? null),
-                'digestion_issue' => $this->toBool($payload['digestion_issue'] ?? $payload['digestion'] ?? $payload['poop_issue'] ?? false),
+                'digestion_issue' => $this->normalizeOptionalBool($this->firstPayloadValue($payload, ['digestion_issue', 'digestion', 'poop_issue'])),
                 'digestion_note' => $this->optionalText($payload['digestion_note'] ?? $payload['poop_note'] ?? null),
             ]
         );
@@ -91,6 +91,7 @@ class HealthPulseController extends Controller
             ->where('pet_id', $pet->id)
             ->whereDate('entry_date', $date)
             ->first();
+        $completed = $entry !== null && $this->isCompleteEntry($entry);
 
         return response()->json([
             'success' => true,
@@ -98,8 +99,8 @@ class HealthPulseController extends Controller
                 'pet_id' => (int) $pet->id,
                 'pet_name' => $pet->name,
                 'entry_date' => $date,
-                'completed' => $entry !== null,
-                'banner_text' => ($pet->name ?: 'Your pet').($entry ? "'s health pulse logged ✓" : "'s daily health check is pending"),
+                'completed' => $completed,
+                'banner_text' => ($pet->name ?: 'Your pet').($completed ? "'s health pulse logged ✓" : "'s daily health check is pending"),
                 'entry' => $entry ? $this->formatEntry($entry) : null,
             ],
         ]);
@@ -286,8 +287,9 @@ class HealthPulseController extends Controller
             'energy' => $entry->energy,
             'water' => $entry->water,
             'symptoms' => $entry->symptoms,
-            'digestion_issue' => (bool) $entry->digestion_issue,
+            'digestion_issue' => $entry->digestion_issue,
             'digestion_note' => $entry->digestion_note,
+            'is_complete' => $this->isCompleteEntry($entry),
             'ai' => [
                 'short_summary' => $entry->ai_short_summary,
                 'pattern_observation' => $entry->ai_pattern_observation,
@@ -347,6 +349,28 @@ class HealthPulseController extends Controller
         }
 
         return null;
+    }
+
+    private function isCompleteEntry(HealthPulseEntry $entry): bool
+    {
+        return $this->hasSignal($entry->food)
+            && $this->hasSignal($entry->energy)
+            && $this->hasSignal($entry->water)
+            && $entry->digestion_issue !== null;
+    }
+
+    private function hasSignal($value): bool
+    {
+        return trim((string) $value) !== '';
+    }
+
+    private function normalizeOptionalBool($value): ?bool
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return $this->toBool($value);
     }
 
     private function optionalText($value): ?string
