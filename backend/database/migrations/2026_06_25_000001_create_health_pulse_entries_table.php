@@ -17,9 +17,9 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('pet_id');
             $table->date('entry_date');
-            $table->string('food', 40);
-            $table->string('energy', 40);
-            $table->string('water', 40);
+            $table->string('food', 40)->nullable();
+            $table->string('energy', 40)->nullable();
+            $table->string('water', 40)->nullable();
             $table->text('symptoms')->nullable();
             $table->boolean('digestion_issue')->default(false);
             $table->string('digestion_note', 255)->nullable();

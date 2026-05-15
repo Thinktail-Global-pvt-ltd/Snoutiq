@@ -190,9 +190,13 @@ class HealthPulseController extends Controller
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'entry_date' => ['nullable', 'date'],
             'care_date' => ['nullable', 'date'],
-            'food' => ['required', 'string', 'max:40'],
-            'energy' => ['required', 'string', 'max:40'],
-            'water' => ['required', 'string', 'max:40'],
+            'food' => ['nullable', 'string', 'max:40'],
+            'appetite' => ['nullable', 'string', 'max:40'],
+            'food_intake' => ['nullable', 'string', 'max:40'],
+            'energy' => ['nullable', 'string', 'max:40'],
+            'energy_level' => ['nullable', 'string', 'max:40'],
+            'water' => ['nullable', 'string', 'max:40'],
+            'water_intake' => ['nullable', 'string', 'max:40'],
             'symptoms' => ['nullable', 'string'],
             'digestion_issue' => ['nullable'],
             'digestion' => ['nullable'],
@@ -327,9 +331,11 @@ class HealthPulseController extends Controller
         };
     }
 
-    private function normalizeSignal($value): string
+    private function normalizeSignal($value): ?string
     {
-        return substr(trim((string) $value), 0, 40);
+        $text = trim((string) $value);
+
+        return $text === '' ? null : substr($text, 0, 40);
     }
 
     private function optionalText($value): ?string
