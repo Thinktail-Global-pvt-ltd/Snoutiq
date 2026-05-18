@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\GroomerProfile;
 use App\Models\GroomerService;
 use App\Models\UserRating;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class PublicController extends Controller
 {
@@ -136,12 +138,13 @@ class PublicController extends Controller
         $status = $success
             ? 200
             : ($missingGoogleKey ? 503 : (($result['requires_location'] ?? false) ? 422 : 502));
+        $clinics = $this->withClinicImageBlobUrls($result['places'] ?? []);
 
         return response()->json([
             'success' => $success,
             'user_id' => (int) $user->id,
-            'clinics' => $result['places'] ?? [],
-            'count' => (int) ($result['count'] ?? 0),
+            'clinics' => $clinics,
+            'count' => count($clinics),
             'source' => $result['source'] ?? null,
             'location' => $result['location'] ?? $location,
             'range_km' => $success && $hasCoordinates ? 5 : null,
@@ -156,6 +159,145 @@ class PublicController extends Controller
                 ? 'Clinics loaded successfully.'
                 : ($result['error'] ?? 'Clinics could not be loaded.'),
         ], $status);
+    }
+
+    private function withClinicImageBlobUrls(array $places): array
+    {
+        if ($places === []) {
+            return $places;
+        }
+
+        if (! Schema::hasTable('vet_registerations_temp')
+            || ! Schema::hasColumn('vet_registerations_temp', 'clinic_image')
+        ) {
+            return $this->withEmptyClinicImageBlobUrls($places);
+        }
+        $hasPlaceIdColumn = Schema::hasColumn('vet_registerations_temp', 'place_id');
+        $hasNameColumn = Schema::hasColumn('vet_registerations_temp', 'name');
+        $hasClinicProfileColumn = Schema::hasColumn('vet_registerations_temp', 'clinic_profile');
+        if (! $hasPlaceIdColumn && ! $hasNameColumn && ! $hasClinicProfileColumn) {
+            return $this->withEmptyClinicImageBlobUrls($places);
+        }
+
+        $placeIds = collect($places)
+            ->pluck('place_id')
+            ->filter()
+            ->map(static fn ($value) => (string) $value)
+            ->unique()
+            ->values();
+
+        $names = collect($places)
+            ->pluck('name')
+            ->filter()
+            ->map(static fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($placeIds->isEmpty() && $names->isEmpty()) {
+            return $this->withEmptyClinicImageBlobUrls($places);
+        }
+
+        $selectColumns = ['id'];
+        if ($hasPlaceIdColumn) {
+            $selectColumns[] = 'place_id';
+        }
+        if ($hasNameColumn) {
+            $selectColumns[] = 'name';
+        }
+        if ($hasClinicProfileColumn) {
+            $selectColumns[] = 'clinic_profile';
+        }
+
+        $query = DB::table('vet_registerations_temp')
+            ->select($selectColumns)
+            ->whereNotNull('clinic_image')
+            ->whereRaw('LENGTH(clinic_image) > 0');
+
+        $query->where(function ($inner) use ($placeIds, $names, $hasPlaceIdColumn, $hasNameColumn, $hasClinicProfileColumn) {
+            if ($hasPlaceIdColumn && $placeIds->isNotEmpty()) {
+                $inner->whereIn('place_id', $placeIds->all());
+            }
+
+            if ($hasNameColumn && $names->isNotEmpty()) {
+                $method = ($hasPlaceIdColumn && $placeIds->isNotEmpty()) ? 'orWhereIn' : 'whereIn';
+                $inner->{$method}('name', $names->all());
+            }
+
+            if ($hasClinicProfileColumn && $names->isNotEmpty()) {
+                $inner->orWhereIn('clinic_profile', $names->all());
+            }
+        });
+
+        $clinics = $query->get();
+        if ($clinics->isEmpty()) {
+            return $this->withEmptyClinicImageBlobUrls($places);
+        }
+
+        $byPlaceId = $clinics
+            ->filter(static fn ($clinic) => ! empty($clinic->place_id))
+            ->keyBy(static fn ($clinic) => (string) $clinic->place_id);
+        $byName = $clinics
+            ->flatMap(function ($clinic) {
+                $keys = [];
+                foreach ([$clinic->name ?? null, $clinic->clinic_profile ?? null] as $name) {
+                    $key = $this->normalizeClinicMatchKey($name);
+                    if ($key !== '') {
+                        $keys[$key] = $clinic;
+                    }
+                }
+
+                return $keys;
+            });
+
+        return array_map(function (array $place) use ($byPlaceId, $byName) {
+            $clinic = null;
+            $placeId = (string) ($place['place_id'] ?? '');
+            if ($placeId !== '') {
+                $clinic = $byPlaceId->get($placeId);
+            }
+
+            if (! $clinic) {
+                $clinic = $byName->get($this->normalizeClinicMatchKey($place['name'] ?? null));
+            }
+
+            if (! $clinic) {
+                return $place + [
+                    'clinic_image_url' => null,
+                    'chlin_image' => null,
+                    'local_clinic_id' => null,
+                ];
+            }
+
+            $imageUrl = route('clinics.media.image', ['clinic' => (int) $clinic->id], true);
+
+            return $place + [
+                'clinic_image_url' => $imageUrl,
+                'chlin_image' => $imageUrl,
+                'local_clinic_id' => (int) $clinic->id,
+            ];
+        }, $places);
+    }
+
+    private function withEmptyClinicImageBlobUrls(array $places): array
+    {
+        return array_map(static function (array $place) {
+            return $place + [
+                'clinic_image_url' => null,
+                'chlin_image' => null,
+                'local_clinic_id' => null,
+            ];
+        }, $places);
+    }
+
+    private function normalizeClinicMatchKey($value): string
+    {
+        $value = strtolower(trim((string) $value));
+        if ($value === '') {
+            return '';
+        }
+
+        return preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
     }
 
     public function updateUserLocation(Request $request)

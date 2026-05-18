@@ -233,6 +233,11 @@ class PushController extends Controller
             'body' => ['nullable', 'string'],
             'data' => ['nullable', 'array'],
             'data.*' => ['nullable'],
+            'image' => ['nullable', 'string', 'max:2048'],
+            'image_url' => ['nullable', 'string', 'max:2048'],
+            'imageUrl' => ['nullable', 'string', 'max:2048'],
+            'logo' => ['nullable', 'string', 'max:255'],
+            'icon' => ['nullable', 'string', 'max:255'],
         ]);
 
         $title = $validated['title'] ?? 'Snoutiq Alert';
@@ -242,12 +247,45 @@ class PushController extends Controller
             $data['type'] = 'test';
         }
 
+        $image = $this->firstNonEmptyString([
+            $validated['image'] ?? null,
+            $validated['image_url'] ?? null,
+            $validated['imageUrl'] ?? null,
+            $data['image'] ?? null,
+        ]);
+
+        $icon = $this->firstNonEmptyString([
+            $validated['logo'] ?? null,
+            $validated['icon'] ?? null,
+            $data['logo'] ?? null,
+            $data['icon'] ?? null,
+        ]);
+
+        if ($image !== null && !isset($data['image'])) {
+            $data['image'] = $image;
+        }
+        if ($icon !== null) {
+            if (!isset($data['logo'])) {
+                $data['logo'] = $icon;
+            }
+            if (!isset($data['icon'])) {
+                $data['icon'] = $icon;
+            }
+        }
+
+        $options = [
+            'image' => $image,
+            'icon' => $icon,
+        ];
+
         \Log::info('PushController@testToToken received', [
             'has_token' => !empty($validated['token']),
             'token' => isset($validated['token']) ? $this->maskToken($validated['token']) : null,
             'title' => $title,
             'body_len' => strlen($body),
             'data_keys' => array_keys($data),
+            'has_image' => $image !== null,
+            'has_icon' => $icon !== null,
         ]);
 
         try {
@@ -259,7 +297,11 @@ class PushController extends Controller
                     ], 422);
                 }
                 // Send immediately for testing
-                $push->sendToToken($normalizedToken, $title, $body, $data);
+                if ($image !== null || $icon !== null) {
+                    $push->sendToTokenRich($normalizedToken, $title, $body, $data, $options);
+                } else {
+                    $push->sendToToken($normalizedToken, $title, $body, $data);
+                }
             } else {
                 // If token not provided, try sending to the current user's registered devices
                 $userId = Auth::id();
@@ -268,7 +310,11 @@ class PushController extends Controller
                 }
                 $tokens = DeviceToken::where('user_id', $userId)->pluck('token')->all();
                 foreach ($tokens as $t) {
-                    $push->sendToToken($t, $title, $body, $data);
+                    if ($image !== null || $icon !== null) {
+                        $push->sendToTokenRich($t, $title, $body, $data, $options);
+                    } else {
+                        $push->sendToToken($t, $title, $body, $data);
+                    }
                 }
             }
 
