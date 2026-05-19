@@ -59,9 +59,9 @@ class HealthPulseNotificationService
         $summary = trim((string) $entry->ai_short_summary);
         $action = trim((string) $entry->ai_recommended_action);
         $loggedDays = $this->loggedDaysForPet((int) $entry->pet_id);
-        $prefix = "Thanks for logging {$petName}'s health pulse";
+        $prefix = "Thanks for checking in on {$petName}";
         if ($loggedDays > 0) {
-            $prefix .= " - {$loggedDays} days logged";
+            $prefix .= " - {$loggedDays} days in";
         }
         $prefix .= '.';
 
@@ -72,13 +72,19 @@ class HealthPulseNotificationService
 
         if ($body === '') {
             $body = $entry->ai_flag_level === 'Alert'
-                ? "{$petName}'s pulse has signs worth a vet check if they continue."
-                : "{$petName}'s pulse has a change worth monitoring.";
+                ? "A few things for {$petName} are worth a vet check if they continue."
+                : "A few things for {$petName} are worth keeping an eye on.";
         }
 
         if (!str_contains(strtolower($body), 'thank')) {
             $body = "{$prefix} {$body}";
         }
+
+        $body = str_ireplace(
+            ['health pulse', 'pulse', 'logging', 'logged', ' log '],
+            ['check-in', 'check-in', 'checking in', 'checked in', ' check '],
+            $body
+        );
 
         return mb_substr($body, 0, 240);
     }

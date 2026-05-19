@@ -35,7 +35,7 @@ class HealthPulseAiService
         }
 
         $entryCount = count($entries);
-        $fallback = "Thanks for keeping the daily pulse going - {$entryCount} days logged. Based on the logged health pulses, keep watching appetite, energy, water intake, digestion, and any repeated symptoms over time.";
+        $fallback = "Nice work checking in for {$entryCount} days. Based on these quick daily updates, keep an eye on appetite, energy, water, digestion, and any repeated symptoms.";
         $apiKey = trim(GeminiConfig::apiKey());
         if ($apiKey === '') {
             return $fallback;
@@ -54,7 +54,7 @@ class HealthPulseAiService
         $prompt = "You are a pet health journaling assistant for Snoutiq. Do not diagnose.\n"
             ."Write a concise, safe health trend summary from these daily check-ins. Use phrases like worth monitoring or worth a vet check.\n"
             ."Use only these fields: food, energy, water, symptoms, digestion_issue. Ignore any other context.\n"
-            ."Start by appreciating the pet parent for logging {$entryCount} days of health data.\n"
+            ."Start with a warm, informal thank-you for checking in for {$entryCount} days. Do not use the words pulse, logging, logged, or log.\n"
             ."Return JSON only: {\"summary\":\"...\"}.\n\n"
             .'Entries: '.json_encode($payload);
 
@@ -88,9 +88,9 @@ class HealthPulseAiService
 
         return [
             'short_summary' => $flag === 'None'
-                ? "Thanks for logging today's health pulse - {$loggedDays} days logged. Today's pulse looks generally steady from the logged signals."
-                : "Thanks for logging today's health pulse - {$loggedDays} days logged. Today's pulse has a few signals worth monitoring.",
-            'pattern_observation' => 'This observation is based only on today\'s food, energy, water, symptoms, and digestion inputs.',
+                ? "Nice job checking in today - {$loggedDays} days in. Things look steady from what you shared."
+                : "Thanks for checking in today - {$loggedDays} days in. A few things from today are worth keeping an eye on.",
+            'pattern_observation' => 'This is based only on today\'s food, energy, water, symptoms, and digestion answers.',
             'flag_level' => $flag,
             'recommended_action' => $flag === 'Alert'
                 ? 'Keep monitoring closely and consider a vet check if these signs continue or worsen.'
@@ -104,7 +104,7 @@ class HealthPulseAiService
             ."Analyze one daily check-in and return JSON only with keys: short_summary, pattern_observation, flag_level, recommended_action.\n"
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n\n"
             ."Use only these five fields. Do not use pet profile, date, previous entries, FCM token, or any other metadata.\n"
-            ."In short_summary, warmly thank the pet parent for logging today's pulse and mention {$loggedDays} days logged. Keep it human and concise.\n"
+            ."In short_summary, sound warm, simple, and informal. Thank the pet parent for checking in today and mention {$loggedDays} days in. Do not use the words pulse, logging, logged, or log.\n"
             .'Pulse fields: '.json_encode([
                 'food' => $entry->food,
                 'energy' => $entry->energy,
