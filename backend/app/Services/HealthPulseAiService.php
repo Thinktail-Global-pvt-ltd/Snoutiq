@@ -110,7 +110,7 @@ class HealthPulseAiService
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n\n"
             ."Use only these five fields. Do not use pet profile, date, previous entries, FCM token, or any other metadata.\n"
             ."Use the pet name {$petName} in short_summary. Sound warm, simple, informal, and motivating. Congratulate the pet parent for completing today's care update and mention {$loggedDays} days in. Make them feel good about entering the data. Do not use the words pulse, logging, logged, or log.\n"
-            ."If symptoms is not empty, mention the symptom text naturally in short_summary. If digestion_issue is true, mention digestion/poop was marked as a concern. If both exist, mention both briefly.\n"
+            ."If symptoms is not empty, mention the symptom text naturally in short_summary. If digestion_issue is true, mention the tummy/poop update in a caring, human way. Do not say marked as a concern. If both exist, mention both briefly.\n"
             .'Pulse fields: '.json_encode([
                 'food' => $entry->food,
                 'energy' => $entry->energy,
@@ -130,7 +130,7 @@ class HealthPulseAiService
         }
 
         if ($entry->digestion_issue) {
-            $notes[] = 'digestion/poop was marked as a concern';
+            $notes[] = 'the tummy/poop update is worth watching too';
         }
 
         if (empty($notes)) {
