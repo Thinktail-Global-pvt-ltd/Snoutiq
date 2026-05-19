@@ -12,13 +12,13 @@ class HealthPulseAiService
 {
     public function analyzeEntry(Pet $pet, HealthPulseEntry $entry, array $recentEntries = []): array
     {
-        $fallback = $this->fallbackAnalysis($entry, $recentEntries);
+        $fallback = $this->fallbackAnalysis($entry);
         $apiKey = trim(GeminiConfig::apiKey());
         if ($apiKey === '') {
             return $fallback;
         }
 
-        $prompt = $this->entryPrompt($pet, $entry, $recentEntries);
+        $prompt = $this->entryPrompt($entry);
         $result = $this->callGemini($prompt);
         if (!is_array($result)) {
             return $fallback;
@@ -51,8 +51,8 @@ class HealthPulseAiService
 
         $prompt = "You are a pet health journaling assistant for Snoutiq. Do not diagnose.\n"
             ."Write a concise, safe health trend summary from these daily check-ins. Use phrases like worth monitoring or worth a vet check.\n"
+            ."Use only these fields: food, energy, water, symptoms, digestion_issue. Ignore any other context.\n"
             ."Return JSON only: {\"summary\":\"...\"}.\n\n"
-            .'Pet: '.json_encode($this->petProfile($pet))."\n"
             .'Entries: '.json_encode($payload);
 
         $result = $this->callGemini($prompt);
@@ -61,7 +61,7 @@ class HealthPulseAiService
         return $summary !== '' ? $summary : $fallback;
     }
 
-    private function fallbackAnalysis(HealthPulseEntry $entry, array $recentEntries): array
+    private function fallbackAnalysis(HealthPulseEntry $entry): array
     {
         $symptoms = trim((string) $entry->symptoms);
         $food = strtolower((string) $entry->food);
@@ -87,9 +87,7 @@ class HealthPulseAiService
             'short_summary' => $flag === 'None'
                 ? 'Today\'s pulse looks generally steady from the logged signals.'
                 : 'Today\'s pulse has a few signals worth monitoring.',
-            'pattern_observation' => count($recentEntries) > 1
-                ? 'Compare this with the recent entries to see if the same signal repeats.'
-                : 'This is an early data point; more entries will make patterns clearer.',
+            'pattern_observation' => 'This observation is based only on today\'s food, energy, water, symptoms, and digestion inputs.',
             'flag_level' => $flag,
             'recommended_action' => $flag === 'Alert'
                 ? 'Keep monitoring closely and consider a vet check if these signs continue or worsen.'
@@ -97,22 +95,19 @@ class HealthPulseAiService
         ];
     }
 
-    private function entryPrompt(Pet $pet, HealthPulseEntry $entry, array $recentEntries): string
+    private function entryPrompt(HealthPulseEntry $entry): string
     {
         return "You are a pet health journaling assistant for Snoutiq. You must not diagnose or say the pet is sick.\n"
             ."Analyze one daily check-in and return JSON only with keys: short_summary, pattern_observation, flag_level, recommended_action.\n"
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n\n"
-            .'Pet: '.json_encode($this->petProfile($pet))."\n"
-            .'Today: '.json_encode([
-                'entry_date' => $entry->entry_date?->toDateString(),
+            ."Use only these five fields. Do not use pet profile, date, previous entries, FCM token, or any other metadata.\n"
+            .'Pulse fields: '.json_encode([
                 'food' => $entry->food,
                 'energy' => $entry->energy,
                 'water' => $entry->water,
                 'symptoms' => $entry->symptoms,
                 'digestion_issue' => $entry->digestion_issue,
-                'digestion_note' => $entry->digestion_note,
-            ])."\n"
-            .'Recent entries: '.json_encode($recentEntries);
+            ]);
     }
 
     private function callGemini(string $prompt): ?array
