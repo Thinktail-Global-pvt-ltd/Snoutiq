@@ -13,13 +13,14 @@ class HealthPulseAiService
     public function analyzeEntry(Pet $pet, HealthPulseEntry $entry, array $recentEntries = []): array
     {
         $loggedDays = max(1, count($recentEntries) + 1);
-        $fallback = $this->fallbackAnalysis($entry, $loggedDays);
+        $petName = trim((string) ($pet->name ?? 'your pet')) ?: 'your pet';
+        $fallback = $this->fallbackAnalysis($entry, $loggedDays, $petName);
         $apiKey = trim(GeminiConfig::apiKey());
         if ($apiKey === '') {
             return $fallback;
         }
 
-        $prompt = $this->entryPrompt($entry, $loggedDays);
+        $prompt = $this->entryPrompt($entry, $loggedDays, $petName);
         $result = $this->callGemini($prompt);
         if (!is_array($result)) {
             return $fallback;
@@ -64,7 +65,7 @@ class HealthPulseAiService
         return $summary !== '' ? $summary : $fallback;
     }
 
-    private function fallbackAnalysis(HealthPulseEntry $entry, int $loggedDays): array
+    private function fallbackAnalysis(HealthPulseEntry $entry, int $loggedDays, string $petName): array
     {
         $symptoms = trim((string) $entry->symptoms);
         $food = strtolower((string) $entry->food);
@@ -88,23 +89,23 @@ class HealthPulseAiService
 
         return [
             'short_summary' => $flag === 'None'
-                ? "Nice job checking in today - {$loggedDays} days in. Things look steady from what you shared."
-                : "Thanks for checking in today - {$loggedDays} days in. A few things from today are worth keeping an eye on.",
-            'pattern_observation' => 'This is based only on today\'s food, energy, water, symptoms, and digestion answers.',
+                ? "Nice work - {$petName}'s check-in is done for today, and that's {$loggedDays} days in. From what you shared, things look steady."
+                : "Thanks for checking in on {$petName} today - {$loggedDays} days in. A few answers stand out, so it is worth keeping an eye on them.",
+            'pattern_observation' => "This is based only on {$petName}'s food, energy, water, symptoms, and digestion answers from today.",
             'flag_level' => $flag,
             'recommended_action' => $flag === 'Alert'
-                ? 'Keep monitoring closely and consider a vet check if these signs continue or worsen.'
-                : ($flag === 'Watch' ? 'Monitor over the next day and log any change.' : 'Continue the daily health pulse habit.'),
+                ? "Keep a closer eye on {$petName}; if this continues or feels unusual, a vet check is a good idea."
+                : ($flag === 'Watch' ? "Check on {$petName} again later today or tomorrow and note any change." : "Keep the routine going - these small daily check-ins make {$petName}'s care easier to follow."),
         ];
     }
 
-    private function entryPrompt(HealthPulseEntry $entry, int $loggedDays): string
+    private function entryPrompt(HealthPulseEntry $entry, int $loggedDays, string $petName): string
     {
         return "You are a pet health journaling assistant for Snoutiq. You must not diagnose or say the pet is sick.\n"
             ."Analyze one daily check-in and return JSON only with keys: short_summary, pattern_observation, flag_level, recommended_action.\n"
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n\n"
             ."Use only these five fields. Do not use pet profile, date, previous entries, FCM token, or any other metadata.\n"
-            ."In short_summary, sound warm, simple, and informal. Thank the pet parent for checking in today and mention {$loggedDays} days in. Do not use the words pulse, logging, logged, or log.\n"
+            ."Use the pet name {$petName} in short_summary. Sound warm, simple, and informal. Thank the pet parent for checking in today and mention {$loggedDays} days in. Do not use the words pulse, logging, logged, or log.\n"
             .'Pulse fields: '.json_encode([
                 'food' => $entry->food,
                 'energy' => $entry->energy,

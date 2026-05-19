@@ -37,7 +37,7 @@ class HealthPulseNotificationService
             userId: (int) $entry->user_id,
             petId: (int) $entry->pet_id,
             type: $type,
-            title: 'Daily Health Pulse',
+            title: 'Daily health care',
             body: $body,
             payload: [
                 'pet_id' => (string) $entry->pet_id,
