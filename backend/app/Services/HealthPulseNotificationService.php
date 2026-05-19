@@ -59,9 +59,9 @@ class HealthPulseNotificationService
         $summary = trim((string) $entry->ai_short_summary);
         $action = trim((string) $entry->ai_recommended_action);
         $loggedDays = $this->loggedDaysForPet((int) $entry->pet_id);
-        $prefix = "Thanks for checking in on {$petName}";
+        $prefix = "Well done - {$petName}'s care update is done";
         if ($loggedDays > 0) {
-            $prefix .= " - {$loggedDays} days in";
+            $prefix .= " for today. {$loggedDays} days in";
         }
         $prefix .= '.';
 

@@ -89,13 +89,13 @@ class HealthPulseAiService
 
         return [
             'short_summary' => $flag === 'None'
-                ? "Nice work - {$petName}'s check-in is done for today, and that's {$loggedDays} days in. From what you shared, things look steady."
-                : "Thanks for checking in on {$petName} today - {$loggedDays} days in. A few answers stand out, so it is worth keeping an eye on them.",
+                ? "Well done - you completed {$petName}'s care update for today. That's {$loggedDays} days in, and what you shared looks steady."
+                : "Well done - you completed {$petName}'s care update for today. That's {$loggedDays} days in. A few answers need a little extra attention.",
             'pattern_observation' => "This is based only on {$petName}'s food, energy, water, symptoms, and digestion answers from today.",
             'flag_level' => $flag,
             'recommended_action' => $flag === 'Alert'
                 ? "Keep a closer eye on {$petName}; if this continues or feels unusual, a vet check is a good idea."
-                : ($flag === 'Watch' ? "Check on {$petName} again later today or tomorrow and note any change." : "Keep the routine going - these small daily check-ins make {$petName}'s care easier to follow."),
+                : ($flag === 'Watch' ? "You are building a useful habit - check on {$petName} again later today or tomorrow and note any change." : "Keep the streak going - these small daily care updates make {$petName}'s routine easier to follow."),
         ];
     }
 
@@ -105,7 +105,7 @@ class HealthPulseAiService
             ."Analyze one daily check-in and return JSON only with keys: short_summary, pattern_observation, flag_level, recommended_action.\n"
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n\n"
             ."Use only these five fields. Do not use pet profile, date, previous entries, FCM token, or any other metadata.\n"
-            ."Use the pet name {$petName} in short_summary. Sound warm, simple, and informal. Thank the pet parent for checking in today and mention {$loggedDays} days in. Do not use the words pulse, logging, logged, or log.\n"
+            ."Use the pet name {$petName} in short_summary. Sound warm, simple, informal, and motivating. Congratulate the pet parent for completing today's care update and mention {$loggedDays} days in. Make them feel good about entering the data. Do not use the words pulse, logging, logged, or log.\n"
             .'Pulse fields: '.json_encode([
                 'food' => $entry->food,
                 'energy' => $entry->energy,
