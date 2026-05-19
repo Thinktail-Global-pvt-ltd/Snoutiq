@@ -86,11 +86,15 @@ class HealthPulseAiService
         }
 
         $flag = $concerning >= 3 ? 'Alert' : ($concerning >= 1 ? 'Watch' : 'None');
+        $specificNotes = $this->specificNotes($entry);
+        $watchDetail = $specificNotes !== ''
+            ? " {$specificNotes}"
+            : ' A few answers need a little extra attention.';
 
         return [
             'short_summary' => $flag === 'None'
                 ? "Well done - you completed {$petName}'s care update for today. That's {$loggedDays} days in, and what you shared looks steady."
-                : "Well done - you completed {$petName}'s care update for today. That's {$loggedDays} days in. A few answers need a little extra attention.",
+                : "Well done - you completed {$petName}'s care update for today. That's {$loggedDays} days in.{$watchDetail}",
             'pattern_observation' => "This is based only on {$petName}'s food, energy, water, symptoms, and digestion answers from today.",
             'flag_level' => $flag,
             'recommended_action' => $flag === 'Alert'
@@ -106,6 +110,7 @@ class HealthPulseAiService
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n\n"
             ."Use only these five fields. Do not use pet profile, date, previous entries, FCM token, or any other metadata.\n"
             ."Use the pet name {$petName} in short_summary. Sound warm, simple, informal, and motivating. Congratulate the pet parent for completing today's care update and mention {$loggedDays} days in. Make them feel good about entering the data. Do not use the words pulse, logging, logged, or log.\n"
+            ."If symptoms is not empty, mention the symptom text naturally in short_summary. If digestion_issue is true, mention digestion/poop was marked as a concern. If both exist, mention both briefly.\n"
             .'Pulse fields: '.json_encode([
                 'food' => $entry->food,
                 'energy' => $entry->energy,
@@ -113,6 +118,26 @@ class HealthPulseAiService
                 'symptoms' => $entry->symptoms,
                 'digestion_issue' => $entry->digestion_issue,
             ]);
+    }
+
+    private function specificNotes(HealthPulseEntry $entry): string
+    {
+        $notes = [];
+        $symptoms = trim((string) $entry->symptoms);
+
+        if ($symptoms !== '') {
+            $notes[] = "You mentioned {$symptoms}, so keep an eye on that";
+        }
+
+        if ($entry->digestion_issue) {
+            $notes[] = 'digestion/poop was marked as a concern';
+        }
+
+        if (empty($notes)) {
+            return '';
+        }
+
+        return ucfirst(implode(', and ', $notes)).'.';
     }
 
     private function callGemini(string $prompt): ?array
