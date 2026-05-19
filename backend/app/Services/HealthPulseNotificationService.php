@@ -58,6 +58,12 @@ class HealthPulseNotificationService
     {
         $summary = trim((string) $entry->ai_short_summary);
         $action = trim((string) $entry->ai_recommended_action);
+        $loggedDays = $this->loggedDaysForPet((int) $entry->pet_id);
+        $prefix = "Thanks for logging {$petName}'s health pulse";
+        if ($loggedDays > 0) {
+            $prefix .= " - {$loggedDays} days logged";
+        }
+        $prefix .= '.';
 
         $body = $summary;
         if ($action !== '') {
@@ -70,7 +76,23 @@ class HealthPulseNotificationService
                 : "{$petName}'s pulse has a change worth monitoring.";
         }
 
+        if (!str_contains(strtolower($body), 'thank')) {
+            $body = "{$prefix} {$body}";
+        }
+
         return mb_substr($body, 0, 240);
+    }
+
+    private function loggedDaysForPet(int $petId): int
+    {
+        if (!Schema::hasTable('health_pulse_entries')) {
+            return 0;
+        }
+
+        return HealthPulseEntry::query()
+            ->where('pet_id', $petId)
+            ->distinct()
+            ->count('entry_date');
     }
 
     public function sendReminder(Pet $pet, string $trigger, string $title, string $body, bool $allowRepeat = false): bool
