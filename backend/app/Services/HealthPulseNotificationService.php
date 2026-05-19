@@ -31,9 +31,7 @@ class HealthPulseNotificationService
 
         $petName = $pet->name ?: 'Your pet';
         $type = $entry->ai_flag_level === 'Alert' ? 'health_pulse_ai_alert' : 'health_pulse_ai_watch';
-        $body = $entry->ai_flag_level === 'Alert'
-            ? "{$petName}'s pulse has signs worth a vet check if they continue."
-            : "{$petName}'s pulse has a change worth monitoring.";
+        $body = $this->aiNotificationBody($petName, $entry);
 
         return $this->sendPush(
             userId: (int) $entry->user_id,
@@ -46,11 +44,33 @@ class HealthPulseNotificationService
                 'entry_id' => (string) $entry->id,
                 'entry_date' => $entry->entry_date?->toDateString(),
                 'flag_level' => $entry->ai_flag_level,
+                'ai_summary' => $entry->ai_short_summary,
+                'ai_pattern_observation' => $entry->ai_pattern_observation,
+                'ai_recommended_action' => $entry->ai_recommended_action,
                 'screen' => 'health_pulse',
             ],
             explicitToken: $explicitToken,
             userName: $userName
         );
+    }
+
+    private function aiNotificationBody(string $petName, HealthPulseEntry $entry): string
+    {
+        $summary = trim((string) $entry->ai_short_summary);
+        $action = trim((string) $entry->ai_recommended_action);
+
+        $body = $summary;
+        if ($action !== '') {
+            $body = trim($body === '' ? $action : "{$body} {$action}");
+        }
+
+        if ($body === '') {
+            $body = $entry->ai_flag_level === 'Alert'
+                ? "{$petName}'s pulse has signs worth a vet check if they continue."
+                : "{$petName}'s pulse has a change worth monitoring.";
+        }
+
+        return mb_substr($body, 0, 240);
     }
 
     public function sendReminder(Pet $pet, string $trigger, string $title, string $body, bool $allowRepeat = false): bool
