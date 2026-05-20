@@ -4883,6 +4883,31 @@ class AdminPanelController extends Controller
             ->with('status', 'Full onboarding entry deleted.');
     }
 
+    public function updateFullOnboardingClinicMedia(Request $request, VetRegisterationTemp $clinic): RedirectResponse
+    {
+        $request->validate([
+            'clinic_image' => ['nullable', 'file'],
+            'clinic_video' => ['nullable', 'file'],
+        ]);
+
+        $updates = [];
+        foreach (['clinic_image', 'clinic_video'] as $field) {
+            if (! Schema::hasColumn('vet_registerations_temp', $field) || ! $request->hasFile($field)) {
+                continue;
+            }
+
+            $updates[$field] = $request->file($field)->get();
+        }
+
+        if (empty($updates)) {
+            return $this->redirectFullOnboardingWithStatus($request, 'Choose a clinic image or video to upload.');
+        }
+
+        $clinic->forceFill($updates)->save();
+
+        return $this->redirectFullOnboardingWithStatus($request, 'Clinic media uploaded.');
+    }
+
     public function updateFullOnboardingDoctorClinicHours(Request $request, Doctor $doctor): RedirectResponse
     {
         $validated = $request->validate([

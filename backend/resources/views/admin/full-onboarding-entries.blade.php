@@ -187,6 +187,14 @@
                                                     @else
                                                         <div class="small text-muted mb-2">No clinic image blob.</div>
                                                     @endif
+                                                    <form method="POST" action="{{ route('admin.full-onboarding.media.update', ['clinic' => $clinic->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" enctype="multipart/form-data" class="mb-3">
+                                                        @csrf
+                                                        <label class="form-label small text-muted mb-1">Upload clinic image</label>
+                                                        <div class="d-flex gap-2">
+                                                            <input type="file" name="clinic_image" accept="image/*" class="form-control form-control-sm">
+                                                            <button type="submit" class="btn btn-sm btn-outline-primary">Upload</button>
+                                                        </div>
+                                                    </form>
 
                                                     @if(!empty($clinic->clinic_video))
                                                         <video class="w-100 rounded border" style="max-height: 180px;" controls preload="metadata">
@@ -195,6 +203,14 @@
                                                     @else
                                                         <div class="small text-muted">No clinic video blob.</div>
                                                     @endif
+                                                    <form method="POST" action="{{ route('admin.full-onboarding.media.update', ['clinic' => $clinic->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" enctype="multipart/form-data" class="mt-2">
+                                                        @csrf
+                                                        <label class="form-label small text-muted mb-1">Upload clinic video</label>
+                                                        <div class="d-flex gap-2">
+                                                            <input type="file" name="clinic_video" accept="video/*" class="form-control form-control-sm">
+                                                            <button type="submit" class="btn btn-sm btn-outline-primary">Upload</button>
+                                                        </div>
+                                                    </form>
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
