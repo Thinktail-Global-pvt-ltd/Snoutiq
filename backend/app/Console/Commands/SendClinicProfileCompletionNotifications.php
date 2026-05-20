@@ -18,6 +18,7 @@ class SendClinicProfileCompletionNotifications extends Command
         {--clinic_id= : Send only for one clinic}
         {--doctor_id= : Send only for one doctor}
         {--limit=500 : Maximum doctor tokens to process}
+        {--force : Send even when the clinic profile is already 100% complete}
         {--dry : Calculate candidates without sending FCM}';
 
     protected $description = 'Send clinic profile completion FCM nudges to doctors with saved FCM tokens.';
@@ -36,6 +37,7 @@ class SendClinicProfileCompletionNotifications extends Command
         $clinicId = $this->option('clinic_id') ? (int) $this->option('clinic_id') : null;
         $doctorId = $this->option('doctor_id') ? (int) $this->option('doctor_id') : null;
         $limit = max(1, min((int) $this->option('limit'), 5000));
+        $force = (bool) $this->option('force');
         $dryRun = (bool) $this->option('dry');
 
         $query = Doctor::query()
@@ -68,8 +70,11 @@ class SendClinicProfileCompletionNotifications extends Command
             'clinic_id' => $clinicId,
             'doctor_id' => $doctorId,
             'limit' => $limit,
+            'force' => $force,
             'dry' => $dryRun,
         ]);
+
+        $this->info("Clinic profile completion candidates: {$doctors->count()}");
 
         foreach ($doctors as $doctor) {
             $currentClinicId = (int) $doctor->vet_registeration_id;
@@ -87,7 +92,10 @@ class SendClinicProfileCompletionNotifications extends Command
                 $request = Request::create(
                     "/api/vet-registerations/{$currentClinicId}/profile-completion-notification",
                     'POST',
-                    ['doctor_id' => $currentDoctorId]
+                    [
+                        'doctor_id' => $currentDoctorId,
+                        'force' => $force,
+                    ]
                 );
 
                 $response = $controller->sendProfileCompletionNotification($request, (string) $currentClinicId);
@@ -95,6 +103,7 @@ class SendClinicProfileCompletionNotifications extends Command
 
                 if ($response->getStatusCode() >= 400 || ! ($payload['success'] ?? false)) {
                     $failed++;
+                    $this->line("failed: clinic {$currentClinicId}, doctor {$currentDoctorId}, status {$response->getStatusCode()}, ".($payload['message'] ?? 'unknown error'));
                     Log::warning('clinic_profile_completion.scheduler.failed_candidate', [
                         'clinic_id' => $currentClinicId,
                         'doctor_id' => $currentDoctorId,
@@ -105,8 +114,12 @@ class SendClinicProfileCompletionNotifications extends Command
                 }
 
                 if (($payload['sent'] ?? false) === true) {
+                    $fcmSuccess = (int) data_get($payload, 'data.fcm_success', 0);
+                    $fcmFailure = (int) data_get($payload, 'data.fcm_failure', 0);
+                    $this->line("sent: clinic {$currentClinicId}, doctor {$currentDoctorId}, fcm_success {$fcmSuccess}, fcm_failure {$fcmFailure}");
                     $sent++;
                 } else {
+                    $this->line("skipped: clinic {$currentClinicId}, doctor {$currentDoctorId}, ".($payload['message'] ?? 'not sent'));
                     $skipped++;
                 }
             } catch (Throwable $e) {

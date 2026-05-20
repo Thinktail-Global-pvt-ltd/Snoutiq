@@ -71,6 +71,7 @@ class ClinicFullOnboardingController extends Controller
     {
         $validated = $request->validate([
             'doctor_id' => ['required', 'integer'],
+            'force' => ['nullable', 'boolean'],
         ]);
 
         $clinic = VetRegisterationTemp::query()->find((int) $clinicId);
@@ -127,7 +128,8 @@ class ClinicFullOnboardingController extends Controller
             ->values()
             ->all();
 
-        if ($completionPercent >= 100) {
+        $force = filter_var($validated['force'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($completionPercent >= 100 && ! $force) {
             return response()->json([
                 'success' => true,
                 'sent' => false,
@@ -158,7 +160,7 @@ class ClinicFullOnboardingController extends Controller
         ];
 
         try {
-            $this->fcm->sendMulticast($tokens, $title, $body, $data);
+            $fcmResult = $this->fcm->sendMulticast($tokens, $title, $body, $data);
         } catch (Throwable $e) {
             Log::error('clinic.profile_completion_push.failed', [
                 'clinic_id' => (int) $clinic->id,
@@ -172,6 +174,44 @@ class ClinicFullOnboardingController extends Controller
             ], 500);
         }
 
+        $fcmSuccess = (int) ($fcmResult['success'] ?? 0);
+        $fcmFailure = (int) ($fcmResult['failure'] ?? count($tokens));
+        $fcmErrors = collect($fcmResult['results'] ?? [])
+            ->filter(fn ($result) => ! (bool) ($result['ok'] ?? false))
+            ->map(fn ($result) => [
+                'code' => $result['code'] ?? null,
+                'error' => $result['error'] ?? null,
+            ])
+            ->values()
+            ->all();
+
+        if ($fcmSuccess <= 0) {
+            Log::warning('clinic.profile_completion_push.no_successful_tokens', [
+                'clinic_id' => (int) $clinic->id,
+                'doctor_id' => (int) $doctor->id,
+                'token_count' => count($tokens),
+                'fcm_success' => $fcmSuccess,
+                'fcm_failure' => $fcmFailure,
+                'fcm_errors' => $fcmErrors,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'sent' => false,
+                'message' => 'FCM notification failed for all doctor tokens.',
+                'data' => [
+                    'clinic_id' => (int) $clinic->id,
+                    'doctor_id' => (int) $doctor->id,
+                    'profile_completion_percentage' => $completionPercent,
+                    'missing_fields' => $missingFields,
+                    'token_count' => count($tokens),
+                    'fcm_success' => $fcmSuccess,
+                    'fcm_failure' => $fcmFailure,
+                    'fcm_errors' => $fcmErrors,
+                ],
+            ], 502);
+        }
+
         return response()->json([
             'success' => true,
             'sent' => true,
@@ -182,6 +222,9 @@ class ClinicFullOnboardingController extends Controller
                 'profile_completion_percentage' => $completionPercent,
                 'missing_fields' => $missingFields,
                 'token_count' => count($tokens),
+                'fcm_success' => $fcmSuccess,
+                'fcm_failure' => $fcmFailure,
+                'fcm_errors' => $fcmErrors,
             ],
         ]);
     }
