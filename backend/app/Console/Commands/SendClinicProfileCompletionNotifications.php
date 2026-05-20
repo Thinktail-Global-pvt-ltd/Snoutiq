@@ -24,10 +24,10 @@ class SendClinicProfileCompletionNotifications extends Command
 
     public function handle(ClinicFullOnboardingController $controller): int
     {
-        if (! Schema::hasTable('doctor_fcm_tokens')) {
-            $this->warn('doctor_fcm_tokens table is not available.');
+        if (! Schema::hasTable('device_tokens')) {
+            $this->warn('device_tokens table is not available.');
             Log::warning('clinic_profile_completion.scheduler.skip', [
-                'reason' => 'doctor_fcm_tokens_table_missing',
+                'reason' => 'device_tokens_table_missing',
             ]);
 
             return self::SUCCESS;
@@ -40,10 +40,11 @@ class SendClinicProfileCompletionNotifications extends Command
 
         $query = Doctor::query()
             ->select(['doctors.id', 'doctors.vet_registeration_id'])
-            ->join('doctor_fcm_tokens', 'doctor_fcm_tokens.doctor_id', '=', 'doctors.id')
+            ->join('device_tokens', 'device_tokens.user_id', '=', 'doctors.id')
             ->whereNotNull('doctors.vet_registeration_id')
-            ->whereNotNull('doctor_fcm_tokens.token')
-            ->where('doctor_fcm_tokens.token', '!=', '');
+            ->whereNotNull('device_tokens.token')
+            ->where('device_tokens.token', '!=', '')
+            ->distinct();
 
         if ($clinicId) {
             $query->where('doctors.vet_registeration_id', $clinicId);

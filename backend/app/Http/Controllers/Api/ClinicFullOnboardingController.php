@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClinicSpecializedPackage;
+use App\Models\DeviceToken;
 use App\Models\Doctor;
-use App\Models\DoctorFcmToken;
 use App\Models\GroomerService;
 use App\Models\GroomerServiceCategory;
 use App\Models\VetAtHomeService;
@@ -93,19 +93,25 @@ class ClinicFullOnboardingController extends Controller
             ], 404);
         }
 
-        if (! Schema::hasTable('doctor_fcm_tokens')) {
+        if (! Schema::hasTable('device_tokens')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Doctor FCM token storage is not available.',
+                'message' => 'Device token storage is not available.',
             ], 503);
         }
 
-        $token = DoctorFcmToken::query()
-            ->where('doctor_id', (int) $doctor->id)
-            ->value('token');
+        $tokens = DeviceToken::query()
+            ->where('user_id', (int) $doctor->id)
+            ->whereNotNull('token')
+            ->pluck('token')
+            ->filter()
+            ->map(fn ($token) => trim(trim((string) $token), "\"'"))
+            ->filter(fn (string $token) => $token !== '')
+            ->unique()
+            ->values()
+            ->all();
 
-        $token = trim(trim((string) $token), "\"'");
-        if ($token === '') {
+        if (empty($tokens)) {
             return response()->json([
                 'success' => false,
                 'message' => 'No FCM token found for this doctor.',
@@ -152,7 +158,7 @@ class ClinicFullOnboardingController extends Controller
         ];
 
         try {
-            $this->fcm->sendToToken($token, $title, $body, $data);
+            $this->fcm->sendMulticast($tokens, $title, $body, $data);
         } catch (Throwable $e) {
             Log::error('clinic.profile_completion_push.failed', [
                 'clinic_id' => (int) $clinic->id,
@@ -175,6 +181,7 @@ class ClinicFullOnboardingController extends Controller
                 'doctor_id' => (int) $doctor->id,
                 'profile_completion_percentage' => $completionPercent,
                 'missing_fields' => $missingFields,
+                'token_count' => count($tokens),
             ],
         ]);
     }
