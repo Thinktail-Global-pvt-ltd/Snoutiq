@@ -4954,6 +4954,71 @@ class AdminPanelController extends Controller
         return $this->redirectFullOnboardingWithStatus($request, 'Video hours cleared.');
     }
 
+    public function updateFullOnboardingDoctorPackages(Request $request, Doctor $doctor): RedirectResponse
+    {
+        $validated = $request->validate([
+            'dog_vaccination_male_package_price' => ['nullable', 'numeric', 'min:0'],
+            'dog_vaccination_female_package_price' => ['nullable', 'numeric', 'min:0'],
+            'cat_vaccination_male_package_price' => ['nullable', 'numeric', 'min:0'],
+            'cat_vaccination_female_package_price' => ['nullable', 'numeric', 'min:0'],
+            'dog_neutering_male_price' => ['nullable', 'numeric', 'min:0'],
+            'dog_neutering_female_price' => ['nullable', 'numeric', 'min:0'],
+            'cat_neutering_male_price' => ['nullable', 'numeric', 'min:0'],
+            'cat_neutering_female_price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        if (! Schema::hasTable('clinic_specialized_packages')) {
+            return $this->redirectFullOnboardingWithStatus($request, 'Packages table is not available.');
+        }
+
+        $clinicId = (int) $doctor->vet_registeration_id;
+        if ($clinicId <= 0) {
+            return $this->redirectFullOnboardingWithStatus($request, 'Doctor is not linked to a clinic.');
+        }
+
+        $data = [
+            'clinic_id' => $clinicId,
+            'doctor_id' => (int) $doctor->id,
+            'dog_vaccination_package_price' => $validated['dog_vaccination_male_package_price'] ?? $validated['dog_vaccination_female_package_price'] ?? null,
+            'cat_vaccination_package_price' => $validated['cat_vaccination_male_package_price'] ?? $validated['cat_vaccination_female_package_price'] ?? null,
+            'dog_neutering_price' => $validated['dog_neutering_male_price'] ?? $validated['dog_neutering_female_price'] ?? null,
+            'cat_neutering_price' => $validated['cat_neutering_male_price'] ?? $validated['cat_neutering_female_price'] ?? null,
+            'updated_at' => now(),
+        ];
+
+        foreach ($validated as $field => $value) {
+            if (Schema::hasColumn('clinic_specialized_packages', $field)) {
+                $data[$field] = $value;
+            }
+        }
+
+        if (Schema::hasColumn('clinic_specialized_packages', 'created_at')) {
+            $data['created_at'] = now();
+        }
+
+        DB::table('clinic_specialized_packages')->updateOrInsert(
+            [
+                'clinic_id' => $clinicId,
+                'doctor_id' => (int) $doctor->id,
+            ],
+            $data
+        );
+
+        return $this->redirectFullOnboardingWithStatus($request, 'Packages updated.');
+    }
+
+    public function clearFullOnboardingDoctorPackages(Request $request, Doctor $doctor): RedirectResponse
+    {
+        if (Schema::hasTable('clinic_specialized_packages')) {
+            DB::table('clinic_specialized_packages')
+                ->where('doctor_id', (int) $doctor->id)
+                ->where('clinic_id', (int) $doctor->vet_registeration_id)
+                ->delete();
+        }
+
+        return $this->redirectFullOnboardingWithStatus($request, 'Packages cleared.');
+    }
+
     private function normalizeFullOnboardingHoursRows(array $rows, bool $includeServiceType): array
     {
         return collect($rows)

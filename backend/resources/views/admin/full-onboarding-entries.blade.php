@@ -243,6 +243,7 @@
                                                             $clinicHours = $clinicAvailabilityByDoctor->get($doctor->id, collect());
                                                             $videoHours = $videoAvailabilityByDoctor->get($doctor->id, collect());
                                                             $doctorPackages = $packages->where('doctor_id', $doctor->id);
+                                                            $packageEdit = $doctorPackages->first() ?? (object) [];
                                                             $clinicHourEditRows = $clinicHours->isNotEmpty()
                                                                 ? $clinicHours->values()
                                                                 : collect(range(0, 6))->map(fn ($day) => (object) [
@@ -362,7 +363,7 @@
                                                                     </form>
                                                                 </div>
                                                             </td>
-                                                            <td style="min-width: 220px;">
+                                                            <td style="min-width: 320px;">
                                                                 @forelse($doctorPackages as $package)
                                                                     <div class="small">Dog vaccine male: {{ $fmtMoney($package->dog_vaccination_male_package_price ?? $package->dog_vaccination_package_price) }}</div>
                                                                     <div class="small">Dog vaccine female: {{ $fmtMoney($package->dog_vaccination_female_package_price ?? $package->dog_vaccination_package_price) }}</div>
@@ -375,6 +376,45 @@
                                                                 @empty
                                                                     <span class="text-muted small">—</span>
                                                                 @endforelse
+                                                                <div class="d-flex gap-2 mt-2">
+                                                                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#packagesEdit{{ $doctor->id }}">
+                                                                        Edit
+                                                                    </button>
+                                                                    <form method="POST" action="{{ route('admin.full-onboarding.doctors.packages.clear', ['doctor' => $doctor->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" onsubmit="return confirm('Clear all packages for this doctor?');">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button type="submit" class="btn btn-sm btn-outline-danger">Clear</button>
+                                                                    </form>
+                                                                </div>
+                                                                <div class="collapse mt-2" id="packagesEdit{{ $doctor->id }}">
+                                                                    <form method="POST" action="{{ route('admin.full-onboarding.doctors.packages.update', ['doctor' => $doctor->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" class="border rounded p-2 bg-white">
+                                                                        @csrf
+                                                                        @method('PUT')
+                                                                        @php
+                                                                            $packageFields = [
+                                                                                'dog_vaccination_male_package_price' => ['Dog vaccine', 'Male', $packageEdit->dog_vaccination_male_package_price ?? $packageEdit->dog_vaccination_package_price ?? null],
+                                                                                'dog_vaccination_female_package_price' => ['Dog vaccine', 'Female', $packageEdit->dog_vaccination_female_package_price ?? $packageEdit->dog_vaccination_package_price ?? null],
+                                                                                'cat_vaccination_male_package_price' => ['Cat vaccine', 'Male', $packageEdit->cat_vaccination_male_package_price ?? $packageEdit->cat_vaccination_package_price ?? null],
+                                                                                'cat_vaccination_female_package_price' => ['Cat vaccine', 'Female', $packageEdit->cat_vaccination_female_package_price ?? $packageEdit->cat_vaccination_package_price ?? null],
+                                                                                'dog_neutering_male_price' => ['Dog neuter', 'Male', $packageEdit->dog_neutering_male_price ?? $packageEdit->dog_neutering_price ?? null],
+                                                                                'dog_neutering_female_price' => ['Dog neuter', 'Female', $packageEdit->dog_neutering_female_price ?? $packageEdit->dog_neutering_price ?? null],
+                                                                                'cat_neutering_male_price' => ['Cat neuter', 'Male', $packageEdit->cat_neutering_male_price ?? $packageEdit->cat_neutering_price ?? null],
+                                                                                'cat_neutering_female_price' => ['Cat neuter', 'Female', $packageEdit->cat_neutering_female_price ?? $packageEdit->cat_neutering_price ?? null],
+                                                                            ];
+                                                                        @endphp
+                                                                        @foreach($packageFields as $field => [$packageLabel, $genderLabel, $value])
+                                                                            <div class="row g-1 align-items-center mb-1">
+                                                                                <div class="col-5 small">{{ $packageLabel }}</div>
+                                                                                <div class="col-3 small text-muted">{{ $genderLabel }}</div>
+                                                                                <div class="col-4">
+                                                                                    <input type="number" step="0.01" min="0" name="{{ $field }}" value="{{ $value !== null ? (float) $value : '' }}" class="form-control form-control-sm">
+                                                                                </div>
+                                                                            </div>
+                                                                        @endforeach
+                                                                        <div class="small text-muted mb-2">Saving updates this doctor's package prices.</div>
+                                                                        <button type="submit" class="btn btn-sm btn-primary">Save packages</button>
+                                                                    </form>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     @endforeach

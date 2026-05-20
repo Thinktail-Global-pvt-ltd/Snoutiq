@@ -312,6 +312,8 @@ Route::prefix('admin')->group(function () {
         Route::delete('/full-onboarding/doctors/{doctor}/clinic-hours', [AdminPanelController::class, 'clearFullOnboardingDoctorClinicHours'])->name('admin.full-onboarding.doctors.clinic-hours.clear');
         Route::put('/full-onboarding/doctors/{doctor}/video-hours', [AdminPanelController::class, 'updateFullOnboardingDoctorVideoHours'])->name('admin.full-onboarding.doctors.video-hours.update');
         Route::delete('/full-onboarding/doctors/{doctor}/video-hours', [AdminPanelController::class, 'clearFullOnboardingDoctorVideoHours'])->name('admin.full-onboarding.doctors.video-hours.clear');
+        Route::put('/full-onboarding/doctors/{doctor}/packages', [AdminPanelController::class, 'updateFullOnboardingDoctorPackages'])->name('admin.full-onboarding.doctors.packages.update');
+        Route::delete('/full-onboarding/doctors/{doctor}/packages', [AdminPanelController::class, 'clearFullOnboardingDoctorPackages'])->name('admin.full-onboarding.doctors.packages.clear');
         Route::get('/vet-registration-report', VetRegistrationReportPageController::class)->name('admin.vet-registration-report');
         Route::get('/clinic-report', [ClinicDataReportController::class, 'index'])->name('admin.clinic-report');
         Route::get('/clinic-report/export', [ClinicDataReportController::class, 'export'])->name('admin.clinic-report.export');
