@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\VetAtHomeServiceController;
 use App\Http\Controllers\Api\VetRegistrationReportController;
 use App\Http\Controllers\Api\DoctorCsvExportController;
 use App\Http\Controllers\Api\DoctorChatController;
+use App\Http\Controllers\Api\DoctorFcmTokenController;
 use App\Http\Controllers\Api\VaccinationBookingController;
 use App\Models\User;
 use App\Models\DeviceToken;
@@ -2664,8 +2665,10 @@ Route::post('/vet-registerations/store', [VetRegisterationTempController::class,
 Route::post('/vet-registerations/store-full', [ClinicFullOnboardingController::class, 'store']);
 Route::get('/vet-registerations/full', [ClinicFullOnboardingController::class, 'index']);
 Route::get('/vet-registerations/{clinicId}/full', [ClinicFullOnboardingController::class, 'show'])->whereNumber('clinicId');
+Route::post('/vet-registerations/{clinicId}/profile-completion-notification', [ClinicFullOnboardingController::class, 'sendProfileCompletionNotification'])->whereNumber('clinicId');
 Route::post('/vet-registerations/{clinic}/media', [ClinicMediaUploadController::class, 'store'])->whereNumber('clinic');
 Route::get('/vet-registerations/{vet}', [VetRegisterationTempController::class, 'show']);
+Route::post('/doctor-fcm-token', [DoctorFcmTokenController::class, 'store']);
 
 Route::get('/ai-stats', function (Request $Request) {
             

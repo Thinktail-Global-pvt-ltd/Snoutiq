@@ -5,21 +5,26 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClinicSpecializedPackage;
 use App\Models\Doctor;
+use App\Models\DoctorFcmToken;
 use App\Models\GroomerService;
 use App\Models\GroomerServiceCategory;
 use App\Models\VetAtHomeService;
 use App\Models\VetRegisterationTemp;
 use App\Services\ClinicProfileCompletionService;
+use App\Services\Push\FcmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ClinicFullOnboardingController extends Controller
 {
     public function __construct(
         private readonly ClinicProfileCompletionService $clinicProfileCompletionService,
+        private readonly FcmService $fcm,
     ) {
     }
 
@@ -59,6 +64,118 @@ class ClinicFullOnboardingController extends Controller
         return response()->json([
             'success' => true,
             'data' => $this->fullPayloadForClinic($clinic),
+        ]);
+    }
+
+    public function sendProfileCompletionNotification(Request $request, string $clinicId)
+    {
+        $validated = $request->validate([
+            'doctor_id' => ['required', 'integer'],
+        ]);
+
+        $clinic = VetRegisterationTemp::query()->find((int) $clinicId);
+        if (! $clinic) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Clinic not found.',
+            ], 404);
+        }
+
+        $doctor = Doctor::query()
+            ->whereKey((int) $validated['doctor_id'])
+            ->where('vet_registeration_id', (int) $clinic->id)
+            ->first();
+
+        if (! $doctor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found for this clinic.',
+            ], 404);
+        }
+
+        if (! Schema::hasTable('doctor_fcm_tokens')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor FCM token storage is not available.',
+            ], 503);
+        }
+
+        $token = DoctorFcmToken::query()
+            ->where('doctor_id', (int) $doctor->id)
+            ->value('token');
+
+        $token = trim(trim((string) $token), "\"'");
+        if ($token === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'No FCM token found for this doctor.',
+            ], 404);
+        }
+
+        $payload = $this->fullPayloadForClinic($clinic);
+        $completion = $payload['profile_completion'] ?? [];
+        $completionPercent = (int) ($completion['percentage'] ?? 0);
+        $missingFields = collect($completion['missing_fields'] ?? [])
+            ->pluck('label')
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($completionPercent >= 100) {
+            return response()->json([
+                'success' => true,
+                'sent' => false,
+                'message' => 'Clinic profile is already complete.',
+                'data' => [
+                    'clinic_id' => (int) $clinic->id,
+                    'doctor_id' => (int) $doctor->id,
+                    'profile_completion_percentage' => $completionPercent,
+                    'missing_fields' => $missingFields,
+                ],
+            ]);
+        }
+
+        $title = 'Complete your Snoutiq profile';
+        $body = sprintf(
+            '%s is %d%% complete. Add missing details to get more profile views and bookings.',
+            $clinic->name ?: 'Your clinic profile',
+            $completionPercent
+        );
+
+        $data = [
+            'type' => 'clinic_profile_completion',
+            'clinic_id' => (string) $clinic->id,
+            'doctor_id' => (string) $doctor->id,
+            'completion_percent' => (string) $completionPercent,
+            'missing_fields' => $missingFields,
+            'deepLink' => '/vet-dashboard',
+        ];
+
+        try {
+            $this->fcm->sendToToken($token, $title, $body, $data);
+        } catch (Throwable $e) {
+            Log::error('clinic.profile_completion_push.failed', [
+                'clinic_id' => (int) $clinic->id,
+                'doctor_id' => (int) $doctor->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send profile completion notification.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'sent' => true,
+            'message' => 'Profile completion notification sent to doctor.',
+            'data' => [
+                'clinic_id' => (int) $clinic->id,
+                'doctor_id' => (int) $doctor->id,
+                'profile_completion_percentage' => $completionPercent,
+                'missing_fields' => $missingFields,
+            ],
         ]);
     }
 
