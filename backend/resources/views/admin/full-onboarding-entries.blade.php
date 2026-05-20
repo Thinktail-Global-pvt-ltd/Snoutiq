@@ -243,13 +243,28 @@
                                                             $clinicHours = $clinicAvailabilityByDoctor->get($doctor->id, collect());
                                                             $videoHours = $videoAvailabilityByDoctor->get($doctor->id, collect());
                                                             $doctorPackages = $packages->where('doctor_id', $doctor->id);
+                                                            $clinicHourEditRows = $clinicHours->isNotEmpty()
+                                                                ? $clinicHours->values()
+                                                                : collect(range(0, 6))->map(fn ($day) => (object) [
+                                                                    'service_type' => 'in_clinic',
+                                                                    'day_of_week' => $day,
+                                                                    'start_time' => '09:00',
+                                                                    'end_time' => '21:00',
+                                                                ]);
+                                                            $videoHourEditRows = $videoHours->isNotEmpty()
+                                                                ? $videoHours->values()
+                                                                : collect(range(0, 6))->map(fn ($day) => (object) [
+                                                                    'day_of_week' => $day,
+                                                                    'start_time' => '09:00',
+                                                                    'end_time' => '21:00',
+                                                                ]);
                                                         @endphp
                                                         <tr>
                                                             <td style="min-width: 180px;">
                                                                 <div class="fw-semibold">{{ $doctor->doctor_name ?? 'Doctor #'.$doctor->id }}</div>
                                                                 <div class="small text-muted">{{ $doctor->doctor_mobile ?? '—' }}</div>
                                                             </td>
-                                                            <td>
+                                                            <td style="min-width: 330px;">
                                                                 @forelse($clinicHours as $row)
                                                                     <div class="small">
                                                                         <span class="badge text-bg-light">{{ $row->service_type }}</span>
@@ -259,8 +274,50 @@
                                                                 @empty
                                                                     <span class="text-muted small">—</span>
                                                                 @endforelse
+                                                                <div class="d-flex gap-2 mt-2">
+                                                                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#clinicHoursEdit{{ $doctor->id }}">
+                                                                        Edit
+                                                                    </button>
+                                                                    <form method="POST" action="{{ route('admin.full-onboarding.doctors.clinic-hours.clear', ['doctor' => $doctor->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" onsubmit="return confirm('Clear all clinic hours for this doctor?');">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button type="submit" class="btn btn-sm btn-outline-danger">Clear</button>
+                                                                    </form>
+                                                                </div>
+                                                                <div class="collapse mt-2" id="clinicHoursEdit{{ $doctor->id }}">
+                                                                    <form method="POST" action="{{ route('admin.full-onboarding.doctors.clinic-hours.update', ['doctor' => $doctor->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" class="border rounded p-2 bg-white">
+                                                                        @csrf
+                                                                        @method('PUT')
+                                                                        @foreach($clinicHourEditRows as $index => $row)
+                                                                            <div class="row g-1 align-items-center mb-1">
+                                                                                <div class="col-4">
+                                                                                    <select name="rows[{{ $index }}][service_type]" class="form-select form-select-sm">
+                                                                                        @foreach(['in_clinic' => 'In clinic', 'home_visit' => 'Home visit', 'video' => 'Video'] as $value => $label)
+                                                                                            <option value="{{ $value }}" @selected(($row->service_type ?? 'in_clinic') === $value)>{{ $label }}</option>
+                                                                                        @endforeach
+                                                                                    </select>
+                                                                                </div>
+                                                                                <div class="col-3">
+                                                                                    <select name="rows[{{ $index }}][day_of_week]" class="form-select form-select-sm">
+                                                                                        @foreach($dayNames as $dayIndex => $dayName)
+                                                                                            <option value="{{ $dayIndex }}" @selected((int) ($row->day_of_week ?? 0) === $dayIndex)>{{ $dayName }}</option>
+                                                                                        @endforeach
+                                                                                    </select>
+                                                                                </div>
+                                                                                <div class="col-2">
+                                                                                    <input type="time" name="rows[{{ $index }}][start_time]" value="{{ $fmtTime($row->start_time ?? null) !== '—' ? $fmtTime($row->start_time) : '' }}" class="form-control form-control-sm">
+                                                                                </div>
+                                                                                <div class="col-2">
+                                                                                    <input type="time" name="rows[{{ $index }}][end_time]" value="{{ $fmtTime($row->end_time ?? null) !== '—' ? $fmtTime($row->end_time) : '' }}" class="form-control form-control-sm">
+                                                                                </div>
+                                                                            </div>
+                                                                        @endforeach
+                                                                        <div class="small text-muted mb-2">Blank start/end rows are ignored. Saving replaces this doctor's clinic hours.</div>
+                                                                        <button type="submit" class="btn btn-sm btn-primary">Save clinic hours</button>
+                                                                    </form>
+                                                                </div>
                                                             </td>
-                                                            <td>
+                                                            <td style="min-width: 280px;">
                                                                 @forelse($videoHours as $row)
                                                                     <div class="small">
                                                                         {{ $dayNames[(int) $row->day_of_week] ?? $row->day_of_week }}
@@ -269,6 +326,41 @@
                                                                 @empty
                                                                     <span class="text-muted small">—</span>
                                                                 @endforelse
+                                                                <div class="d-flex gap-2 mt-2">
+                                                                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#videoHoursEdit{{ $doctor->id }}">
+                                                                        Edit
+                                                                    </button>
+                                                                    <form method="POST" action="{{ route('admin.full-onboarding.doctors.video-hours.clear', ['doctor' => $doctor->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" onsubmit="return confirm('Clear all video hours for this doctor?');">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button type="submit" class="btn btn-sm btn-outline-danger">Clear</button>
+                                                                    </form>
+                                                                </div>
+                                                                <div class="collapse mt-2" id="videoHoursEdit{{ $doctor->id }}">
+                                                                    <form method="POST" action="{{ route('admin.full-onboarding.doctors.video-hours.update', ['doctor' => $doctor->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" class="border rounded p-2 bg-white">
+                                                                        @csrf
+                                                                        @method('PUT')
+                                                                        @foreach($videoHourEditRows as $index => $row)
+                                                                            <div class="row g-1 align-items-center mb-1">
+                                                                                <div class="col-4">
+                                                                                    <select name="rows[{{ $index }}][day_of_week]" class="form-select form-select-sm">
+                                                                                        @foreach($dayNames as $dayIndex => $dayName)
+                                                                                            <option value="{{ $dayIndex }}" @selected((int) ($row->day_of_week ?? 0) === $dayIndex)>{{ $dayName }}</option>
+                                                                                        @endforeach
+                                                                                    </select>
+                                                                                </div>
+                                                                                <div class="col-3">
+                                                                                    <input type="time" name="rows[{{ $index }}][start_time]" value="{{ $fmtTime($row->start_time ?? null) !== '—' ? $fmtTime($row->start_time) : '' }}" class="form-control form-control-sm">
+                                                                                </div>
+                                                                                <div class="col-3">
+                                                                                    <input type="time" name="rows[{{ $index }}][end_time]" value="{{ $fmtTime($row->end_time ?? null) !== '—' ? $fmtTime($row->end_time) : '' }}" class="form-control form-control-sm">
+                                                                                </div>
+                                                                            </div>
+                                                                        @endforeach
+                                                                        <div class="small text-muted mb-2">Blank start/end rows are ignored. Saving replaces this doctor's video hours.</div>
+                                                                        <button type="submit" class="btn btn-sm btn-primary">Save video hours</button>
+                                                                    </form>
+                                                                </div>
                                                             </td>
                                                             <td style="min-width: 220px;">
                                                                 @forelse($doctorPackages as $package)

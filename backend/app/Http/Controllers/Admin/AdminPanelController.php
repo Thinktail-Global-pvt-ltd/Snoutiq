@@ -4883,6 +4883,169 @@ class AdminPanelController extends Controller
             ->with('status', 'Full onboarding entry deleted.');
     }
 
+    public function updateFullOnboardingDoctorClinicHours(Request $request, Doctor $doctor): RedirectResponse
+    {
+        $validated = $request->validate([
+            'rows' => ['nullable', 'array'],
+            'rows.*.service_type' => ['nullable', 'string', 'in:video,in_clinic,home_visit'],
+            'rows.*.day_of_week' => ['nullable', 'integer', 'min:0', 'max:6'],
+            'rows.*.start_time' => ['nullable', 'date_format:H:i'],
+            'rows.*.end_time' => ['nullable', 'date_format:H:i'],
+        ]);
+
+        if (! Schema::hasTable('doctor_availability')) {
+            return $this->redirectFullOnboardingWithStatus($request, 'Clinic hours table is not available.');
+        }
+
+        $rows = $this->normalizeFullOnboardingHoursRows($validated['rows'] ?? [], true);
+
+        DB::transaction(function () use ($doctor, $rows): void {
+            DB::table('doctor_availability')->where('doctor_id', (int) $doctor->id)->delete();
+
+            if (! empty($rows)) {
+                DB::table('doctor_availability')->insert($this->buildFullOnboardingHoursInsertRows('doctor_availability', (int) $doctor->id, $rows));
+            }
+        });
+
+        return $this->redirectFullOnboardingWithStatus($request, 'Clinic hours updated.');
+    }
+
+    public function clearFullOnboardingDoctorClinicHours(Request $request, Doctor $doctor): RedirectResponse
+    {
+        if (Schema::hasTable('doctor_availability')) {
+            DB::table('doctor_availability')->where('doctor_id', (int) $doctor->id)->delete();
+        }
+
+        return $this->redirectFullOnboardingWithStatus($request, 'Clinic hours cleared.');
+    }
+
+    public function updateFullOnboardingDoctorVideoHours(Request $request, Doctor $doctor): RedirectResponse
+    {
+        $validated = $request->validate([
+            'rows' => ['nullable', 'array'],
+            'rows.*.day_of_week' => ['nullable', 'integer', 'min:0', 'max:6'],
+            'rows.*.start_time' => ['nullable', 'date_format:H:i'],
+            'rows.*.end_time' => ['nullable', 'date_format:H:i'],
+        ]);
+
+        if (! Schema::hasTable('doctor_video_availability')) {
+            return $this->redirectFullOnboardingWithStatus($request, 'Video hours table is not available.');
+        }
+
+        $rows = $this->normalizeFullOnboardingHoursRows($validated['rows'] ?? [], false);
+
+        DB::transaction(function () use ($doctor, $rows): void {
+            DB::table('doctor_video_availability')->where('doctor_id', (int) $doctor->id)->delete();
+
+            if (! empty($rows)) {
+                DB::table('doctor_video_availability')->insert($this->buildFullOnboardingHoursInsertRows('doctor_video_availability', (int) $doctor->id, $rows));
+            }
+        });
+
+        return $this->redirectFullOnboardingWithStatus($request, 'Video hours updated.');
+    }
+
+    public function clearFullOnboardingDoctorVideoHours(Request $request, Doctor $doctor): RedirectResponse
+    {
+        if (Schema::hasTable('doctor_video_availability')) {
+            DB::table('doctor_video_availability')->where('doctor_id', (int) $doctor->id)->delete();
+        }
+
+        return $this->redirectFullOnboardingWithStatus($request, 'Video hours cleared.');
+    }
+
+    private function normalizeFullOnboardingHoursRows(array $rows, bool $includeServiceType): array
+    {
+        return collect($rows)
+            ->map(function (array $row) use ($includeServiceType): ?array {
+                $day = $row['day_of_week'] ?? null;
+                $start = trim((string) ($row['start_time'] ?? ''));
+                $end = trim((string) ($row['end_time'] ?? ''));
+
+                if ($day === null || $start === '' || $end === '') {
+                    return null;
+                }
+
+                $normalized = [
+                    'day_of_week' => (int) $day,
+                    'start_time' => $start,
+                    'end_time' => $end,
+                ];
+
+                if ($includeServiceType) {
+                    $normalized['service_type'] = $row['service_type'] ?? 'in_clinic';
+                }
+
+                return $normalized;
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function buildFullOnboardingHoursInsertRows(string $table, int $doctorId, array $rows): array
+    {
+        $now = now();
+        $hasCreatedAt = Schema::hasColumn($table, 'created_at');
+        $hasUpdatedAt = Schema::hasColumn($table, 'updated_at');
+        $hasIsActive = Schema::hasColumn($table, 'is_active');
+        $hasAvgConsultationMins = Schema::hasColumn($table, 'avg_consultation_mins');
+        $hasMaxBookingsPerHour = Schema::hasColumn($table, 'max_bookings_per_hour');
+
+        return collect($rows)->map(function (array $row) use (
+            $table,
+            $doctorId,
+            $now,
+            $hasCreatedAt,
+            $hasUpdatedAt,
+            $hasIsActive,
+            $hasAvgConsultationMins,
+            $hasMaxBookingsPerHour
+        ): array {
+            $insert = [
+                'doctor_id' => $doctorId,
+                'day_of_week' => $row['day_of_week'],
+                'start_time' => $row['start_time'],
+                'end_time' => $row['end_time'],
+                'break_start' => null,
+                'break_end' => null,
+            ];
+
+            if ($table === 'doctor_availability') {
+                $insert['service_type'] = $row['service_type'] ?? 'in_clinic';
+            }
+
+            if ($hasAvgConsultationMins) {
+                $insert['avg_consultation_mins'] = 20;
+            }
+
+            if ($hasMaxBookingsPerHour) {
+                $insert['max_bookings_per_hour'] = 3;
+            }
+
+            if ($hasIsActive) {
+                $insert['is_active'] = 1;
+            }
+
+            if ($hasCreatedAt) {
+                $insert['created_at'] = $now;
+            }
+
+            if ($hasUpdatedAt) {
+                $insert['updated_at'] = $now;
+            }
+
+            return $insert;
+        })->all();
+    }
+
+    private function redirectFullOnboardingWithStatus(Request $request, string $status): RedirectResponse
+    {
+        return redirect()
+            ->route('admin.full-onboarding', $request->only(['date_filter', 'from_date']))
+            ->with('status', $status);
+    }
+
     public function videoAnalytics(): View
     {
         $overviewMetrics = $this->callAnalyticsService->lifecycleOverview();
