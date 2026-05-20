@@ -131,6 +131,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->dailyAt('12:00')
             ->withoutOverlapping();
 
+            
         // Weather fetch every 4 hours
         $schedule->command('weather:fetch 28.6139 77.2090')->everyFourHours();
     })
