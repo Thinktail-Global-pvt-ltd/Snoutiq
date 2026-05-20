@@ -16,6 +16,7 @@ use App\Console\Commands\SendPrescriptionMedicationReminders;
 use App\Console\Commands\SendPetNeuteringReminders;
 use App\Console\Commands\SendPetVaccinationUpcomingReminders;
 use App\Console\Commands\SendLeadAiMarketingPushes;
+use App\Console\Commands\SendClinicProfileCompletionNotifications;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SendPetNeuteringReminders::class,
         SendPetVaccinationUpcomingReminders::class,
         SendLeadAiMarketingPushes::class,
+        SendClinicProfileCompletionNotifications::class,
     ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -122,6 +124,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command('notifications:lead-ai-marketing-push')
             ->hourly()
+            ->withoutOverlapping();
+
+        $schedule->command('notifications:clinic-profile-completion')
+            ->timezone('Asia/Kolkata')
+            ->dailyAt('12:00')
             ->withoutOverlapping();
 
         // Weather fetch every 4 hours
