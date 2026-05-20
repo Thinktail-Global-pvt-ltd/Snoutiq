@@ -9,6 +9,7 @@ use App\Models\GroomerService;
 use App\Models\GroomerServiceCategory;
 use App\Models\VetAtHomeService;
 use App\Models\VetRegisterationTemp;
+use App\Services\ClinicProfileCompletionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -17,6 +18,11 @@ use Illuminate\Validation\ValidationException;
 
 class ClinicFullOnboardingController extends Controller
 {
+    public function __construct(
+        private readonly ClinicProfileCompletionService $clinicProfileCompletionService,
+    ) {
+    }
+
     public function index(Request $request)
     {
         $filters = $request->validate([
@@ -113,8 +119,20 @@ class ClinicFullOnboardingController extends Controller
                 })
                 ->values();
 
+        $profileCompletion = $this->clinicProfileCompletionService->calculate(
+            $clinic,
+            $doctors,
+            $services,
+            $specializedPackages,
+            $vetAtHomeServices,
+            $clinicAvailability,
+            $videoSchedules
+        );
+
         return [
             'clinic' => $this->clinicPayloadWithMediaUrls($clinic),
+            'profile_completion_percentage' => $profileCompletion['percentage'],
+            'profile_completion' => $profileCompletion,
             'doctors' => $doctors,
             'services' => $services,
             'specialized_packages' => $specializedPackages,

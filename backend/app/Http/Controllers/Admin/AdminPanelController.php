@@ -20,6 +20,7 @@ use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\View\View;
 use App\Services\CallAnalyticsService;
+use App\Services\ClinicProfileCompletionService;
 use App\Services\ConsultationBookingWhatsAppService;
 use App\Services\DoctorAvailabilityService;
 use App\Services\LeadAiMarketingPushService;
@@ -38,6 +39,7 @@ class AdminPanelController extends Controller
         private readonly DoctorAvailabilityService $doctorAvailabilityService,
         private readonly CallAnalyticsService $callAnalyticsService,
         private readonly ConsultationBookingWhatsAppService $consultationBookingWhatsAppService,
+        private readonly ClinicProfileCompletionService $clinicProfileCompletionService,
     ) {
     }
 
@@ -4803,6 +4805,35 @@ class AdminPanelController extends Controller
             }
         }
 
+        $profileCompletionByClinic = $clinics
+            ->mapWithKeys(function (VetRegisterationTemp $clinic) use (
+                $servicesByClinic,
+                $packagesByClinic,
+                $vetAtHomeByClinic,
+                $clinicAvailabilityByDoctor,
+                $videoAvailabilityByDoctor
+            ): array {
+                $doctorIds = $clinic->doctors->pluck('id')->map(fn ($id) => (int) $id);
+                $clinicAvailability = $doctorIds
+                    ->flatMap(fn (int $doctorId) => $clinicAvailabilityByDoctor->get($doctorId, collect()))
+                    ->values();
+                $videoAvailability = $doctorIds
+                    ->flatMap(fn (int $doctorId) => $videoAvailabilityByDoctor->get($doctorId, collect()))
+                    ->values();
+
+                return [
+                    (int) $clinic->id => $this->clinicProfileCompletionService->calculate(
+                        $clinic,
+                        $clinic->doctors,
+                        $servicesByClinic->get($clinic->id, collect()),
+                        $packagesByClinic->get($clinic->id, collect()),
+                        $vetAtHomeByClinic->get($clinic->id, collect()),
+                        $clinicAvailability,
+                        $videoAvailability
+                    ),
+                ];
+            });
+
         return view('admin.full-onboarding-entries', compact(
             'clinics',
             'servicesByClinic',
@@ -4811,6 +4842,7 @@ class AdminPanelController extends Controller
             'clinicAvailabilityByDoctor',
             'videoAvailabilityByDoctor',
             'transactionsByClinic',
+            'profileCompletionByClinic',
             'dateFilter',
             'fromDate'
         ));

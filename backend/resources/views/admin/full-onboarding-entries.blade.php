@@ -125,6 +125,9 @@
                                 $homeServices = $vetAtHomeByClinic->get($clinic->id, collect());
                                 $clinicTransactions = $transactionsByClinic->get($clinic->id, collect());
                                 $doctorNameById = $clinic->doctors->keyBy('id');
+                                $profileCompletion = $profileCompletionByClinic->get($clinic->id, ['percentage' => 0, 'completed_fields' => 0, 'total_fields' => 0, 'missing_fields' => []]);
+                                $profileCompletionPercent = (int) ($profileCompletion['percentage'] ?? 0);
+                                $profileCompletionBarClass = $profileCompletionPercent >= 75 ? 'bg-success' : ($profileCompletionPercent >= 40 ? 'bg-warning' : 'bg-danger');
                             @endphp
                             <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
                                 <h2 class="accordion-header" id="clinicHeading{{ $clinic->id }}">
@@ -135,7 +138,7 @@
                                                 <span class="text-muted small ms-2">#{{ $clinic->id }}</span>
                                             </span>
                                             <span class="small text-muted">
-                                                {{ $clinic->city ?? '—' }} • {{ number_format($clinic->doctors->count()) }} doctors • {{ number_format($clinicServices->count()) }} services
+                                                {{ $clinic->city ?? '—' }} • {{ number_format($clinic->doctors->count()) }} doctors • {{ number_format($clinicServices->count()) }} services • {{ $profileCompletionPercent }}% complete
                                             </span>
                                         </span>
                                     </button>
@@ -149,6 +152,26 @@
                                                     <div class="fw-semibold">{{ $clinic->name ?? '—' }}</div>
                                                     <div class="small text-muted">{{ $clinic->mobile ?? 'No mobile' }} · {{ $clinic->email ?? 'No email' }}</div>
                                                     <div class="small text-muted">{{ $clinic->city ?? '—' }} {{ $clinic->pincode ? '· '.$clinic->pincode : '' }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="p-3 bg-light rounded h-100">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <div class="text-uppercase small text-muted fw-semibold">Profile Completion</div>
+                                                        <span class="badge {{ $profileCompletionBarClass }}">{{ $profileCompletionPercent }}%</span>
+                                                    </div>
+                                                    <div class="progress mb-2" role="progressbar" aria-label="Clinic profile completion" aria-valuenow="{{ $profileCompletionPercent }}" aria-valuemin="0" aria-valuemax="100" style="height: 8px;">
+                                                        <div class="progress-bar {{ $profileCompletionBarClass }}" style="width: {{ $profileCompletionPercent }}%"></div>
+                                                    </div>
+                                                    <div class="small text-muted">
+                                                        {{ (int) ($profileCompletion['completed_fields'] ?? 0) }} / {{ (int) ($profileCompletion['total_fields'] ?? 0) }} fields completed
+                                                    </div>
+                                                    @if(!empty($profileCompletion['missing_fields']))
+                                                        <div class="small text-muted mt-1">
+                                                            Missing:
+                                                            {{ collect($profileCompletion['missing_fields'])->pluck('label')->take(4)->implode(', ') }}{{ count($profileCompletion['missing_fields']) > 4 ? '...' : '' }}
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
