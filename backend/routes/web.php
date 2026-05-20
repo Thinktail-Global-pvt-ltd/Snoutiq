@@ -54,6 +54,7 @@ use App\Http\Controllers\Admin\VetClinicConnectionsExportController;
 use App\Http\Controllers\ClinicWebsiteContentController;
 use App\Services\RagSnouticSymptomService;
 use App\Http\Controllers\PublicCapturedTransactionsController;
+use App\Http\Controllers\PublicCapturedTransactionMonthlyInvoicesController;
 
 
 // Public routes
@@ -120,6 +121,8 @@ Route::get('/vet-clinic-connections/export', [VetClinicConnectionsExportControll
     ->name('vet-clinic-connections.export');
 Route::get('/captured-transactions', PublicCapturedTransactionsController::class)
     ->name('captured-transactions.public');
+Route::get('/captured-transactions/invoices/month', PublicCapturedTransactionMonthlyInvoicesController::class)
+    ->name('captured-transactions.invoices.month');
 Route::get('/captured-transactions/{transaction}/invoice', \App\Http\Controllers\PublicCapturedTransactionInvoiceController::class)
     ->whereNumber('transaction')
     ->name('captured-transactions.invoice');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
+use App\Support\PublicCapturedTransactionInvoices;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -423,15 +424,7 @@ class PublicCapturedTransactionInvoiceController extends Controller
 
     private function formatInvoiceNumber(Transaction $transaction): string
     {
-        $invoiceDate = $transaction->created_at
-            ? $transaction->created_at->copy()->timezone('Asia/Kolkata')
-            : now('Asia/Kolkata');
-
-        $series = $invoiceDate->greaterThanOrEqualTo(
-            \Carbon\CarbonImmutable::create(2026, 4, 1, 0, 0, 0, 'Asia/Kolkata')
-        ) ? '002' : '001';
-
-        return '0000-' . $series . '-' . $transaction->id;
+        return PublicCapturedTransactionInvoices::invoiceNumber($transaction);
     }
 
     private function formatInr(int $paise): string

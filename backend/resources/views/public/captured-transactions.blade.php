@@ -101,6 +101,8 @@
     };
     $inclusiveGstPaiseFor = static fn ($amountPaise) => (int) round(((int) $amountPaise) * 18 / 118);
     $additionalGstPaiseFor = static fn ($amountPaise) => (int) round(((int) $amountPaise) * 18 / 100);
+    $invoiceNumberFor = static fn ($transaction) => \App\Support\PublicCapturedTransactionInvoices::invoiceNumber($transaction);
+    $defaultInvoiceMonth = now('Asia/Kolkata')->format('Y-m');
 @endphp
 
 <section class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
@@ -151,6 +153,12 @@
                     <p class="text-muted mb-0">Sorted newest first.</p>
                 </div>
                 <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                    <div class="input-group input-group-sm" style="width: 270px;">
+                        <input type="month" id="invoiceMonth" class="form-control" value="{{ $defaultInvoiceMonth }}">
+                        <button type="button" id="downloadMonthlyInvoices" class="btn btn-outline-success">
+                            Download month
+                        </button>
+                    </div>
                     <button type="button" id="downloadAllInvoices" class="btn btn-sm btn-success">
                         Download all invoices
                     </button>
@@ -213,7 +221,12 @@
                                     };
                                 @endphp
                                 <tr class="{{ $rowClass }}">
-                                    <td data-label="ID">#{{ $transaction->id }}</td>
+                                    <td data-label="ID">
+                                        <div>#{{ $transaction->id }}</div>
+                                        @if($isExpectedPriceMatch)
+                                            <div class="small text-muted">Invoice: {{ $invoiceNumberFor($transaction) }}</div>
+                                        @endif
+                                    </td>
                                     <td data-label="Created">
                                         {{ optional($transaction->created_at)->timezone('Asia/Kolkata')->format('d M Y, h:i A') ?? 'N/A' }}
                                     </td>
@@ -295,25 +308,21 @@
 <script>
 (() => {
     const button = document.getElementById('downloadAllInvoices');
-    if (!button) return;
-
-    const originalLabel = button.textContent;
+    const monthButton = document.getElementById('downloadMonthlyInvoices');
+    const monthInput = document.getElementById('invoiceMonth');
     const delayMs = 900;
 
-    button.addEventListener('click', () => {
-        const links = Array.from(document.querySelectorAll('.invoice-download-link'))
-            .map((link) => link.href)
-            .filter(Boolean);
-
+    const triggerDownloads = (links, activeButton, originalLabel) => {
         if (links.length === 0) {
-            button.textContent = 'No invoices found';
+            activeButton.textContent = 'No invoices found';
             setTimeout(() => {
-                button.textContent = originalLabel;
+                activeButton.disabled = false;
+                activeButton.textContent = originalLabel;
             }, 1400);
             return;
         }
 
-        button.disabled = true;
+        activeButton.disabled = true;
 
         links.forEach((href, index) => {
             setTimeout(() => {
@@ -325,17 +334,65 @@
                 anchor.click();
                 anchor.remove();
 
-                button.textContent = `Downloading ${index + 1}/${links.length}`;
+                activeButton.textContent = `Downloading ${index + 1}/${links.length}`;
 
                 if (index === links.length - 1) {
                     setTimeout(() => {
-                        button.disabled = false;
-                        button.textContent = originalLabel;
+                        activeButton.disabled = false;
+                        activeButton.textContent = originalLabel;
                     }, delayMs);
                 }
             }, index * delayMs);
         });
-    });
+    };
+
+    if (button) {
+        const originalLabel = button.textContent;
+
+        button.addEventListener('click', () => {
+            const links = Array.from(document.querySelectorAll('.invoice-download-link'))
+                .map((link) => link.href)
+                .filter(Boolean);
+
+            triggerDownloads(links, button, originalLabel);
+        });
+    }
+
+    if (monthButton && monthInput) {
+        const originalMonthLabel = monthButton.textContent;
+
+        monthButton.addEventListener('click', async () => {
+            const month = monthInput.value;
+            if (!month) {
+                monthButton.textContent = 'Select month';
+                setTimeout(() => {
+                    monthButton.textContent = originalMonthLabel;
+                }, 1400);
+                return;
+            }
+
+            monthButton.disabled = true;
+            monthButton.textContent = 'Loading...';
+
+            try {
+                const response = await fetch(`{{ route('captured-transactions.invoices.month') }}?month=${encodeURIComponent(month)}`, {
+                    headers: { Accept: 'application/json' },
+                });
+                const payload = await response.json();
+                const links = Array.isArray(payload.invoices)
+                    ? payload.invoices.map((invoice) => invoice.download_url).filter(Boolean)
+                    : [];
+
+                triggerDownloads(links, monthButton, originalMonthLabel);
+            } catch (error) {
+                monthButton.textContent = 'Unable to load';
+                setTimeout(() => {
+                    monthButton.disabled = false;
+                    monthButton.textContent = originalMonthLabel;
+                }, 1800);
+            }
+        });
+    }
 })();
 </script>
 @endpush
