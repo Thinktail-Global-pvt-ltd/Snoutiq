@@ -34,10 +34,6 @@ class ClinicProfileCompletionService
                 'label' => 'Clinic mobile',
                 'complete' => $this->filled(data_get($clinic, 'mobile')),
             ],
-            'clinic_email' => [
-                'label' => 'Clinic email',
-                'complete' => $this->filled(data_get($clinic, 'email')),
-            ],
             'clinic_city' => [
                 'label' => 'Clinic city',
                 'complete' => $this->filled(data_get($clinic, 'city')),
@@ -45,17 +41,6 @@ class ClinicProfileCompletionService
             'clinic_pincode' => [
                 'label' => 'Clinic pincode',
                 'complete' => $this->filled(data_get($clinic, 'pincode')),
-            ],
-            'clinic_address' => [
-                'label' => 'Clinic address',
-                'complete' => $this->filled(data_get($clinic, 'address'))
-                    || $this->filled(data_get($clinic, 'formatted_address')),
-            ],
-            'clinic_profile' => [
-                'label' => 'Clinic profile',
-                'complete' => $this->filled(data_get($clinic, 'clinic_profile'))
-                    || $this->filled(data_get($clinic, 'hospital_profile'))
-                    || $this->filled(data_get($clinic, 'bio')),
             ],
             'clinic_image' => [
                 'label' => 'Clinic image',
