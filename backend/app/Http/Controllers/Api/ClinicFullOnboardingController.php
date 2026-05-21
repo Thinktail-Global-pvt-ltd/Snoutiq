@@ -361,6 +361,10 @@ class ClinicFullOnboardingController extends Controller
             'services.*.status' => ['nullable', 'string', 'max:255'],
             'services.*.serviceCategory' => ['nullable', 'integer', 'exists:groomer_service_categories,id'],
 
+            'machinery' => ['nullable', 'array'],
+            'machinery.*.name' => ['required_with:machinery', 'string', 'max:255'],
+            'machinery.*.image' => ['nullable'],
+
             'specialized_package' => ['nullable', 'array'],
             'specialized_package.doctor_index' => ['nullable', 'integer', 'min:0'],
             'specialized_package.dog_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
@@ -425,6 +429,7 @@ class ClinicFullOnboardingController extends Controller
             $clinic = $this->createClinic($request, $data);
             $doctors = $this->createDoctors($request, $clinic, $data['doctors']);
             $services = $this->createServices((int) $clinic->id, $data['services'] ?? []);
+            $machinery = $this->createMachineryServices($request, (int) $clinic->id, $data['machinery'] ?? []);
             $specializedPackage = $this->createSpecializedPackage((int) $clinic->id, $doctors, $data);
             $clinicAvailabilityCount = $this->createClinicAvailability($doctors, $data['clinic_availability'] ?? []);
             $videoAvailabilityCount = $this->createVideoAvailability($doctors, $data['video_schedule'] ?? null);
@@ -434,6 +439,7 @@ class ClinicFullOnboardingController extends Controller
                 'clinic' => $clinic->fresh(),
                 'doctors' => $doctors,
                 'services' => $services,
+                'machinery' => $machinery,
                 'specialized_package' => $specializedPackage,
                 'vet_at_home_service' => $vetAtHomeService,
                 'clinic_availability_rows' => $clinicAvailabilityCount,
@@ -575,6 +581,70 @@ class ClinicFullOnboardingController extends Controller
             }
             if ($hasPriceAfterService) {
                 $serviceData['price_after_service'] = $priceAfterService;
+            }
+
+            return GroomerService::create($serviceData);
+        })->values();
+    }
+
+    private function createMachineryServices(Request $request, int $clinicId, array $machineryRows)
+    {
+        if (empty($machineryRows)) {
+            return collect();
+        }
+
+        $hasPriceMin = Schema::hasColumn('groomer_services', 'price_min');
+        $hasPriceMax = Schema::hasColumn('groomer_services', 'price_max');
+        $hasPriceAfterService = Schema::hasColumn('groomer_services', 'price_after_service');
+        $hasCategoryColumn = Schema::hasColumn('groomer_services', 'groomer_service_category_id');
+        $hasMainService = Schema::hasColumn('groomer_services', 'main_service');
+        $hasMachineryImageBlob = Schema::hasColumn('groomer_services', 'machinery_image_blob');
+        $hasMachineryImageMime = Schema::hasColumn('groomer_services', 'machinery_image_mime');
+
+        return collect($machineryRows)->map(function (array $machineryRow, int $index) use (
+            $request,
+            $clinicId,
+            $hasPriceMin,
+            $hasPriceMax,
+            $hasPriceAfterService,
+            $hasCategoryColumn,
+            $hasMainService,
+            $hasMachineryImageBlob,
+            $hasMachineryImageMime
+        ) {
+            $serviceData = [
+                'user_id' => $clinicId,
+                'name' => $machineryRow['name'],
+                'description' => $machineryRow['description'] ?? null,
+                'pet_type' => $machineryRow['petType'] ?? 'all',
+                'price' => 0,
+                'duration' => $machineryRow['duration'] ?? 1,
+                'status' => $machineryRow['status'] ?? 'Active',
+            ];
+
+            if ($hasMainService) {
+                $serviceData['main_service'] = 'machinery';
+            }
+            if ($hasCategoryColumn) {
+                $serviceData['groomer_service_category_id'] = $this->resolveServiceCategoryId($clinicId, null);
+            }
+            if ($hasPriceMin) {
+                $serviceData['price_min'] = 0;
+            }
+            if ($hasPriceMax) {
+                $serviceData['price_max'] = 0;
+            }
+            if ($hasPriceAfterService) {
+                $serviceData['price_after_service'] = false;
+            }
+            if ($hasMachineryImageBlob) {
+                [$blob, $mime] = $this->decodeBlobInputWithMime($request, "machinery.{$index}.image");
+                if ($blob !== null) {
+                    $serviceData['machinery_image_blob'] = $blob;
+                    if ($hasMachineryImageMime) {
+                        $serviceData['machinery_image_mime'] = $mime;
+                    }
+                }
             }
 
             return GroomerService::create($serviceData);

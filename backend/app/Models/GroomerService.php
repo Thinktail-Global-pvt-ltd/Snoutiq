@@ -20,7 +20,13 @@ class GroomerService extends Model
         'duration',
         'status',
         'service_pic',
+        'machinery_image_blob',
+        'machinery_image_mime',
         'main_service'
+    ];
+
+    protected $hidden = [
+        'machinery_image_blob',
     ];
 
     protected $casts = [
