@@ -5167,10 +5167,12 @@ class AdminPanelController extends Controller
         $filters = $request->validate([
             'days' => ['nullable', 'integer', 'min:1', 'max:365'],
             'page' => ['nullable', 'string', 'max:255'],
+            'user_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $days = (int) ($filters['days'] ?? 30);
         $pageFilter = trim((string) ($filters['page'] ?? ''));
+        $userIdFilter = isset($filters['user_id']) ? (int) $filters['user_id'] : null;
         $from = now()->subDays($days)->startOfDay();
 
         $hasVisits = Schema::hasTable('user_page_visits');
@@ -5195,6 +5197,9 @@ class AdminPanelController extends Controller
 
             if ($pageFilter !== '') {
                 $visitBase->where('page_name', $pageFilter);
+            }
+            if ($userIdFilter !== null) {
+                $visitBase->where('user_id', $userIdFilter);
             }
 
             $summary['total_visits'] = (clone $visitBase)->count();
@@ -5252,6 +5257,9 @@ class AdminPanelController extends Controller
             if ($pageFilter !== '') {
                 $clickBase->where('page_name', $pageFilter);
             }
+            if ($userIdFilter !== null) {
+                $clickBase->where('user_id', $userIdFilter);
+            }
 
             $summary['total_button_clicks'] = (clone $clickBase)->count();
 
@@ -5289,6 +5297,7 @@ class AdminPanelController extends Controller
             'pageOptions' => $pageOptions,
             'days' => $days,
             'pageFilter' => $pageFilter,
+            'userIdFilter' => $userIdFilter,
             'hasVisits' => $hasVisits,
             'hasClicks' => $hasClicks,
         ]);

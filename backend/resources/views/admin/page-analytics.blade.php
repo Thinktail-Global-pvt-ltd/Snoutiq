@@ -52,7 +52,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-12 col-md-5">
+                <div class="col-12 col-md-4">
                     <label for="page" class="form-label small text-muted text-uppercase">Page</label>
                     <select id="page" name="page" class="form-select">
                         <option value="">All pages</option>
@@ -61,7 +61,19 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-12 col-md-4 d-flex gap-2">
+                <div class="col-12 col-md-2">
+                    <label for="user_id" class="form-label small text-muted text-uppercase">User ID</label>
+                    <input
+                        id="user_id"
+                        name="user_id"
+                        type="number"
+                        min="1"
+                        value="{{ $userIdFilter ?? '' }}"
+                        class="form-control"
+                        placeholder="1471"
+                    >
+                </div>
+                <div class="col-12 col-md-3 d-flex gap-2">
                     <button type="submit" class="btn btn-dark">
                         <i class="bi bi-funnel me-1"></i> Apply
                     </button>
