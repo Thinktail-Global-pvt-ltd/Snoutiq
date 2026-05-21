@@ -160,6 +160,7 @@
                                     <th>Button</th>
                                     <th class="text-end">Clicks</th>
                                     <th class="text-end">Users</th>
+                                    <th>Last Clicked</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -169,10 +170,11 @@
                                         <td class="fw-semibold">{{ $button->button_name }}</td>
                                         <td class="text-end">{{ number_format($button->clicks ?? 0) }}</td>
                                         <td class="text-end">{{ number_format($button->users ?? 0) }}</td>
+                                        <td class="text-muted small">{{ $button->last_clicked_at ? \Illuminate\Support\Carbon::parse($button->last_clicked_at)->format('d M, H:i') : '—' }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="text-center text-muted py-4">No button clicks found.</td>
+                                        <td colspan="5" class="text-center text-muted py-4">No button clicks found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
