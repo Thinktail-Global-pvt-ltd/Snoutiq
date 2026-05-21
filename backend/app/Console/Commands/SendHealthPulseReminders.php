@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
 class SendHealthPulseReminders extends Command
 {
     protected $signature = 'health-pulse:send-reminders {--pet_id=} {--dry} {--repeat}';
-    protected $description = 'Send Daily Health Pulse reminder pushes for missing or lapsed entries.';
+    protected $description = 'Send Daily Health Check reminders for pets missing today\'s entry.';
 
     public function __construct(private readonly HealthPulseNotificationService $notifications)
     {
@@ -56,7 +56,7 @@ class SendHealthPulseReminders extends Command
                 $this->warn("pet {$pet->id} has today's entry; continuing because --pet_id is test mode.");
             }
 
-            $triggers = $this->triggersForPet($pet, $now, $hour, $today, (bool) $forcedPetId);
+            $triggers = $this->triggersForPet($pet, $today);
             if (empty($triggers)) {
                 $this->warn("No reminder triggers matched for pet {$pet->id}.");
             }
@@ -91,59 +91,15 @@ class SendHealthPulseReminders extends Command
         return self::SUCCESS;
     }
 
-    private function triggersForPet(Pet $pet, Carbon $now, int $hour, string $today, bool $forced): array
+    private function triggersForPet(Pet $pet, string $today): array
     {
-        $createdAt = $pet->created_at ? Carbon::parse($pet->created_at)->timezone('Asia/Kolkata') : null;
-        $lastEntryDate = $this->lastEntryDate((int) $pet->id);
-        $petName = $pet->name ?: 'Your pet';
-        $triggers = [[
+        $petName = $pet->name ?: 'your pet';
+
+        return [[
             'key' => "missing_today_{$today}",
-            'title' => 'Daily Health Pulse',
-            'body' => "Log {$petName}'s quick health pulse for today.",
+            'title' => 'Daily Health Check',
+            'body' => "How is {$petName} feeling today? A quick check-in helps us spot small changes early.",
         ]];
-
-        if ($createdAt && ($forced || $now->diffInMinutes($createdAt) >= 240) && !$lastEntryDate) {
-            $triggers[] = [
-                'key' => 'install_4h_no_entry',
-                'title' => 'Daily Health Pulse',
-                'body' => "{$petName}'s first daily health check is pending.",
-            ];
-        }
-
-        if ($createdAt && ($forced || ($hour === 9 && $createdAt->isSameDay($now->copy()->subDay())))) {
-            $triggers[] = [
-                'key' => 'day_2_9am_no_entry',
-                'title' => 'Daily Health Pulse',
-                'body' => "Log {$petName}'s quick health pulse for today.",
-            ];
-        }
-
-        if ($createdAt && ($forced || ($hour === 19 && $createdAt->isSameDay($now->copy()->subDays(2))))) {
-            $triggers[] = [
-                'key' => 'day_3_7pm_no_entry',
-                'title' => 'Daily Health Pulse',
-                'body' => "{$petName}'s daily health check is still pending.",
-            ];
-        }
-
-        if ($lastEntryDate) {
-            $daysSince = $lastEntryDate->diffInDays($now->copy()->startOfDay());
-            foreach ([
-                [3, 9, 'lapse_3d_9am', "{$petName}'s health pulse has a 3-day gap."],
-                [7, 20, 'lapse_7d_8pm', "{$petName}'s health timeline is missing recent entries."],
-                [30, 19, 'silence_30d_7pm', "Restart {$petName}'s daily health pulse habit."],
-            ] as [$days, $triggerHour, $key, $body]) {
-                if ($forced || ($daysSince >= $days && $hour === $triggerHour)) {
-                    $triggers[] = [
-                        'key' => $key,
-                        'title' => 'Daily Health Pulse',
-                        'body' => $body,
-                    ];
-                }
-            }
-        }
-
-        return $triggers;
     }
 
     private function hasEntryOn(int $petId, string $date): bool
@@ -154,12 +110,4 @@ class SendHealthPulseReminders extends Command
             ->exists();
     }
 
-    private function lastEntryDate(int $petId): ?Carbon
-    {
-        $date = HealthPulseEntry::query()
-            ->where('pet_id', $petId)
-            ->max('entry_date');
-
-        return $date ? Carbon::parse($date)->startOfDay() : null;
-    }
 }
