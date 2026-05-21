@@ -346,6 +346,9 @@ class ClinicFullOnboardingController extends Controller
             'doctors.*.doctor_email' => ['nullable', 'email', 'max:255'],
             'doctors.*.doctor_mobile' => ['nullable', 'string', 'max:15'],
             'doctors.*.doctor_license' => ['nullable', 'string', 'max:255'],
+            'doctors.*.years_of_experience' => ['nullable', 'string', 'max:255'],
+            'doctors.*.degree' => ['nullable', 'string', 'max:255'],
+            'doctors.*.specialization_select_all_that_apply' => ['nullable'],
             'doctors.*.doctor_image' => ['nullable'],
 
             'services' => ['nullable', 'array'],
@@ -506,12 +509,18 @@ class ClinicFullOnboardingController extends Controller
     {
         $hasDoctorImageBlob = Schema::hasColumn('doctors', 'doctor_image_blob');
         $hasDoctorImageMime = Schema::hasColumn('doctors', 'doctor_image_mime');
+        $hasYearsOfExperience = Schema::hasColumn('doctors', 'years_of_experience');
+        $hasDegree = Schema::hasColumn('doctors', 'degree');
+        $hasSpecialization = Schema::hasColumn('doctors', 'specialization_select_all_that_apply');
 
         return collect($doctorRows)->map(function (array $doctorRow, int $index) use (
             $request,
             $clinic,
             $hasDoctorImageBlob,
-            $hasDoctorImageMime
+            $hasDoctorImageMime,
+            $hasYearsOfExperience,
+            $hasDegree,
+            $hasSpecialization
         ) {
             $doctorData = [
                 'vet_registeration_id' => $clinic->id,
@@ -520,6 +529,18 @@ class ClinicFullOnboardingController extends Controller
                 'doctor_mobile' => $doctorRow['doctor_mobile'] ?? null,
                 'doctor_license' => $doctorRow['doctor_license'] ?? null,
             ];
+
+            if ($hasYearsOfExperience && array_key_exists('years_of_experience', $doctorRow)) {
+                $doctorData['years_of_experience'] = $doctorRow['years_of_experience'];
+            }
+            if ($hasDegree && array_key_exists('degree', $doctorRow)) {
+                $doctorData['degree'] = $doctorRow['degree'];
+            }
+            if ($hasSpecialization && array_key_exists('specialization_select_all_that_apply', $doctorRow)) {
+                $doctorData['specialization_select_all_that_apply'] = $this->stringifyDoctorSpecialization(
+                    $doctorRow['specialization_select_all_that_apply']
+                );
+            }
 
             if ($hasDoctorImageBlob) {
                 [$blob, $mime] = $this->decodeBlobInputWithMime($request, "doctors.{$index}.doctor_image");
@@ -533,6 +554,21 @@ class ClinicFullOnboardingController extends Controller
 
             return Doctor::create($doctorData);
         })->values();
+    }
+
+    private function stringifyDoctorSpecialization($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_array($value)) {
+            return implode(', ', array_values(array_filter(array_map(static function ($item) {
+                return is_scalar($item) ? trim((string) $item) : null;
+            }, $value))));
+        }
+
+        return (string) $value;
     }
 
     private function createServices(int $clinicId, array $serviceRows)
