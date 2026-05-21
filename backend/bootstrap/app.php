@@ -16,6 +16,7 @@ use App\Console\Commands\SendPrescriptionMedicationReminders;
 use App\Console\Commands\SendPetNeuteringReminders;
 use App\Console\Commands\SendPetVaccinationUpcomingReminders;
 use App\Console\Commands\SendLeadAiMarketingPushes;
+use App\Console\Commands\SendHealthPulseReminders;
 use App\Console\Commands\SendClinicProfileCompletionNotifications;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SendPetNeuteringReminders::class,
         SendPetVaccinationUpcomingReminders::class,
         SendLeadAiMarketingPushes::class,
+        SendHealthPulseReminders::class,
         SendClinicProfileCompletionNotifications::class,
     ])
     ->withRouting(
@@ -85,6 +87,11 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         $schedule->command('vaccines:send-reminders')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('health-pulse:send-reminders')
+            ->timezone('Asia/Kolkata')
             ->everyMinute()
             ->withoutOverlapping();
 

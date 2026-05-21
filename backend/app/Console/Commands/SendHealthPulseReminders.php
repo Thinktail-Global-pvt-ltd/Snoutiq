@@ -56,7 +56,7 @@ class SendHealthPulseReminders extends Command
                 $this->warn("pet {$pet->id} has today's entry; continuing because --pet_id is test mode.");
             }
 
-            $triggers = $this->triggersForPet($pet, $now, $hour, (bool) $forcedPetId);
+            $triggers = $this->triggersForPet($pet, $now, $hour, $today, (bool) $forcedPetId);
             if (empty($triggers)) {
                 $this->warn("No reminder triggers matched for pet {$pet->id}.");
             }
@@ -91,12 +91,16 @@ class SendHealthPulseReminders extends Command
         return self::SUCCESS;
     }
 
-    private function triggersForPet(Pet $pet, Carbon $now, int $hour, bool $forced): array
+    private function triggersForPet(Pet $pet, Carbon $now, int $hour, string $today, bool $forced): array
     {
         $createdAt = $pet->created_at ? Carbon::parse($pet->created_at)->timezone('Asia/Kolkata') : null;
         $lastEntryDate = $this->lastEntryDate((int) $pet->id);
         $petName = $pet->name ?: 'Your pet';
-        $triggers = [];
+        $triggers = [[
+            'key' => "missing_today_{$today}",
+            'title' => 'Daily Health Pulse',
+            'body' => "Log {$petName}'s quick health pulse for today.",
+        ]];
 
         if ($createdAt && ($forced || $now->diffInMinutes($createdAt) >= 240) && !$lastEntryDate) {
             $triggers[] = [

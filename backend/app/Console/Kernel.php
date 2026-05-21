@@ -142,7 +142,7 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('health-pulse:send-reminders')
             ->timezone('Asia/Kolkata')
-            ->hourly()
+            ->everyMinute()
             ->withoutOverlapping();
 
         $schedule->command('socket:expire-calls')
