@@ -346,6 +346,7 @@ class ClinicFullOnboardingController extends Controller
             'doctors.*.doctor_email' => ['nullable', 'email', 'max:255'],
             'doctors.*.doctor_mobile' => ['nullable', 'string', 'max:15'],
             'doctors.*.doctor_license' => ['nullable', 'string', 'max:255'],
+            'doctors.*.doctor_image' => ['nullable'],
 
             'services' => ['nullable', 'array'],
             'services.*.serviceName' => ['required_with:services', 'string', 'max:255'],
@@ -422,7 +423,7 @@ class ClinicFullOnboardingController extends Controller
 
         $result = DB::transaction(function () use ($request, $data) {
             $clinic = $this->createClinic($request, $data);
-            $doctors = $this->createDoctors($clinic, $data['doctors']);
+            $doctors = $this->createDoctors($request, $clinic, $data['doctors']);
             $services = $this->createServices((int) $clinic->id, $data['services'] ?? []);
             $specializedPackage = $this->createSpecializedPackage((int) $clinic->id, $doctors, $data);
             $clinicAvailabilityCount = $this->createClinicAvailability($doctors, $data['clinic_availability'] ?? []);
@@ -495,16 +496,36 @@ class ClinicFullOnboardingController extends Controller
         return $clinic;
     }
 
-    private function createDoctors(VetRegisterationTemp $clinic, array $doctorRows)
+    private function createDoctors(Request $request, VetRegisterationTemp $clinic, array $doctorRows)
     {
-        return collect($doctorRows)->map(function (array $doctorRow) use ($clinic) {
-            return Doctor::create([
+        $hasDoctorImageBlob = Schema::hasColumn('doctors', 'doctor_image_blob');
+        $hasDoctorImageMime = Schema::hasColumn('doctors', 'doctor_image_mime');
+
+        return collect($doctorRows)->map(function (array $doctorRow, int $index) use (
+            $request,
+            $clinic,
+            $hasDoctorImageBlob,
+            $hasDoctorImageMime
+        ) {
+            $doctorData = [
                 'vet_registeration_id' => $clinic->id,
                 'doctor_name' => $doctorRow['doctor_name'],
                 'doctor_email' => $doctorRow['doctor_email'] ?? null,
                 'doctor_mobile' => $doctorRow['doctor_mobile'] ?? null,
                 'doctor_license' => $doctorRow['doctor_license'] ?? null,
-            ]);
+            ];
+
+            if ($hasDoctorImageBlob) {
+                [$blob, $mime] = $this->decodeBlobInputWithMime($request, "doctors.{$index}.doctor_image");
+                if ($blob !== null) {
+                    $doctorData['doctor_image_blob'] = $blob;
+                    if ($hasDoctorImageMime) {
+                        $doctorData['doctor_image_mime'] = $mime;
+                    }
+                }
+            }
+
+            return Doctor::create($doctorData);
         })->values();
     }
 
@@ -737,12 +758,19 @@ class ClinicFullOnboardingController extends Controller
 
     private function decodeBlobInput(Request $request, string $field): ?string
     {
+        return $this->decodeBlobInputWithMime($request, $field)[0];
+    }
+
+    private function decodeBlobInputWithMime(Request $request, string $field): array
+    {
         if ($request->hasFile($field)) {
-            return $request->file($field)->get();
+            $file = $request->file($field);
+
+            return [$file->get(), $file->getMimeType()];
         }
 
         if (! $request->filled($field)) {
-            return null;
+            return [null, null];
         }
 
         $value = (string) $request->input($field);
@@ -759,7 +787,7 @@ class ClinicFullOnboardingController extends Controller
             ]);
         }
 
-        return $binary;
+        return [$binary, $matches[1] ?? null];
     }
 
     private function resolvePriceRange(array $serviceRow, bool $priceAfterService): array
