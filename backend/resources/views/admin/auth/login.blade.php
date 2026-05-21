@@ -16,17 +16,7 @@
         }
 
         .auth-wrapper {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            width: min(100%, 1100px);
-        }
-
-        @media (min-width: 992px) {
-            .auth-wrapper {
-                flex-direction: row;
-                align-items: stretch;
-            }
+            width: min(100%, 460px);
         }
 
         .auth-card {
@@ -54,46 +44,15 @@
             padding: 2.5rem;
         }
 
-        .online-count {
-            font-size: 0.95rem;
-        }
-
-        .online-empty {
-            padding: 2.5rem 1rem;
-        }
-
-        .login-card {
-            max-width: none;
-        }
-
-        .status-card .card-header {
-            text-align: left;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
     </style>
 </head>
 <body>
     <div class="auth-wrapper">
-        <div class="auth-card login-card">
+        <div class="auth-card">
             <div class="card-header">
                 <h1>Admin Panel</h1>
-                <p class="text-muted mb-0">Sign in to continue.</p>
             </div>
             <div class="card-body">
-                <nav aria-label="Admin quick links" class="mb-4">
-                    <div class="list-group list-group-flush">
-                        <a href="{{ route('admin.online-doctors') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Available Clinics</span>
-                            <span class="badge bg-success rounded-pill">Live</span>
-                        </a>
-                        <a href="{{ route('admin.video.slot-overview') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Video Slot Overview</span>
-                            <span class="badge bg-primary rounded-pill">Open</span>
-                        </a>
-                    </div>
-                </nav>
                 @if ($errors->any())
                     <div class="alert alert-danger">
                         <ul class="mb-0">
@@ -116,58 +75,6 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-lg w-100">Sign in</button>
                 </form>
-            </div>
-        </div>
-
-        <div class="auth-card status-card">
-            <div class="card-header">
-                <h1>Available Clinics</h1>
-                <p class="text-muted online-count mb-0">
-                    {{ $onlineClinics->count() }} {{ \Illuminate\Support\Str::plural('clinic', $onlineClinics->count()) }} currently available.
-                </p>
-            </div>
-            <div class="card-body">
-                @if ($onlineClinics->isEmpty())
-                    <div class="text-center text-muted online-empty">
-                        <div class="fw-semibold mb-1">No clinics are live right now</div>
-                        <div class="small">Clinics appear here when at least one doctor toggles on and connects to the console.</div>
-                    </div>
-                @else
-                    <div class="list-group list-group-flush">
-                        @foreach ($onlineClinics as $clinic)
-                            <div class="list-group-item py-3">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <div class="fw-semibold">{{ $clinic->name ?? 'Clinic name unavailable' }}</div>
-                                        <div class="small text-muted">
-                                            @if (!empty($clinic->city))
-                                                {{ $clinic->city }}
-                                            @endif
-                                            @if (!empty($clinic->available_doctors_count))
-                                                @if (!empty($clinic->city))
-                                                    •
-                                                @endif
-                                                {{ $clinic->available_doctors_count }} {{ \Illuminate\Support\Str::plural('doctor', $clinic->available_doctors_count) }} online
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <span class="badge text-bg-success-subtle text-success-emphasis">Online</span>
-                                </div>
-                                <div class="small text-muted mt-2 d-flex flex-wrap gap-3">
-                                    @if (!empty($clinic->email))
-                                        <span>Email: <a href="mailto:{{ $clinic->email }}" class="text-decoration-none">{{ $clinic->email }}</a></span>
-                                    @endif
-                                    @if (!empty($clinic->mobile))
-                                        <span>Phone: <a href="tel:{{ $clinic->mobile }}" class="text-decoration-none">{{ $clinic->mobile }}</a></span>
-                                    @endif
-                                    @if (!empty($clinic->address))
-                                        <span>Address: {{ $clinic->address }}</span>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
             </div>
         </div>
     </div>
