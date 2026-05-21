@@ -121,6 +121,12 @@
                         @foreach($clinics as $clinic)
                             @php
                                 $clinicServices = $servicesByClinic->get($clinic->id, collect());
+                                $machineryServices = $clinicServices
+                                    ->filter(fn ($service) => strtolower((string) ($service->main_service ?? '')) === 'machinery')
+                                    ->values();
+                                $regularServices = $clinicServices
+                                    ->reject(fn ($service) => strtolower((string) ($service->main_service ?? '')) === 'machinery')
+                                    ->values();
                                 $packages = $packagesByClinic->get($clinic->id, collect());
                                 $homeServices = $vetAtHomeByClinic->get($clinic->id, collect());
                                 $clinicTransactions = $transactionsByClinic->get($clinic->id, collect());
@@ -138,7 +144,7 @@
                                                 <span class="text-muted small ms-2">#{{ $clinic->id }}</span>
                                             </span>
                                             <span class="small text-muted">
-                                                {{ $clinic->city ?? '—' }} • {{ number_format($clinic->doctors->count()) }} doctors • {{ number_format($clinicServices->count()) }} services • {{ $profileCompletionPercent }}% complete
+                                                {{ $clinic->city ?? '—' }} • {{ number_format($clinic->doctors->count()) }} doctors • {{ number_format($regularServices->count()) }} services • {{ number_format($machineryServices->count()) }} machinery • {{ $profileCompletionPercent }}% complete
                                             </span>
                                         </span>
                                     </button>
@@ -216,13 +222,38 @@
                                             <div class="col-md-4">
                                                 <div class="p-3 bg-light rounded h-100">
                                                     <div class="text-uppercase small text-muted fw-semibold mb-1">Services</div>
-                                                    @forelse($clinicServices as $service)
+                                                    @forelse($regularServices as $service)
                                                         <div class="d-flex justify-content-between gap-2 small">
                                                             <span>{{ $service->name ?? '—' }}</span>
                                                             <span class="text-muted">{{ ($service->price_after_service ?? false) ? 'After service' : $fmtMoney($service->price ?? null) }}</span>
                                                         </div>
                                                     @empty
                                                         <span class="text-muted small">No services saved.</span>
+                                                    @endforelse
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="p-3 bg-light rounded h-100">
+                                                    <div class="text-uppercase small text-muted fw-semibold mb-2">Machinery</div>
+                                                    @forelse($machineryServices as $machine)
+                                                        <div class="d-flex gap-2 align-items-center mb-2">
+                                                            @if(!empty($machine->machinery_image_blob))
+                                                                <img
+                                                                    src="data:{{ $machine->machinery_image_mime ?: 'image/jpeg' }};base64,{{ base64_encode($machine->machinery_image_blob) }}"
+                                                                    alt="{{ $machine->name ?? 'Machinery' }}"
+                                                                    class="rounded border"
+                                                                    style="width: 56px; height: 56px; object-fit: cover;"
+                                                                >
+                                                            @else
+                                                                <div class="rounded border bg-white d-flex align-items-center justify-content-center text-muted small" style="width: 56px; height: 56px;">No img</div>
+                                                            @endif
+                                                            <div>
+                                                                <div class="small fw-semibold">{{ $machine->name ?? '—' }}</div>
+                                                                <div class="small text-muted">{{ $machine->description ?? 'Machinery equipment' }}</div>
+                                                            </div>
+                                                        </div>
+                                                    @empty
+                                                        <span class="text-muted small">No machinery saved.</span>
                                                     @endforelse
                                                 </div>
                                             </div>
@@ -278,8 +309,31 @@
                                                         @endphp
                                                         <tr>
                                                             <td style="min-width: 180px;">
-                                                                <div class="fw-semibold">{{ $doctor->doctor_name ?? 'Doctor #'.$doctor->id }}</div>
-                                                                <div class="small text-muted">{{ $doctor->doctor_mobile ?? '—' }}</div>
+                                                                <div class="d-flex gap-2 align-items-start">
+                                                                    @if(!empty($doctor->doctor_image_blob))
+                                                                        <img
+                                                                            src="{{ route('api.doctors.blob-image', ['doctor' => $doctor->id]) }}"
+                                                                            alt="{{ $doctor->doctor_name ?? 'Doctor' }}"
+                                                                            class="rounded border"
+                                                                            style="width: 56px; height: 56px; object-fit: cover;"
+                                                                        >
+                                                                    @else
+                                                                        <div class="rounded border bg-light d-flex align-items-center justify-content-center text-muted small" style="width: 56px; height: 56px;">No img</div>
+                                                                    @endif
+                                                                    <div>
+                                                                        <div class="fw-semibold">{{ $doctor->doctor_name ?? 'Doctor #'.$doctor->id }}</div>
+                                                                        <div class="small text-muted">{{ $doctor->doctor_mobile ?? '—' }}</div>
+                                                                        @if(!empty($doctor->degree))
+                                                                            <div class="small text-muted">Degree: {{ $doctor->degree }}</div>
+                                                                        @endif
+                                                                        @if(!empty($doctor->years_of_experience))
+                                                                            <div class="small text-muted">Experience: {{ $doctor->years_of_experience }} yrs</div>
+                                                                        @endif
+                                                                        @if(!empty($doctor->specialization_select_all_that_apply))
+                                                                            <div class="small text-muted">Specialization: {{ $doctor->specialization_select_all_that_apply }}</div>
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
                                                             </td>
                                                             <td style="min-width: 330px;">
                                                                 @forelse($clinicHours as $row)
