@@ -79,7 +79,7 @@
         <div class="auth-card login-card">
             <div class="card-header">
                 <h1>Admin Panel</h1>
-                <p class="text-muted mb-0">Sign in with the static admin credentials to continue.</p>
+                <p class="text-muted mb-0">Sign in to continue.</p>
             </div>
             <div class="card-body">
                 <nav aria-label="Admin quick links" class="mb-4">
@@ -104,27 +104,18 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('admin.login.attempt') }}" novalidate>
+                <form method="POST" action="{{ route('admin.login.attempt') }}" autocomplete="off" novalidate>
                     @csrf
                     <div class="mb-3">
                         <label for="email" class="form-label">Email address</label>
-                        <input type="email" class="form-control form-control-lg" id="email" name="email" value="{{ old('email') }}" required autofocus placeholder="{{ $adminEmail }}">
+                        <input type="email" class="form-control form-control-lg" id="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="off">
                     </div>
                     <div class="mb-4">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control form-control-lg" id="password" name="password" placeholder="••••••" required>
-                        <small class="text-muted">Use <code>{{ $adminPassword }}</code> as the admin password.</small>
+                        <input type="password" class="form-control form-control-lg" id="password" name="password" required autocomplete="new-password">
                     </div>
                     <button type="submit" class="btn btn-primary btn-lg w-100">Sign in</button>
                 </form>
-            </div>
-            <div class="card-footer text-center bg-transparent border-0 pb-4">
-                <div class="alert alert-light border mt-3 mb-0" role="alert">
-                    <div class="fw-semibold mb-1">Default admin credentials</div>
-                    <div class="small mb-1">Email: <code>{{ $adminEmail }}</code></div>
-                    <div class="small">Password: <code>{{ $adminPassword }}</code></div>
-                </div>
-                <small class="text-muted d-block mt-3">Only {{ $adminEmail }} can access this panel.</small>
             </div>
         </div>
 
