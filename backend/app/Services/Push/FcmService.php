@@ -149,6 +149,26 @@ class FcmService
         ), $response->status());
     }
 
+    /**
+     * Send a fully-built FCM v1 message payload.
+     *
+     * @param array<string, mixed> $messagePayload Payload inside the FCM "message" object.
+     * @return array<string, mixed>
+     */
+    public function sendRawMessagePayload(array $messagePayload, string $target): array
+    {
+        try {
+            return $this->sendFirebaseMessagePayload($messagePayload, $target);
+        } catch (MessagingException | FirebaseException | Throwable $e) {
+            Log::error('FCM raw send failed', [
+                'target' => $this->maskToken($target),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
     private function normalizeToken(?string $token): string
     {
         // Trim whitespace and stray quotes that sometimes get saved from clients
