@@ -1985,12 +1985,71 @@ PROMPT;
             return false;
         }
 
-        $updates = [
-            'pet_doc2_blob_new' => $blob,
-            'updated_at' => now(),
-        ];
+        return DB::transaction(function () use ($petId, $blob, $mime) {
+            $this->archiveExistingPetDoc2BlobNew($petId);
 
-        return DB::table('pets')->where('id', $petId)->update($updates) > 0;
+            $updates = [
+                'pet_doc2_blob_new' => $blob,
+                'updated_at' => now(),
+            ];
+            if ($mime !== null && Schema::hasColumn('pets', 'pet_doc2_mime')) {
+                $updates['pet_doc2_mime'] = $mime;
+            }
+
+            return DB::table('pets')->where('id', $petId)->update($updates) > 0;
+        });
+    }
+
+    private function archiveExistingPetDoc2BlobNew(int $petId): void
+    {
+        if (!Schema::hasTable('reported_symptom_image_logs')
+            || !Schema::hasColumn('reported_symptom_image_logs', 'image_blob')) {
+            return;
+        }
+
+        $columns = ['id', 'pet_doc2_blob_new'];
+        foreach (['pet_doc2_mime', 'reported_symptom'] as $column) {
+            if (Schema::hasColumn('pets', $column)) {
+                $columns[] = $column;
+            }
+        }
+
+        $pet = DB::table('pets')
+            ->select($columns)
+            ->where('id', $petId)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$pet) {
+            return;
+        }
+
+        $oldBlob = $pet->pet_doc2_blob_new ?? null;
+        if ($oldBlob === null || $oldBlob === '') {
+            return;
+        }
+
+        DB::table('reported_symptom_image_logs')->insert([
+            'pet_id' => $petId,
+            'reported_symptom' => $pet->reported_symptom ?? null,
+            'image_mime' => $this->detectBlobMimeType($oldBlob) ?: ($pet->pet_doc2_mime ?? null),
+            'image_blob' => $oldBlob,
+            'source' => 'api.chat.dog-disease-question',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function detectBlobMimeType($blob): ?string
+    {
+        if (!is_string($blob) || $blob === '') {
+            return null;
+        }
+
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->buffer($blob);
+
+        return is_string($mime) && $mime !== '' ? $mime : null;
     }
 
     private function extractLocalUploadBlob(string $path): array
