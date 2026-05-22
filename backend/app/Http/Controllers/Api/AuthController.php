@@ -1242,7 +1242,7 @@ public function register(Request $request)
             ], 404);
         }
 
-        $mime = $pet->pet_doc2_mime ?: 'application/octet-stream';
+        $mime = $this->detectBlobMimeType($blob) ?: ($pet->pet_doc2_mime ?: 'application/octet-stream');
 
         return response($blob, 200, [
             'Content-Type' => $mime,
@@ -1268,7 +1268,7 @@ public function register(Request $request)
             ], 404);
         }
 
-        $mime = $pet->pet_doc2_mime ?: 'application/octet-stream';
+        $mime = $this->detectBlobMimeType($blob) ?: ($pet->pet_doc2_mime ?: 'application/octet-stream');
 
         return response($blob, 200, [
             'Content-Type' => $mime,
@@ -2842,6 +2842,18 @@ public function googleLogin_bkp(Request $request)
             'currency'        => 'INR',
             'transactions'    => $transactionsQuery->orderByDesc('created_at')->limit(300)->get(),
         ]);
+    }
+
+    private function detectBlobMimeType($blob): ?string
+    {
+        if (! is_string($blob) || $blob === '') {
+            return null;
+        }
+
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->buffer($blob);
+
+        return is_string($mime) && $mime !== '' ? $mime : null;
     }
 
 }
