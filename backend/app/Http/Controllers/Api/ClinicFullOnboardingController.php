@@ -450,11 +450,184 @@ class ClinicFullOnboardingController extends Controller
             ];
         });
 
+        $result['pet_parent_notification'] = $this->sendNewDoctorNotificationToPetParents(
+            $result['clinic'],
+            $result['doctors']
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Clinic, doctors, services and specialized package prices created successfully.',
             'data' => $result,
         ], 201);
+    }
+
+    private function sendNewDoctorNotificationToPetParents(VetRegisterationTemp $clinic, $doctors): array
+    {
+        if (! Schema::hasTable('device_tokens') || ! Schema::hasTable('users')) {
+            return [
+                'sent' => false,
+                'reason' => 'Device token or user storage is not available.',
+                'targeted' => 0,
+                'success' => 0,
+                'failure' => 0,
+            ];
+        }
+
+        $doctor = $doctors->first();
+        if (! $doctor) {
+            return [
+                'sent' => false,
+                'reason' => 'No doctor was created.',
+                'targeted' => 0,
+                'success' => 0,
+                'failure' => 0,
+            ];
+        }
+
+        $title = 'Congratulations, pet parents!';
+        $body = $this->newDoctorNotificationBody($clinic, $doctor, (int) $doctors->count());
+        $data = [
+            'type' => 'new_doctor_added',
+            'clinic_id' => (string) $clinic->id,
+            'clinic_name' => (string) ($clinic->name ?? ''),
+            'doctor_id' => (string) $doctor->id,
+            'doctor_name' => (string) ($doctor->doctor_name ?? ''),
+            'specialization' => $this->doctorSpecializationForMessage($doctor),
+            'experience' => $this->doctorExperienceForMessage($doctor),
+            'deepLink' => '/clinics/'.$clinic->id,
+        ];
+
+        $summary = [
+            'sent' => false,
+            'targeted' => 0,
+            'success' => 0,
+            'failure' => 0,
+            'errors' => [],
+        ];
+
+        try {
+            DeviceToken::query()
+                ->select(['device_tokens.id', 'device_tokens.token', 'device_tokens.meta'])
+                ->join('users', 'users.id', '=', 'device_tokens.user_id')
+                ->whereNotNull('device_tokens.token')
+                ->when(Schema::hasColumn('users', 'role'), function ($query) {
+                    $query->where(function ($roleQuery) {
+                        $roleQuery
+                            ->whereNull('users.role')
+                            ->orWhereIn('users.role', ['pet', 'pet_owner', 'pet_parent', 'user']);
+                    });
+                })
+                ->orderBy('device_tokens.id')
+                ->chunkById(500, function ($deviceTokens) use ($title, $body, $data, &$summary) {
+                    $tokens = $deviceTokens
+                        ->filter(fn (DeviceToken $deviceToken) => $this->isPetParentDeviceToken($deviceToken))
+                        ->pluck('token')
+                        ->map(fn ($token) => trim(trim((string) $token), "\"'"))
+                        ->filter(fn (string $token) => $token !== '')
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    if (empty($tokens)) {
+                        return;
+                    }
+
+                    $summary['targeted'] += count($tokens);
+
+                    try {
+                        $result = $this->fcm->sendMulticast($tokens, $title, $body, $data);
+                        $summary['success'] += (int) ($result['success'] ?? 0);
+                        $summary['failure'] += (int) ($result['failure'] ?? 0);
+                    } catch (Throwable $e) {
+                        $summary['failure'] += count($tokens);
+                        if (count($summary['errors']) < 5) {
+                            $summary['errors'][] = $e->getMessage();
+                        }
+                    }
+                }, 'device_tokens.id', 'id');
+        } catch (Throwable $e) {
+            Log::error('clinic.new_doctor_pet_parent_push.failed', [
+                'clinic_id' => (int) $clinic->id,
+                'doctor_id' => (int) $doctor->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $summary['errors'][] = $e->getMessage();
+        }
+
+        $summary['sent'] = $summary['success'] > 0;
+
+        Log::info('clinic.new_doctor_pet_parent_push.completed', [
+            'clinic_id' => (int) $clinic->id,
+            'doctor_id' => (int) $doctor->id,
+            'targeted' => $summary['targeted'],
+            'success' => $summary['success'],
+            'failure' => $summary['failure'],
+        ]);
+
+        return $summary;
+    }
+
+    private function newDoctorNotificationBody(VetRegisterationTemp $clinic, Doctor $doctor, int $doctorCount): string
+    {
+        $doctorName = trim((string) ($doctor->doctor_name ?? 'a new veterinarian'));
+        $specialization = $this->doctorSpecializationForMessage($doctor);
+        $experience = $this->doctorExperienceForMessage($doctor);
+        $clinicName = trim((string) ($clinic->name ?? 'a trusted Snoutiq clinic'));
+        $city = trim((string) ($clinic->city ?? ''));
+        $location = $city !== '' ? ' in '.$city : '';
+        $moreDoctors = $doctorCount > 1 ? ' and '.($doctorCount - 1).' more caring vet'.($doctorCount > 2 ? 's' : '') : '';
+
+        return sprintf(
+            'Congratulations! %s%s has just joined Snoutiq at %s%s. Specialization: %s. Experience: %s. More expert care is now closer for your pet.',
+            $doctorName,
+            $moreDoctors,
+            $clinicName,
+            $location,
+            $specialization,
+            $experience
+        );
+    }
+
+    private function doctorSpecializationForMessage(Doctor $doctor): string
+    {
+        $specialization = trim((string) ($doctor->specialization_select_all_that_apply ?? ''));
+        if ($specialization !== '' && str_starts_with($specialization, '[')) {
+            $decoded = json_decode($specialization, true);
+            if (is_array($decoded)) {
+                $specialization = implode(', ', array_filter(array_map(static function ($item) {
+                    return is_scalar($item) ? trim((string) $item) : null;
+                }, $decoded)));
+            }
+        }
+
+        return $specialization !== '' ? $specialization : 'General veterinary care';
+    }
+
+    private function doctorExperienceForMessage(Doctor $doctor): string
+    {
+        $experience = trim((string) ($doctor->years_of_experience ?? ''));
+        if ($experience === '') {
+            return 'Experienced veterinary care';
+        }
+
+        return preg_match('/year/i', $experience) ? $experience : $experience.' years';
+    }
+
+    private function isPetParentDeviceToken(DeviceToken $deviceToken): bool
+    {
+        $ownerModel = data_get($deviceToken->meta ?? [], 'owner_model');
+        if (! is_string($ownerModel) || trim($ownerModel) === '') {
+            return true;
+        }
+
+        $ownerModel = strtolower($ownerModel);
+
+        return str_contains($ownerModel, 'user')
+            && ! str_contains($ownerModel, 'doctor')
+            && ! str_contains($ownerModel, 'vet')
+            && ! str_contains($ownerModel, 'clinic');
     }
 
     private function createClinic(Request $request, array $data): VetRegisterationTemp
