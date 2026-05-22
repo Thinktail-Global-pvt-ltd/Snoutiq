@@ -605,8 +605,10 @@ class PrescriptionController extends Controller
                 }
 
                 $blobUrl = $this->petDoc2BlobUrl($pet);
+                $blobNewUrl = $this->petDoc2BlobNewUrl($pet);
                 $pet->setAttribute('pet_doc2_blob_url', $blobUrl);
-                $pet->setAttribute('pet_image_url', $blobUrl ?: ($pet->pet_doc1 ?? $pet->pet_doc2 ?? $pet->pic_link ?? null));
+                $pet->setAttribute('pet_doc2_blob_new_url', $blobNewUrl);
+                $pet->setAttribute('pet_image_url', $blobNewUrl ?: $blobUrl ?: ($pet->pet_doc1 ?? $pet->pet_doc2 ?? $pet->pic_link ?? null));
 
                 return $pet;
             });
@@ -1052,6 +1054,22 @@ class PrescriptionController extends Controller
         }
 
         return route('api.pets.pet-doc2-blob', ['pet' => $pet->id]);
+    }
+
+    private function petDoc2BlobNewUrl(?Pet $pet): ?string
+    {
+        if (! $pet
+            || ! Schema::hasTable('pets')
+            || ! Schema::hasColumn('pets', 'pet_doc2_blob_new')) {
+            return null;
+        }
+
+        $blob = $pet->getRawOriginal('pet_doc2_blob_new');
+        if ($blob === null || $blob === '') {
+            return null;
+        }
+
+        return route('api.pets.pet-doc2-blob-new', ['pet' => $pet->id]);
     }
 
     private function markVideoApointmentCompleted($videoApointmentId): void

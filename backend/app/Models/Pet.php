@@ -73,6 +73,7 @@ class Pet extends Model
 
     protected $hidden = [
         'pet_doc2_blob',
+        'pet_doc2_blob_new',
         'vaccination_image_blob',
     ];
 
