@@ -283,7 +283,7 @@ class GeminiChatController extends Controller
         $payload['question'] = $question;
 
         unset($payload['video_calling_upload_file']);
-        $petDoc2BlobSaved = $this->storeUploadInPetDoc2Blob($request, (int) $petRow->id, 'video_calling_upload_file');
+        $petDoc2BlobSaved = $this->storeUploadInPetDoc2BlobNew($request, (int) $petRow->id, 'video_calling_upload_file');
 
         $updatePayload = [
             'dog_disease_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
