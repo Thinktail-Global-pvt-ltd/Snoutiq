@@ -485,7 +485,9 @@ class ClinicFullOnboardingController extends Controller
             ];
         }
 
-        $title = 'Congratulations, pet parents!';
+        $doctor = $doctor->fresh() ?: $doctor;
+
+        $title = "Snoutiq's verified network just got stronger";
         $body = $this->newDoctorNotificationBody($clinic, $doctor, (int) $doctors->count());
         $data = [
             'type' => 'new_doctor_added',
@@ -496,6 +498,7 @@ class ClinicFullOnboardingController extends Controller
             'specialization' => $this->doctorSpecializationForMessage($doctor),
             'experience' => $this->doctorExperienceForMessage($doctor),
             'deepLink' => '/clinics/'.$clinic->id,
+            'cta' => 'Book Now',
         ];
 
         $summary = [
@@ -572,21 +575,18 @@ class ClinicFullOnboardingController extends Controller
     private function newDoctorNotificationBody(VetRegisterationTemp $clinic, Doctor $doctor, int $doctorCount): string
     {
         $doctorName = trim((string) ($doctor->doctor_name ?? 'a new veterinarian'));
-        $specialization = $this->doctorSpecializationForMessage($doctor);
         $experience = $this->doctorExperienceForMessage($doctor);
         $clinicName = trim((string) ($clinic->name ?? 'a trusted Snoutiq clinic'));
         $city = trim((string) ($clinic->city ?? ''));
-        $location = $city !== '' ? ' in '.$city : '';
-        $moreDoctors = $doctorCount > 1 ? ' and '.($doctorCount - 1).' more caring vet'.($doctorCount > 2 ? 's' : '') : '';
+        $clinicLine = $clinicName.($city !== '' ? ', '.$city : '');
+        $consultationPrice = $this->doctorConsultationPriceForMessage($doctor);
 
         return sprintf(
-            'Congratulations! %s%s has just joined Snoutiq at %s%s. Specialization: %s. Experience: %s. More expert care is now closer for your pet.',
+            "%s · %s\nSnoutiq-verified · %s · Consults from %s\nBook Now",
             $doctorName,
-            $moreDoctors,
-            $clinicName,
-            $location,
-            $specialization,
-            $experience
+            $clinicLine,
+            $experience,
+            $consultationPrice
         );
     }
 
@@ -609,10 +609,31 @@ class ClinicFullOnboardingController extends Controller
     {
         $experience = trim((string) ($doctor->years_of_experience ?? ''));
         if ($experience === '') {
-            return 'Experienced veterinary care';
+            return 'Experienced vet care';
         }
 
-        return preg_match('/year/i', $experience) ? $experience : $experience.' years';
+        if (preg_match('/experience/i', $experience)) {
+            return $experience;
+        }
+
+        if (preg_match('/yr|year/i', $experience)) {
+            return $experience.' experience';
+        }
+
+        return $experience.' yrs experience';
+    }
+
+    private function doctorConsultationPriceForMessage(Doctor $doctor): string
+    {
+        $price = $doctor->video_day_rate ?? $doctor->doctors_price ?? null;
+        if ($price === null || $price === '') {
+            return '₹499';
+        }
+
+        $price = (float) $price;
+        $formatted = floor($price) === $price ? (string) (int) $price : number_format($price, 2);
+
+        return '₹'.$formatted;
     }
 
     private function isPetParentDeviceToken(DeviceToken $deviceToken): bool
