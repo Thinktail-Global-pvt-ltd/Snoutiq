@@ -190,6 +190,11 @@
                                                             class="img-fluid rounded border mb-2"
                                                             style="max-height: 140px; object-fit: cover;"
                                                         >
+                                                        <form method="POST" action="{{ route('admin.full-onboarding.media.delete', ['clinic' => $clinic->id, 'field' => 'clinic_image', 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" class="mb-3" onsubmit="return confirm('Delete clinic image?');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete clinic image</button>
+                                                        </form>
                                                     @else
                                                         <div class="small text-muted mb-2">No clinic image blob.</div>
                                                     @endif
@@ -203,9 +208,14 @@
                                                     </form>
 
                                                     @if(!empty($clinic->clinic_video))
-                                                        <video class="w-100 rounded border" style="max-height: 180px;" controls preload="metadata">
+                                                        <video class="w-100 rounded border mb-2" style="max-height: 180px;" controls preload="metadata">
                                                             <source src="{{ url('/clinics/'.$clinic->id.'/media/video') }}" type="video/mp4">
                                                         </video>
+                                                        <form method="POST" action="{{ route('admin.full-onboarding.media.delete', ['clinic' => $clinic->id, 'field' => 'clinic_video', 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" class="mb-3" onsubmit="return confirm('Delete clinic video?');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete clinic video</button>
+                                                        </form>
                                                     @else
                                                         <div class="small text-muted">No clinic video blob.</div>
                                                     @endif

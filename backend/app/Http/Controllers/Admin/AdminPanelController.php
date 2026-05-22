@@ -4908,6 +4908,22 @@ class AdminPanelController extends Controller
         return $this->redirectFullOnboardingWithStatus($request, 'Clinic media uploaded.');
     }
 
+    public function deleteFullOnboardingClinicMedia(Request $request, VetRegisterationTemp $clinic, string $field): RedirectResponse
+    {
+        if (! in_array($field, ['clinic_image', 'clinic_video'], true)) {
+            abort(404);
+        }
+
+        if (! Schema::hasColumn('vet_registerations_temp', $field)) {
+            return $this->redirectFullOnboardingWithStatus($request, 'Clinic media field is not available.');
+        }
+
+        $clinic->forceFill([$field => null])->save();
+
+        $label = str_replace('_', ' ', $field);
+        return $this->redirectFullOnboardingWithStatus($request, ucfirst($label).' deleted.');
+    }
+
     public function updateFullOnboardingDoctorClinicHours(Request $request, Doctor $doctor): RedirectResponse
     {
         $validated = $request->validate([
