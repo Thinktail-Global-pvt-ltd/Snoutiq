@@ -106,8 +106,8 @@ Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
 Route::get('/app-version/professional', [AppVersionController::class, 'professional']);
 Route::middleware(['web', EnsureAdminAuthenticated::class])->group(function () {
     Route::get('/admin/app-versions/professional', [AppVersionController::class, 'adminProfessional']);
-    Route::put('/admin/app-versions/{id}', [AppVersionController::class, 'update'])->whereNumber('id');
 });
+Route::put('/admin/app-versions/{id}', [AppVersionController::class, 'update'])->whereNumber('id');
 Route::get('/call-sessions', [CallSessionCrudController::class, 'index']);
 Route::post('/call-sessions', [CallSessionCrudController::class, 'store']);
 Route::get('/call-sessions/{callSession}', [CallSessionCrudController::class, 'show'])->whereNumber('callSession');
