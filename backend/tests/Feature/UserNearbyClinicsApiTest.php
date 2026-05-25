@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Services\GooglePlacesLookupService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Tests\TestCase;
@@ -107,6 +108,74 @@ class UserNearbyClinicsApiTest extends TestCase
             ->assertJsonPath('range_km', null)
             ->assertJsonPath('source', 'google_places')
             ->assertJsonPath('clinics.0.name', 'Google City Clinic');
+    }
+
+    public function test_user_nearby_clinics_includes_google_photo_proxy_url(): void
+    {
+        config(['services.google_maps.api_key' => 'test-google-key']);
+
+        DB::table('users')->insert([
+            'id' => 1394,
+            'name' => 'Pet Parent',
+            'city' => 'Gurgaon',
+            'latitude' => 28.4595,
+            'longitude' => 77.0266,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Http::fake([
+            'https://maps.googleapis.com/maps/api/place/nearbysearch/json*' => Http::response([
+                'status' => 'OK',
+                'results' => [
+                    [
+                        'name' => 'Google Vet Clinic',
+                        'vicinity' => 'Sector 45, Gurgaon',
+                        'place_id' => 'google_place_123',
+                        'rating' => 4.8,
+                        'geometry' => [
+                            'location' => [
+                                'lat' => 28.4601,
+                                'lng' => 77.0271,
+                            ],
+                        ],
+                        'opening_hours' => [
+                            'open_now' => true,
+                            'weekday_text' => ['Monday: 10:00 AM - 5:00 PM'],
+                        ],
+                        'photos' => [
+                            ['photo_reference' => 'google_photo_ref_123'],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $response = $this->getJson('/api/users/nearby-clinics?user_id=1394');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('clinics.0.google_photo_reference', 'google_photo_ref_123')
+            ->assertJsonPath('clinics.0.google_photo_url', url('/api/places/photo?photo_reference=google_photo_ref_123'));
+
+        $this->assertStringNotContainsString('test-google-key', $response->json('clinics.0.google_photo_url'));
+    }
+
+    public function test_google_place_photo_endpoint_proxies_google_image(): void
+    {
+        config(['services.google_maps.api_key' => 'test-google-key']);
+
+        Http::fake([
+            'https://maps.googleapis.com/maps/api/place/photo*' => Http::response('fake-image-bytes', 200, [
+                'Content-Type' => 'image/jpeg',
+            ]),
+        ]);
+
+        $response = $this->get('/api/places/photo?photo_reference=google_photo_ref_123');
+
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'image/jpeg')
+            ->assertSee('fake-image-bytes', false);
     }
 
     public function test_user_nearby_clinics_requires_saved_or_request_location(): void

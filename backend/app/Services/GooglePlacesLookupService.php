@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class GooglePlacesLookupService
 {
@@ -315,6 +316,48 @@ class GooglePlacesLookupService
         ];
     }
 
+    public function placePhoto(string $photoReference, int $maxWidth = 800): array
+    {
+        $apiKey = $this->resolveApiKey();
+        if ($apiKey === null) {
+            return [
+                'success' => false,
+                'error' => 'Google Places API key is missing. Set GOOGLE_API_KEY or GOOGLE_MAPS_API_KEY.',
+            ];
+        }
+
+        $photoReference = trim($photoReference);
+        if ($photoReference === '') {
+            return [
+                'success' => false,
+                'error' => 'photo_reference is required.',
+            ];
+        }
+
+        $response = Http::timeout(10)
+            ->retry(1, 200)
+            ->withOptions(['allow_redirects' => true])
+            ->get('https://maps.googleapis.com/maps/api/place/photo', [
+                'maxwidth' => max(100, min($maxWidth, 1600)),
+                'photo_reference' => $photoReference,
+                'key' => $apiKey,
+            ]);
+
+        if (!$response->successful()) {
+            return [
+                'success' => false,
+                'error' => 'Google Places photo lookup failed.',
+                'status' => $response->status(),
+            ];
+        }
+
+        return [
+            'success' => true,
+            'body' => $response->body(),
+            'content_type' => $response->header('Content-Type') ?: 'image/jpeg',
+        ];
+    }
+
     private function nearbySearch(array $definition, float $latitude, float $longitude, string $apiKey)
     {
         $params = [
@@ -356,6 +399,7 @@ class GooglePlacesLookupService
         $geometry = is_array($place['geometry']['location'] ?? null) ? $place['geometry']['location'] : [];
         $placeLatitude = isset($geometry['lat']) && is_numeric($geometry['lat']) ? (float) $geometry['lat'] : null;
         $placeLongitude = isset($geometry['lng']) && is_numeric($geometry['lng']) ? (float) $geometry['lng'] : null;
+        $photoReference = $this->firstPhotoReference($place);
 
         return [
             'name' => $name,
@@ -378,7 +422,32 @@ class GooglePlacesLookupService
             'latitude' => $placeLatitude !== null ? round($placeLatitude, 7) : null,
             'longitude' => $placeLongitude !== null ? round($placeLongitude, 7) : null,
             'distance_km' => $this->distanceKm($originLatitude, $originLongitude, $placeLatitude, $placeLongitude),
+            'google_photo_reference' => $photoReference,
+            'google_photo_url' => $photoReference !== null
+                ? route('google.places.photo', ['photo_reference' => $photoReference], true)
+                : null,
         ];
+    }
+
+    private function firstPhotoReference(array $place): ?string
+    {
+        $photos = $place['photos'] ?? null;
+        if (!is_array($photos)) {
+            return null;
+        }
+
+        foreach ($photos as $photo) {
+            if (!is_array($photo)) {
+                continue;
+            }
+
+            $reference = trim((string) ($photo['photo_reference'] ?? ''));
+            if ($reference !== '') {
+                return Str::limit($reference, 1024, '');
+            }
+        }
+
+        return null;
     }
 
     private function normalizePlaceType(string $placeType): string

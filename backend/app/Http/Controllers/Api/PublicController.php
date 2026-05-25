@@ -161,6 +161,33 @@ class PublicController extends Controller
         ], $status);
     }
 
+    public function googlePlacePhoto(Request $request)
+    {
+        $data = $request->validate([
+            'photo_reference' => ['required', 'string', 'max:1024'],
+            'maxwidth' => ['nullable', 'integer', 'min:100', 'max:1600'],
+        ]);
+
+        /** @var GooglePlacesLookupService $places */
+        $places = app(GooglePlacesLookupService::class);
+        $result = $places->placePhoto(
+            $data['photo_reference'],
+            (int) ($data['maxwidth'] ?? 800)
+        );
+
+        if (($result['success'] ?? false) !== true) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['error'] ?? 'Google Places photo could not be loaded.',
+            ], str_contains((string) ($result['error'] ?? ''), 'API key is missing') ? 503 : 502);
+        }
+
+        return response($result['body'], 200, [
+            'Content-Type' => $result['content_type'] ?? 'image/jpeg',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
     private function withClinicImageBlobUrls(array $places): array
     {
         if ($places === []) {

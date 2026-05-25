@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\VetRegistrationReportController;
 use App\Http\Controllers\Api\DoctorCsvExportController;
 use App\Http\Controllers\Api\DoctorChatController;
 use App\Http\Controllers\Api\DoctorFcmTokenController;
+use App\Http\Controllers\Api\PushController;
 use App\Http\Controllers\Api\VaccinationBookingController;
 use App\Models\User;
 use App\Models\DeviceToken;
@@ -129,6 +130,9 @@ Route::get('/users/{userId}/exists', function (int $userId) {
         'message' => $exists ? 'User exists' : 'User does not exist',
     ]);
 })->whereNumber('userId')->name('api.users.exists');
+Route::post('/users/{userId}/device-token', [PushController::class, 'registerUserToken'])
+    ->whereNumber('userId')
+    ->name('api.users.device-token.store');
 Route::get('/doctors/{doctorId}/exists', function (int $doctorId) {
     $exists = Doctor::query()->whereKey($doctorId)->exists();
 
@@ -2590,6 +2594,7 @@ Route::get('/ask/chat/listRooms', [SnoutiqSymptomController::class, 'listWebChat
 Route::get('/ask/chat-rooms/{session_id}/chats', [SnoutiqSymptomController::class, 'webChatHistory']);
 Route::delete('/ask/chat-rooms/{session_id}', [SnoutiqSymptomController::class, 'deleteWebChatRoom']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
+Route::get('/places/photo', [PublicController::class, 'googlePlacePhoto'])->name('google.places.photo');
 Route::post('/chat/send', [SnoutiqSymptomController::class, 'chatSend']);
 Route::post('/users/location', [PublicController::class, 'updateUserLocation']);
 Route::match(['get', 'post'], '/users/nearby-clinics', [PublicController::class, 'userNearbyClinics']);
@@ -2697,7 +2702,6 @@ if(App\Models\UserProfile::where('user_id', $Request->user()->id)->count() == 0)
 });
 
 // Push Notifications using FCM
-use App\Http\Controllers\Api\PushController; // late import is okay in routes
 Route::prefix('push')->group(function () {
     Route::post('/register-token', [PushController::class, 'registerToken']);
     Route::put('/edit-token', [PushController::class, 'editToken']);
