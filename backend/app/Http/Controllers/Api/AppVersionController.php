@@ -12,7 +12,7 @@ class AppVersionController extends Controller
     private const DEFAULT_TITLE = 'Update required';
     private const DEFAULT_MESSAGE = 'Please update your app to continue using SnoutIQ Professional.';
 
-    public function professional()
+    public function professional(Request $request)
     {
         $versions = AppVersion::query()
             ->where('app_key', self::APP_KEY_PROFESSIONAL)
@@ -20,6 +20,8 @@ class AppVersionController extends Controller
             ->whereIn('platform', ['android', 'ios'])
             ->get()
             ->keyBy('platform');
+
+        $this->bumpLatestVersionFromRequest($request, $versions);
 
         $android = $versions->get('android');
         $ios = $versions->get('ios');
@@ -87,6 +89,35 @@ class AppVersionController extends Controller
             'force_update' => $version->force_update,
             'store_url' => $version->store_url,
         ];
+    }
+
+    private function bumpLatestVersionFromRequest(Request $request, $versions): void
+    {
+        $platform = strtolower((string) ($request->query('platform') ?: $request->header('X-App-Platform')));
+        $currentVersion = trim((string) (
+            $request->query('current_version')
+            ?: $request->query('app_version')
+            ?: $request->header('X-App-Version')
+        ));
+
+        if (! in_array($platform, ['android', 'ios'], true) || ! $this->isVersionString($currentVersion)) {
+            return;
+        }
+
+        $version = $versions->get($platform);
+        if (! $version || version_compare($currentVersion, $version->latest_version, '<=')) {
+            return;
+        }
+
+        $version->latest_version = $currentVersion;
+        $version->save();
+    }
+
+    private function isVersionString(string $version): bool
+    {
+        return $version !== ''
+            && strlen($version) <= 50
+            && preg_match('/^[0-9]+(?:\.[0-9]+){0,4}$/', $version) === 1;
     }
 
     private function adminPayload(AppVersion $version): array
