@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\UserObservationController;
 use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
+use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\DashboardProfileController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\ClinicFullOnboardingController;
@@ -97,10 +98,16 @@ use App\Http\Controllers\Api\PetConsultTimelineController;
 use App\Http\Controllers\Api\RagSnouticSymptomController;
 use App\Http\Controllers\Api\SnoutiqSymptomController;
 use App\Http\Controllers\Api\HomeVetBookingController;
+use App\Http\Middleware\EnsureAdminAuthenticated;
 use App\Services\PetDiseaseInferenceService;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
+Route::get('/app-version/professional', [AppVersionController::class, 'professional']);
+Route::middleware(['web', EnsureAdminAuthenticated::class])->group(function () {
+    Route::get('/admin/app-versions/professional', [AppVersionController::class, 'adminProfessional']);
+    Route::put('/admin/app-versions/{id}', [AppVersionController::class, 'update'])->whereNumber('id');
+});
 Route::get('/call-sessions', [CallSessionCrudController::class, 'index']);
 Route::post('/call-sessions', [CallSessionCrudController::class, 'store']);
 Route::get('/call-sessions/{callSession}', [CallSessionCrudController::class, 'show'])->whereNumber('callSession');
