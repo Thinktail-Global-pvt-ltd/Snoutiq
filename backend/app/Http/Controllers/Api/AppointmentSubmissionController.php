@@ -560,7 +560,7 @@ class AppointmentSubmissionController extends Controller
                 'pet' => $petPayloadById[(int) $appointment->pet_id] ?? null,
                 'user' => $resolvedUser,
                 'clinic' => $appointment->clinic?->toArray(),
-                'doctor' => $appointment->doctor?->toArray(),
+                'doctor' => $this->doctorPayload($appointment->doctor),
                 'prescriptions' => $prescriptionsByAppointment[$appointment->id] ?? [],
             ];
         })->values()->all();
@@ -626,6 +626,7 @@ class AppointmentSubmissionController extends Controller
             'doctor' => [
                 'id' => $appointment->doctor?->id ?? $appointment->doctor_id,
                 'name' => $appointment->doctor?->doctor_name ?? $appointment->doctor?->name ?? ($notes['doctor_name'] ?? null),
+                'doctor_image' => $this->doctorImageUrl($appointment->doctor),
             ],
             'patient' => [
                 'user_id' => $patientUserId,
@@ -642,6 +643,38 @@ class AppointmentSubmissionController extends Controller
             'currency' => $notes['currency'] ?? 'INR',
             'appointment_table' => $this->appointmentTablePayload($appointment, $notes),
         ];
+    }
+
+    private function doctorPayload(?Doctor $doctor): ?array
+    {
+        if (!$doctor) {
+            return null;
+        }
+
+        $payload = $doctor->toArray();
+        $payload['doctor_image'] = $this->doctorImageUrl($doctor);
+        $payload['doctor_image_blob_url'] = $this->doctorImageBlobUrl($doctor);
+        unset($payload['doctor_image_blob']);
+
+        return $payload;
+    }
+
+    private function doctorImageUrl(?Doctor $doctor): ?string
+    {
+        if (!$doctor) {
+            return null;
+        }
+
+        return $this->doctorImageBlobUrl($doctor) ?: $doctor->doctor_image;
+    }
+
+    private function doctorImageBlobUrl(?Doctor $doctor): ?string
+    {
+        if (!$doctor || empty($doctor->doctor_image_blob)) {
+            return null;
+        }
+
+        return route('api.doctors.blob-image', ['doctor' => $doctor->id]);
     }
 
     /**

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Pet;
+use App\Models\Doctor;
 use App\Services\PetDiseaseInferenceService;
 use Carbon\Carbon;
 
@@ -33,6 +34,7 @@ class PrescriptionController extends Controller
         $hasPetDogDiseasePayload = $hasPetsTable && Schema::hasColumn('pets', 'dog_disease_payload');
         $hasPetIsNeutered = $hasPetsTable && Schema::hasColumn('pets', 'is_neutered');
         $hasPetVaccinated = $hasPetsTable && Schema::hasColumn('pets', 'vaccenated_yes_no');
+        $hasDoctorsTable = Schema::hasTable('doctors');
 
         if ($request->filled('user_id')) {
             $query->where('user_id', (int) $request->query('user_id'));
@@ -60,11 +62,15 @@ class PrescriptionController extends Controller
                 $petQuery->select($petSelect);
             }]);
         }
+        if ($hasDoctorsTable) {
+            $query->with('doctor');
+        }
 
         $prescriptions = $query->paginate(20);
         $prescriptions->getCollection()->transform(function ($prescription) use ($hasFollowUpDate, $hasFollowUpType, $hasFollowUpNotes, $hasSeen) {
             $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
             $prescription->seen = $hasSeen ? (bool) $prescription->seen : false;
+            $this->attachDoctorImageUrl($prescription);
 
             // Enrich medications_json with days_remaining based on created_at + duration
             $createdAt = $prescription->created_at ? Carbon::parse($prescription->created_at) : null;
@@ -154,10 +160,13 @@ class PrescriptionController extends Controller
     // GET /api/prescriptions/{id}
     public function show(int $id)
     {
-        $prescription = Prescription::find($id);
+        $prescription = Prescription::query()
+            ->when(Schema::hasTable('doctors'), fn ($query) => $query->with('doctor'))
+            ->find($id);
         if (!$prescription) {
             return response()->json(['message' => 'Prescription not found'], 404);
         }
+        $this->attachDoctorImageUrl($prescription);
         return response()->json(array_merge($prescription->toArray(), [
             'image_url' => $this->buildPrescriptionUrl($prescription->image_path),
             'seen' => Schema::hasColumn('prescriptions', 'seen') ? (bool) $prescription->seen : false,
@@ -207,6 +216,7 @@ class PrescriptionController extends Controller
             ->orderByDesc('id')
             ->get()
             ->map(function (Prescription $prescription) {
+                $this->attachDoctorImageUrl($prescription);
                 $row = $prescription->toArray(); // full prescription row + loaded relations
                 $row['image_url'] = $this->buildPrescriptionUrl($prescription->image_path);
                 $row['seen'] = Schema::hasColumn('prescriptions', 'seen') ? (bool) $prescription->seen : false;
@@ -267,6 +277,33 @@ class PrescriptionController extends Controller
             'count' => $rows->count(),
             'data' => $rows,
         ]);
+    }
+
+    private function attachDoctorImageUrl(Prescription $prescription): void
+    {
+        if (!$prescription->relationLoaded('doctor')) {
+            return;
+        }
+
+        $doctor = $prescription->doctor;
+        if (!$doctor instanceof Doctor) {
+            return;
+        }
+
+        $blobUrl = $this->doctorImageBlobUrl($doctor);
+        $doctor->setAttribute('doctor_image_blob_url', $blobUrl);
+        if ($blobUrl !== null) {
+            $doctor->setAttribute('doctor_image', $blobUrl);
+        }
+    }
+
+    private function doctorImageBlobUrl(Doctor $doctor): ?string
+    {
+        if (empty($doctor->doctor_image_blob)) {
+            return null;
+        }
+
+        return route('api.doctors.blob-image', ['doctor' => $doctor->id]);
     }
 
     // GET /api/users/medical-summary?user_id=
