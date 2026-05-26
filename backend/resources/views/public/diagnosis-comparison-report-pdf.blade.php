@@ -153,8 +153,8 @@
                     <td width="50%">
                         <span class="label">AI diagnosis</span>
                         @if($aiOk)
-                            <div class="diagnosis strong">{{ $comparison['ai_diagnosis'] ?? 'N/A' }}</div>
-                            <div class="muted">Confidence: {{ $comparison['confidence'] ?? 'N/A' }}</div>
+                            <div class="diagnosis strong">{{ $comparison['ai_diagnosis'] ?? 'Limited-evidence AI impression: veterinary consultation recommended for further assessment' }}</div>
+                            <div class="muted">Confidence: {{ $comparison['confidence'] ?? 'low' }}</div>
                             <span class="label" style="margin-top: 8px;">AI basis</span>
                             @if(!empty($comparison['basis']) && is_array($comparison['basis']))
                                 <ul>
@@ -163,7 +163,7 @@
                                     @endforeach
                                 </ul>
                             @else
-                                <div class="muted">N/A</div>
+                                <div class="muted">No AI basis returned.</div>
                             @endif
                         @else
                             <div class="muted">{{ $comparisonPayload['message'] ?? 'Unable to generate AI diagnosis.' }}</div>
@@ -175,8 +175,8 @@
             @if($aiOk)
                 <div class="summary">
                     <span class="label">Comparison</span>
-                    <div>{{ $comparison['comparison_summary'] ?? 'N/A' }}</div>
-                    <div class="muted" style="margin-top: 4px;">Status: {{ $comparison['match_status'] ?? 'N/A' }}</div>
+                    <div>{{ $comparison['comparison_summary'] ?? 'AI generated a limited-evidence impression for doctor review.' }}</div>
+                    <div class="muted" style="margin-top: 4px;">Status: {{ $comparison['match_status'] ?? 'insufficient_data' }}</div>
                     <div class="muted">{{ $comparison['recommended_review'] ?? 'Use as internal comparison only. A veterinarian should review any mismatch.' }}</div>
                 </div>
             @endif

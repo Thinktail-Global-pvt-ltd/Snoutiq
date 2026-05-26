@@ -242,8 +242,12 @@
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
     const renderList = (items) => {
-        if (!Array.isArray(items) || items.length === 0) return '<span class="text-muted">N/A</span>';
+        if (!Array.isArray(items) || items.length === 0) return '<span class="text-muted">No AI basis returned.</span>';
         return `<ul class="mb-0 ps-3">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+    };
+    const usefulText = (value, fallback) => {
+        const text = String(value ?? '').trim();
+        return text && !['n/a', 'na', 'n.a.', 'unknown', 'null'].includes(text.toLowerCase()) ? text : fallback;
     };
 
     document.querySelectorAll('.diagnosis-comparison-item').forEach(async (item) => {
@@ -272,8 +276,8 @@
             loading.classList.add('d-none');
             result.classList.remove('d-none');
             result.innerHTML = `
-                <div class="diagnosis-text fw-semibold">${escapeHtml(comparison.ai_diagnosis || 'N/A')}</div>
-                <div class="small text-muted mt-2">Confidence: ${escapeHtml(comparison.confidence || 'N/A')}</div>
+                <div class="diagnosis-text fw-semibold">${escapeHtml(usefulText(comparison.ai_diagnosis, 'Limited-evidence AI impression: veterinary consultation recommended for further assessment'))}</div>
+                <div class="small text-muted mt-2">Confidence: ${escapeHtml(usefulText(comparison.confidence, 'low'))}</div>
                 <div class="mt-3">
                     <span class="comparison-label">AI basis</span>
                     ${renderList(comparison.basis)}
@@ -285,9 +289,9 @@
                 <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-2">
                     <div>
                         <span class="comparison-label mb-1">Comparison</span>
-                        <p class="mb-0">${escapeHtml(comparison.comparison_summary || 'N/A')}</p>
+                        <p class="mb-0">${escapeHtml(usefulText(comparison.comparison_summary, 'AI generated a limited-evidence impression for doctor review.'))}</p>
                     </div>
-                    <span class="badge text-bg-dark align-self-start">${escapeHtml(comparison.match_status || 'N/A')}</span>
+                    <span class="badge text-bg-dark align-self-start">${escapeHtml(usefulText(comparison.match_status, 'insufficient_data'))}</span>
                 </div>
                 <div class="small text-muted">${escapeHtml(comparison.recommended_review || 'Use as internal comparison only. A veterinarian should review any mismatch.')}</div>
             `;

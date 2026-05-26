@@ -550,7 +550,13 @@ class PublicCapturedTransactionsController extends Controller
 
         $json = json_decode($resp, true);
         $text = trim((string) ($json['candidates'][0]['content']['parts'][0]['text'] ?? ''));
-        $comparison = $this->decodeGeminiJson($text) ?: ['raw_text' => $text];
+        $comparison = $this->normalizeDiagnosisComparison(
+            $this->decodeGeminiJson($text),
+            $text,
+            $reportedSymptom,
+            $prescriptionDiagnoses,
+            $imageParts
+        );
 
         return [
             'success' => true,
@@ -605,11 +611,105 @@ Return valid JSON only using this schema:
 }
 
 Rules:
+- ai_diagnosis must never be "N/A", "NA", "unknown", empty, or null.
+- If evidence is limited, provide a cautious differential such as "limited-evidence differential: wellness consult / exposure risk assessment" using available context.
 - Do not invent facts not supported by the symptom text or attached document.
 - If image content is unreadable, say so in basis and lower confidence.
 - This is for internal comparison only, not a final medical diagnosis.
 - Keep the output concise.
 PROMPT;
+    }
+
+    private function normalizeDiagnosisComparison(?array $decoded, string $rawText, string $reportedSymptom, array $prescriptionDiagnoses, array $imageParts): array
+    {
+        $comparison = is_array($decoded) ? $decoded : [];
+        $rawText = trim($rawText);
+        $doctorDiagnosis = trim(implode('; ', array_filter(array_map('strval', $prescriptionDiagnoses))));
+        $fallbackDiagnosis = $this->fallbackAiDiagnosis($reportedSymptom, $doctorDiagnosis, $imageParts, $rawText);
+
+        $aiDiagnosis = trim((string) ($comparison['ai_diagnosis'] ?? ''));
+        if ($this->isEmptyAiValue($aiDiagnosis)) {
+            $aiDiagnosis = $fallbackDiagnosis;
+        }
+
+        $basis = $comparison['basis'] ?? null;
+        if (! is_array($basis)) {
+            $basis = [];
+        }
+        $basis = array_values(array_filter(array_map(
+            fn ($value) => trim((string) $value),
+            $basis
+        ), fn ($value) => ! $this->isEmptyAiValue($value)));
+        if (empty($basis)) {
+            if ($reportedSymptom !== '') {
+                $basis[] = 'Reported symptom/context: ' . $reportedSymptom;
+            }
+            if (! empty($imageParts)) {
+                $basis[] = 'Pet image/report was available for visual context.';
+            }
+            if ($rawText !== '' && ! $this->isEmptyAiValue($rawText)) {
+                $basis[] = 'Gemini returned unstructured text; summarized as a cautious differential.';
+            }
+        }
+
+        $comparisonSummary = trim((string) ($comparison['comparison_summary'] ?? ''));
+        if ($this->isEmptyAiValue($comparisonSummary)) {
+            $comparisonSummary = $doctorDiagnosis !== ''
+                ? "AI impression: {$aiDiagnosis}. Doctor diagnosis: {$doctorDiagnosis}."
+                : "AI impression: {$aiDiagnosis}. No doctor diagnosis was available for direct matching.";
+        }
+
+        $matchStatus = strtolower(trim((string) ($comparison['match_status'] ?? '')));
+        if (! in_array($matchStatus, ['matches', 'partially_matches', 'differs', 'insufficient_data'], true)) {
+            $matchStatus = $doctorDiagnosis !== '' ? 'partially_matches' : 'insufficient_data';
+        }
+
+        return [
+            'ai_diagnosis' => $aiDiagnosis,
+            'confidence' => $this->normalizeConfidence($comparison['confidence'] ?? null),
+            'basis' => $basis,
+            'prescription_diagnosis' => $doctorDiagnosis !== '' ? $doctorDiagnosis : null,
+            'match_status' => $matchStatus,
+            'comparison_summary' => $comparisonSummary,
+            'recommended_review' => trim((string) ($comparison['recommended_review'] ?? '')) ?: 'A veterinarian should review this AI impression before any clinical use.',
+        ];
+    }
+
+    private function fallbackAiDiagnosis(string $reportedSymptom, string $doctorDiagnosis, array $imageParts, string $rawText): string
+    {
+        if ($rawText !== '' && ! $this->isEmptyAiValue($rawText)) {
+            return mb_substr(preg_replace('/\s+/', ' ', $rawText), 0, 220);
+        }
+
+        $symptom = mb_strtolower(trim($reportedSymptom));
+        if ($symptom !== '' && ! in_array($symptom, ['need to consult', 'consult', 'need consult', 'need consultation'], true)) {
+            return 'Cautious differential based on reported symptoms: ' . mb_substr($reportedSymptom, 0, 160);
+        }
+
+        if ($doctorDiagnosis !== '') {
+            return 'Limited-evidence AI impression: review for ' . mb_substr($doctorDiagnosis, 0, 160);
+        }
+
+        if (! empty($imageParts)) {
+            return 'Limited-evidence AI impression: visual pet wellness review from uploaded image/report';
+        }
+
+        return 'Limited-evidence AI impression: veterinary consultation recommended for further assessment';
+    }
+
+    private function normalizeConfidence($value): string
+    {
+        $confidence = strtolower(trim((string) $value));
+
+        return in_array($confidence, ['low', 'medium', 'high'], true) ? $confidence : 'low';
+    }
+
+    private function isEmptyAiValue(string $value): bool
+    {
+        $normalized = strtolower(trim($value));
+
+        return $normalized === ''
+            || in_array($normalized, ['n/a', 'na', 'n.a.', 'none', 'null', 'unknown', 'not available'], true);
     }
 
     private function decodeGeminiJson(string $text): ?array
