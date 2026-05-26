@@ -108,7 +108,7 @@ class PublicCapturedTransactionsController extends Controller
             ];
         }
 
-        return view('public.captured-transactions', [
+        return view('public.diagnosis-comparison-report', [
             'transactions' => new LengthAwarePaginator(
                 $transactions,
                 $transactions->count(),
@@ -119,10 +119,6 @@ class PublicCapturedTransactionsController extends Controller
             'metrics' => $metrics,
             'hasRequiredTables' => $hasRequiredTables,
             'hasRequiredColumns' => $hasRequiredColumns,
-            'reportTitle' => 'Diagnosis comparison report',
-            'reportIntroTitle' => 'Diagnosis comparison for transactions #855 and #866',
-            'reportDescriptionHtml' => 'Shareable report for transaction IDs <code>855</code> and <code>866</code>. Prescription diagnosis is loaded from <code>transactions.channel_name = prescriptions.call_session</code>.',
-            'showInvoiceControls' => false,
         ]);
     }
 
