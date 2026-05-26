@@ -55,6 +55,7 @@ use App\Http\Controllers\ClinicWebsiteContentController;
 use App\Services\RagSnouticSymptomService;
 use App\Http\Controllers\PublicCapturedTransactionsController;
 use App\Http\Controllers\PublicCapturedTransactionMonthlyInvoicesController;
+use App\Http\Controllers\PublicPrescriptionDiagnosisUsersController;
 
 
 // Public routes
@@ -133,6 +134,8 @@ Route::post('/captured-transactions/{transaction}/diagnosis-comparison', [Public
 Route::get('/captured-transactions/{transaction}/invoice', \App\Http\Controllers\PublicCapturedTransactionInvoiceController::class)
     ->whereNumber('transaction')
     ->name('captured-transactions.invoice');
+Route::get('/prescription-diagnosis-users', PublicPrescriptionDiagnosisUsersController::class)
+    ->name('prescription-diagnosis-users.public');
 Route::get('/clinics/{clinic}/media/image', [ClinicMediaController::class, 'image'])
     ->whereNumber('clinic')
     ->name('clinics.media.image');
