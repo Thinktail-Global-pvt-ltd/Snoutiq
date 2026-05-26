@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Transaction extends Model
 {
@@ -64,6 +65,11 @@ class Transaction extends Model
     public function reportedSymptomLog(): HasOne
     {
         return $this->hasOne(ReportedSymptomLog::class);
+    }
+
+    public function prescriptions(): HasMany
+    {
+        return $this->hasMany(Prescription::class, 'call_session', 'channel_name');
     }
 
     public function scopeCompleted($query)
