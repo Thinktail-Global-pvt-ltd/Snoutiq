@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeviceToken;
 use App\Models\Doctor;
 use App\Models\Pet;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Services\Push\FcmService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +20,10 @@ class PrescriptionMedicationReminderController extends Controller
 {
     private const LOG_TYPE = 'cf_medication_reminder';
 
-    public function __construct(private readonly WhatsAppService $whatsApp)
+    public function __construct(
+        private readonly WhatsAppService $whatsApp,
+        private readonly FcmService $fcm,
+    )
     {
     }
 
@@ -58,19 +63,9 @@ class PrescriptionMedicationReminderController extends Controller
         $pet = $prescription->pet_id ? Pet::query()->find($prescription->pet_id) : null;
         $doctor = $prescription->doctor_id ? Doctor::query()->find($prescription->doctor_id) : null;
 
-        $to = $this->normalizeWhatsAppPhone($user?->phone);
-        if (!$to) {
-            $this->logReminder($prescription, 'skipped', null, null, null, 'missing_patient_phone');
-
-            return response()->json([
-                'success' => false,
-                'error' => 'missing_patient_phone',
-            ], 422);
-        }
-
         $medicineLines = $this->buildMedicationLines($prescription->medications_json);
         if ($medicineLines === []) {
-            $this->logReminder($prescription, 'skipped', $to, null, null, 'missing_medications_json');
+            $this->logReminder($prescription, 'skipped', null, null, null, 'missing_medications_json');
 
             return response()->json([
                 'success' => false,
@@ -84,6 +79,8 @@ class PrescriptionMedicationReminderController extends Controller
         $petName = $this->cleanText($pet?->name) ?: 'your pet';
         $template = config('services.whatsapp.templates.cf_medication_reminder', 'cf_medication_reminder');
         $language = config('services.whatsapp.templates.cf_medication_reminder_language', 'en');
+        $fcmResult = $this->sendFcmReminder($prescription, $petName, $medicineLines, $dryRun);
+        $to = $this->normalizeWhatsAppPhone($user?->phone);
 
         $components = [
             [
@@ -113,17 +110,49 @@ class PrescriptionMedicationReminderController extends Controller
                     'prescription_id' => $prescription->id,
                     'medicine_lines' => $medicineLines,
                     'components' => $components,
+                    'fcm' => $fcmResult,
                 ],
             ]);
         }
 
-        if (!$this->whatsApp->isConfigured()) {
-            $this->logReminder($prescription, 'skipped', $to, $template, $language, 'whatsapp_not_configured');
+        if (!$to) {
+            $this->logReminder($prescription, $fcmResult['sent'] ? 'sent' : 'skipped', null, null, null, 'missing_patient_phone', [
+                'channel' => 'fcm',
+                'fcm' => $fcmResult,
+            ]);
 
             return response()->json([
-                'success' => false,
+                'success' => (bool) $fcmResult['sent'],
+                'error' => $fcmResult['sent'] ? null : 'missing_patient_phone',
+                'data' => [
+                    'sent' => (bool) $fcmResult['sent'],
+                    'whatsapp_sent' => false,
+                    'fcm_sent' => (bool) $fcmResult['sent'],
+                    'fcm' => $fcmResult,
+                    'prescription_id' => $prescription->id,
+                    'medicine_lines' => $medicineLines,
+                ],
+            ], $fcmResult['sent'] ? 200 : 422);
+        }
+
+        if (!$this->whatsApp->isConfigured()) {
+            $this->logReminder($prescription, $fcmResult['sent'] ? 'sent' : 'skipped', $to, $template, $language, 'whatsapp_not_configured', [
+                'channel' => 'fcm',
+                'fcm' => $fcmResult,
+            ]);
+
+            return response()->json([
+                'success' => (bool) $fcmResult['sent'],
                 'error' => 'whatsapp_not_configured',
-            ], 500);
+                'data' => [
+                    'sent' => (bool) $fcmResult['sent'],
+                    'whatsapp_sent' => false,
+                    'fcm_sent' => (bool) $fcmResult['sent'],
+                    'fcm' => $fcmResult,
+                    'prescription_id' => $prescription->id,
+                    'medicine_lines' => $medicineLines,
+                ],
+            ], $fcmResult['sent'] ? 200 : 500);
         }
 
         try {
@@ -138,23 +167,29 @@ class PrescriptionMedicationReminderController extends Controller
             $this->logReminder($prescription, 'sent', $to, $template, $language, null, [
                 'medicine_lines' => $medicineLines,
                 'whatsapp_response' => $response,
+                'fcm' => $fcmResult,
             ]);
 
             return response()->json([
                 'success' => true,
                 'data' => [
                     'sent' => true,
+                    'whatsapp_sent' => true,
+                    'fcm_sent' => (bool) $fcmResult['sent'],
                     'template' => $template,
                     'language' => $language,
                     'to' => $to,
                     'prescription_id' => $prescription->id,
                     'medicine_lines' => $medicineLines,
                     'whatsapp' => $response,
+                    'fcm' => $fcmResult,
                 ],
             ]);
         } catch (\Throwable $e) {
-            $this->logReminder($prescription, 'failed', $to, $template, $language, $e->getMessage(), [
+            $this->logReminder($prescription, $fcmResult['sent'] ? 'sent' : 'failed', $to, $template, $language, $e->getMessage(), [
                 'medicine_lines' => $medicineLines,
+                'channel' => $fcmResult['sent'] ? 'fcm' : 'whatsapp',
+                'fcm' => $fcmResult,
             ]);
 
             Log::warning('prescriptions.medication_reminder_failed', [
@@ -164,10 +199,114 @@ class PrescriptionMedicationReminderController extends Controller
             ]);
 
             return response()->json([
-                'success' => false,
+                'success' => (bool) $fcmResult['sent'],
                 'error' => 'send_failed',
                 'message' => $e->getMessage(),
-            ], 500);
+                'data' => [
+                    'sent' => (bool) $fcmResult['sent'],
+                    'whatsapp_sent' => false,
+                    'fcm_sent' => (bool) $fcmResult['sent'],
+                    'fcm' => $fcmResult,
+                    'prescription_id' => $prescription->id,
+                    'medicine_lines' => $medicineLines,
+                ],
+            ], $fcmResult['sent'] ? 200 : 500);
+        }
+    }
+
+    private function sendFcmReminder(Prescription $prescription, string $petName, array $medicineLines, bool $dryRun): array
+    {
+        $userId = (int) ($prescription->user_id ?? 0);
+        if ($userId <= 0 || !Schema::hasTable('device_tokens')) {
+            return [
+                'sent' => false,
+                'success' => 0,
+                'failure' => 0,
+                'token_count' => 0,
+                'reason' => $userId <= 0 ? 'missing_user_id' : 'missing_device_tokens_table',
+            ];
+        }
+
+        $tokens = DeviceToken::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('token')
+            ->pluck('token')
+            ->filter()
+            ->map(fn ($token) => trim(trim((string) $token), "\"'"))
+            ->filter(fn (string $token) => $token !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($tokens)) {
+            return [
+                'sent' => false,
+                'success' => 0,
+                'failure' => 0,
+                'token_count' => 0,
+                'reason' => 'no_device_tokens',
+            ];
+        }
+
+        $title = 'Medication Reminder';
+        $body = 'Time for '.$petName.' medication: '.$medicineLines[0];
+        $data = [
+            'type' => 'medication_reminder',
+            'prescription_id' => (string) $prescription->id,
+            'medical_record_id' => (string) ($prescription->medical_record_id ?? ''),
+            'pet_id' => (string) ($prescription->pet_id ?? ''),
+            'follow_up_date' => (string) optional($prescription->follow_up_date)->toDateString(),
+            'deepLink' => 'snoutiq://prescriptions/'.$prescription->id,
+            'deep_link' => 'snoutiq://prescriptions/'.$prescription->id,
+            'deeplink' => 'snoutiq://prescriptions/'.$prescription->id,
+        ];
+
+        if ($dryRun) {
+            return [
+                'sent' => false,
+                'dry_run' => true,
+                'token_count' => count($tokens),
+                'title' => $title,
+                'body' => $body,
+                'data' => $data,
+            ];
+        }
+
+        try {
+            $result = $this->fcm->sendMulticast($tokens, $title, $body, $data);
+            $success = (int) ($result['success'] ?? 0);
+            $failure = (int) ($result['failure'] ?? max(0, count($tokens) - $success));
+
+            return [
+                'sent' => $success > 0,
+                'success' => $success,
+                'failure' => $failure,
+                'token_count' => count($tokens),
+                'errors' => collect($result['results'] ?? [])
+                    ->filter(fn ($item) => ! (bool) ($item['ok'] ?? false))
+                    ->map(fn ($item) => [
+                        'code' => $item['code'] ?? null,
+                        'error' => $item['error'] ?? null,
+                    ])
+                    ->values()
+                    ->take(5)
+                    ->all(),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('prescriptions.medication_reminder_fcm_failed', [
+                'prescription_id' => $prescription->id,
+                'user_id' => $userId,
+                'token_count' => count($tokens),
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'sent' => false,
+                'success' => 0,
+                'failure' => count($tokens),
+                'token_count' => count($tokens),
+                'error' => $e->getMessage(),
+            ];
         }
     }
 

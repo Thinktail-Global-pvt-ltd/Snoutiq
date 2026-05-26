@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
 class SendPrescriptionMedicationReminders extends Command
 {
     protected $signature = 'notifications:prescription-medication-reminders {--prescription_id=} {--dry}';
-    protected $description = 'Send recurring WhatsApp medication reminders from prescriptions.medications_json.';
+    protected $description = 'Send recurring FCM and WhatsApp medication reminders from prescriptions.medications_json.';
 
     public function handle(): int
     {
