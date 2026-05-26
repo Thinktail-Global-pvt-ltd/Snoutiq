@@ -15,6 +15,10 @@
         overflow-wrap: anywhere;
         white-space: pre-wrap;
     }
+    .ai-analysis-box {
+        max-width: 420px;
+        min-width: 260px;
+    }
     @media (max-width: 767.98px) {
         .diagnosis-users-table thead {
             display: none;
@@ -113,6 +117,8 @@
                                 <th>Pet</th>
                                 <th>Doctor</th>
                                 <th>Diagnosis</th>
+                                <th>Reported Symptom</th>
+                                <th>AI Analysis</th>
                                 <th>Call Session</th>
                             </tr>
                         </thead>
@@ -123,6 +129,7 @@
                                     $pet = $prescription->pet;
                                     $doctor = $prescription->doctor;
                                     $user = $prescription->user;
+                                    $reportedSymptom = trim((string) ($pet->reported_symptom ?? ''));
                                 @endphp
                                 <tr>
                                     <td data-label="Prescription">
@@ -175,6 +182,23 @@
                                             <div class="small text-muted">Status: {{ $prescription->diagnosis_status }}</div>
                                         @endif
                                     </td>
+                                    <td data-label="Reported Symptom">
+                                        @if($reportedSymptom !== '')
+                                            <div class="diagnosis-text">{{ $reportedSymptom }}</div>
+                                        @else
+                                            <span class="text-muted">No reported symptom</span>
+                                        @endif
+                                    </td>
+                                    <td data-label="AI Analysis" class="ai-analysis-box">
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-primary ai-analysis-btn"
+                                            data-url="{{ route('prescription-diagnosis-users.ai-analysis', $prescription) }}"
+                                        >
+                                            Analyze symptom
+                                        </button>
+                                        <div class="ai-analysis-result small mt-2 text-muted"></div>
+                                    </td>
                                     <td data-label="Call Session">
                                         {{ $prescription->call_session ?: 'N/A' }}
                                     </td>
@@ -194,3 +218,68 @@
     </section>
 @endif
 @endsection
+
+@push('scripts')
+<script>
+(() => {
+    const csrfToken = '{{ csrf_token() }}';
+    const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    const renderList = (items) => {
+        if (!Array.isArray(items) || items.length === 0) return '';
+        return `<ul class="mb-0 ps-3">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+    };
+
+    document.querySelectorAll('.ai-analysis-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const result = button.parentElement.querySelector('.ai-analysis-result');
+            button.disabled = true;
+            button.textContent = 'Analyzing...';
+            result.className = 'ai-analysis-result small mt-2 text-muted';
+            result.textContent = 'Loading Gemini analysis...';
+
+            try {
+                const response = await fetch(button.dataset.url, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({}),
+                });
+                const payload = await response.json();
+
+                if (!response.ok || !payload.success) {
+                    result.className = 'ai-analysis-result small mt-2 text-danger';
+                    result.textContent = payload.message || 'Unable to generate AI analysis.';
+                    button.disabled = false;
+                    button.textContent = 'Analyze symptom';
+                    return;
+                }
+
+                const data = payload.data || {};
+                result.className = 'ai-analysis-result small mt-2';
+                result.innerHTML = `
+                    <div class="fw-semibold">${escapeHtml(data.ai_summary || 'AI analysis generated.')}</div>
+                    <div class="text-muted mt-1">Confidence: ${escapeHtml(data.confidence || 'low')}</div>
+                    <div class="mt-2">${escapeHtml(data.comparison || '')}</div>
+                    <div class="mt-2">${renderList(data.basis)}</div>
+                `;
+                button.textContent = 'Re-run analysis';
+                button.disabled = false;
+            } catch (error) {
+                result.className = 'ai-analysis-result small mt-2 text-danger';
+                result.textContent = 'Unable to generate AI analysis.';
+                button.disabled = false;
+                button.textContent = 'Analyze symptom';
+            }
+        });
+    });
+})();
+</script>
+@endpush
