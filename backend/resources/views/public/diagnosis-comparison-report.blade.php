@@ -247,7 +247,9 @@
     };
     const usefulText = (value, fallback) => {
         const text = String(value ?? '').trim();
-        return text && !['n/a', 'na', 'n.a.', 'unknown', 'null'].includes(text.toLowerCase()) ? text : fallback;
+        const lower = text.toLowerCase();
+        const looksJson = text.startsWith('{') || text.startsWith('[') || text.startsWith('```');
+        return text && !looksJson && !['n/a', 'na', 'n.a.', 'unknown', 'null'].includes(lower) ? text : fallback;
     };
 
     document.querySelectorAll('.diagnosis-comparison-item').forEach(async (item) => {

@@ -189,6 +189,7 @@ class PublicCapturedTransactionsController extends Controller
         }
 
         $cacheKey = 'captured_transactions.diagnosis_comparison.' . sha1(json_encode([
+            'normalizer_version' => 2,
             'transaction_id' => $transaction->id,
             'pet_id' => $pet->id,
             'symptom' => $reportedSymptom,
@@ -612,6 +613,7 @@ Return valid JSON only using this schema:
 
 Rules:
 - ai_diagnosis must never be "N/A", "NA", "unknown", empty, or null.
+- Use the exact JSON key "ai_diagnosis"; do not use "ai_diagnosys".
 - If evidence is limited, provide a cautious differential such as "limited-evidence differential: wellness consult / exposure risk assessment" using available context.
 - Do not invent facts not supported by the symptom text or attached document.
 - If image content is unreadable, say so in basis and lower confidence.
@@ -627,7 +629,7 @@ PROMPT;
         $doctorDiagnosis = trim(implode('; ', array_filter(array_map('strval', $prescriptionDiagnoses))));
         $fallbackDiagnosis = $this->fallbackAiDiagnosis($reportedSymptom, $doctorDiagnosis, $imageParts, $rawText);
 
-        $aiDiagnosis = trim((string) ($comparison['ai_diagnosis'] ?? ''));
+        $aiDiagnosis = trim((string) ($comparison['ai_diagnosis'] ?? $comparison['ai_diagnosys'] ?? $comparison['diagnosis'] ?? ''));
         if ($this->isEmptyAiValue($aiDiagnosis)) {
             $aiDiagnosis = $fallbackDiagnosis;
         }
@@ -647,9 +649,9 @@ PROMPT;
             if (! empty($imageParts)) {
                 $basis[] = 'Pet image/report was available for visual context.';
             }
-            if ($rawText !== '' && ! $this->isEmptyAiValue($rawText)) {
-                $basis[] = 'Gemini returned unstructured text; summarized as a cautious differential.';
-            }
+        if ($rawText !== '' && ! $this->isEmptyAiValue($rawText) && ! $this->looksLikeJsonPayload($rawText)) {
+            $basis[] = 'Gemini returned unstructured text; summarized as a cautious differential.';
+        }
         }
 
         $comparisonSummary = trim((string) ($comparison['comparison_summary'] ?? ''));
@@ -677,8 +679,17 @@ PROMPT;
 
     private function fallbackAiDiagnosis(string $reportedSymptom, string $doctorDiagnosis, array $imageParts, string $rawText): string
     {
-        if ($rawText !== '' && ! $this->isEmptyAiValue($rawText)) {
+        if ($rawText !== '' && ! $this->isEmptyAiValue($rawText) && ! $this->looksLikeJsonPayload($rawText)) {
             return mb_substr(preg_replace('/\s+/', ' ', $rawText), 0, 220);
+        }
+
+        $doctorLower = mb_strtolower($doctorDiagnosis);
+        if (str_contains($doctorLower, 'fpv') || str_contains($doctorLower, 'panleukopenia')) {
+            return 'Limited-evidence differential: feline panleukopenia virus exposure risk assessment';
+        }
+
+        if (str_contains($doctorLower, 'positive') && str_contains($doctorLower, 'cat')) {
+            return 'Limited-evidence differential: infectious exposure risk assessment';
         }
 
         $symptom = mb_strtolower(trim($reportedSymptom));
@@ -695,6 +706,15 @@ PROMPT;
         }
 
         return 'Limited-evidence AI impression: veterinary consultation recommended for further assessment';
+    }
+
+    private function looksLikeJsonPayload(string $value): bool
+    {
+        $trimmed = ltrim($value);
+
+        return str_starts_with($trimmed, '{')
+            || str_starts_with($trimmed, '[')
+            || str_starts_with($trimmed, '```');
     }
 
     private function normalizeConfidence($value): string
@@ -714,6 +734,13 @@ PROMPT;
 
     private function decodeGeminiJson(string $text): ?array
     {
+        $text = trim($text);
+        if (str_starts_with($text, '```')) {
+            $text = preg_replace('/^```(?:json)?\s*/i', '', $text);
+            $text = preg_replace('/\s*```$/', '', (string) $text);
+            $text = trim((string) $text);
+        }
+
         $decoded = json_decode($text, true);
         if (is_array($decoded)) {
             return $decoded;
@@ -725,7 +752,8 @@ PROMPT;
             return null;
         }
 
-        $decoded = json_decode(substr($text, $start, $end - $start + 1), true);
+        $json = substr($text, $start, $end - $start + 1);
+        $decoded = json_decode($json, true);
 
         return is_array($decoded) ? $decoded : null;
     }
