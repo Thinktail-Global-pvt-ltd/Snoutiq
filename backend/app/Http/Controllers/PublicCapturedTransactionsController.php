@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Pet;
 use App\Models\Transaction;
 use App\Support\GeminiConfig;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
@@ -107,6 +109,7 @@ class PublicCapturedTransactionsController extends Controller
                 'unique_users' => $transactions->pluck('user_id')->filter()->unique()->count(),
             ];
         }
+        $reportRows = $this->diagnosisReportRows($transactions, false);
 
         return view('public.diagnosis-comparison-report', [
             'transactions' => new LengthAwarePaginator(
@@ -119,6 +122,32 @@ class PublicCapturedTransactionsController extends Controller
             'metrics' => $metrics,
             'hasRequiredTables' => $hasRequiredTables,
             'hasRequiredColumns' => $hasRequiredColumns,
+            'reportRows' => $reportRows,
+        ]);
+    }
+
+    public function diagnosisReportPdf(Request $request)
+    {
+        $transactionIds = [855, 866];
+        abort_unless(Schema::hasTable('transactions') && Schema::hasTable('users'), 404);
+
+        $transactions = $this->baseTransactionReportQuery()
+            ->whereIn('id', $transactionIds)
+            ->get()
+            ->sortBy(fn ($transaction) => array_search((int) $transaction->id, $transactionIds, true))
+            ->values();
+
+        $rows = $this->diagnosisReportRows($transactions, true);
+        $html = view('public.diagnosis-comparison-report-pdf', [
+            'rows' => $rows,
+            'generatedAt' => now('Asia/Kolkata'),
+        ])->render();
+        $pdf = $this->renderPdf($html);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="diagnosis-comparison-855-866.pdf"',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
         ]);
     }
 
@@ -198,7 +227,10 @@ class PublicCapturedTransactionsController extends Controller
         }
 
         $query = Transaction::query()
-            ->with(['user' => fn ($query) => $query->select(array_unique($userColumns))])
+            ->with([
+                'user' => fn ($query) => $query->select(array_unique($userColumns)),
+                'doctor' => fn ($query) => $query->select($this->doctorColumns()),
+            ])
             ->whereNotNull('user_id')
             ->whereHas('user');
 
@@ -218,6 +250,77 @@ class PublicCapturedTransactionsController extends Controller
         }
 
         return $query;
+    }
+
+    private function doctorColumns(): array
+    {
+        $columns = ['id'];
+        foreach (['doctor_name', 'doctor_email', 'doctor_mobile', 'degree', 'doctor_license'] as $column) {
+            if (Schema::hasColumn('doctors', $column)) {
+                $columns[] = $column;
+            }
+        }
+
+        return array_unique($columns);
+    }
+
+    private function diagnosisReportRows($transactions, bool $includeAi): array
+    {
+        $diagnosisColumn = $this->prescriptionDiagnosisColumn();
+
+        return $transactions->map(function (Transaction $transaction) use ($diagnosisColumn, $includeAi) {
+            $pet = $this->resolvePetForTransaction($transaction);
+            $prescriptions = $transaction->relationLoaded('prescriptions')
+                ? $transaction->prescriptions
+                : $this->prescriptionsForTransaction($transaction);
+            $doctorDiagnoses = $diagnosisColumn
+                ? $prescriptions
+                    ->map(fn ($prescription) => trim((string) ($prescription->{$diagnosisColumn} ?? '')))
+                    ->filter()
+                    ->values()
+                    ->all()
+                : [];
+            $imageParts = $pet ? $this->geminiImagePartsForPet($pet) : [];
+            $reportedSymptom = $pet && Schema::hasColumn('pets', 'reported_symptom')
+                ? trim((string) ($pet->reported_symptom ?? ''))
+                : '';
+            $comparisonPayload = null;
+
+            if ($includeAi && $pet && ($reportedSymptom !== '' || ! empty($imageParts))) {
+                $comparisonPayload = $this->generateDiagnosisComparison(
+                    $transaction,
+                    $pet,
+                    $reportedSymptom,
+                    $doctorDiagnoses,
+                    $imageParts
+                );
+            }
+
+            return [
+                'transaction' => $transaction,
+                'user' => $transaction->user,
+                'doctor' => $transaction->doctor,
+                'pet' => $pet,
+                'doctor_diagnoses' => $doctorDiagnoses,
+                'reported_symptom' => $reportedSymptom,
+                'image_documents' => $this->imageDocumentsForReport($imageParts),
+                'comparison_payload' => $comparisonPayload,
+            ];
+        })->all();
+    }
+
+    private function imageDocumentsForReport(array $imageParts): array
+    {
+        return array_map(function (array $part) {
+            return [
+                'label' => $part['column'] === 'pet_doc2_blob_new' ? 'Latest uploaded pet image/report' : 'Original pet image/report',
+                'column' => $part['column'],
+                'mime_type' => $part['mime_type'],
+                'data_uri' => str_starts_with((string) $part['mime_type'], 'image/')
+                    ? 'data:' . $part['mime_type'] . ';base64,' . $part['data']
+                    : null,
+            ];
+        }, $imageParts);
     }
 
     private function prescriptionDiagnosisColumn(): ?string
@@ -537,5 +640,19 @@ PROMPT;
         $mime = $finfo->buffer($blob);
 
         return is_string($mime) && $mime !== '' ? $mime : null;
+    }
+
+    private function renderPdf(string $html): string
+    {
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        return $dompdf->output();
     }
 }

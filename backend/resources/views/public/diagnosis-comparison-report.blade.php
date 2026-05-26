@@ -10,11 +10,35 @@
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         background: #fff;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+    .summary-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+    .summary-box {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.85rem;
+        background: #fff;
     }
     .comparison-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 1rem;
+    }
+    .context-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+    .context-box {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.85rem;
+        background: #ffffff;
+        min-height: 95px;
     }
     .comparison-panel {
         border: 1px solid #e5e7eb;
@@ -36,8 +60,18 @@
         overflow-wrap: anywhere;
         white-space: pre-wrap;
     }
+    .source-image {
+        width: 100%;
+        max-height: 180px;
+        object-fit: contain;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fff;
+    }
     @media (max-width: 767.98px) {
-        .comparison-grid {
+        .comparison-grid,
+        .context-grid,
+        .summary-strip {
             grid-template-columns: 1fr;
         }
     }
@@ -45,12 +79,6 @@
 @endpush
 
 @section('content')
-@php
-    $diagnosisColumn = \Illuminate\Support\Facades\Schema::hasTable('prescriptions') && \Illuminate\Support\Facades\Schema::hasColumn('prescriptions', 'diagnosis')
-        ? 'diagnosis'
-        : (\Illuminate\Support\Facades\Schema::hasTable('prescriptions') && \Illuminate\Support\Facades\Schema::hasColumn('prescriptions', 'diagnosys') ? 'diagnosys' : null);
-@endphp
-
 <section class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
         <h2 class="h5 mb-1">Doctor vs AI diagnosis comparison</h2>
@@ -58,7 +86,12 @@
             Shareable comparison report for transactions <code>855</code> and <code>866</code>.
         </p>
     </div>
-    <span class="badge text-bg-dark align-self-start align-self-md-center">Gemini 2.5 Flash</span>
+    <div class="d-flex flex-column flex-sm-row gap-2 align-self-start align-self-md-center">
+        <a href="{{ route('captured-transactions.diagnosis-report.pdf') }}" class="btn btn-dark btn-sm">
+            <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF
+        </a>
+        <span class="badge text-bg-dark align-self-start align-self-sm-center">Gemini 2.5 Flash</span>
+    </div>
 </section>
 
 @if (!$hasRequiredTables || !$hasRequiredColumns)
@@ -70,16 +103,34 @@
         No matching transactions found for IDs 855 and 866.
     </div>
 @else
+    <section class="summary-strip mb-3">
+        <div class="summary-box">
+            <span class="comparison-label">Transactions</span>
+            <strong>{{ number_format($metrics['total_transactions'] ?? 0) }}</strong>
+        </div>
+        <div class="summary-box">
+            <span class="comparison-label">Unique users</span>
+            <strong>{{ number_format($metrics['unique_users'] ?? 0) }}</strong>
+        </div>
+        <div class="summary-box">
+            <span class="comparison-label">Report scope</span>
+            <strong>#855, #866</strong>
+        </div>
+        <div class="summary-box">
+            <span class="comparison-label">Output</span>
+            <strong>Doctor vs AI</strong>
+        </div>
+    </section>
+
     <div class="d-flex flex-column gap-3">
-        @foreach($transactions as $transaction)
+        @foreach($reportRows as $row)
             @php
-                $relatedPrescriptions = $transaction->relationLoaded('prescriptions') ? $transaction->prescriptions : collect();
-                $doctorDiagnoses = $diagnosisColumn
-                    ? $relatedPrescriptions
-                        ->map(fn ($prescription) => trim((string) ($prescription->{$diagnosisColumn} ?? '')))
-                        ->filter()
-                        ->values()
-                    : collect();
+                $transaction = $row['transaction'];
+                $user = $row['user'];
+                $doctor = $row['doctor'];
+                $pet = $row['pet'];
+                $doctorDiagnoses = collect($row['doctor_diagnoses'] ?? []);
+                $imageDocuments = $row['image_documents'] ?? [];
             @endphp
             <article class="comparison-card p-3 p-md-4 diagnosis-comparison-item" data-url="{{ route('captured-transactions.diagnosis-comparison', $transaction) }}">
                 <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
@@ -94,6 +145,63 @@
                     </div>
                     <span class="badge text-bg-light align-self-start">Doctor vs AI</span>
                 </div>
+
+                <div class="context-grid mb-3">
+                    <section class="context-box">
+                        <span class="comparison-label">Pet</span>
+                        <div class="fw-semibold">{{ $pet->name ?? 'Pet unavailable' }}</div>
+                        <div class="small text-muted">
+                            {{ collect([$pet?->pet_type ?? $pet?->type ?? null, $pet?->breed ?? null, $pet?->pet_age ? $pet->pet_age . ' yrs' : null, $pet?->pet_gender ?? null])->filter()->join(' · ') ?: 'Details unavailable' }}
+                        </div>
+                    </section>
+                    <section class="context-box">
+                        <span class="comparison-label">Doctor</span>
+                        <div class="fw-semibold">{{ $doctor->doctor_name ?? 'Doctor unavailable' }}</div>
+                        <div class="small text-muted">
+                            {{ collect([$doctor?->degree ?? null, $doctor?->doctor_license ?? null])->filter()->join(' · ') ?: 'Details unavailable' }}
+                        </div>
+                    </section>
+                    <section class="context-box">
+                        <span class="comparison-label">User</span>
+                        <div class="fw-semibold">{{ $user->name ?? 'User #' . $transaction->user_id }}</div>
+                        <div class="small text-muted">
+                            {{ collect([$user?->phone ?? null, $user?->email ?? null])->filter()->join(' · ') ?: 'Contact unavailable' }}
+                        </div>
+                    </section>
+                    <section class="context-box">
+                        <span class="comparison-label">Image used</span>
+                        @forelse($imageDocuments as $document)
+                            <div class="small fw-semibold">{{ $document['label'] }}</div>
+                            <div class="small text-muted">{{ $document['mime_type'] }}</div>
+                        @empty
+                            <div class="text-muted small">No image/report blob available.</div>
+                        @endforelse
+                    </section>
+                </div>
+
+                @if(!empty($row['reported_symptom']))
+                    <section class="border rounded p-3 mb-3 bg-light">
+                        <span class="comparison-label">Reported symptom</span>
+                        <div class="diagnosis-text">{{ $row['reported_symptom'] }}</div>
+                    </section>
+                @endif
+
+                @if(!empty($imageDocuments))
+                    <div class="row g-3 mb-3">
+                        @foreach($imageDocuments as $document)
+                            <div class="col-md-6">
+                                <div class="border rounded p-2 bg-light h-100">
+                                    <div class="small fw-semibold mb-2">{{ $document['label'] }}</div>
+                                    @if(!empty($document['data_uri']))
+                                        <img src="{{ $document['data_uri'] }}" class="source-image" alt="{{ $document['label'] }}">
+                                    @else
+                                        <div class="text-muted small">Preview unavailable for {{ $document['mime_type'] }}.</div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
 
                 <div class="comparison-grid">
                     <section class="comparison-panel">
