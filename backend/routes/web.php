@@ -123,6 +123,8 @@ Route::get('/captured-transactions', PublicCapturedTransactionsController::class
     ->name('captured-transactions.public');
 Route::get('/captured-transactions/invoices/month', PublicCapturedTransactionMonthlyInvoicesController::class)
     ->name('captured-transactions.invoices.month');
+Route::get('/captured-transactions/diagnosis-report', [PublicCapturedTransactionsController::class, 'diagnosisReport'])
+    ->name('captured-transactions.diagnosis-report');
 Route::post('/captured-transactions/{transaction}/diagnosis-comparison', [PublicCapturedTransactionsController::class, 'diagnosisComparison'])
     ->whereNumber('transaction')
     ->name('captured-transactions.diagnosis-comparison');

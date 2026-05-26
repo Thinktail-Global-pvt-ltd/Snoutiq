@@ -1,6 +1,6 @@
 @extends('layouts.admin-panel')
 
-@section('page-title', 'Captured Transactions')
+@section('page-title', $reportTitle ?? 'Captured Transactions')
 @section('hide-sidebar', 'true')
 @section('access-badge', 'Public view')
 
@@ -111,14 +111,14 @@
     $additionalGstPaiseFor = static fn ($amountPaise) => (int) round(((int) $amountPaise) * 18 / 100);
     $invoiceNumberFor = static fn ($transaction) => \App\Support\PublicCapturedTransactionInvoices::invoiceNumber($transaction);
     $defaultInvoiceMonth = now('Asia/Kolkata')->format('Y-m');
+    $showInvoiceControls = $showInvoiceControls ?? true;
 @endphp
 
 <section class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
-        <h2 class="h5 mb-1">Captured transactions above ₹1</h2>
+        <h2 class="h5 mb-1">{{ $reportIntroTitle ?? 'Captured transactions above ₹1' }}</h2>
         <p class="text-muted mb-0">
-            Public report for <code>transactions.status = captured</code>, <code>amount_paise != 100</code>, and users that still exist in <code>users</code>.
-            GST-included rows are marked green. Rows where GST was not added are marked red.
+            {!! $reportDescriptionHtml ?? 'Public report for <code>transactions.status = captured</code>, <code>amount_paise != 100</code>, and users that still exist in <code>users</code>. GST-included rows are marked green. Rows where GST was not added are marked red.' !!}
         </p>
     </div>
     <div class="d-flex align-items-center gap-2">
@@ -161,6 +161,7 @@
                     <p class="text-muted mb-0">Sorted newest first.</p>
                 </div>
                 <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                    @if($showInvoiceControls)
                     <div class="input-group input-group-sm" style="width: 270px;">
                         <input type="month" id="invoiceMonth" class="form-control" value="{{ $defaultInvoiceMonth }}">
                         <button type="button" id="downloadMonthlyInvoices" class="btn btn-outline-success">
@@ -170,6 +171,7 @@
                     <button type="button" id="downloadAllInvoices" class="btn btn-sm btn-success">
                         Download all invoices
                     </button>
+                    @endif
                     @if(method_exists($transactions, 'total'))
                         <span class="badge text-bg-light">{{ number_format($transactions->total()) }} records</span>
                     @endif
@@ -333,9 +335,11 @@
                     </table>
                 </div>
 
+                @if($transactions->hasPages())
                 <div class="mt-3">
                     {{ $transactions->links() }}
                 </div>
+                @endif
             @endif
         </div>
     </section>

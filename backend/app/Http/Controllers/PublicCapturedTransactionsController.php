@@ -6,6 +6,7 @@ use App\Models\Pet;
 use App\Models\Transaction;
 use App\Support\GeminiConfig;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -78,12 +79,59 @@ class PublicCapturedTransactionsController extends Controller
         ]);
     }
 
+    public function diagnosisReport(Request $request)
+    {
+        $transactionIds = [855, 866];
+        $hasRequiredTables = Schema::hasTable('transactions') && Schema::hasTable('users');
+        $hasRequiredColumns = $hasRequiredTables
+            && Schema::hasColumn('transactions', 'user_id')
+            && Schema::hasColumn('transactions', 'amount_paise');
+
+        $transactions = collect();
+        $metrics = [
+            'total_transactions' => 0,
+            'total_amount_paise' => 0,
+            'unique_users' => 0,
+        ];
+
+        if ($hasRequiredColumns) {
+            $transactions = $this->baseTransactionReportQuery()
+                ->whereIn('id', $transactionIds)
+                ->get()
+                ->sortBy(fn ($transaction) => array_search((int) $transaction->id, $transactionIds, true))
+                ->values();
+
+            $metrics = [
+                'total_transactions' => $transactions->count(),
+                'total_amount_paise' => (int) $transactions->sum('amount_paise'),
+                'unique_users' => $transactions->pluck('user_id')->filter()->unique()->count(),
+            ];
+        }
+
+        return view('public.captured-transactions', [
+            'transactions' => new LengthAwarePaginator(
+                $transactions,
+                $transactions->count(),
+                max(1, $transactions->count()),
+                1,
+                ['path' => $request->url(), 'query' => $request->query()]
+            ),
+            'metrics' => $metrics,
+            'hasRequiredTables' => $hasRequiredTables,
+            'hasRequiredColumns' => $hasRequiredColumns,
+            'reportTitle' => 'Diagnosis comparison report',
+            'reportIntroTitle' => 'Diagnosis comparison for transactions #855 and #866',
+            'reportDescriptionHtml' => 'Shareable report for transaction IDs <code>855</code> and <code>866</code>. Prescription diagnosis is loaded from <code>transactions.channel_name = prescriptions.call_session</code>.',
+            'showInvoiceControls' => false,
+        ]);
+    }
+
     public function diagnosisComparison(Request $request, Transaction $transaction)
     {
-        if (! $this->transactionIsVisibleOnReport($transaction)) {
+        if (! $this->transactionCanBeCompared($transaction)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Transaction is not available on this public report.',
+                'message' => 'Transaction is not available for this diagnosis report.',
             ], 404);
         }
 
@@ -144,6 +192,38 @@ class PublicCapturedTransactionsController extends Controller
             && $this->prescriptionDiagnosisColumn() !== null;
     }
 
+    private function baseTransactionReportQuery()
+    {
+        $userColumns = ['id'];
+        foreach (['name', 'email', 'phone'] as $column) {
+            if (Schema::hasColumn('users', $column)) {
+                $userColumns[] = $column;
+            }
+        }
+
+        $query = Transaction::query()
+            ->with(['user' => fn ($query) => $query->select(array_unique($userColumns))])
+            ->whereNotNull('user_id')
+            ->whereHas('user');
+
+        if ($this->canLoadPrescriptionDiagnoses()) {
+            $diagnosisColumn = $this->prescriptionDiagnosisColumn();
+            $query->with(['prescriptions' => function ($query) use ($diagnosisColumn) {
+                $query->select(array_unique(array_filter([
+                    'id',
+                    'user_id',
+                    'pet_id',
+                    'call_session',
+                    $diagnosisColumn,
+                    Schema::hasColumn('prescriptions', 'disease_name') ? 'disease_name' : null,
+                    'created_at',
+                ])))->orderByDesc('created_at')->orderByDesc('id');
+            }]);
+        }
+
+        return $query;
+    }
+
     private function prescriptionDiagnosisColumn(): ?string
     {
         if (! Schema::hasTable('prescriptions')) {
@@ -164,6 +244,13 @@ class PublicCapturedTransactionsController extends Controller
         return strtolower(trim((string) ($transaction->status ?? ''))) === 'captured'
             && (int) ($transaction->amount_paise ?? 0) !== 100
             && ! empty($transaction->user_id)
+            && Schema::hasTable('users')
+            && \App\Models\User::query()->whereKey($transaction->user_id)->exists();
+    }
+
+    private function transactionCanBeCompared(Transaction $transaction): bool
+    {
+        return ! empty($transaction->user_id)
             && Schema::hasTable('users')
             && \App\Models\User::query()->whereKey($transaction->user_id)->exists();
     }
