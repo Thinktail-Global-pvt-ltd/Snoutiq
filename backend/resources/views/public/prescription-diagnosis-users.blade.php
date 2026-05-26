@@ -15,7 +15,7 @@
         overflow-wrap: anywhere;
         white-space: pre-wrap;
     }
-    .ai-analysis-box {
+    .ai-diagnosis-box {
         max-width: 420px;
         min-width: 260px;
     }
@@ -118,7 +118,7 @@
                                 <th>Doctor</th>
                                 <th>Diagnosis</th>
                                 <th>Reported Symptom</th>
-                                <th>AI Analysis</th>
+                                <th>AI Diagnosis</th>
                                 <th>Call Session</th>
                             </tr>
                         </thead>
@@ -189,15 +189,15 @@
                                             <span class="text-muted">No reported symptom</span>
                                         @endif
                                     </td>
-                                    <td data-label="AI Analysis" class="ai-analysis-box">
+                                    <td data-label="AI Diagnosis" class="ai-diagnosis-box">
                                         <button
                                             type="button"
-                                            class="btn btn-sm btn-outline-primary ai-analysis-btn"
+                                            class="btn btn-sm btn-outline-primary ai-diagnosis-btn"
                                             data-url="{{ route('prescription-diagnosis-users.ai-analysis', $prescription) }}"
                                         >
-                                            Analyze symptom
+                                            Generate AI diagnosis
                                         </button>
-                                        <div class="ai-analysis-result small mt-2 text-muted"></div>
+                                        <div class="ai-diagnosis-result small mt-2 text-muted"></div>
                                     </td>
                                     <td data-label="Call Session">
                                         {{ $prescription->call_session ?: 'N/A' }}
@@ -229,18 +229,13 @@
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
-    const renderList = (items) => {
-        if (!Array.isArray(items) || items.length === 0) return '';
-        return `<ul class="mb-0 ps-3">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
-    };
-
-    document.querySelectorAll('.ai-analysis-btn').forEach((button) => {
+    document.querySelectorAll('.ai-diagnosis-btn').forEach((button) => {
         button.addEventListener('click', async () => {
-            const result = button.parentElement.querySelector('.ai-analysis-result');
+            const result = button.parentElement.querySelector('.ai-diagnosis-result');
             button.disabled = true;
-            button.textContent = 'Analyzing...';
-            result.className = 'ai-analysis-result small mt-2 text-muted';
-            result.textContent = 'Loading Gemini analysis...';
+            button.textContent = 'Diagnosing...';
+            result.className = 'ai-diagnosis-result small mt-2 text-muted';
+            result.textContent = 'Loading Gemini diagnosis...';
 
             try {
                 const response = await fetch(button.dataset.url, {
@@ -255,28 +250,26 @@
                 const payload = await response.json();
 
                 if (!response.ok || !payload.success) {
-                    result.className = 'ai-analysis-result small mt-2 text-danger';
-                    result.textContent = payload.message || 'Unable to generate AI analysis.';
+                    result.className = 'ai-diagnosis-result small mt-2 text-danger';
+                    result.textContent = payload.message || 'Unable to generate AI diagnosis.';
                     button.disabled = false;
-                    button.textContent = 'Analyze symptom';
+                    button.textContent = 'Generate AI diagnosis';
                     return;
                 }
 
                 const data = payload.data || {};
-                result.className = 'ai-analysis-result small mt-2';
+                result.className = 'ai-diagnosis-result small mt-2';
                 result.innerHTML = `
-                    <div class="fw-semibold">${escapeHtml(data.ai_summary || 'AI analysis generated.')}</div>
-                    <div class="text-muted mt-1">Confidence: ${escapeHtml(data.confidence || 'low')}</div>
-                    <div class="mt-2">${escapeHtml(data.comparison || '')}</div>
-                    <div class="mt-2">${renderList(data.basis)}</div>
+                    <div class="fw-semibold">${escapeHtml(data.ai_diagnosis || 'AI diagnosis generated.')}</div>
+                    <div class="text-muted mt-1">Source: reported symptom + pet_doc2_blob_new</div>
                 `;
-                button.textContent = 'Re-run analysis';
+                button.textContent = 'Regenerate AI diagnosis';
                 button.disabled = false;
             } catch (error) {
-                result.className = 'ai-analysis-result small mt-2 text-danger';
-                result.textContent = 'Unable to generate AI analysis.';
+                result.className = 'ai-diagnosis-result small mt-2 text-danger';
+                result.textContent = 'Unable to generate AI diagnosis.';
                 button.disabled = false;
-                button.textContent = 'Analyze symptom';
+                button.textContent = 'Generate AI diagnosis';
             }
         });
     });

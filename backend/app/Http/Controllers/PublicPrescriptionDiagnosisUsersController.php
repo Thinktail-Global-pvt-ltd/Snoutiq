@@ -78,28 +78,26 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
         }
 
         $reportedSymptom = $this->reportedSymptomFor($prescription);
-        if ($reportedSymptom === '') {
+        $imagePart = $this->petDoc2BlobNewPart($prescription);
+        if ($reportedSymptom === '' && $imagePart === null) {
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'ai_summary' => 'No reported symptom is available for this prescription, so AI symptom analysis cannot be generated.',
-                    'confidence' => 'none',
-                    'comparison' => 'Doctor diagnosis is present, but there is no reported symptom to compare against.',
-                    'basis' => ['Missing pets.reported_symptom for the related pet.'],
+                    'ai_diagnosis' => 'Unable to diagnose: reported symptom and pet_doc2_blob_new are both missing.',
                     'model' => null,
                 ],
             ]);
         }
 
-        $cacheKey = 'prescription_diagnosis_users.ai_analysis.' . sha1(json_encode([
+        $cacheKey = 'prescription_diagnosis_users.ai_diagnosis.' . sha1(json_encode([
             'version' => 1,
             'prescription_id' => $prescription->id,
-            'diagnosis' => $diagnosis,
             'reported_symptom' => $reportedSymptom,
+            'image_signature' => $imagePart['signature'] ?? null,
         ]));
 
-        $payload = Cache::remember($cacheKey, now()->addDay(), function () use ($prescription, $diagnosis, $reportedSymptom) {
-            return $this->generateAiAnalysis($prescription, $diagnosis, $reportedSymptom);
+        $payload = Cache::remember($cacheKey, now()->addDay(), function () use ($prescription, $reportedSymptom, $imagePart) {
+            return $this->generateAiDiagnosis($prescription, $reportedSymptom, $imagePart);
         });
 
         return response()->json($payload, ($payload['success'] ?? false) ? 200 : 502);
@@ -178,7 +176,7 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
     private function petColumns(): array
     {
         $columns = ['id'];
-        foreach (['user_id', 'name', 'breed', 'pet_type', 'type', 'pet_age', 'pet_gender', 'reported_symptom'] as $column) {
+        foreach (['user_id', 'name', 'breed', 'pet_type', 'type', 'pet_age', 'pet_gender', 'reported_symptom', 'pet_doc2_blob_new', 'pet_doc2_mime'] as $column) {
             if (Schema::hasColumn('pets', $column)) {
                 $columns[] = $column;
             }
@@ -208,7 +206,34 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
         return '';
     }
 
-    private function generateAiAnalysis(Prescription $prescription, string $diagnosis, string $reportedSymptom): array
+    private function petDoc2BlobNewPart(Prescription $prescription): ?array
+    {
+        if (! $prescription->pet || ! Schema::hasColumn('pets', 'pet_doc2_blob_new')) {
+            return null;
+        }
+
+        $blob = $prescription->pet->getRawOriginal('pet_doc2_blob_new');
+        if (! is_string($blob) || $blob === '') {
+            return null;
+        }
+
+        if (strlen($blob) > 8 * 1024 * 1024) {
+            return null;
+        }
+
+        $mime = $this->detectBlobMimeType($blob) ?: ($prescription->pet->pet_doc2_mime ?? 'image/jpeg');
+        if (! str_starts_with((string) $mime, 'image/')) {
+            return null;
+        }
+
+        return [
+            'mime_type' => $mime,
+            'data' => base64_encode($blob),
+            'signature' => strlen($blob) . ':' . sha1(substr($blob, 0, 4096)),
+        ];
+    }
+
+    private function generateAiDiagnosis(Prescription $prescription, string $reportedSymptom, ?array $imagePart): array
     {
         $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? GeminiConfig::apiKey()));
         if ($apiKey === '') {
@@ -219,23 +244,33 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
         }
 
         $model = 'gemini-2.5-flash';
-        $prompt = $this->aiAnalysisPrompt($prescription, $diagnosis, $reportedSymptom);
+        $prompt = $this->aiDiagnosisPrompt($prescription, $reportedSymptom, $imagePart !== null);
         $url = sprintf(
             'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
             $model,
             urlencode($apiKey)
         );
+        $parts = [];
+        if ($imagePart !== null) {
+            $parts[] = [
+                'inline_data' => [
+                    'mime_type' => $imagePart['mime_type'],
+                    'data' => $imagePart['data'],
+                ],
+            ];
+        }
+        $parts[] = ['text' => $prompt];
 
         $payload = json_encode([
             'contents' => [[
                 'role' => 'user',
-                'parts' => [['text' => $prompt]],
+                'parts' => $parts,
             ]],
             'generationConfig' => [
                 'temperature' => 0.1,
                 'topP' => 0.8,
                 'topK' => 32,
-                'maxOutputTokens' => 900,
+                'maxOutputTokens' => 400,
                 'responseMimeType' => 'application/json',
             ],
         ], JSON_UNESCAPED_SLASHES);
@@ -292,16 +327,21 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
 
         return [
             'success' => true,
-            'data' => $this->normalizeAiAnalysis($decoded, $diagnosis, $reportedSymptom),
+            'data' => $this->normalizeAiDiagnosis($decoded, $reportedSymptom),
         ];
     }
 
-    private function aiAnalysisPrompt(Prescription $prescription, string $diagnosis, string $reportedSymptom): string
+    private function aiDiagnosisPrompt(Prescription $prescription, string $reportedSymptom, bool $hasImage): string
     {
         $pet = $prescription->pet;
+        $imageLine = $hasImage
+            ? 'pet_doc2_blob_new: attached image is provided in this request.'
+            : 'pet_doc2_blob_new: missing or not readable.';
 
         return <<<PROMPT
-You are a veterinary clinical assistant. Analyze whether the reported symptom supports, partially supports, or does not support the doctor's prescription diagnosis.
+You are replacing the doctor's diagnosis for this internal report. Diagnose the pet using only:
+1. pets.reported_symptom
+2. pets.pet_doc2_blob_new attached image, if provided
 
 Context:
 - prescription_id: {$prescription->id}
@@ -311,60 +351,49 @@ Context:
 - pet_age: {$pet?->pet_age}
 - pet_gender: {$pet?->pet_gender}
 - reported_symptom: {$reportedSymptom}
-- doctor_diagnosis: {$diagnosis}
+- {$imageLine}
 
 Return valid JSON only:
 {
-  "ai_summary": "specific clinical interpretation based on reported symptom",
-  "confidence": "low|medium|high",
-  "comparison": "how reported symptom compares with doctor diagnosis",
-  "basis": ["short evidence points"]
+  "ai_diagnosis": "single concise veterinary diagnosis or differential diagnosis"
 }
 
 Rules:
 - Do not output N/A.
-- If reported symptom is vague, say it is insufficient and explain what is missing.
+- Do not compare with the doctor's diagnosis.
+- Do not explain your reasoning.
+- Do not include analysis, confidence, basis, comparison, recommendations, or next steps.
 - Do not invent symptoms not present in reported_symptom.
-- Keep it concise and useful for internal review.
+- If evidence is limited, still provide a cautious differential diagnosis.
+- Keep ai_diagnosis under 160 characters.
 PROMPT;
     }
 
-    private function normalizeAiAnalysis(?array $decoded, string $diagnosis, string $reportedSymptom): array
+    private function normalizeAiDiagnosis(?array $decoded, string $reportedSymptom): array
     {
-        $summary = trim((string) ($decoded['ai_summary'] ?? $decoded['summary'] ?? ''));
-        if ($summary === '' || in_array(strtolower($summary), ['n/a', 'na', 'unknown'], true)) {
-            $summary = "Reported symptom '{$reportedSymptom}' should be clinically reviewed against doctor diagnosis '{$diagnosis}'.";
-        }
-
-        $confidence = strtolower(trim((string) ($decoded['confidence'] ?? 'low')));
-        if (! in_array($confidence, ['low', 'medium', 'high'], true)) {
-            $confidence = 'low';
-        }
-
-        $comparison = trim((string) ($decoded['comparison'] ?? ''));
-        if ($comparison === '') {
-            $comparison = "Doctor diagnosis: {$diagnosis}. Reported symptom: {$reportedSymptom}.";
-        }
-
-        $basis = $decoded['basis'] ?? [];
-        if (! is_array($basis)) {
-            $basis = [];
-        }
-        $basis = array_values(array_filter(array_map(fn ($item) => trim((string) $item), $basis)));
-        if (empty($basis)) {
-            $basis = [
-                "Reported symptom: {$reportedSymptom}",
-                "Doctor diagnosis: {$diagnosis}",
-            ];
+        $diagnosis = trim((string) ($decoded['ai_diagnosis'] ?? $decoded['diagnosis'] ?? $decoded['ai_diagnosys'] ?? ''));
+        if ($diagnosis === '' || in_array(strtolower($diagnosis), ['n/a', 'na', 'unknown', 'none'], true)) {
+            $diagnosis = $reportedSymptom !== ''
+                ? 'Cautious differential based on reported symptom: ' . mb_substr($reportedSymptom, 0, 110)
+                : 'Cautious visual differential from pet_doc2_blob_new';
         }
 
         return [
-            'ai_summary' => $summary,
-            'confidence' => $confidence,
-            'comparison' => $comparison,
-            'basis' => $basis,
+            'ai_diagnosis' => mb_substr($diagnosis, 0, 180),
             'model' => 'gemini-2.5-flash',
         ];
+    }
+
+    private function detectBlobMimeType(string $blob): ?string
+    {
+        if ($blob === '') {
+            return null;
+        }
+
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->buffer($blob);
+
+        return is_string($mime) && $mime !== '' ? $mime : null;
     }
 
     private function decodeGeminiJson(string $text): ?array
