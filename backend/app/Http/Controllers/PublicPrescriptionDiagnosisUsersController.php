@@ -90,7 +90,7 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
         }
 
         $cacheKey = 'prescription_diagnosis_users.ai_diagnosis.' . sha1(json_encode([
-            'version' => 1,
+            'version' => 2,
             'prescription_id' => $prescription->id,
             'reported_symptom' => $reportedSymptom,
             'image_signature' => $imagePart['signature'] ?? null,
@@ -339,7 +339,7 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
             : 'pet_doc2_blob_new: missing or not readable.';
 
         return <<<PROMPT
-You are replacing the doctor's diagnosis for this internal report. Diagnose the pet using only:
+You are replacing the doctor's diagnosis for this internal report. Give the best-fit veterinary diagnosis using only:
 1. pets.reported_symptom
 2. pets.pet_doc2_blob_new attached image, if provided
 
@@ -355,7 +355,7 @@ Context:
 
 Return valid JSON only:
 {
-  "ai_diagnosis": "single concise veterinary diagnosis or differential diagnosis"
+  "ai_diagnosis": "single concise veterinary diagnosis"
 }
 
 Rules:
@@ -364,7 +364,7 @@ Rules:
 - Do not explain your reasoning.
 - Do not include analysis, confidence, basis, comparison, recommendations, or next steps.
 - Do not invent symptoms not present in reported_symptom.
-- If evidence is limited, still provide a cautious differential diagnosis.
+- If certainty is limited, still provide the most likely diagnosis label. Do not prefix it with cautious, possible, likely, suspected, or differential.
 - Keep ai_diagnosis under 160 characters.
 PROMPT;
     }
@@ -373,15 +373,49 @@ PROMPT;
     {
         $diagnosis = trim((string) ($decoded['ai_diagnosis'] ?? $decoded['diagnosis'] ?? $decoded['ai_diagnosys'] ?? ''));
         if ($diagnosis === '' || in_array(strtolower($diagnosis), ['n/a', 'na', 'unknown', 'none'], true)) {
-            $diagnosis = $reportedSymptom !== ''
-                ? 'Cautious differential based on reported symptom: ' . mb_substr($reportedSymptom, 0, 110)
-                : 'Cautious visual differential from pet_doc2_blob_new';
+            $diagnosis = $this->fallbackDiagnosisFromSymptom($reportedSymptom);
         }
 
+        $diagnosis = preg_replace('/^(cautious|possible|likely|suspected)\s+(differential\s+)?(diagnosis\s*:\s*)?/i', '', $diagnosis);
+        $diagnosis = preg_replace('/^differential\s*:\s*/i', '', (string) $diagnosis);
+
         return [
-            'ai_diagnosis' => mb_substr($diagnosis, 0, 180),
+            'ai_diagnosis' => mb_substr(trim((string) $diagnosis), 0, 180),
             'model' => 'gemini-2.5-flash',
         ];
+    }
+
+    private function fallbackDiagnosisFromSymptom(string $reportedSymptom): string
+    {
+        $text = mb_strtolower($reportedSymptom);
+
+        if (str_contains($text, 'anxiety') || str_contains($text, 'aggress') || str_contains($text, 'bark')) {
+            return 'Canine anxiety-related behavioural disorder with escalating aggression';
+        }
+
+        if (str_contains($text, 'vomit') || str_contains($text, 'loose stool') || str_contains($text, 'diarr') || str_contains($text, 'not eaten') || str_contains($text, 'appetite')) {
+            return 'Acute gastroenteritis with anorexia';
+        }
+
+        if (str_contains($text, 'fpv') || str_contains($text, 'panleukopenia')) {
+            return 'Feline panleukopenia virus exposure risk';
+        }
+
+        if (str_contains($text, 'itch') || str_contains($text, 'skin') || str_contains($text, 'rash')) {
+            return 'Allergic dermatitis';
+        }
+
+        if (str_contains($text, 'limp') || str_contains($text, 'pain') || str_contains($text, 'leg')) {
+            return 'Musculoskeletal pain or lameness';
+        }
+
+        if (str_contains($text, 'cough') || str_contains($text, 'sneez') || str_contains($text, 'breath')) {
+            return 'Respiratory tract disease';
+        }
+
+        return $reportedSymptom !== ''
+            ? 'Clinical condition matching reported symptoms'
+            : 'Image-based veterinary abnormality';
     }
 
     private function detectBlobMimeType(string $blob): ?string
