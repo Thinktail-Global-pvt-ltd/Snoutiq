@@ -19,6 +19,14 @@
     .price-breakdown {
         line-height: 1.35;
     }
+    .diagnosis-cell {
+        min-width: 220px;
+        max-width: 320px;
+    }
+    .diagnosis-text {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
 
     @media (max-width: 767.98px) {
         .public-transactions-table thead {
@@ -186,6 +194,7 @@
                                 <th>Type</th>
                                 <th>Reference</th>
                                 <th>Payment Method</th>
+                                <th>Diagnosis</th>
                                 <th>Invoice</th>
                             </tr>
                         </thead>
@@ -219,6 +228,16 @@
                                         'not_added' => 'gst-not-added-row',
                                         default => '',
                                     };
+                                    $diagnosisColumn = \Illuminate\Support\Facades\Schema::hasTable('prescriptions') && \Illuminate\Support\Facades\Schema::hasColumn('prescriptions', 'diagnosis')
+                                        ? 'diagnosis'
+                                        : (\Illuminate\Support\Facades\Schema::hasTable('prescriptions') && \Illuminate\Support\Facades\Schema::hasColumn('prescriptions', 'diagnosys') ? 'diagnosys' : null);
+                                    $relatedPrescriptions = $transaction->relationLoaded('prescriptions') ? $transaction->prescriptions : collect();
+                                    $prescriptionDiagnoses = $diagnosisColumn
+                                        ? $relatedPrescriptions
+                                            ->map(fn ($prescription) => trim((string) ($prescription->{$diagnosisColumn} ?? '')))
+                                            ->filter()
+                                            ->values()
+                                        : collect();
                                 @endphp
                                 <tr class="{{ $rowClass }}">
                                     <td data-label="ID">
@@ -267,6 +286,25 @@
                                     <td data-label="Type">{{ $transaction->type ?: 'N/A' }}</td>
                                     <td data-label="Reference">{{ $transaction->reference ?: 'N/A' }}</td>
                                     <td data-label="Payment Method">{{ $transaction->payment_method ?: 'N/A' }}</td>
+                                    <td data-label="Diagnosis" class="diagnosis-cell">
+                                        @if($prescriptionDiagnoses->isNotEmpty())
+                                            <div class="diagnosis-text small">
+                                                @foreach($prescriptionDiagnoses as $diagnosis)
+                                                    <div>{{ $diagnosis }}</div>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <div class="text-muted small">No related prescription diagnosis</div>
+                                        @endif
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-primary mt-2 diagnosis-comparison-btn"
+                                            data-url="{{ route('captured-transactions.diagnosis-comparison', $transaction) }}"
+                                            data-transaction-id="{{ $transaction->id }}"
+                                        >
+                                            See diagnosys comparison
+                                        </button>
+                                    </td>
                                     <td data-label="Invoice">
                                         @if($isExpectedPriceMatch)
                                             <div class="d-flex flex-column gap-1">
@@ -302,6 +340,20 @@
         </div>
     </section>
 @endif
+
+<div class="modal fade" id="diagnosisComparisonModal" tabindex="-1" aria-labelledby="diagnosisComparisonModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="diagnosisComparisonModalLabel">Diagnosis comparison</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="diagnosisComparisonBody">
+                <div class="text-muted">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -393,6 +445,103 @@
             }
         });
     }
+
+    const comparisonModalElement = document.getElementById('diagnosisComparisonModal');
+    const comparisonBody = document.getElementById('diagnosisComparisonBody');
+    const comparisonModal = comparisonModalElement ? new bootstrap.Modal(comparisonModalElement) : null;
+    const csrfToken = '{{ csrf_token() }}';
+    const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    const renderList = (items) => {
+        if (!Array.isArray(items) || items.length === 0) return '<span class="text-muted">N/A</span>';
+        return `<ul class="mb-0 ps-3">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+    };
+    const renderComparison = (payload) => {
+        const comparison = payload.comparison || {};
+        const pet = payload.pet || {};
+
+        return `
+            <div class="mb-3">
+                <div class="small text-muted">Transaction #${escapeHtml(payload.transaction_id)} • Gemini model: ${escapeHtml(payload.model || 'N/A')}</div>
+                <div class="fw-semibold">${escapeHtml(pet.name || `Pet #${pet.id || ''}`)}</div>
+                <div class="small text-muted">${escapeHtml([pet.type, pet.breed, pet.age, pet.gender].filter(Boolean).join(' • ') || 'Pet details unavailable')}</div>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100 bg-light">
+                        <div class="small text-muted mb-1">Prescription diagnosis</div>
+                        ${renderList(payload.prescription_diagnoses)}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100 bg-light">
+                        <div class="small text-muted mb-1">AI diagnosis</div>
+                        <div class="fw-semibold">${escapeHtml(comparison.ai_diagnosis || 'N/A')}</div>
+                        <div class="small text-muted mt-1">Confidence: ${escapeHtml(comparison.confidence || 'N/A')}</div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="border rounded p-3">
+                        <div class="small text-muted mb-1">Reported symptom</div>
+                        <div>${escapeHtml(payload.reported_symptom || 'N/A')}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <div class="small text-muted mb-1">Match status</div>
+                        <span class="badge text-bg-dark">${escapeHtml(comparison.match_status || 'N/A')}</span>
+                        <p class="mb-0 mt-2">${escapeHtml(comparison.comparison_summary || 'N/A')}</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <div class="small text-muted mb-1">Basis</div>
+                        ${renderList(comparison.basis)}
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="alert alert-warning mb-0">
+                        ${escapeHtml(comparison.recommended_review || 'Use as internal comparison only. A veterinarian should review any mismatch.')}
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+
+    document.querySelectorAll('.diagnosis-comparison-btn').forEach((diagnosisButton) => {
+        diagnosisButton.addEventListener('click', async () => {
+            if (!comparisonModal || !comparisonBody) return;
+
+            comparisonBody.innerHTML = '<div class="text-muted">Loading diagnosis comparison...</div>';
+            comparisonModal.show();
+
+            try {
+                const response = await fetch(diagnosisButton.dataset.url, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({}),
+                });
+                const payload = await response.json();
+
+                if (!response.ok || !payload.success) {
+                    comparisonBody.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(payload.message || 'Unable to generate diagnosis comparison.')}</div>`;
+                    return;
+                }
+
+                comparisonBody.innerHTML = renderComparison(payload);
+            } catch (error) {
+                comparisonBody.innerHTML = '<div class="alert alert-danger mb-0">Unable to generate diagnosis comparison.</div>';
+            }
+        });
+    });
 })();
 </script>
 @endpush
