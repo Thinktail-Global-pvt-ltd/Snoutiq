@@ -187,7 +187,7 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
     private function petColumns(): array
     {
         $columns = ['id'];
-        foreach (['user_id', 'name', 'breed', 'pet_type', 'type', 'pet_age', 'pet_gender', 'reported_symptom', 'pet_doc2_blob_new', 'pet_doc2_mime'] as $column) {
+        foreach (['user_id', 'name', 'breed', 'pet_type', 'type', 'pet_age', 'pet_gender', 'reported_symptom', 'pet_doc2_blob', 'pet_doc2_mime'] as $column) {
             if (Schema::hasColumn('pets', $column)) {
                 $columns[] = $column;
             }
@@ -220,19 +220,19 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
     private function aiDiagnosisPayloadFor(Prescription $prescription): array
     {
         $reportedSymptom = $this->reportedSymptomFor($prescription);
-        $imagePart = $this->petDoc2BlobNewPart($prescription);
+        $imagePart = $this->petDoc2BlobPart($prescription);
         if ($reportedSymptom === '' && $imagePart === null) {
             return [
                 'success' => true,
                 'data' => [
-                    'ai_diagnosis' => 'Unable to diagnose: reported symptom and pet_doc2_blob_new are both missing.',
+                    'ai_diagnosis' => 'Unable to diagnose: reported symptom and pet_doc2_blob are both missing.',
                     'model' => null,
                 ],
             ];
         }
 
         $cacheKey = 'prescription_diagnosis_users.ai_diagnosis.' . sha1(json_encode([
-            'version' => 2,
+            'version' => 3,
             'prescription_id' => $prescription->id,
             'reported_symptom' => $reportedSymptom,
             'image_signature' => $imagePart['signature'] ?? null,
@@ -262,13 +262,13 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
         })->all();
     }
 
-    private function petDoc2BlobNewPart(Prescription $prescription): ?array
+    private function petDoc2BlobPart(Prescription $prescription): ?array
     {
-        if (! $prescription->pet || ! Schema::hasColumn('pets', 'pet_doc2_blob_new')) {
+        if (! $prescription->pet || ! Schema::hasColumn('pets', 'pet_doc2_blob')) {
             return null;
         }
 
-        $blob = $prescription->pet->getRawOriginal('pet_doc2_blob_new');
+        $blob = $prescription->pet->getRawOriginal('pet_doc2_blob');
         if (! is_string($blob) || $blob === '') {
             return null;
         }
@@ -391,13 +391,13 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
     {
         $pet = $prescription->pet;
         $imageLine = $hasImage
-            ? 'pet_doc2_blob_new: attached image is provided in this request.'
-            : 'pet_doc2_blob_new: missing or not readable.';
+            ? 'pet_doc2_blob: attached image is provided in this request.'
+            : 'pet_doc2_blob: missing or not readable.';
 
         return <<<PROMPT
 You are replacing the doctor's diagnosis for this internal report. Give the best-fit veterinary diagnosis using only:
 1. pets.reported_symptom
-2. pets.pet_doc2_blob_new attached image, if provided
+2. pets.pet_doc2_blob attached image, if provided
 
 Context:
 - prescription_id: {$prescription->id}
@@ -449,6 +449,18 @@ PROMPT;
             return 'Canine anxiety-related behavioural disorder with escalating aggression';
         }
 
+        if (str_contains($text, 'anal gland') || str_contains($text, 'anal sac') || str_contains($text, 'scoot')) {
+            return 'Anal sac disease with anal gland swelling';
+        }
+
+        if (str_contains($text, 'vaccination record') || str_contains($text, 'vaccine record') || str_contains($text, 'vaccination update')) {
+            return 'Vaccination record assessment';
+        }
+
+        if (str_contains($text, 'need to consult') || str_contains($text, 'consult')) {
+            return 'Undifferentiated veterinary consultation case';
+        }
+
         if (str_contains($text, 'vomit') || str_contains($text, 'loose stool') || str_contains($text, 'diarr') || str_contains($text, 'not eaten') || str_contains($text, 'appetite')) {
             return 'Acute gastroenteritis with anorexia';
         }
@@ -470,7 +482,7 @@ PROMPT;
         }
 
         return $reportedSymptom !== ''
-            ? 'Clinical condition matching reported symptoms'
+            ? 'Undifferentiated clinical presentation'
             : 'Image-based veterinary abnormality';
     }
 

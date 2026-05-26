@@ -146,7 +146,7 @@
                                         </td>
                                         <td>{{ $previewSymptom !== '' ? $previewSymptom : 'No reported symptom' }}</td>
                                         <td>{{ $previewDiagnosis }}</td>
-                                        <td class="text-muted">Generated in PDF from reported symptom + pet_doc2_blob_new.</td>
+                                        <td class="text-muted">Generated in PDF from reported symptom + pet_doc2_blob.</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -324,7 +324,7 @@
                 result.className = 'ai-diagnosis-result small mt-2';
                 result.innerHTML = `
                     <div class="fw-semibold">${escapeHtml(data.ai_diagnosis || 'AI diagnosis generated.')}</div>
-                    <div class="text-muted mt-1">Source: reported symptom + pet_doc2_blob_new</div>
+                    <div class="text-muted mt-1">Source: reported symptom + pet_doc2_blob</div>
                 `;
                 button.textContent = 'Regenerate AI diagnosis';
                 button.disabled = false;
