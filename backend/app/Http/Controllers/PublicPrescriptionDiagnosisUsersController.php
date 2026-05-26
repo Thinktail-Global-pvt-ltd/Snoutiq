@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Prescription;
 use App\Support\GeminiConfig;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -77,30 +79,39 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
             ], 404);
         }
 
-        $reportedSymptom = $this->reportedSymptomFor($prescription);
-        $imagePart = $this->petDoc2BlobNewPart($prescription);
-        if ($reportedSymptom === '' && $imagePart === null) {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'ai_diagnosis' => 'Unable to diagnose: reported symptom and pet_doc2_blob_new are both missing.',
-                    'model' => null,
-                ],
-            ]);
-        }
-
-        $cacheKey = 'prescription_diagnosis_users.ai_diagnosis.' . sha1(json_encode([
-            'version' => 2,
-            'prescription_id' => $prescription->id,
-            'reported_symptom' => $reportedSymptom,
-            'image_signature' => $imagePart['signature'] ?? null,
-        ]));
-
-        $payload = Cache::remember($cacheKey, now()->addDay(), function () use ($prescription, $reportedSymptom, $imagePart) {
-            return $this->generateAiDiagnosis($prescription, $reportedSymptom, $imagePart);
-        });
+        $payload = $this->aiDiagnosisPayloadFor($prescription);
 
         return response()->json($payload, ($payload['success'] ?? false) ? 200 : 502);
+    }
+
+    public function pdf(Request $request)
+    {
+        $diagnosisColumn = $this->diagnosisColumn();
+        abort_unless(
+            Schema::hasTable('prescriptions')
+            && Schema::hasTable('users')
+            && Schema::hasColumn('prescriptions', 'user_id')
+            && $diagnosisColumn !== null,
+            404
+        );
+
+        $prescriptions = $this->baseQuery($diagnosisColumn)
+            ->orderByDesc(Schema::hasColumn('prescriptions', 'created_at') ? 'created_at' : 'id')
+            ->orderByDesc('id')
+            ->get();
+
+        $rows = $this->pdfRows($prescriptions, $diagnosisColumn, true);
+        $html = view('public.prescription-diagnosis-users-pdf', [
+            'rows' => $rows,
+            'generatedAt' => now('Asia/Kolkata'),
+        ])->render();
+        $pdf = $this->renderPdf($html);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="prescription-ai-vs-doctor-diagnosis.pdf"',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+        ]);
     }
 
     private function baseQuery(string $diagnosisColumn)
@@ -204,6 +215,51 @@ class PublicPrescriptionDiagnosisUsersController extends Controller
         }
 
         return '';
+    }
+
+    private function aiDiagnosisPayloadFor(Prescription $prescription): array
+    {
+        $reportedSymptom = $this->reportedSymptomFor($prescription);
+        $imagePart = $this->petDoc2BlobNewPart($prescription);
+        if ($reportedSymptom === '' && $imagePart === null) {
+            return [
+                'success' => true,
+                'data' => [
+                    'ai_diagnosis' => 'Unable to diagnose: reported symptom and pet_doc2_blob_new are both missing.',
+                    'model' => null,
+                ],
+            ];
+        }
+
+        $cacheKey = 'prescription_diagnosis_users.ai_diagnosis.' . sha1(json_encode([
+            'version' => 2,
+            'prescription_id' => $prescription->id,
+            'reported_symptom' => $reportedSymptom,
+            'image_signature' => $imagePart['signature'] ?? null,
+        ]));
+
+        return Cache::remember($cacheKey, now()->addDay(), function () use ($prescription, $reportedSymptom, $imagePart) {
+            return $this->generateAiDiagnosis($prescription, $reportedSymptom, $imagePart);
+        });
+    }
+
+    private function pdfRows($prescriptions, string $diagnosisColumn, bool $includeAi): array
+    {
+        return $prescriptions->map(function (Prescription $prescription) use ($diagnosisColumn, $includeAi) {
+            $payload = $includeAi ? $this->aiDiagnosisPayloadFor($prescription) : null;
+
+            return [
+                'prescription' => $prescription,
+                'user' => $prescription->user,
+                'pet' => $prescription->pet,
+                'doctor' => $prescription->doctor,
+                'doctor_diagnosis' => trim((string) ($prescription->{$diagnosisColumn} ?? '')),
+                'reported_symptom' => $this->reportedSymptomFor($prescription),
+                'ai_diagnosis' => is_array($payload) && ($payload['success'] ?? false)
+                    ? (string) ($payload['data']['ai_diagnosis'] ?? 'AI diagnosis unavailable')
+                    : 'AI diagnosis unavailable',
+            ];
+        })->all();
     }
 
     private function petDoc2BlobNewPart(Prescription $prescription): ?array
@@ -453,5 +509,19 @@ PROMPT;
         $decoded = json_decode(substr($text, $start, $end - $start + 1), true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private function renderPdf(string $html): string
+    {
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        return $dompdf->output();
     }
 }

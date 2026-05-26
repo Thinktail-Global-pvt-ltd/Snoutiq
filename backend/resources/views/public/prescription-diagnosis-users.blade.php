@@ -19,6 +19,21 @@
         max-width: 420px;
         min-width: 260px;
     }
+    .pdf-template-preview {
+        border: 1px solid #dbe3ef;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+    .pdf-template-table th {
+        color: #475569;
+        font-size: 0.76rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .pdf-template-table td {
+        vertical-align: top;
+    }
     @media (max-width: 767.98px) {
         .diagnosis-users-table thead {
             display: none;
@@ -67,7 +82,12 @@
             Prescriptions where <code>prescriptions.{{ $diagnosisColumn ?? 'diagnosis' }}</code> is filled and the related <code>users</code> row still exists.
         </p>
     </div>
-    <span class="badge text-bg-dark align-self-start align-self-md-center">Live data</span>
+    <div class="d-flex flex-column flex-sm-row gap-2 align-self-start align-self-md-center">
+        <a href="{{ route('prescription-diagnosis-users.pdf') }}" class="btn btn-dark btn-sm">
+            <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF
+        </a>
+        <span class="badge text-bg-dark align-self-start align-self-sm-center">Live data</span>
+    </div>
 </section>
 
 @if (!$hasRequiredTables || !$hasRequiredColumns)
@@ -92,6 +112,49 @@
 
     <section class="card border-0 shadow-sm">
         <div class="card-body">
+            @if(!$prescriptions->isEmpty())
+                <section class="pdf-template-preview p-3 p-md-4 mb-4">
+                    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+                        <div>
+                            <h3 class="h6 mb-1">PDF template preview</h3>
+                            <p class="text-muted mb-0">This is the layout used in the downloaded PDF: patient symptom vs doctor diagnosis vs AI diagnosis.</p>
+                        </div>
+                        <span class="badge text-bg-light align-self-start align-self-md-center">First page preview</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm pdf-template-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 18%;">Patient</th>
+                                    <th style="width: 26%;">Actual symptom</th>
+                                    <th style="width: 26%;">Doctor diagnosis</th>
+                                    <th style="width: 30%;">AI diagnosis</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($prescriptions->take(3) as $previewPrescription)
+                                    @php
+                                        $previewPet = $previewPrescription->pet;
+                                        $previewUser = $previewPrescription->user;
+                                        $previewDiagnosis = trim((string) ($previewPrescription->{$diagnosisColumn} ?? ''));
+                                        $previewSymptom = trim((string) ($previewPet->reported_symptom ?? ''));
+                                    @endphp
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">{{ $previewPet->name ?? 'Pet #' . ($previewPet->id ?? 'N/A') }}</div>
+                                            <div class="small text-muted">{{ $previewUser->name ?? 'User #' . $previewPrescription->user_id }}</div>
+                                        </td>
+                                        <td>{{ $previewSymptom !== '' ? $previewSymptom : 'No reported symptom' }}</td>
+                                        <td>{{ $previewDiagnosis }}</td>
+                                        <td class="text-muted">Generated in PDF from reported symptom + pet_doc2_blob_new.</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            @endif
+
             <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
                 <div>
                     <h3 class="h6 mb-1">Diagnosis users</h3>

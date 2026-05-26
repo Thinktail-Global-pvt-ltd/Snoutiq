@@ -136,6 +136,8 @@ Route::get('/captured-transactions/{transaction}/invoice', \App\Http\Controllers
     ->name('captured-transactions.invoice');
 Route::get('/prescription-diagnosis-users', PublicPrescriptionDiagnosisUsersController::class)
     ->name('prescription-diagnosis-users.public');
+Route::get('/prescription-diagnosis-users/pdf', [PublicPrescriptionDiagnosisUsersController::class, 'pdf'])
+    ->name('prescription-diagnosis-users.pdf');
 Route::post('/prescription-diagnosis-users/{prescription}/ai-analysis', [PublicPrescriptionDiagnosisUsersController::class, 'aiAnalysis'])
     ->whereNumber('prescription')
     ->name('prescription-diagnosis-users.ai-analysis');
