@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class DogBreedController extends Controller
@@ -56,25 +57,26 @@ class DogBreedController extends Controller
 
     public function allBreeds()
     {
-        $resp = Http::acceptJson()
-            ->timeout(20)
-            ->get('https://dogapi.dog/api/v2/breeds');
-
-        if (!$resp->successful()) {
-            return response()->json(['status' => 'error'], 500);
-        }
-
-        $rows = $resp->json('data');
-        if (!is_array($rows)) {
-            $rows = [];
-        }
-
-        // Keep response structure exactly same as existing endpoint:
-        // { status: "success", breeds: { "<breed>": [] } }
         $breeds = [];
-        foreach ($rows as $row) {
-            $name = trim((string) data_get($row, 'attributes.name', ''));
-            $this->appendBreed($breeds, $name);
+
+        try {
+            $resp = Http::acceptJson()
+                ->timeout(10)
+                ->get('https://dogapi.dog/api/v2/breeds');
+
+            if ($resp->successful()) {
+                $rows = $resp->json('data');
+                if (!is_array($rows)) {
+                    $rows = [];
+                }
+
+                foreach ($rows as $row) {
+                    $name = trim((string) data_get($row, 'attributes.name', ''));
+                    $this->appendBreed($breeds, $name);
+                }
+            }
+        } catch (ConnectionException $e) {
+            report($e);
         }
 
         foreach (self::MANUAL_DOG_BREEDS as $breedName) {

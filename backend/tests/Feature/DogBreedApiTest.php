@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -63,5 +64,25 @@ class DogBreedApiTest extends TestCase
             $this->assertArrayHasKey($breedName, $breeds);
             $this->assertSame([], $breeds[$breedName]);
         }
+    }
+
+    public function test_dog_breeds_endpoint_falls_back_to_manual_breeds_when_external_api_times_out(): void
+    {
+        Http::fake([
+            'https://dogapi.dog/api/v2/breeds' => function () {
+                throw new ConnectionException('Connection timed out.');
+            },
+        ]);
+
+        $response = $this->getJson('/api/dog-breeds/all');
+
+        $response->assertOk()
+            ->assertJsonPath('status', 'success');
+
+        $breeds = $response->json('breeds');
+
+        $this->assertIsArray($breeds);
+        $this->assertSame([], $breeds['rajapalayam'] ?? null);
+        $this->assertSame([], $breeds['indian pariah dog'] ?? null);
     }
 }
