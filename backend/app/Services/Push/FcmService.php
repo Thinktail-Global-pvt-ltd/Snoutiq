@@ -31,6 +31,7 @@ class FcmService
     private static ?bool $notificationTableExists = null;
     private static ?bool $notificationCallSessionColumnExists = null;
 
+    private string $firebaseProjectKey = 'app';
     private ?string $firebaseAccessToken = null;
     private ?int $firebaseAccessTokenExpiresAt = null;
 
@@ -38,9 +39,28 @@ class FcmService
     {
     }
 
+    public function forProject(?string $projectKey): self
+    {
+        $projectKey = trim((string) $projectKey);
+        if ($projectKey === '') {
+            return $this;
+        }
+
+        if (!array_key_exists($projectKey, (array) config('firebase.projects', []))) {
+            throw new \InvalidArgumentException(sprintf('Firebase project is not configured: %s', $projectKey));
+        }
+
+        $clone = clone $this;
+        $clone->firebaseProjectKey = $projectKey;
+        $clone->firebaseAccessToken = null;
+        $clone->firebaseAccessTokenExpiresAt = null;
+
+        return $clone;
+    }
+
     private function firebaseCredentialsPath(): string
     {
-        $path = config('firebase.projects.app.credentials.file');
+        $path = config("firebase.projects.{$this->firebaseProjectKey}.credentials.file");
 
         if (!is_string($path) || trim($path) === '') {
             throw new \RuntimeException('Firebase credentials path is not configured.');
@@ -56,7 +76,7 @@ class FcmService
 
     private function firebaseProjectId(): string
     {
-        $projectId = config('firebase.projects.app.project_id');
+        $projectId = config("firebase.projects.{$this->firebaseProjectKey}.project_id");
 
         if (is_string($projectId)) {
             $projectId = trim($projectId);

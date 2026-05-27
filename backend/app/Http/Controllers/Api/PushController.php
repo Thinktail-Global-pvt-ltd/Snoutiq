@@ -238,7 +238,15 @@ class PushController extends Controller
             'imageUrl' => ['nullable', 'string', 'max:2048'],
             'logo' => ['nullable', 'string', 'max:255'],
             'icon' => ['nullable', 'string', 'max:255'],
+            'firebase_project' => ['nullable', 'string', 'max:64'],
+            'app' => ['nullable', 'string', 'max:64'],
         ]);
+
+        try {
+            $push = $push->forProject($this->resolveFirebaseProject($request));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
 
         $title = $validated['title'] ?? 'Snoutiq Alert';
         $body = $validated['body'] ?? 'Test push from API';
@@ -361,7 +369,15 @@ class PushController extends Controller
             'imageUrl' => ['nullable', 'string', 'max:2048'],
             'logo' => ['nullable', 'string', 'max:255'],
             'icon' => ['nullable', 'string', 'max:255'],
+            'firebase_project' => ['nullable', 'string', 'max:64'],
+            'app' => ['nullable', 'string', 'max:64'],
         ]);
+
+        try {
+            $push = $push->forProject($this->resolveFirebaseProject($request));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
 
         $title = $validated['title'] ?? 'Snoutiq Alert';
         $body = $validated['body'] ?? 'Test push from API';
@@ -1406,6 +1422,32 @@ class PushController extends Controller
         }
 
         return null;
+    }
+
+    private function resolveFirebaseProject(Request $request): ?string
+    {
+        $project = $this->firstNonEmptyString([
+            $request->input('firebase_project'),
+            $request->input('app'),
+            $request->input('data.firebase_project'),
+            $request->input('data.app'),
+            $request->header('X-Firebase-Project'),
+            $request->header('X-App-Key'),
+        ]);
+
+        if ($project === null) {
+            return null;
+        }
+
+        $normalized = strtolower(str_replace(['_', ' '], '-', $project));
+
+        return match ($normalized) {
+            'professional', 'pro', 'snoutiq-professional' => 'professional',
+            'groomer', 'snoutiq-groomer' => 'groomer',
+            'vet', 'vet-app', 'snoutiq-vet' => 'vet',
+            'app', 'pet-parent', 'petparent', 'snoutiq' => 'app',
+            default => $normalized,
+        };
     }
 
     private function isLikelyFcmToken(string $token): bool

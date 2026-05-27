@@ -65,5 +65,17 @@ return [
                 'default_bucket' => env('FIREBASE_STORAGE_BUCKET', 'snoutiqapp.firebasestorage.app'),
             ],
         ],
+        'professional' => [
+            'credentials' => ['file' => env('FIREBASE_PROFESSIONAL_CREDENTIALS', $credentialsPath)],
+            'project_id' => env('FIREBASE_PROFESSIONAL_PROJECT_ID', env('FIREBASE_PROJECT_ID', 'snoutiqapp')),
+        ],
+        'groomer' => [
+            'credentials' => ['file' => env('FIREBASE_GROOMER_CREDENTIALS', $credentialsPath)],
+            'project_id' => env('FIREBASE_GROOMER_PROJECT_ID', env('FIREBASE_PROJECT_ID', 'snoutiqapp')),
+        ],
+        'vet' => [
+            'credentials' => ['file' => $credentialsPath],
+            'project_id' => env('FIREBASE_PROJECT_ID', 'snoutiqapp'),
+        ],
     ],
 ];

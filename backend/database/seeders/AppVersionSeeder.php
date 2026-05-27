@@ -32,6 +32,28 @@ class AppVersionSeeder extends Seeder
                 'message' => 'Please update your app to continue using SnoutIQ Professional.',
                 'is_active' => true,
             ],
+            [
+                'app_key' => 'pet-parent',
+                'platform' => 'android',
+                'min_supported_version' => '1.0.4',
+                'latest_version' => '1.0.4',
+                'force_update' => false,
+                'store_url' => 'https://play.google.com/store/apps/details?id=com.petai.snoutiq&pcampaignid=web_share',
+                'title' => 'Update required',
+                'message' => 'Please update your app to continue using SnoutIQ.',
+                'is_active' => true,
+            ],
+            [
+                'app_key' => 'pet-parent',
+                'platform' => 'ios',
+                'min_supported_version' => '1.0.4',
+                'latest_version' => '1.0.4',
+                'force_update' => false,
+                'store_url' => null,
+                'title' => 'Update required',
+                'message' => 'Please update your app to continue using SnoutIQ.',
+                'is_active' => true,
+            ],
         ];
 
         foreach ($defaults as $default) {
