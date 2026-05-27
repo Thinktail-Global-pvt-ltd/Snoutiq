@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ChatRoom;
 use App\Models\Doctor;
+use App\Models\Otp;
 use App\Models\Receptionist;
 use App\Models\User;
+use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -74,6 +76,223 @@ class RoleLoginController extends Controller
             return 'receptionist';
         }
         return $role;
+    }
+
+    private function normalizePhone(?string $phone): string
+    {
+        $phone = (string) preg_replace('/\D+/', '', (string) $phone);
+        if (strlen($phone) === 12 && str_starts_with($phone, '91')) {
+            return substr($phone, -10);
+        }
+        if (strlen($phone) === 11 && str_starts_with($phone, '0')) {
+            return substr($phone, 1);
+        }
+
+        return $phone;
+    }
+
+    private function findReceptionistByPhone(string $phone): ?Receptionist
+    {
+        $phoneCandidates = array_values(array_unique([
+            $phone,
+            '0' . $phone,
+            '91' . $phone,
+            '+91' . $phone,
+        ]));
+
+        return Receptionist::query()
+            ->where(function ($query) use ($phone, $phoneCandidates) {
+                $query->whereIn('phone', $phoneCandidates);
+
+                if (DB::connection()->getDriverName() !== 'sqlite') {
+                    $query->orWhereRaw("REGEXP_REPLACE(phone, '[^0-9]', '') = ?", [$phone]);
+                }
+            })
+            ->first();
+    }
+
+    private function receptionistLoginResponse(Request $request, Receptionist $receptionistRow, ?string $roomTitle = null)
+    {
+        $room = null;
+        $plainToken = null;
+        $tokenExpiresAt = now()->addDays(30);
+        $clinicId = (int) ($receptionistRow->vet_registeration_id ?? 0);
+        $clinicRecord = $clinicId > 0
+            ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
+            : null;
+
+        $doctors = Doctor::where('vet_registeration_id', $clinicId)
+            ->get()
+            ->map(function (Doctor $doctor) {
+                return [
+                    'id'                   => $doctor->id,
+                    'name'                 => $doctor->doctor_name,
+                    'email'                => $doctor->doctor_email,
+                    'mobile'               => $doctor->doctor_mobile,
+                    'license'              => $doctor->doctor_license,
+                    'image'                => $doctor->doctor_image,
+                    'toggle_availability'  => $doctor->toggle_availability,
+                    'consultation_price'   => $doctor->doctors_price,
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        DB::transaction(function () use (&$plainToken, &$room, $receptionistRow, $roomTitle, $tokenExpiresAt) {
+            $plainToken = bin2hex(random_bytes(32));
+            $tokenHash = hash('sha256', $plainToken);
+
+            $this->persistTokenToTable('receptionists', (int) $receptionistRow->id, $tokenHash, $tokenExpiresAt);
+
+            $room = ChatRoom::create([
+                'user_id'         => $receptionistRow->id,
+                'chat_room_token' => 'room_' . Str::uuid()->toString(),
+                'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
+            ]);
+        });
+
+        $receptionistData = $receptionistRow->toArray();
+        unset(
+            $receptionistData['password'],
+            $receptionistData['receptionist_password'],
+            $receptionistData['api_token_hash'],
+            $receptionistData['api_token_expires_at'],
+            $receptionistData['remember_token']
+        );
+        $receptionistData['role'] = 'receptionist';
+        $receptionistData['clinic_id'] = $clinicId ?: null;
+        $receptionistData['vet_registeration_id'] = $clinicId ?: null;
+        $receptionistData['vet_registerations_temp_id'] = $clinicId ?: null;
+        $receptionistData['email'] = $receptionistRow->email;
+        if ($clinicRecord) {
+            $receptionistData['clinic_profile'] = $clinicRecord->clinic_profile ?? ($clinicRecord->name ?? null);
+        }
+
+        $receptionistId = (int) $receptionistRow->id;
+
+        $response = [
+            'message'    => 'Login successful',
+            'role'       => 'receptionist',
+            'email'      => $receptionistRow->email,
+            'phone'      => $receptionistRow->phone,
+            'token'      => $plainToken,
+            'token_type' => 'Bearer',
+            'chat_room'  => [
+                'id'    => $room->id,
+                'token' => $room->chat_room_token,
+                'name'  => $room->name,
+            ],
+            'user'        => $receptionistData,
+            'user_id'     => $receptionistId,
+            'receptionist_id' => $receptionistId,
+            'clinic_id'   => $clinicId ?: null,
+            'vet_id'      => $clinicId ?: null,
+            'vet_registeration_id'       => $clinicId ?: null,
+            'vet_registerations_temp_id' => $clinicId ?: null,
+            'doctors'     => $doctors,
+        ];
+
+        session([
+            'user_id'                     => $receptionistId,
+            'receptionist_id'             => $receptionistId,
+            'clinic_id'                   => $clinicId ?: null,
+            'role'                        => 'receptionist',
+            'token'                       => $plainToken,
+            'token_type'                  => 'Bearer',
+            'chat_room'                   => $response['chat_room'],
+            'user'                        => $receptionistData,
+            'auth_full'                   => $response,
+            'vet_id'                      => $clinicId ?: null,
+            'vet_registeration_id'        => $clinicId ?: null,
+            'vet_registerations_temp_id'  => $clinicId ?: null,
+            'doctors'                     => $doctors,
+        ]);
+
+        return response()->json($response, 200);
+    }
+
+    public function requestReceptionistOtp(Request $request, WhatsAppService $whatsApp)
+    {
+        $payload = $request->validate([
+            'phone' => ['required', 'string'],
+        ]);
+
+        $phone = $this->normalizePhone($payload['phone']);
+        if ($phone === '' || strlen($phone) < 10) {
+            return response()->json(['success' => false, 'message' => 'Invalid phone'], 422);
+        }
+
+        $receptionist = $this->findReceptionistByPhone($phone);
+        if (!$receptionist) {
+            return response()->json(['success' => false, 'message' => 'Receptionist not found'], 404);
+        }
+
+        $otp = (string) random_int(100000, 999999);
+        $token = (string) Str::uuid();
+        $expiresAt = now()->addMinutes(10);
+
+        if ($whatsApp->isConfigured()) {
+            try {
+                $whatsApp->sendOtpTemplate($phone, $otp);
+            } catch (\Throwable $e) {
+                return response()->json(['success' => false, 'message' => 'Unable to send OTP'], 503);
+            }
+        }
+
+        Otp::create([
+            'token' => $token,
+            'type' => 'receptionist_whatsapp',
+            'value' => $phone,
+            'otp' => $otp,
+            'expires_at' => $expiresAt,
+            'is_verified' => 0,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'OTP sent',
+            'request_id' => $token,
+            'expires_in' => 600,
+            'otp' => config('app.debug') ? $otp : 'hidden',
+        ]);
+    }
+
+    public function verifyReceptionistOtp(Request $request)
+    {
+        $payload = $request->validate([
+            'phone' => ['required', 'string'],
+            'otp' => ['required', 'string'],
+            'request_id' => ['nullable', 'string'],
+        ]);
+
+        $phone = $this->normalizePhone($payload['phone']);
+        if ($phone === '' || strlen($phone) < 10) {
+            return response()->json(['success' => false, 'message' => 'Invalid phone'], 422);
+        }
+
+        $receptionist = $this->findReceptionistByPhone($phone);
+        if (!$receptionist) {
+            return response()->json(['success' => false, 'message' => 'Receptionist not found'], 404);
+        }
+
+        $otpQuery = Otp::query()
+            ->where('type', 'receptionist_whatsapp')
+            ->where('value', $phone)
+            ->where('otp', $payload['otp'])
+            ->where('expires_at', '>', now());
+
+        if (!empty($payload['request_id'])) {
+            $otpQuery->where('token', $payload['request_id']);
+        }
+
+        $otpEntry = $otpQuery->latest()->first();
+        if (!$otpEntry) {
+            return response()->json(['success' => false, 'message' => 'Invalid or expired OTP'], 401);
+        }
+
+        $otpEntry->update(['is_verified' => 1]);
+
+        return $this->receptionistLoginResponse($request, $receptionist);
     }
 
     public function login(Request $request)
@@ -403,91 +622,7 @@ class RoleLoginController extends Controller
                     return response()->json(['message' => 'Invalid credentials'], 401);
                 }
 
-                $clinicId = (int) ($receptionistRow->vet_registeration_id ?? 0);
-                $clinicRecord = $clinicId > 0
-                    ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
-                    : null;
-
-                $doctors = Doctor::where('vet_registeration_id', $clinicId)
-                    ->get()
-                    ->map(function (Doctor $doctor) {
-                        return [
-                            'id'                   => $doctor->id,
-                            'name'                 => $doctor->doctor_name,
-                            'email'                => $doctor->doctor_email,
-                            'mobile'               => $doctor->doctor_mobile,
-                            'license'              => $doctor->doctor_license,
-                            'image'                => $doctor->doctor_image,
-                            'toggle_availability'  => $doctor->toggle_availability,
-                            'consultation_price'   => $doctor->doctors_price,
-                        ];
-                    })
-                    ->values()
-                    ->toArray();
-
-                DB::transaction(function () use (&$plainToken, &$room, $receptionistRow, $roomTitle, $tokenExpiresAt) {
-                    $plainToken = bin2hex(random_bytes(32));
-                    $tokenHash = hash('sha256', $plainToken);
-
-                    $this->persistTokenToTable('receptionists', (int) $receptionistRow->id, $tokenHash, $tokenExpiresAt);
-
-                    $room = ChatRoom::create([
-                        'user_id'         => $receptionistRow->id,
-                        'chat_room_token' => 'room_' . Str::uuid()->toString(),
-                        'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
-                    ]);
-                });
-
-                $receptionistData = $receptionistRow->toArray();
-                $receptionistData['role'] = 'receptionist';
-                $receptionistData['clinic_id'] = $clinicId ?: null;
-                $receptionistData['vet_registeration_id'] = $clinicId ?: null;
-                $receptionistData['vet_registerations_temp_id'] = $clinicId ?: null;
-                $receptionistData['email'] = $receptionistRow->email;
-                if ($clinicRecord) {
-                    $receptionistData['clinic_profile'] = $clinicRecord->clinic_profile ?? ($clinicRecord->name ?? null);
-                }
-
-                $receptionistId = (int) $receptionistRow->id;
-
-                $response = [
-                    'message'    => 'Login successful',
-                    'role'       => 'receptionist',
-                    'email'      => $receptionistRow->email,
-                    'token'      => $plainToken,
-                    'token_type' => 'Bearer',
-                    'chat_room'  => [
-                        'id'    => $room->id,
-                        'token' => $room->chat_room_token,
-                        'name'  => $room->name,
-                    ],
-                    'user'        => $receptionistData,
-                    'user_id'     => $receptionistId,
-                    'receptionist_id' => $receptionistId,
-                    'clinic_id'   => $clinicId ?: null,
-                    'vet_id'      => $clinicId ?: null,
-                    'vet_registeration_id'       => $clinicId ?: null,
-                    'vet_registerations_temp_id' => $clinicId ?: null,
-                    'doctors'     => $doctors,
-                ];
-
-                session([
-                    'user_id'                     => $receptionistId,
-                    'receptionist_id'             => $receptionistId,
-                    'clinic_id'                   => $clinicId ?: null,
-                    'role'                        => 'receptionist',
-                    'token'                       => $plainToken,
-                    'token_type'                  => 'Bearer',
-                    'chat_room'                   => $response['chat_room'],
-                    'user'                        => $receptionistData,
-                    'auth_full'                   => $response,
-                    'vet_id'                      => $clinicId ?: null,
-                    'vet_registeration_id'        => $clinicId ?: null,
-                    'vet_registerations_temp_id'  => $clinicId ?: null,
-                    'doctors'                     => $doctors,
-                ]);
-
-                return response()->json($response, 200);
+                return $this->receptionistLoginResponse($request, $receptionistRow, $roomTitle);
             }
 
             return response()->json(['message' => 'Invalid role'], 400);

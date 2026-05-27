@@ -2744,6 +2744,8 @@ Route::post('/auth/initial-register', [AuthController::class, 'createInitialRegi
 Route::post('/auth/initial-register-mobile', [AuthController::class, 'createInitialRegistrationMobile']);
 Route::post('/auth/login',      [AuthController::class, 'login']);
 Route::post('/auth/role-login', [RoleLoginController::class, 'login']);
+Route::post('/auth/receptionist/otp/request', [RoleLoginController::class, 'requestReceptionistOtp']);
+Route::post('/auth/receptionist/otp/verify', [RoleLoginController::class, 'verifyReceptionistOtp']);
 Route::post('/auth/pet-summary', [AuthController::class, 'generatePetSummary']);
 Route::get('/clinics/{clinic}/payments', [AuthController::class, 'clinicPayments']);
 Route::get('/clinics/payments', [AuthController::class, 'clinicPayments']);

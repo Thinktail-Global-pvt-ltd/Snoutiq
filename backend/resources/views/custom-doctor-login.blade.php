@@ -598,16 +598,21 @@
 
       <form id="loginForm" novalidate>
         <div class="row">
-          <label for="email">Email Address</label>
+          <label id="loginLabel" for="email">Email Address</label>
           <input id="email" type="email" class="input" placeholder="Enter your email address" autocomplete="email"/>
         </div>
 
-        <div class="row">
+        <div class="row" id="passwordRow">
           <label for="password">Password</label>
           <div class="input-wrap">
             <input id="password" type="password" class="input" placeholder="Enter your password" autocomplete="current-password"/>
             <button id="pwBtn" class="pw-toggle" type="button" aria-label="Show password">SHOW</button>
           </div>
+        </div>
+
+        <div class="row" id="otpRow" style="display:none;">
+          <label for="otp">OTP</label>
+          <input id="otp" type="text" class="input" placeholder="Enter 6-digit OTP" inputmode="numeric" autocomplete="one-time-code" maxlength="6"/>
         </div>
 
         <button id="loginBtn" class="btn btn-primary" type="submit">Login as Clinic Admin</button>
@@ -669,6 +674,8 @@
 
   const ROUTES = {
     login:        `${API_BASE}/auth/role-login`,
+    receptionistOtpRequest: `${API_BASE}/auth/receptionist/otp/request`,
+    receptionistOtpVerify: `${API_BASE}/auth/receptionist/otp/verify`,
     sessionLogin: IS_LOCAL ? 'http://127.0.0.1:8000/api/session/login' : `${ORIGIN}/backend/api/session/login`,
   };
 
@@ -707,7 +714,7 @@
       title: 'Receptionist Login',
       description: 'Handle walk-ins, bookings, and intake from a single screen.',
       note: 'Front-desk access only. Ask your clinic admin if you need help.',
-      cta: 'Login as Receptionist',
+      cta: 'Send OTP',
       promoBadge: 'Front Desk Companion',
       promoTitle: 'Scan the QR to manage check-ins',
       promoDesc: 'Confirm appointments, manage queues, and send updates in seconds.',
@@ -718,9 +725,13 @@
 
   const els = {
     loginForm: document.getElementById('loginForm'),
+    loginLabel: document.getElementById('loginLabel'),
     email: document.getElementById('email'),
+    passwordRow: document.getElementById('passwordRow'),
     password: document.getElementById('password'),
     pwBtn: document.getElementById('pwBtn'),
+    otpRow: document.getElementById('otpRow'),
+    otp: document.getElementById('otp'),
     loginBtn: document.getElementById('loginBtn'),
     dump: document.getElementById('dump'),
     errorBox: document.getElementById('errorBox'),
@@ -739,6 +750,8 @@
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   let currentRole = 'clinic_admin';
   let roleSwitchTimer;
+  let receptionistOtpRequestId = null;
+  let receptionistOtpPhone = '';
 
   function normalizeRole(role){
     const clean = (role || '').toString().trim().toLowerCase().replace(/\s|-/g, '_');
@@ -819,6 +832,62 @@
     els.errorBox.style.display = msg ? 'block' : 'none';
   }
 
+  function normalizePhoneInput(value) {
+    return (value || '').toString().replace(/\D+/g, '');
+  }
+
+  async function completeLogin(loginDataRaw, roleToSend) {
+    const loginDataParsed = parseDeepJSON(loginDataRaw);
+
+    if (loginDataParsed?.role === 'admin') {
+      const adminTarget = loginDataParsed?.redirect || `${WEB_BASE}/admin/dashboard`;
+      dump({ loginDataRaw, loginDataParsed, adminTarget }, 'Admin Login');
+      setTimeout(()=> window.location.replace(adminTarget), 150);
+      return;
+    }
+
+    const computedUserId = extractUserId(loginDataParsed);
+    const resolvedRole = loginDataParsed?.role || roleToSend;
+    const resolvedClinicId = loginDataParsed?.clinic_id
+      ?? loginDataParsed?.vet_id
+      ?? loginDataParsed?.vet_registerations_temp_id
+      ?? loginDataParsed?.vet_registeration_id
+      ?? loginDataParsed?.user?.clinic_id
+      ?? null;
+    const resolvedDoctorId = loginDataParsed?.doctor_id
+      ?? loginDataParsed?.user?.doctor_id
+      ?? (resolvedRole === 'doctor' ? computedUserId : null);
+
+    const payload = {
+      success: true,
+      message: loginDataParsed?.message || 'Login success',
+      role: resolvedRole,
+      email:  loginDataParsed?.email ?? loginDataParsed?.user?.email ?? null,
+      phone:  loginDataParsed?.phone ?? loginDataParsed?.user?.phone ?? null,
+      token:  loginDataParsed?.token,
+      token_type: loginDataParsed?.token_type || 'Bearer',
+      chat_room: loginDataParsed?.chat_room || null,
+      user: loginDataParsed?.user || null,
+      user_id: computedUserId,
+      clinic_id: resolvedClinicId,
+      doctor_id: resolvedDoctorId,
+    };
+    saveAuthFull(payload);
+
+    const sessionSync = await syncSessionWithBackend(payload.user_id, resolvedRole);
+    dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Vet Login + Session');
+
+    if (sessionSync.ok) {
+      const target =
+        resolvedRole === 'receptionist'
+          ? RECEPTIONIST_REDIRECT
+          : POST_LOGIN_REDIRECT;
+      setTimeout(()=> window.location.replace(target), 150);
+    } else {
+      setError('Login succeeded but session could not be established. Please retry.');
+    }
+  }
+
   function triggerRoleAnimation() {
     document.body.classList.remove('role-switch');
     void document.body.offsetWidth;
@@ -851,6 +920,21 @@
     if (els.roleIcon) {
       els.roleIcon.innerHTML = `<i class="fa-solid ${data.icon}"></i>`;
     }
+
+    const isReceptionist = currentRole === 'receptionist';
+    receptionistOtpRequestId = null;
+    receptionistOtpPhone = '';
+    if (els.loginLabel) els.loginLabel.textContent = isReceptionist ? 'Phone Number' : 'Email Address';
+    if (els.email) {
+      els.email.type = isReceptionist ? 'tel' : 'email';
+      els.email.placeholder = isReceptionist ? 'Enter your phone number' : 'Enter your email address';
+      els.email.autocomplete = isReceptionist ? 'tel' : 'email';
+      els.email.value = '';
+    }
+    if (els.passwordRow) els.passwordRow.style.display = isReceptionist ? 'none' : 'block';
+    if (els.password) els.password.value = '';
+    if (els.otpRow) els.otpRow.style.display = 'none';
+    if (els.otp) els.otp.value = '';
 
     els.roleButtons.forEach((btn) => {
       const isActive = btn.dataset.role === currentRole;
@@ -892,12 +976,66 @@
 
     const emailVal = els.email.value.trim();
     const pwVal = els.password.value.trim();
+    const otpVal = els.otp.value.trim();
+    const roleToSend = currentRole;
+
+    if (roleToSend === 'receptionist') {
+      const phoneVal = normalizePhoneInput(emailVal);
+      if (phoneVal.length < 10) {
+        setError('Phone number is required.');
+        return;
+      }
+
+      els.loginBtn.disabled = true;
+      try {
+        if (!receptionistOtpRequestId || receptionistOtpPhone !== phoneVal) {
+          els.loginBtn.textContent = 'Sending OTP...';
+          const res = await axios.post(ROUTES.receptionistOtpRequest, {
+            phone: phoneVal,
+          }, { withCredentials: true });
+
+          receptionistOtpRequestId = res?.data?.request_id || null;
+          receptionistOtpPhone = phoneVal;
+          if (els.otpRow) els.otpRow.style.display = 'block';
+          if (els.otp) els.otp.focus();
+          if (els.loginBtn) els.loginBtn.textContent = 'Verify OTP & Login';
+          dump({ otpRequest: res?.data }, 'Receptionist OTP Sent');
+          return;
+        }
+
+        if (!otpVal) {
+          setError('OTP is required.');
+          return;
+        }
+
+        els.loginBtn.textContent = 'Verifying OTP...';
+        const res = await axios.post(ROUTES.receptionistOtpVerify, {
+          phone: phoneVal,
+          otp: otpVal,
+          request_id: receptionistOtpRequestId,
+        }, { withCredentials: true });
+
+        await completeLogin(res?.data, roleToSend);
+      } catch (err) {
+        const data = err?.response?.data || { error:String(err) };
+        dump({ error:'Receptionist OTP login failed', detail:data }, 'Receptionist OTP Login Error');
+        const msg =
+          data?.message ||
+          data?.error ||
+          (typeof data === 'string' ? data : null) ||
+          'Unable to verify OTP. Please try again.';
+        setError(msg);
+      } finally {
+        els.loginBtn.disabled = false;
+        els.loginBtn.textContent = receptionistOtpRequestId ? 'Verify OTP & Login' : 'Send OTP';
+      }
+      return;
+    }
+
     if (!emailVal || !pwVal) {
       setError('Email and password are required.');
       return;
     }
-
-    const roleToSend = currentRole;
 
     els.loginBtn.disabled = true;
     els.loginBtn.textContent = 'Logging in...';
@@ -908,55 +1046,7 @@
         role: roleToSend,
       }, { withCredentials: true });
 
-      const loginDataRaw    = res?.data;
-      const loginDataParsed = parseDeepJSON(loginDataRaw);
-
-      if (loginDataParsed?.role === 'admin') {
-        const adminTarget = loginDataParsed?.redirect || `${WEB_BASE}/admin/dashboard`;
-        dump({ loginDataRaw, loginDataParsed, adminTarget }, 'Admin Login');
-        setTimeout(()=> window.location.replace(adminTarget), 150);
-        return;
-      }
-
-      const computedUserId = extractUserId(loginDataParsed);
-      const resolvedRole = loginDataParsed?.role || roleToSend;
-      const resolvedClinicId = loginDataParsed?.clinic_id
-        ?? loginDataParsed?.vet_id
-        ?? loginDataParsed?.vet_registerations_temp_id
-        ?? loginDataParsed?.vet_registeration_id
-        ?? loginDataParsed?.user?.clinic_id
-        ?? null;
-      const resolvedDoctorId = loginDataParsed?.doctor_id
-        ?? loginDataParsed?.user?.doctor_id
-        ?? (resolvedRole === 'doctor' ? computedUserId : null);
-
-      const payload = {
-        success: true,
-        message: loginDataParsed?.message || 'Login success',
-        role: resolvedRole,
-        email:  loginDataParsed?.email ?? loginDataParsed?.user?.email ?? null,
-        token:  loginDataParsed?.token,
-        token_type: loginDataParsed?.token_type || 'Bearer',
-        chat_room: loginDataParsed?.chat_room || null,
-        user: loginDataParsed?.user || null,
-        user_id: computedUserId,
-        clinic_id: resolvedClinicId,
-        doctor_id: resolvedDoctorId,
-      };
-      saveAuthFull(payload);
-
-      const sessionSync = await syncSessionWithBackend(payload.user_id, resolvedRole);
-      dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Vet Login + Session');
-
-      if (sessionSync.ok) {
-        const target =
-          resolvedRole === 'receptionist'
-            ? RECEPTIONIST_REDIRECT
-            : POST_LOGIN_REDIRECT;
-        setTimeout(()=> window.location.replace(target), 150);
-      } else {
-        setError('Login succeeded but session could not be established. Please retry.');
-      }
+      await completeLogin(res?.data, roleToSend);
     }catch(err){
       const data = err?.response?.data || { error:String(err) };
       dump({ error:'Vet login failed', detail:data }, 'Vet Login Error');
