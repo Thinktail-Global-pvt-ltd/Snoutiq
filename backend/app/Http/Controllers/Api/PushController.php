@@ -242,11 +242,7 @@ class PushController extends Controller
             'app' => ['nullable', 'string', 'max:64'],
         ]);
 
-        try {
-            $push = $push->forProject($this->resolveFirebaseProject($request));
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        }
+        $firebaseProject = $this->resolveFirebaseProject($request);
 
         $title = $validated['title'] ?? 'Snoutiq Alert';
         $body = $validated['body'] ?? 'Test push from API';
@@ -305,11 +301,16 @@ class PushController extends Controller
                     ], 422);
                 }
                 // Send immediately for testing
-                if ($image !== null || $icon !== null) {
-                    $push->sendToTokenRich($normalizedToken, $title, $body, $data, $options);
-                } else {
-                    $push->sendToToken($normalizedToken, $title, $body, $data);
-                }
+                $sentProject = $this->sendPushToTokenWithProjectFallback(
+                    $push,
+                    $firebaseProject,
+                    $normalizedToken,
+                    $title,
+                    $body,
+                    $data,
+                    $options,
+                    $image !== null || $icon !== null
+                );
             } else {
                 // If token not provided, try sending to the current user's registered devices
                 $userId = Auth::id();
@@ -318,17 +319,23 @@ class PushController extends Controller
                 }
                 $tokens = DeviceToken::where('user_id', $userId)->pluck('token')->all();
                 foreach ($tokens as $t) {
-                    if ($image !== null || $icon !== null) {
-                        $push->sendToTokenRich($t, $title, $body, $data, $options);
-                    } else {
-                        $push->sendToToken($t, $title, $body, $data);
-                    }
+                    $sentProject = $this->sendPushToTokenWithProjectFallback(
+                        $push,
+                        $firebaseProject,
+                        $t,
+                        $title,
+                        $body,
+                        $data,
+                        $options,
+                        $image !== null || $icon !== null
+                    );
                 }
             }
 
             return response()->json([
                 'sent' => true,
                 'success' => true,
+                'firebase_project' => $sentProject ?? ($firebaseProject ?: 'app'),
             ]);
         } catch (Throwable $e) {
             if ($e instanceof StaleFcmTokenException) {
@@ -373,11 +380,7 @@ class PushController extends Controller
             'app' => ['nullable', 'string', 'max:64'],
         ]);
 
-        try {
-            $push = $push->forProject($this->resolveFirebaseProject($request));
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        }
+        $firebaseProject = $this->resolveFirebaseProject($request);
 
         $title = $validated['title'] ?? 'Snoutiq Alert';
         $body = $validated['body'] ?? 'Test push from API';
@@ -460,7 +463,16 @@ class PushController extends Controller
                         'error' => 'The provided token does not look like a valid FCM registration token.',
                     ], 422);
                 }
-                $push->sendToTokenRich($normalizedToken, $title, $body, $data, $options);
+                $sentProject = $this->sendPushToTokenWithProjectFallback(
+                    $push,
+                    $firebaseProject,
+                    $normalizedToken,
+                    $title,
+                    $body,
+                    $data,
+                    $options,
+                    true
+                );
             } else {
                 $userId = Auth::id();
                 if (!$userId) {
@@ -468,13 +480,23 @@ class PushController extends Controller
                 }
                 $tokens = DeviceToken::where('user_id', $userId)->pluck('token')->all();
                 foreach ($tokens as $t) {
-                    $push->sendToTokenRich($t, $title, $body, $data, $options);
+                    $sentProject = $this->sendPushToTokenWithProjectFallback(
+                        $push,
+                        $firebaseProject,
+                        $t,
+                        $title,
+                        $body,
+                        $data,
+                        $options,
+                        true
+                    );
                 }
             }
 
             return response()->json([
                 'sent' => true,
                 'success' => true,
+                'firebase_project' => $sentProject ?? ($firebaseProject ?: 'app'),
             ]);
         } catch (Throwable $e) {
             if ($e instanceof StaleFcmTokenException) {
@@ -1448,6 +1470,80 @@ class PushController extends Controller
             'app', 'pet-parent', 'petparent', 'snoutiq' => 'app',
             default => $normalized,
         };
+    }
+
+    private function sendPushToTokenWithProjectFallback(
+        FcmService $push,
+        ?string $firebaseProject,
+        string $token,
+        string $title,
+        string $body,
+        array $data,
+        array $options = [],
+        bool $rich = false
+    ): string {
+        $projectCandidates = $firebaseProject
+            ? [$firebaseProject]
+            : ['app', 'professional', 'groomer', 'vet'];
+
+        $projectCandidates = array_values(array_unique($projectCandidates));
+        $failures = [];
+        $lastException = null;
+
+        foreach ($projectCandidates as $projectKey) {
+            try {
+                $projectPush = $push->forProject($projectKey);
+
+                if ($rich) {
+                    $projectPush->sendToTokenRich($token, $title, $body, $data, $options);
+                } else {
+                    $projectPush->sendToToken($token, $title, $body, $data);
+                }
+
+                return $projectKey;
+            } catch (Throwable $e) {
+                $lastException = $e;
+                $failures[$projectKey] = $e->getMessage();
+
+                if ($firebaseProject || ! $this->shouldTryNextFirebaseProject($e)) {
+                    break;
+                }
+            }
+        }
+
+        if ($lastException && $this->isSenderIdMismatch($lastException)) {
+            throw new \RuntimeException(
+                'FCM SenderId mismatch for every configured Firebase project. The token belongs to a Firebase project that is not configured on this backend. Project failures: '
+                . json_encode($failures),
+                (int) $lastException->getCode(),
+                $lastException
+            );
+        }
+
+        if ($lastException) {
+            throw $lastException;
+        }
+
+        throw new \RuntimeException('FCM send failed: no Firebase projects configured.');
+    }
+
+    private function shouldTryNextFirebaseProject(Throwable $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'senderid mismatch')
+            || str_contains($message, 'sender id mismatch')
+            || str_contains($message, 'firebase credentials file is not readable')
+            || str_contains($message, 'firebase credentials path is not configured')
+            || str_contains($message, 'firebase project id is not configured');
+    }
+
+    private function isSenderIdMismatch(Throwable $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'senderid mismatch')
+            || str_contains($message, 'sender id mismatch');
     }
 
     private function isLikelyFcmToken(string $token): bool
