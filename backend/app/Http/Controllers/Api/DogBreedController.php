@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Http;
 
 class DogBreedController extends Controller
 {
+    private const ALL_BREEDS_URL = 'https://dog.ceo/api/breeds/list/all';
+
     private const MANUAL_DOG_BREEDS = [
         'Rajapalayam',
         'Chippiparai',
@@ -62,17 +64,14 @@ class DogBreedController extends Controller
         try {
             $resp = Http::acceptJson()
                 ->timeout(10)
-                ->get('https://dogapi.dog/api/v2/breeds');
+                ->get(self::ALL_BREEDS_URL);
 
             if ($resp->successful()) {
-                $rows = $resp->json('data');
-                if (!is_array($rows)) {
-                    $rows = [];
-                }
-
-                foreach ($rows as $row) {
-                    $name = trim((string) data_get($row, 'attributes.name', ''));
-                    $this->appendBreed($breeds, $name);
+                $apiBreeds = $resp->json('message');
+                if (is_array($apiBreeds)) {
+                    foreach ($apiBreeds as $breed => $subBreeds) {
+                        $this->appendBreed($breeds, (string) $breed, is_array($subBreeds) ? $subBreeds : []);
+                    }
                 }
             }
         } catch (ConnectionException $e) {
@@ -91,7 +90,7 @@ class DogBreedController extends Controller
         ]);
     }
 
-    private function appendBreed(array &$breeds, string $name): void
+    private function appendBreed(array &$breeds, string $name, array $subBreeds = []): void
     {
         if ($name === '') {
             return;
@@ -103,7 +102,10 @@ class DogBreedController extends Controller
         }
 
         if (!array_key_exists($key, $breeds)) {
-            $breeds[$key] = [];
+            $breeds[$key] = array_values(array_filter(array_map(
+                fn ($subBreed) => strtolower(trim((string) $subBreed)),
+                $subBreeds
+            )));
         }
     }
 

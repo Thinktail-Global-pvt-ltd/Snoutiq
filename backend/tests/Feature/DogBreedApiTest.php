@@ -11,19 +11,13 @@ class DogBreedApiTest extends TestCase
     public function test_dog_breeds_endpoint_includes_manual_breeds_in_existing_map_shape(): void
     {
         Http::fake([
-            'https://dogapi.dog/api/v2/breeds' => Http::response([
-                'data' => [
-                    [
-                        'attributes' => [
-                            'name' => 'Labrador Retriever',
-                        ],
-                    ],
-                    [
-                        'attributes' => [
-                            'name' => 'Beagle',
-                        ],
-                    ],
+            'https://dog.ceo/api/breeds/list/all' => Http::response([
+                'message' => [
+                    'labrador' => [],
+                    'retriever' => ['golden'],
+                    'beagle' => [],
                 ],
+                'status' => 'success',
             ], 200),
         ]);
 
@@ -35,7 +29,8 @@ class DogBreedApiTest extends TestCase
         $breeds = $response->json('breeds');
 
         $this->assertIsArray($breeds);
-        $this->assertSame([], $breeds['labrador retriever'] ?? null);
+        $this->assertSame([], $breeds['labrador'] ?? null);
+        $this->assertSame(['golden'], $breeds['retriever'] ?? null);
         $this->assertSame([], $breeds['beagle'] ?? null);
 
         foreach ([
@@ -69,7 +64,7 @@ class DogBreedApiTest extends TestCase
     public function test_dog_breeds_endpoint_falls_back_to_manual_breeds_when_external_api_times_out(): void
     {
         Http::fake([
-            'https://dogapi.dog/api/v2/breeds' => function () {
+            'https://dog.ceo/api/breeds/list/all' => function () {
                 throw new ConnectionException('Connection timed out.');
             },
         ]);
