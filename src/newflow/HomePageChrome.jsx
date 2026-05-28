@@ -437,7 +437,7 @@ export function ServiceCard({
   );
 }
 
-export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
+export function Navbar({ consultPath = "/app-links" }) {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -547,7 +547,7 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
               onClick={() => go(consultPath)}
               type="button"
             >
-              Consult Now
+              Download Now
             </Button>
           </div>
 
@@ -597,7 +597,7 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
                 onClick={() => go(consultPath)}
                 type="button"
               >
-                Consult Now
+                Download Now
               </Button>
             </div>
           </div>
