@@ -1,0 +1,269 @@
+import React, { useMemo } from "react";
+import logo from '../assets/images/logo1.png'
+
+const qrPattern = [
+  [1, 1, 1, 1, 1, 1, 1, 0, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 0],
+  [1, 0, 1, 1, 1, 0, 1, 0, 1],
+  [1, 0, 1, 1, 1, 0, 1, 0, 0],
+  [1, 0, 1, 1, 1, 0, 1, 0, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 1],
+  [1, 1, 1, 1, 1, 1, 1, 0, 1],
+  [0, 0, 0, 1, 0, 0, 0, 0, 0],
+  [1, 0, 1, 0, 1, 1, 1, 1, 1],
+];
+
+const BenefitIcon = ({ type }) => {
+  const common = {
+    fill: "none",
+    stroke: "#2AB7A3",
+    strokeWidth: 1.8,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
+
+  if (type === "health") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" {...common}>
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </svg>
+    );
+  }
+
+  if (type === "reminder") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" {...common}>
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    );
+  }
+
+  if (type === "report") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" {...common}>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" {...common}>
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
+};
+
+const benefits = [
+  {
+    type: "health",
+    label: "Track Health",
+    desc: "Full medical history, weight, vaccinations",
+  },
+  {
+    type: "reminder",
+    label: "Get Reminders",
+    desc: "Vaccines, deworm & follow-up alerts",
+  },
+  {
+    type: "report",
+    label: "Access Reports",
+    desc: "Lab results & prescriptions anytime",
+  },
+  {
+    type: "care",
+    label: "Better Care",
+    desc: "Personalised insights for your pet",
+  },
+];
+
+function PawPattern() {
+  return (
+    <svg className="absolute inset-0 h-full w-full opacity-[0.028]" aria-hidden="true">
+      <defs>
+        <pattern id="pawPattern" width="80" height="80" patternUnits="userSpaceOnUse">
+          <g fill="#0B1D35">
+            <ellipse cx="22" cy="18" rx="7" ry="9" />
+            <ellipse cx="40" cy="13" rx="6" ry="8" />
+            <ellipse cx="57" cy="18" rx="7" ry="9" />
+            <ellipse cx="14" cy="34" rx="5" ry="7" />
+            <ellipse cx="66" cy="34" rx="5" ry="7" />
+            <ellipse cx="40" cy="52" rx="18" ry="14" />
+          </g>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#pawPattern)" />
+    </svg>
+  );
+}
+
+function PetDecorations() {
+  return (
+    <>
+      <svg
+        className="pointer-events-none absolute -left-3 bottom-20 z-0 hidden w-64 scale-x-[-1] opacity-[0.04] sm:block"
+        viewBox="0 0 200 260"
+        fill="none"
+        aria-hidden="true"
+      >
+        <ellipse cx="100" cy="160" rx="72" ry="58" fill="#0B1D35" />
+        <ellipse cx="100" cy="105" rx="42" ry="48" fill="#0B1D35" />
+        <ellipse cx="70" cy="74" rx="18" ry="28" fill="#0B1D35" transform="rotate(-15 70 74)" />
+        <ellipse cx="130" cy="72" rx="14" ry="22" fill="#0B1D35" transform="rotate(15 130 72)" />
+        <rect x="64" y="200" width="20" height="50" rx="10" fill="#0B1D35" />
+        <rect x="92" y="205" width="20" height="50" rx="10" fill="#0B1D35" />
+        <rect x="118" y="200" width="20" height="50" rx="10" fill="#0B1D35" />
+        <ellipse cx="140" cy="168" rx="28" ry="14" fill="#0B1D35" transform="rotate(-10 140 168)" />
+      </svg>
+
+      <svg
+        className="pointer-events-none absolute -right-3 top-64 z-0 hidden w-60 opacity-[0.04] sm:block"
+        viewBox="0 0 200 260"
+        fill="none"
+        aria-hidden="true"
+      >
+        <ellipse cx="100" cy="170" rx="65" ry="55" fill="#0B1D35" />
+        <ellipse cx="100" cy="108" rx="44" ry="46" fill="#0B1D35" />
+        <polygon points="68,75 58,32 88,68" fill="#0B1D35" />
+        <polygon points="132,75 142,32 112,68" fill="#0B1D35" />
+        <rect x="68" y="210" width="18" height="46" rx="9" fill="#0B1D35" />
+        <rect x="95" y="215" width="18" height="46" rx="9" fill="#0B1D35" />
+        <rect x="120" y="210" width="18" height="46" rx="9" fill="#0B1D35" />
+        <path d="M145 180 Q175 170 182 148" stroke="#0B1D35" strokeWidth="14" strokeLinecap="round" />
+      </svg>
+    </>
+  );
+}
+
+export default function DoctorAnil() {
+  const qrCells = useMemo(() => qrPattern.flat(), []);
+
+  return (
+    <main className="min-h-screen bg-slate-300 px-4 py-8 font-sans text-[#0B1D35] sm:px-6 print:bg-white print:p-0">
+      <section className="relative mx-auto flex min-h-[1200px] w-full max-w-[900px] flex-col overflow-hidden bg-white shadow-[0_20px_60px_rgba(11,29,53,0.18)] print:min-h-screen print:max-w-none print:shadow-none">
+        <PawPattern />
+        <PetDecorations />
+
+        <div className="relative z-10 h-[3px] bg-gradient-to-r from-[#2AB7A3] to-transparent" />
+
+        <header className="relative z-10 flex flex-col gap-5 bg-[#0B1D35] px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-12">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#2AB7A3]">
+              <svg viewBox="0 0 28 28" className="h-7 w-7" fill="none" aria-hidden="true">
+                <rect x="11" y="3" width="6" height="22" rx="3" fill="white" />
+                <rect x="3" y="11" width="22" height="6" rx="3" fill="white" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-serif text-lg uppercase tracking-[0.06em] text-white">Pet Vet Centre</p>
+              <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[#8A9BB8]">Advanced Veterinary Care</p>
+            </div>
+          </div>
+
+          <div className="flex w-max items-center rounded-full ">
+            <img
+              src={logo}
+              alt="SnoutIQ logo"
+              className="block h-20 w-auto max-w-[120px] object-contain sm:h-20 sm:max-w-[120px]"
+              loading="eager"
+              decoding="async"
+            />
+          </div>
+
+          <div className="absolute bottom-0 left-6 right-6 h-px bg-white/[0.07] sm:left-12 sm:right-12" />
+        </header>
+
+        <section className="relative z-10 flex flex-col gap-4 bg-[#1A3354] px-6 py-5 sm:flex-row sm:items-center sm:px-12">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#2AB7A3] bg-[#122742]">
+            <svg viewBox="0 0 30 30" className="h-8 w-8 opacity-70" fill="none" aria-hidden="true">
+              <circle cx="15" cy="11" r="7" fill="rgba(255,255,255,0.45)" />
+              <path d="M4 28 C4 20 26 20 26 28" fill="rgba(255,255,255,0.45)" />
+            </svg>
+          </div>
+
+          <div className="flex-1">
+            <p className="font-serif text-xl text-white">Dr. Anil Kumar</p>
+            <p className="mt-1 text-xs tracking-[0.06em] text-[#3ECBB6]">B.V.Sc & A.H. · Veterinary Physician</p>
+          </div>
+
+          <div className="w-max rounded-full border border-[#2AB7A3]/30 bg-[#2AB7A3]/15 px-4 py-2 text-xs font-medium tracking-wide text-[#3ECBB6]">
+            30+ Years Experience
+          </div>
+        </section>
+
+        <section className="relative z-10 flex flex-1 flex-col items-center px-6 py-12 text-center sm:px-12 sm:py-16">
+          <div className="pointer-events-none absolute left-1/2 top-28 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(42,183,163,0.08)_0%,transparent_70%)]" />
+
+          <p className="relative text-[11px] font-semibold uppercase tracking-[0.2em] text-[#2AB7A3]">
+            Smart Pet Healthcare · SnoutIQ
+          </p>
+
+          <h1 className="relative mt-5 max-w-[640px] font-serif text-4xl leading-tight text-[#0B1D35] sm:text-5xl md:text-[52px]">
+            Your Pet&apos;s Health
+            <br />
+            Journey <em className="text-[#2AB7A3]">Starts Here</em>
+          </h1>
+
+          <p className="relative mt-4 max-w-[430px] text-base font-light leading-7 text-[#4A5E7A]">
+            One scan. Complete health records, appointment reminders, and personalised care — all in one place.
+          </p>
+
+          <div className="relative mt-12 flex flex-col items-center">
+            <div className="relative flex h-[230px] w-[230px] items-center justify-center overflow-hidden rounded-[28px] bg-white shadow-[0_20px_60px_rgba(11,29,53,0.18),0_0_0_1px_rgba(11,29,53,0.07)]">
+              <span className="absolute left-2.5 top-2.5 h-6 w-6 rounded-tl border-l-[3px] border-t-[3px] border-[#2AB7A3]" />
+              <span className="absolute right-2.5 top-2.5 h-6 w-6 rounded-tr border-r-[3px] border-t-[3px] border-[#2AB7A3]" />
+              <span className="absolute bottom-2.5 left-2.5 h-6 w-6 rounded-bl border-b-[3px] border-l-[3px] border-[#2AB7A3]" />
+              <span className="absolute bottom-2.5 right-2.5 h-6 w-6 rounded-br border-b-[3px] border-r-[3px] border-[#2AB7A3]" />
+
+              <div className="grid h-[180px] w-[180px] grid-cols-9 grid-rows-9 gap-0.5 opacity-90">
+                {qrCells.map((value, index) => (
+                  <div
+                    key={`${value}-${index}`}
+                    className={`rounded-[2px] ${value ? "bg-[#0B1D35]" : "bg-white"}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 text-sm font-normal tracking-[0.08em] text-[#4A5E7A]">
+              <strong className="mb-1 block text-lg font-semibold normal-case tracking-normal text-[#0B1D35]">
+                Scan to Create Your Pet Profile
+              </strong>
+              Free · Takes 60 seconds
+            </div>
+          </div>
+
+          <div className="mx-auto mt-11 h-0.5 w-12 rounded-full bg-[#2AB7A3]" />
+        </section>
+
+        <section className="relative z-10 border-t border-[#E8ECF2] bg-[#F5F7FA] px-6 py-10 sm:px-12">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {benefits.map((benefit) => (
+              <div
+                key={benefit.label}
+                className="flex flex-col items-center gap-3 rounded-[20px] border border-[#E8ECF2] bg-white px-4 py-6 text-center shadow-[0_2px_12px_rgba(11,29,53,0.08)]"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#2AB7A3]/10">
+                  <BenefitIcon type={benefit.type} />
+                </div>
+                <p className="text-[13px] font-bold leading-snug tracking-wide text-[#0B1D35]">{benefit.label}</p>
+                <p className="text-[11px] font-light leading-5 text-[#8A9BB8]">{benefit.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <footer className="relative z-10 flex flex-col gap-2 bg-[#0B1D35] px-6 py-5 text-[11px] tracking-[0.06em] text-[#8A9BB8] sm:flex-row sm:items-center sm:justify-between sm:px-12">
+          <div>snoutiq.com · Free for Pet Parents</div>
+          <div>
+            Powered by <span className="font-medium text-[#3ECBB6]">SnoutIQ</span>
+          </div>
+        </footer>
+      </section>
+    </main>
+  );
+}

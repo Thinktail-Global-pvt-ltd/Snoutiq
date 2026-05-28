@@ -84,6 +84,7 @@ const LegacyHomePage = lazy(() => import("./components/Home"));
 const DoctorRegistration = lazy(() =>
   import("./components/DoctorRegistration")
 );
+const DoctorAnil = lazy(() => import("./DoctorQrPage/DoctorAnil.jsx"));
 const ConsultationBooked = lazy(() => import("./pages/ConsultationBooked"));
 
 const NewAbout = lazy(() => import("./newflow/NewAbout"));
@@ -254,6 +255,7 @@ export default function AppRoutes() {
         <Route path="/vet-register-success" element={<VetRegisterSuccess />} />
         <Route path="/vet-dashboard" element={<VetDashboard />} />
         <Route path="/veterinary-practice-software" element={<Home />} />
+        <Route path="/draniljiqr" element={<DoctorAnil />} />
 
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-service" element={<TearmsCondition />} />
