@@ -79,11 +79,11 @@ export default function DownloadSnoutIQApp() {
             <div className="order-2 md:order-1">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 sm:mb-7 sm:text-sm">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Pet health, now easier
+                <span className="text-[#309BD8]">Pet health, now easier</span>
               </div>
 
               <h1 className="max-w-xl text-3xl font-black leading-[1.05] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-                Download <span className="text-blue-600">SnoutIQ</span> App
+                Download <span className="text-[#309BD8]">SnoutIQ</span> App
               </h1>
 
               <p className="mt-4 max-w-xl text-sm font-medium leading-6 text-slate-600 sm:mt-5 sm:text-lg sm:leading-7">
