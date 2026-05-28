@@ -63,22 +63,22 @@ export default function DownloadSnoutIQApp() {
 
       <section className="relative mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-5xl items-start justify-center pt-2 sm:items-center sm:pt-0">
         <div className="w-full">
-          <div className="mb-4 flex justify-center sm:mb-6">
-            <div className="inline-flex max-w-full items-center gap-3 rounded-full border border-white/80 bg-white/90 px-4 py-2 shadow-lg shadow-blue-950/10 backdrop-blur">
-              <div className="min-w-0 leading-tight">
-                <img
-                  src={logo}
-                  alt="logo"
-                  className="h-auto w-20 max-w-full sm:w-34"
-                />
-
-              </div>
-            </div>
-          </div>
 
           <div className="grid w-full items-center gap-6 rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-2xl shadow-blue-950/10 backdrop-blur sm:gap-8 sm:p-6 md:grid-cols-2 md:p-8 lg:p-10">
             <div className="order-2 md:order-1">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 sm:mb-7 sm:text-sm">
+              <div className="mb-6 flex flex-col items-start gap-3 sm:mb-7">
+                <img
+                  src={logo}
+                  alt="SnoutIQ logo"
+                  className="block h-[20px] w-[104px] object-contain"
+                  width={104}
+                  height={20}
+                  loading="eager"
+                  decoding="async"
+                />
+              </div>
+
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 sm:mb-5 sm:text-sm">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 <span className="text-[#309BD8]">Pet health, now easier</span>
               </div>
