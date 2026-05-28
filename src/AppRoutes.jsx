@@ -138,6 +138,7 @@ const OnlineVetConsultationApp = lazy(() => import("./newflow/OnlineVetConsultat
 const FindVetsNearYou = lazy(() => import("./pages/FindVetsNearYou"));
 const NewDoctorRoute = lazy(() => import("./newdoctordata/NewDoctorRoute.jsx"));
 const AiRoute = lazy(() => import("./ai/AiRoute.jsx"));
+const AppLinks = lazy(() => import("./components/StoreButton"));
 const PetLifelinePage = lazy(() => import("./ai/PetLifelinePage"));
 const EditPetPage = lazy(() => import("./ai/EditPetPage"));
 const ConsultBookingFlow = lazy(() => import("./ai/ConsultBookingFlow"));
@@ -182,6 +183,7 @@ export default function AppRoutes() {
         <Route path="/in-clinic-pet-details" element={<InClinicPetDetailsPage />} />
         <Route path="/in-clinic-payment" element={<InClinicPaymentPage />} />
         <Route path="/ai" element={<AiRoute />} />
+        <Route path="/app-links" element={<AppLinks />} />
      <Route path="/pet-lifeline/:petId" element={<PetLifelinePage />} />
 <Route path="/profile" element={<EditPetPage />} />
 <Route path="/video-counsult" element={<ProtectedBookingRoute><ConsultBookingFlow /></ProtectedBookingRoute>} />
