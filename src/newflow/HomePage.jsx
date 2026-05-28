@@ -23,7 +23,7 @@ import {
 const e = { jsx: _jsx, jsxs: _jsxs };
 const N =
     "https://play.google.com/store/apps/details?id=com.petai.snoutiq&hl=en_IN",
-  C = "/20+vetsonline?start=details",
+  C = "/app-links",
   q = "/backend/api/exported_from_excell_doctors",
   M = "https://snoutiq.com/backend/api/exported_from_excell_doctors",
   ee = "https://snoutiq.com",
@@ -873,7 +873,7 @@ function Ie() {
     e.jsxs("div", {
       className: "flex min-h-screen flex-col bg-white",
       children: [
-        e.jsx(Q, { consultPath: "/20+vetsonline?start=details" }),
+        e.jsx(Q, { consultPath: "/app-links" }),
         e.jsxs("main", {
           "data-home-page": !0,
           className: "flex-1",
