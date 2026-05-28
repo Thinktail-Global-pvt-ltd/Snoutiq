@@ -1,17 +1,8 @@
 import React, { useMemo } from "react";
 import logo from '../assets/images/logo1.png'
+import appqr from '../assets/appqr.png'
+import doctorAnilImage from '../assets/doctor anil.jpeg'
 
-const qrPattern = [
-  [1, 1, 1, 1, 1, 1, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 1, 0, 0],
-  [1, 0, 1, 1, 1, 0, 1, 0, 1],
-  [1, 0, 1, 1, 1, 0, 1, 0, 0],
-  [1, 0, 1, 1, 1, 0, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 1, 0, 1],
-  [1, 1, 1, 1, 1, 1, 1, 0, 1],
-  [0, 0, 0, 1, 0, 0, 0, 0, 0],
-  [1, 0, 1, 0, 1, 1, 1, 1, 1],
-];
 
 const BenefitIcon = ({ type }) => {
   const common = {
@@ -140,7 +131,6 @@ function PetDecorations() {
 }
 
 export default function DoctorAnil() {
-  const qrCells = useMemo(() => qrPattern.flat(), []);
 
   return (
     <main className="min-h-screen bg-slate-300 px-4 py-8 font-sans text-[#0B1D35] sm:px-6 print:bg-white print:p-0">
@@ -179,10 +169,13 @@ export default function DoctorAnil() {
 
         <section className="relative z-10 flex flex-col gap-4 bg-[#1A3354] px-6 py-5 sm:flex-row sm:items-center sm:px-12">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#2AB7A3] bg-[#122742]">
-            <svg viewBox="0 0 30 30" className="h-8 w-8 opacity-70" fill="none" aria-hidden="true">
-              <circle cx="15" cy="11" r="7" fill="rgba(255,255,255,0.45)" />
-              <path d="M4 28 C4 20 26 20 26 28" fill="rgba(255,255,255,0.45)" />
-            </svg>
+            <img
+              src={doctorAnilImage}
+              alt="Dr. Anil Kumar"
+              className="h-full w-full object-cover object-center"
+              loading="eager"
+              decoding="async"
+            />
           </div>
 
           <div className="flex-1">
@@ -202,42 +195,41 @@ export default function DoctorAnil() {
             Smart Pet Healthcare · SnoutIQ
           </p>
 
-          <h1 className="relative mt-5 max-w-[640px] font-serif text-4xl leading-tight text-[#0B1D35] sm:text-5xl md:text-[52px]">
+          <h1 className="relative mt-5 max-w-[560px] font-serif text-[2.4rem] leading-[1.08] text-[#0B1D35] sm:text-5xl md:text-[46px]">
             Your Pet&apos;s Health
             <br />
             Journey <em className="text-[#2AB7A3]">Starts Here</em>
           </h1>
 
-          <p className="relative mt-4 max-w-[430px] text-base font-light leading-7 text-[#4A5E7A]">
+          <p className="relative mt-4 max-w-[420px] text-[15px] font-light leading-6 text-[#4A5E7A] sm:text-base sm:leading-7">
             One scan. Complete health records, appointment reminders, and personalised care — all in one place.
           </p>
 
-          <div className="relative mt-12 flex flex-col items-center">
-            <div className="relative flex h-[230px] w-[230px] items-center justify-center overflow-hidden rounded-[28px] bg-white shadow-[0_20px_60px_rgba(11,29,53,0.18),0_0_0_1px_rgba(11,29,53,0.07)]">
-              <span className="absolute left-2.5 top-2.5 h-6 w-6 rounded-tl border-l-[3px] border-t-[3px] border-[#2AB7A3]" />
-              <span className="absolute right-2.5 top-2.5 h-6 w-6 rounded-tr border-r-[3px] border-t-[3px] border-[#2AB7A3]" />
-              <span className="absolute bottom-2.5 left-2.5 h-6 w-6 rounded-bl border-b-[3px] border-l-[3px] border-[#2AB7A3]" />
-              <span className="absolute bottom-2.5 right-2.5 h-6 w-6 rounded-br border-b-[3px] border-r-[3px] border-[#2AB7A3]" />
+          <div className="relative mt-10 flex flex-col items-center sm:mt-12">
+            <div className="relative flex h-[205px] w-[205px] items-center justify-center overflow-hidden rounded-[28px] bg-white shadow-[0_18px_50px_rgba(11,29,53,0.16),0_0_0_1px_rgba(11,29,53,0.07)] sm:h-[220px] sm:w-[220px]">
+              <span className="absolute left-2.5 top-2.5 h-5 w-5 rounded-tl border-l-[3px] border-t-[3px] border-[#2AB7A3]" />
+              <span className="absolute right-2.5 top-2.5 h-5 w-5 rounded-tr border-r-[3px] border-t-[3px] border-[#2AB7A3]" />
+              <span className="absolute bottom-2.5 left-2.5 h-5 w-5 rounded-bl border-b-[3px] border-l-[3px] border-[#2AB7A3]" />
+              <span className="absolute bottom-2.5 right-2.5 h-5 w-5 rounded-br border-b-[3px] border-r-[3px] border-[#2AB7A3]" />
 
-              <div className="grid h-[180px] w-[180px] grid-cols-9 grid-rows-9 gap-0.5 opacity-90">
-                {qrCells.map((value, index) => (
-                  <div
-                    key={`${value}-${index}`}
-                    className={`rounded-[2px] ${value ? "bg-[#0B1D35]" : "bg-white"}`}
-                  />
-                ))}
+              <div className="flex h-[180px] w-[180px] items-center justify-center opacity-90">
+                <img
+                  src={appqr}
+                  alt="qr"
+                  className="block h-[160px] w-[160px] object-contain sm:h-[172px] sm:w-[172px]"
+                />
               </div>
             </div>
 
-            <div className="mt-6 text-sm font-normal tracking-[0.08em] text-[#4A5E7A]">
-              <strong className="mb-1 block text-lg font-semibold normal-case tracking-normal text-[#0B1D35]">
+            <div className="mt-5 text-[13px] font-normal tracking-[0.06em] text-[#4A5E7A] sm:mt-6 sm:text-sm">
+              <strong className="mb-1 block text-base font-semibold normal-case tracking-normal text-[#0B1D35] sm:text-lg">
                 Scan to Create Your Pet Profile
               </strong>
               Free · Takes 60 seconds
             </div>
           </div>
 
-          <div className="mx-auto mt-11 h-0.5 w-12 rounded-full bg-[#2AB7A3]" />
+          <div className="mx-auto mt-8 h-0.5 w-12 rounded-full bg-[#2AB7A3] sm:mt-10" />
         </section>
 
         <section className="relative z-10 border-t border-[#E8ECF2] bg-[#F5F7FA] px-6 py-10 sm:px-12">
