@@ -162,7 +162,18 @@ class GeminiChatController extends Controller
             'pet_breed'  => 'nullable|string',
             'pet_age'    => 'nullable|string',
             'pet_gender' => 'nullable|string',
+            'pet_type' => 'nullable|string',
             'vaccination' => 'nullable|array',
+            'vaccination_history' => 'nullable|array',
+            'vaccination_all_entries' => 'nullable|array',
+            'vaccination_merged_entries' => 'nullable|array',
+            'vaccination_new_entries' => 'nullable|array',
+            'vaccination_entries' => 'nullable|array',
+            'vaccination_new' => 'nullable|array',
+            'vaccination_new_sections' => 'nullable|array',
+            'vaccination_batch_number' => 'nullable|string|max:255',
+            'batch_number' => 'nullable|string|max:255',
+            'batch_no' => 'nullable|string|max:255',
             'video_calling_upload_file' => 'nullable|file',
         ]);
 
@@ -202,6 +213,17 @@ class GeminiChatController extends Controller
         $category = $inference['category'] ?? 'normal';
 
         $petDoc2BlobSaved = $this->storeUploadInPetDoc2BlobNew($request, (int) $data['pet_id'], 'video_calling_upload_file');
+        $vaccinationPayload = $data['vaccination'] ?? null;
+        $batchNumber = $this->firstFilledString([
+            $data['vaccination_batch_number'] ?? null,
+            $data['batch_number'] ?? null,
+            $data['batch_no'] ?? null,
+        ]);
+        if ($batchNumber !== null) {
+            $vaccinationPayload = is_array($vaccinationPayload) ? $vaccinationPayload : [];
+            $vaccinationPayload['batch_number'] = $batchNumber;
+            $vaccinationPayload['batch_no'] = $batchNumber;
+        }
 
         DB::update(
             'UPDATE pets SET dog_disease_payload = ?, pet_card_for_ai = ?, updated_at = NOW() WHERE id = ?',
@@ -214,7 +236,15 @@ class GeminiChatController extends Controller
                     'pet_breed' => $data['pet_breed'] ?? null,
                     'pet_age' => $data['pet_age'] ?? null,
                     'pet_gender' => $data['pet_gender'] ?? null,
-                    'vaccination' => $data['vaccination'] ?? null,
+                    'pet_type' => $data['pet_type'] ?? null,
+                    'vaccination' => $vaccinationPayload,
+                    'vaccination_history' => $data['vaccination_history'] ?? null,
+                    'vaccination_all_entries' => $data['vaccination_all_entries'] ?? null,
+                    'vaccination_merged_entries' => $data['vaccination_merged_entries'] ?? null,
+                    'vaccination_new_entries' => $data['vaccination_new_entries'] ?? null,
+                    'vaccination_entries' => $data['vaccination_entries'] ?? null,
+                    'vaccination_new' => $data['vaccination_new'] ?? null,
+                    'vaccination_new_sections' => $data['vaccination_new_sections'] ?? null,
                     'pet_card_for_ai' => $petCardPath,
                 ]),
                 $petCardPath,
@@ -2123,5 +2153,21 @@ PROMPT;
 
         $fullUrl = url($value);
         return str_replace(' ', '%20', $fullUrl);
+    }
+
+    private function firstFilledString(array $values): ?string
+    {
+        foreach ($values as $value) {
+            if ($value === null) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 }
