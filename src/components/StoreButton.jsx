@@ -1,6 +1,7 @@
 import React from "react";
 import androidLogo from "../assets/android.PNG";
 import iosLogo from "../assets/ios.PNG";
+import appDownloadPreview from "../assets/download app.png";
 import logo from '../assets/images/logo.png'
 
 const ANDROID_URL =
@@ -75,7 +76,7 @@ export default function DownloadSnoutIQApp() {
             </div>
           </div>
 
-          <div className="grid w-full items-center gap-6 rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-2xl shadow-blue-950/10 backdrop-blur sm:gap-8 sm:p-6 md:p-8 lg:p-10">
+          <div className="grid w-full items-center gap-6 rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-2xl shadow-blue-950/10 backdrop-blur sm:gap-8 sm:p-6 md:grid-cols-2 md:p-8 lg:p-10">
             <div className="order-2 md:order-1">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 sm:mb-7 sm:text-sm">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -116,6 +117,21 @@ export default function DownloadSnoutIQApp() {
                 <span className="rounded-full bg-slate-100 px-3 py-2 sm:px-4">
                   Health records
                 </span>
+              </div>
+            </div>
+
+            <div className="order-1 hidden md:order-2 md:block">
+              <div className="relative mx-auto max-w-[320px]">
+                <div className="absolute -inset-6 rounded-[32px] bg-[#309BD8]/10 blur-3xl" />
+                <div className="relative overflow-hidden rounded-[28px] ">
+                  <img
+                    src={appDownloadPreview}
+                    alt="SnoutIQ app preview"
+                    className="block h-auto w-full object-contain"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
               </div>
             </div>
           </div>
