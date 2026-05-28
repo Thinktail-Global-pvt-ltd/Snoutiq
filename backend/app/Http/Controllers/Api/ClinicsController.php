@@ -206,11 +206,44 @@ class ClinicsController extends Controller
             ->where('user_id', '>', 0)
             ->groupBy('user_id');
 
+        $hasAppointmentPatientSource = Schema::hasTable('appointments')
+            && Schema::hasTable('pets')
+            && Schema::hasColumn('appointments', 'vet_registeration_id')
+            && Schema::hasColumn('appointments', 'pet_id')
+            && Schema::hasColumn('pets', 'id')
+            && Schema::hasColumn('pets', 'user_id');
+
+        $appointmentStats = null;
+        if ($hasAppointmentPatientSource) {
+            $appointmentStats = DB::table('appointments as a')
+                ->join('pets as ap', 'ap.id', '=', 'a.pet_id')
+                ->select(
+                    'ap.user_id',
+                    DB::raw('COUNT(*) as total_appointments'),
+                    DB::raw('MAX(a.created_at) as last_appointment_at')
+                )
+                ->where('a.vet_registeration_id', $clinicId)
+                ->whereNotNull('ap.user_id')
+                ->where('ap.user_id', '>', 0)
+                ->groupBy('ap.user_id');
+        }
+
         $patientIdSources = DB::table('transactions')
             ->select('user_id')
             ->where('clinic_id', $clinicId)
             ->whereNotNull('user_id')
             ->where('user_id', '>', 0);
+
+        if ($hasAppointmentPatientSource) {
+            $patientIdSources = $patientIdSources->union(
+                DB::table('appointments as a')
+                    ->join('pets as ap', 'ap.id', '=', 'a.pet_id')
+                    ->select('ap.user_id')
+                    ->where('a.vet_registeration_id', $clinicId)
+                    ->whereNotNull('ap.user_id')
+                    ->where('ap.user_id', '>', 0)
+            );
+        }
 
         if (Schema::hasColumn('users', 'last_vet_is')) {
             $patientIdSources = $patientIdSources->union(
@@ -246,10 +279,18 @@ class ClinicsController extends Controller
             ->leftJoinSub($transactionStats, 'tx', function ($join) {
                 $join->on('tx.user_id', '=', 'u.id');
             })
+            ->when($appointmentStats !== null, function ($query) use ($appointmentStats) {
+                $query->leftJoinSub($appointmentStats, 'appt', function ($join) {
+                    $join->on('appt.user_id', '=', 'u.id');
+                });
+            })
             ->leftJoinSub($recordStats, 'mr', function ($join) {
                 $join->on('mr.user_id', '=', 'u.id');
             })
             ->orderByDesc('tx.last_transaction_at')
+            ->when($appointmentStats !== null, function ($query) {
+                $query->orderByDesc('appt.last_appointment_at');
+            })
             ->orderByDesc('u.updated_at')
             ->limit(500)
             ->select(
@@ -260,6 +301,8 @@ class ClinicsController extends Controller
                 'u.updated_at',
                 DB::raw('COALESCE(tx.total_transactions, 0) as transactions_count'),
                 'tx.last_transaction_at',
+                DB::raw($appointmentStats !== null ? 'COALESCE(appt.total_appointments, 0) as appointments_count' : '0 as appointments_count'),
+                DB::raw($appointmentStats !== null ? 'appt.last_appointment_at' : 'NULL as last_appointment_at'),
                 DB::raw('COALESCE(mr.total_records, 0) as records_count'),
                 'mr.last_record_at'
             )
@@ -267,6 +310,7 @@ class ClinicsController extends Controller
 
         $petMap = collect();
         $transactionMap = collect();
+        $appointmentMap = collect();
         $userIds = collect();
 
         if ($patients->isNotEmpty()) {
@@ -283,6 +327,35 @@ class ClinicsController extends Controller
                 ->get();
 
             $transactionMap = $transactionRows->groupBy('user_id');
+
+            if ($hasAppointmentPatientSource) {
+                $appointmentRows = DB::table('appointments as a')
+                    ->join('pets as ap', 'ap.id', '=', 'a.pet_id')
+                    ->select(
+                        'a.id',
+                        'ap.user_id',
+                        'a.pet_id',
+                        'a.doctor_id',
+                        'a.name',
+                        'a.mobile',
+                        'a.pet_name',
+                        'a.appointment_date',
+                        'a.appointment_time',
+                        'a.status',
+                        'a.notes',
+                        'a.created_at'
+                    )
+                    ->where('a.vet_registeration_id', $clinicId)
+                    ->whereIn('ap.user_id', $userIds)
+                    ->whereNotNull('ap.user_id')
+                    ->where('ap.user_id', '>', 0)
+                    ->orderByDesc('a.appointment_date')
+                    ->orderByDesc('a.appointment_time')
+                    ->orderByDesc('a.id')
+                    ->get();
+
+                $appointmentMap = $appointmentRows->groupBy('user_id');
+            }
         }
 
         if ($patients->isNotEmpty() && Schema::hasTable('pets')) {
@@ -393,12 +466,13 @@ class ClinicsController extends Controller
             }
         }
 
-        $patients = $patients->map(function ($patient) use ($petMap, $transactionMap) {
+        $patients = $patients->map(function ($patient) use ($petMap, $transactionMap, $appointmentMap) {
             $patient->pets = ($petMap[$patient->id] ?? collect())->values();
             $primaryPet = $patient->pets->first();
             $patient->pet_doc2_blob_url = data_get($primaryPet, 'pet_doc2_blob_url');
             $patient->pet_image_url = data_get($primaryPet, 'pet_image_url');
             $patient->transactions = ($transactionMap[$patient->id] ?? collect())->values();
+            $patient->appointments = ($appointmentMap[$patient->id] ?? collect())->values();
             return $patient;
         });
 
