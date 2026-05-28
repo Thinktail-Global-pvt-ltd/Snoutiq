@@ -72,72 +72,11 @@ const benefits = [
   },
 ];
 
-function PawPattern() {
-  return (
-    <svg className="absolute inset-0 h-full w-full opacity-[0.028]" aria-hidden="true">
-      <defs>
-        <pattern id="pawPattern" width="80" height="80" patternUnits="userSpaceOnUse">
-          <g fill="#0B1D35">
-            <ellipse cx="22" cy="18" rx="7" ry="9" />
-            <ellipse cx="40" cy="13" rx="6" ry="8" />
-            <ellipse cx="57" cy="18" rx="7" ry="9" />
-            <ellipse cx="14" cy="34" rx="5" ry="7" />
-            <ellipse cx="66" cy="34" rx="5" ry="7" />
-            <ellipse cx="40" cy="52" rx="18" ry="14" />
-          </g>
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#pawPattern)" />
-    </svg>
-  );
-}
-
-function PetDecorations() {
-  return (
-    <>
-      <svg
-        className="pointer-events-none absolute -left-3 bottom-20 z-0 hidden w-64 scale-x-[-1] opacity-[0.04] sm:block"
-        viewBox="0 0 200 260"
-        fill="none"
-        aria-hidden="true"
-      >
-        <ellipse cx="100" cy="160" rx="72" ry="58" fill="#0B1D35" />
-        <ellipse cx="100" cy="105" rx="42" ry="48" fill="#0B1D35" />
-        <ellipse cx="70" cy="74" rx="18" ry="28" fill="#0B1D35" transform="rotate(-15 70 74)" />
-        <ellipse cx="130" cy="72" rx="14" ry="22" fill="#0B1D35" transform="rotate(15 130 72)" />
-        <rect x="64" y="200" width="20" height="50" rx="10" fill="#0B1D35" />
-        <rect x="92" y="205" width="20" height="50" rx="10" fill="#0B1D35" />
-        <rect x="118" y="200" width="20" height="50" rx="10" fill="#0B1D35" />
-        <ellipse cx="140" cy="168" rx="28" ry="14" fill="#0B1D35" transform="rotate(-10 140 168)" />
-      </svg>
-
-      <svg
-        className="pointer-events-none absolute -right-3 top-64 z-0 hidden w-60 opacity-[0.04] sm:block"
-        viewBox="0 0 200 260"
-        fill="none"
-        aria-hidden="true"
-      >
-        <ellipse cx="100" cy="170" rx="65" ry="55" fill="#0B1D35" />
-        <ellipse cx="100" cy="108" rx="44" ry="46" fill="#0B1D35" />
-        <polygon points="68,75 58,32 88,68" fill="#0B1D35" />
-        <polygon points="132,75 142,32 112,68" fill="#0B1D35" />
-        <rect x="68" y="210" width="18" height="46" rx="9" fill="#0B1D35" />
-        <rect x="95" y="215" width="18" height="46" rx="9" fill="#0B1D35" />
-        <rect x="120" y="210" width="18" height="46" rx="9" fill="#0B1D35" />
-        <path d="M145 180 Q175 170 182 148" stroke="#0B1D35" strokeWidth="14" strokeLinecap="round" />
-      </svg>
-    </>
-  );
-}
-
 export default function DoctorAnil() {
 
   return (
     <main className="min-h-screen bg-slate-300 px-4 py-8 font-sans text-[#0B1D35] sm:px-6 print:bg-white print:p-0">
       <section className="relative mx-auto flex min-h-[1200px] w-full max-w-[900px] flex-col overflow-hidden bg-white shadow-[0_20px_60px_rgba(11,29,53,0.18)] print:min-h-screen print:max-w-none print:shadow-none">
-        <PawPattern />
-        <PetDecorations />
-
         <div className="relative z-10 h-[3px] bg-gradient-to-r from-[#2AB7A3] to-transparent" />
 
         <header className="relative z-10 flex flex-col gap-5 bg-[#0B1D35] px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-12">
