@@ -65,6 +65,42 @@ class HealthPulseAiService
         return $summary !== '' ? $summary : $fallback;
     }
 
+    public function analyzeSymptomTrend(Pet $pet, array $symptomEntries): array
+    {
+        $symptomEntries = array_values(array_filter($symptomEntries, fn ($entry) => trim((string) ($entry['symptoms'] ?? '')) !== ''));
+        $entryCount = count($symptomEntries);
+        $petName = trim((string) ($pet->name ?? 'your pet')) ?: 'your pet';
+        $fallback = $this->fallbackSymptomTrend($petName, $symptomEntries);
+
+        if ($entryCount === 0) {
+            return $fallback;
+        }
+
+        $apiKey = trim(GeminiConfig::apiKey());
+        if ($apiKey === '') {
+            return $fallback;
+        }
+
+        $payload = array_map(fn ($entry) => [
+            'date' => $entry['entry_date'] ?? null,
+            'symptoms' => $entry['symptoms'] ?? null,
+        ], $symptomEntries);
+
+        $prompt = "You are a pet health journaling assistant for Snoutiq. Do not diagnose, prescribe, or claim the pet is sick.\n"
+            ."Analyze the pet parent's symptom notes across all provided daily entries and return JSON only with keys: analysis_text, flag_level, recommended_action.\n"
+            ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n"
+            ."Focus only on repeated, worsening, or newly mentioned symptoms. If symptoms look isolated, say that simply.\n"
+            ."Use the pet name {$petName}. Keep it short, warm, and useful for the pet parent.\n\n"
+            .'Symptom entries: '.json_encode($payload);
+
+        $result = $this->callGemini($prompt);
+        if (!is_array($result)) {
+            return $fallback;
+        }
+
+        return $this->normalizeSymptomTrend($result, $fallback);
+    }
+
     private function fallbackAnalysis(HealthPulseEntry $entry, int $loggedDays, string $petName): array
     {
         $symptoms = trim((string) $entry->symptoms);
@@ -118,6 +154,48 @@ class HealthPulseAiService
                 'symptoms' => $entry->symptoms,
                 'digestion_issue' => $entry->digestion_issue,
             ]);
+    }
+
+    private function fallbackSymptomTrend(string $petName, array $symptomEntries): array
+    {
+        $entryCount = count($symptomEntries);
+
+        if ($entryCount === 0) {
+            return [
+                'analysis_text' => "No symptom notes have been added for {$petName} yet.",
+                'flag_level' => 'None',
+                'recommended_action' => "Keep adding any new symptom notes so {$petName}'s changes are easier to follow.",
+            ];
+        }
+
+        $latest = trim((string) ($symptomEntries[$entryCount - 1]['symptoms'] ?? ''));
+        $normalized = array_map(fn ($entry) => strtolower(trim((string) ($entry['symptoms'] ?? ''))), $symptomEntries);
+        $repeatCount = count($normalized) - count(array_unique($normalized));
+        $flag = $entryCount >= 3 || $repeatCount > 0 ? 'Watch' : 'None';
+
+        return [
+            'analysis_text' => $entryCount === 1
+                ? "The latest symptom note for {$petName} mentions {$latest}. One note alone is not a pattern yet, but it is useful to track."
+                : "{$petName} has {$entryCount} symptom notes so far. The latest mentions {$latest}; watch whether this repeats or changes.",
+            'flag_level' => $flag,
+            'recommended_action' => $flag === 'Watch'
+                ? "Keep an eye on {$petName}; if the same symptom keeps showing up, gets worse, or feels unusual, a vet check is a good idea."
+                : "Check {$petName} again later today or tomorrow and add any change you notice.",
+        ];
+    }
+
+    private function normalizeSymptomTrend(array $result, array $fallback): array
+    {
+        $flag = trim((string) ($result['flag_level'] ?? $fallback['flag_level']));
+        if (!in_array($flag, ['None', 'Watch', 'Alert'], true)) {
+            $flag = $fallback['flag_level'];
+        }
+
+        return [
+            'analysis_text' => trim((string) ($result['analysis_text'] ?? '')) ?: $fallback['analysis_text'],
+            'flag_level' => $flag,
+            'recommended_action' => trim((string) ($result['recommended_action'] ?? '')) ?: $fallback['recommended_action'],
+        ];
     }
 
     private function specificNotes(HealthPulseEntry $entry): string

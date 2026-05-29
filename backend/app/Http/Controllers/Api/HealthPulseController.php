@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\HealthPulseEntry;
+use App\Models\HealthPulseSymptomAnalysis;
 use App\Models\Pet;
 use App\Services\HealthPulseAiService;
 use App\Services\HealthPulseNotificationService;
@@ -51,6 +52,8 @@ class HealthPulseController extends Controller
             'ai_analyzed_at' => now(),
         ])->save();
 
+        $symptomAnalysis = $this->storeSymptomAnalysis($pet, $entry);
+
         $this->notifications->sendAiFlagNotification(
             $pet,
             $entry,
@@ -61,7 +64,7 @@ class HealthPulseController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Health pulse saved successfully.',
-            'data' => $this->formatEntry($entry),
+            'data' => $this->formatEntry($entry, $symptomAnalysis),
             'streak' => $this->buildStreakPayload((int) $pet->id),
         ]);
     }
@@ -71,12 +74,14 @@ class HealthPulseController extends Controller
         $this->ensureTable();
         $pet = $this->resolvePet($petId, $request->integer('user_id') ?: null);
         $limit = min(max((int) $request->query('limit', 30), 1), 100);
+        $hasSymptomAnalyses = Schema::hasTable('health_pulse_symptom_analyses');
         $entries = HealthPulseEntry::query()
             ->where('pet_id', $pet->id)
+            ->when($hasSymptomAnalyses, fn ($query) => $query->with('symptomAnalysis'))
             ->orderByDesc('entry_date')
             ->limit($limit)
             ->get()
-            ->map(fn (HealthPulseEntry $entry) => $this->formatEntry($entry))
+            ->map(fn (HealthPulseEntry $entry) => $this->formatEntry($entry, $hasSymptomAnalyses ? $entry->symptomAnalysis : null))
             ->values();
 
         return response()->json(['success' => true, 'data' => $entries]);
@@ -87,9 +92,11 @@ class HealthPulseController extends Controller
         $this->ensureTable();
         $pet = $this->resolvePet($petId, $request->integer('user_id') ?: null);
         $date = Carbon::today()->toDateString();
+        $hasSymptomAnalyses = Schema::hasTable('health_pulse_symptom_analyses');
         $entry = HealthPulseEntry::query()
             ->where('pet_id', $pet->id)
             ->whereDate('entry_date', $date)
+            ->when($hasSymptomAnalyses, fn ($query) => $query->with('symptomAnalysis'))
             ->first();
         $completed = $entry !== null && $this->isCompleteEntry($entry);
 
@@ -101,7 +108,7 @@ class HealthPulseController extends Controller
                 'entry_date' => $date,
                 'completed' => $completed,
                 'banner_text' => ($pet->name ?: 'Your pet').($completed ? "'s health pulse logged ✓" : "'s daily health check is pending"),
-                'entry' => $entry ? $this->formatEntry($entry) : null,
+                'entry' => $entry ? $this->formatEntry($entry, $hasSymptomAnalyses ? $entry->symptomAnalysis : null) : null,
             ],
         ]);
     }
@@ -276,7 +283,51 @@ class HealthPulseController extends Controller
             ->all();
     }
 
-    private function formatEntry(HealthPulseEntry $entry): array
+    private function symptomEntryPayloads(int $petId, ?int $limit = null): array
+    {
+        return HealthPulseEntry::query()
+            ->where('pet_id', $petId)
+            ->whereNotNull('symptoms')
+            ->where('symptoms', '!=', '')
+            ->orderBy('entry_date')
+            ->when($limit, fn ($query) => $query->limit($limit))
+            ->get()
+            ->map(fn (HealthPulseEntry $entry) => [
+                'id' => (int) $entry->id,
+                'entry_date' => $entry->entry_date?->toDateString(),
+                'symptoms' => $entry->symptoms,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function storeSymptomAnalysis(Pet $pet, HealthPulseEntry $entry): ?HealthPulseSymptomAnalysis
+    {
+        if (!Schema::hasTable('health_pulse_symptom_analyses')) {
+            return null;
+        }
+
+        $symptomEntries = $this->symptomEntryPayloads((int) $pet->id);
+        $analysis = $this->ai->analyzeSymptomTrend($pet, $symptomEntries);
+
+        return HealthPulseSymptomAnalysis::query()->updateOrCreate(
+            ['health_pulse_entry_id' => $entry->id],
+            [
+                'user_id' => $pet->user_id,
+                'pet_id' => $pet->id,
+                'entry_date' => $entry->entry_date?->toDateString(),
+                'symptom_entry_count' => count($symptomEntries),
+                'symptoms_snapshot' => $symptomEntries,
+                'analysis_text' => $analysis['analysis_text'],
+                'flag_level' => $analysis['flag_level'],
+                'recommended_action' => $analysis['recommended_action'],
+                'ai_payload' => $analysis,
+                'analyzed_at' => now(),
+            ]
+        );
+    }
+
+    private function formatEntry(HealthPulseEntry $entry, ?HealthPulseSymptomAnalysis $symptomAnalysis = null): array
     {
         return [
             'id' => (int) $entry->id,
@@ -297,6 +348,14 @@ class HealthPulseController extends Controller
                 'recommended_action' => $entry->ai_recommended_action,
                 'analyzed_at' => $entry->ai_analyzed_at?->toDateTimeString(),
             ],
+            'symptom_analysis' => $symptomAnalysis ? [
+                'id' => (int) $symptomAnalysis->id,
+                'symptom_entry_count' => (int) $symptomAnalysis->symptom_entry_count,
+                'analysis_text' => $symptomAnalysis->analysis_text,
+                'flag_level' => $symptomAnalysis->flag_level,
+                'recommended_action' => $symptomAnalysis->recommended_action,
+                'analyzed_at' => $symptomAnalysis->analyzed_at?->toDateTimeString(),
+            ] : null,
         ];
     }
 
