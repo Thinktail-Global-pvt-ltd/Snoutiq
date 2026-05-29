@@ -176,11 +176,11 @@ class HealthPulseAiService
 
         if ($entryCount === 0) {
             return [
-                'analysis_text' => "No active symptom pattern is showing for {$petName} right now.",
-                'overall_assessment' => "There are no symptom notes to analyze yet.",
-                'current_status' => "No symptom timeline has been started.",
+                'analysis_text' => "{$petName}'s symptom updates look clear so far. No symptoms have been added yet, so keep using the daily check-in to note any new change if it appears.",
+                'overall_assessment' => "No symptoms have been reported yet.",
+                'current_status' => "No symptom update is available right now.",
                 'timeline_summary' => "The saved entries do not include symptom notes yet.",
-                'recent_window_summary' => "No recent symptom entries are available yet.",
+                'recent_window_summary' => "No recent symptom notes are available yet.",
                 'key_patterns' => [],
                 'watch_points' => [],
                 'reassuring_signals' => [],

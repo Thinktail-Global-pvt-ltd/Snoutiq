@@ -430,6 +430,51 @@ class HealthPulseApiTest extends TestCase
         ]);
     }
 
+    public function test_report_returns_generic_symptom_text_when_no_symptoms_exist(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::sequence()
+                ->push($this->geminiJson(['summary' => 'Overall health trend looks steady.'])),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 1436,
+            'name' => 'Pet Parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1318,
+            'user_id' => 1436,
+            'name' => 'Rocko',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('health_pulse_entries')->insert([
+            'id' => 41,
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'entry_date' => '2026-05-29',
+            'food' => 'good',
+            'energy' => 'normal',
+            'water' => 'normal',
+            'symptoms' => null,
+            'digestion_issue' => true,
+            'ai_flag_level' => 'None',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/pulse/report/1318?user_id=1436');
+
+        $response->assertOk()
+            ->assertJsonPath('data.analysis_text', "Rocko's symptom updates look clear so far. No symptoms have been added yet, so keep using the daily check-in to note any new change if it appears.")
+            ->assertJsonPath('data.ai_symptom_summary.symptom_entry_count', 0)
+            ->assertJsonPath('data.ai_symptom_summary.flag_level', 'None');
+    }
+
     private function geminiJson(array $payload): array
     {
         return [
