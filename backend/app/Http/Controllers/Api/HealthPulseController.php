@@ -125,12 +125,24 @@ class HealthPulseController extends Controller
     {
         $this->ensureTable();
         $pet = $this->resolvePet($petId, $request->integer('user_id') ?: null);
+        $hasSymptomAnalyses = Schema::hasTable('health_pulse_symptom_analyses');
         $entries = HealthPulseEntry::query()
             ->where('pet_id', $pet->id)
+            ->when($hasSymptomAnalyses, fn ($query) => $query->with('symptomAnalysis'))
             ->orderBy('entry_date')
             ->get();
-        $entryPayloads = $entries->map(fn (HealthPulseEntry $entry) => $this->formatEntry($entry))->values()->all();
+        $entryPayloads = $entries
+            ->map(fn (HealthPulseEntry $entry) => $this->formatEntry($entry, $hasSymptomAnalyses ? $entry->symptomAnalysis : null))
+            ->values()
+            ->all();
         $entryCount = count($entryPayloads);
+        $latestSymptomAnalysis = $hasSymptomAnalyses
+            ? HealthPulseSymptomAnalysis::query()
+                ->where('pet_id', $pet->id)
+                ->orderByDesc('entry_date')
+                ->orderByDesc('id')
+                ->first()
+            : null;
 
         return response()->json([
             'success' => true,
@@ -159,6 +171,7 @@ class HealthPulseController extends Controller
                     'symptoms' => $entry['symptoms'],
                 ], $entryPayloads), fn ($row) => $row['symptoms'] !== null)),
                 'ai_health_summary' => $entryCount >= 7 ? $this->ai->summarizeReport($pet, $entryPayloads) : null,
+                'ai_symptom_summary' => $latestSymptomAnalysis ? $this->formatSymptomAnalysis($latestSymptomAnalysis) : null,
                 'entries' => $entryPayloads,
             ],
         ]);
@@ -349,34 +362,41 @@ class HealthPulseController extends Controller
                 'recommended_action' => $entry->ai_recommended_action,
                 'analyzed_at' => $entry->ai_analyzed_at?->toDateTimeString(),
             ],
-            'symptom_analysis' => $symptomAnalysis ? [
-                'id' => (int) $symptomAnalysis->id,
-                'symptom_entry_count' => (int) $symptomAnalysis->symptom_entry_count,
-                'analysis_text' => $symptomAnalysis->analysis_text,
-                'details' => [
-                    'overall_assessment' => $symptomAnalysis->ai_payload['overall_assessment'] ?? null,
-                    'current_status' => $symptomAnalysis->ai_payload['current_status'] ?? null,
-                    'timeline_summary' => $symptomAnalysis->ai_payload['timeline_summary'] ?? $symptomAnalysis->ai_payload['trend_summary'] ?? null,
-                    'recent_window_summary' => $symptomAnalysis->ai_payload['recent_window_summary'] ?? null,
-                    'key_patterns' => $symptomAnalysis->ai_payload['key_patterns'] ?? [],
-                    'watch_points' => $symptomAnalysis->ai_payload['watch_points'] ?? [],
-                    'reassuring_signals' => $symptomAnalysis->ai_payload['reassuring_signals'] ?? [],
-                    'recent_symptom_notes' => $symptomAnalysis->ai_payload['recent_symptom_notes'] ?? [],
-                    'latest_symptom_note' => $symptomAnalysis->ai_payload['latest_symptom_note'] ?? null,
-                    'repeated_symptoms' => $symptomAnalysis->ai_payload['repeated_symptoms'] ?? [],
-                    'possible_pattern' => $symptomAnalysis->ai_payload['possible_pattern'] ?? null,
-                    'total_symptom_entries' => $symptomAnalysis->ai_payload['total_symptom_entries'] ?? (int) $symptomAnalysis->symptom_entry_count,
-                    'meaningful_symptom_entry_count' => $symptomAnalysis->ai_payload['meaningful_symptom_entry_count'] ?? null,
-                    'no_symptom_entry_count' => $symptomAnalysis->ai_payload['no_symptom_entry_count'] ?? null,
-                    'recent_meaningful_symptom_entry_count' => $symptomAnalysis->ai_payload['recent_meaningful_symptom_entry_count'] ?? null,
-                    'recent_no_symptom_entry_count' => $symptomAnalysis->ai_payload['recent_no_symptom_entry_count'] ?? null,
-                    'next_steps' => $symptomAnalysis->ai_payload['next_steps'] ?? [],
-                    'disclaimer' => $symptomAnalysis->ai_payload['disclaimer'] ?? null,
-                ],
-                'flag_level' => $symptomAnalysis->flag_level,
-                'recommended_action' => $symptomAnalysis->recommended_action,
-                'analyzed_at' => $symptomAnalysis->analyzed_at?->toDateTimeString(),
-            ] : null,
+            'symptom_analysis' => $symptomAnalysis ? $this->formatSymptomAnalysis($symptomAnalysis) : null,
+        ];
+    }
+
+    private function formatSymptomAnalysis(HealthPulseSymptomAnalysis $symptomAnalysis): array
+    {
+        return [
+            'id' => (int) $symptomAnalysis->id,
+            'entry_id' => (int) $symptomAnalysis->health_pulse_entry_id,
+            'entry_date' => $this->optionalDate($symptomAnalysis->entry_date),
+            'symptom_entry_count' => (int) $symptomAnalysis->symptom_entry_count,
+            'analysis_text' => $symptomAnalysis->analysis_text,
+            'details' => [
+                'overall_assessment' => $symptomAnalysis->ai_payload['overall_assessment'] ?? null,
+                'current_status' => $symptomAnalysis->ai_payload['current_status'] ?? null,
+                'timeline_summary' => $symptomAnalysis->ai_payload['timeline_summary'] ?? $symptomAnalysis->ai_payload['trend_summary'] ?? null,
+                'recent_window_summary' => $symptomAnalysis->ai_payload['recent_window_summary'] ?? null,
+                'key_patterns' => $symptomAnalysis->ai_payload['key_patterns'] ?? [],
+                'watch_points' => $symptomAnalysis->ai_payload['watch_points'] ?? [],
+                'reassuring_signals' => $symptomAnalysis->ai_payload['reassuring_signals'] ?? [],
+                'recent_symptom_notes' => $symptomAnalysis->ai_payload['recent_symptom_notes'] ?? [],
+                'latest_symptom_note' => $symptomAnalysis->ai_payload['latest_symptom_note'] ?? null,
+                'repeated_symptoms' => $symptomAnalysis->ai_payload['repeated_symptoms'] ?? [],
+                'possible_pattern' => $symptomAnalysis->ai_payload['possible_pattern'] ?? null,
+                'total_symptom_entries' => $symptomAnalysis->ai_payload['total_symptom_entries'] ?? (int) $symptomAnalysis->symptom_entry_count,
+                'meaningful_symptom_entry_count' => $symptomAnalysis->ai_payload['meaningful_symptom_entry_count'] ?? null,
+                'no_symptom_entry_count' => $symptomAnalysis->ai_payload['no_symptom_entry_count'] ?? null,
+                'recent_meaningful_symptom_entry_count' => $symptomAnalysis->ai_payload['recent_meaningful_symptom_entry_count'] ?? null,
+                'recent_no_symptom_entry_count' => $symptomAnalysis->ai_payload['recent_no_symptom_entry_count'] ?? null,
+                'next_steps' => $symptomAnalysis->ai_payload['next_steps'] ?? [],
+                'disclaimer' => $symptomAnalysis->ai_payload['disclaimer'] ?? null,
+            ],
+            'flag_level' => $symptomAnalysis->flag_level,
+            'recommended_action' => $symptomAnalysis->recommended_action,
+            'analyzed_at' => $symptomAnalysis->analyzed_at?->toDateTimeString(),
         ];
     }
 

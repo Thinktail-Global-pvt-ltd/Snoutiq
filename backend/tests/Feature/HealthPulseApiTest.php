@@ -267,10 +267,89 @@ class HealthPulseApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.symptom_analysis.symptom_entry_count', 6)
             ->assertJsonPath('data.symptom_analysis.flag_level', 'None')
+            ->assertJsonPath('data.symptom_analysis.analysis_text', "Sheriff's latest updates look more reassuring. Older notes about skin/nail/toe changes, paw licking or paw discomfort, panting are still useful background, but the recent symptom entries do not strongly point to an active issue right now.")
             ->assertJsonPath('data.symptom_analysis.details.meaningful_symptom_entry_count', 3)
             ->assertJsonPath('data.symptom_analysis.details.recent_meaningful_symptom_entry_count', 0)
             ->assertJsonPath('data.symptom_analysis.details.recent_no_symptom_entry_count', 3)
             ->assertJsonPath('data.symptom_analysis.details.current_status', 'Latest entry does not report an active symptom.');
+    }
+
+    public function test_report_returns_latest_ai_symptom_summary(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1436,
+            'name' => 'Pet Parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1318,
+            'user_id' => 1436,
+            'name' => 'Sheriff',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('health_pulse_entries')->insert([
+            'id' => 39,
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'entry_date' => '2026-05-29',
+            'food' => 'good',
+            'energy' => 'active',
+            'water' => 'normal',
+            'symptoms' => 'No symptoms',
+            'digestion_issue' => false,
+            'ai_flag_level' => 'None',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('health_pulse_symptom_analyses')->insert([
+            'id' => 7,
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'health_pulse_entry_id' => 39,
+            'entry_date' => '2026-05-29',
+            'symptom_entry_count' => 11,
+            'symptoms_snapshot' => json_encode([]),
+            'analysis_text' => 'Recent symptom entries are clean, while older notes remain useful context.',
+            'flag_level' => 'None',
+            'recommended_action' => 'Keep tracking any new changes.',
+            'ai_payload' => json_encode([
+                'overall_assessment' => 'Recent clean entries reduce concern from older symptom notes.',
+                'current_status' => 'Latest entry does not report an active symptom.',
+                'timeline_summary' => '11 symptom rows reviewed.',
+                'recent_window_summary' => 'Last 3 entries: 0 active symptom notes, 3 no-symptom notes.',
+                'key_patterns' => ['Older notes mention skin and paw themes.'],
+                'watch_points' => ['Watch if paw licking returns.'],
+                'reassuring_signals' => ['Recent entries are no-symptom entries.'],
+                'recent_symptom_notes' => [],
+                'latest_symptom_note' => null,
+                'repeated_symptoms' => [],
+                'possible_pattern' => 'No recent active symptom pattern.',
+                'total_symptom_entries' => 11,
+                'meaningful_symptom_entry_count' => 5,
+                'no_symptom_entry_count' => 6,
+                'recent_meaningful_symptom_entry_count' => 0,
+                'recent_no_symptom_entry_count' => 3,
+                'next_steps' => ['Continue daily updates.'],
+                'disclaimer' => 'This is not a diagnosis.',
+            ]),
+            'analyzed_at' => '2026-05-29 10:00:00',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/pulse/report/1318?user_id=1436');
+
+        $response->assertOk()
+            ->assertJsonPath('data.ai_symptom_summary.id', 7)
+            ->assertJsonPath('data.ai_symptom_summary.analysis_text', 'Recent symptom entries are clean, while older notes remain useful context.')
+            ->assertJsonPath('data.ai_symptom_summary.details.current_status', 'Latest entry does not report an active symptom.')
+            ->assertJsonPath('data.ai_symptom_summary.details.recent_no_symptom_entry_count', 3)
+            ->assertJsonPath('data.entries.0.symptom_analysis.id', 7);
     }
 
     private function geminiJson(array $payload): array

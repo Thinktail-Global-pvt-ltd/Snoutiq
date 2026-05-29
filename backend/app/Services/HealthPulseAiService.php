@@ -93,6 +93,7 @@ class HealthPulseAiService
             ."key_patterns, watch_points, reassuring_signals, recent_symptom_notes, next_steps, and repeated_symptoms must be arrays of short practical strings.\n"
             ."Weight recency heavily: the latest entry and last 3 entries should drive current_status, flag_level, recommended_action, and next_steps. Older entries are background context only.\n"
             ."Interpret No, No symptoms, Na, N/A, none, nil, normal, and no issues as no active symptom, but still use them as reassuring timeline context.\n"
+            ."analysis_text must be user-friendly and parent-facing. Do not write database-style phrases like logged rows, active symptom notes, no-symptom/not-applicable entries, latest 3 rows, or note(s). Put counts only in the structured fields, not in analysis_text.\n"
             ."Make the analysis personalized to {$petName}: mention actual logged themes such as skin, nails, toes, paws, licking, panting, poop, or digestion when present. Do not give a generic template.\n"
             ."Use dates only when useful. Keep it detailed but concise enough for an API response.\n\n"
             .'Complete symptom timeline: '.json_encode($payload);
@@ -204,7 +205,7 @@ class HealthPulseAiService
 
         if ($meaningfulCount === 0) {
             return [
-                'analysis_text' => "{$petName}'s symptom timeline currently shows {$entryCount} entries, and they all read like no active symptoms or not-applicable notes.",
+                'analysis_text' => "{$petName}'s recent symptom updates look reassuring. Nothing in the current symptom notes points to an active pattern right now.",
                 'overall_assessment' => "No active symptom pattern is visible from the saved symptom timeline.",
                 'current_status' => "Latest entry does not report an active symptom.",
                 'timeline_summary' => "{$entryCount} symptom rows were reviewed; {$noSymptomCount} are reassuring no-symptom/not-applicable entries.",
@@ -249,7 +250,9 @@ class HealthPulseAiService
         $latestRawIsMeaningful = $this->hasMeaningfulSymptoms($latestRawSymptoms);
 
         return [
-            'analysis_text' => "{$petName}'s full symptom timeline has {$entryCount} logged rows: {$meaningfulCount} active symptom notes and {$noSymptomCount} no-symptom/not-applicable entries. Recent entries carry the most weight: the latest ".count($recentEntries)." rows include {$recentMeaningfulCount} active symptom note(s) and point to {$recentThemeText}. Older notes mainly add background around {$themeText}.",
+            'analysis_text' => $flag === 'Watch'
+                ? "{$petName}'s recent updates are worth keeping an eye on, especially around {$recentThemeText}. Earlier notes about {$themeText} are useful background, but the newest updates should guide what you watch next."
+                : "{$petName}'s latest updates look more reassuring. Older notes about {$themeText} are still useful background, but the recent symptom entries do not strongly point to an active issue right now.",
             'overall_assessment' => $flag === 'Watch'
                 ? "{$petName}'s recent symptom notes are worth watching because a current or repeated theme is showing up, but this is not a diagnosis."
                 : "{$petName}'s older symptom notes are useful context, but the latest entries do not strongly suggest an active symptom pattern.",
