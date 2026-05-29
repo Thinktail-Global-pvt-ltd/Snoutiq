@@ -297,6 +297,7 @@ class HealthPulseController extends Controller
                 'entry_date' => $entry->entry_date?->toDateString(),
                 'symptoms' => $entry->symptoms,
             ])
+            ->filter(fn ($entry) => $this->hasMeaningfulSymptoms($entry['symptoms'] ?? null))
             ->values()
             ->all();
     }
@@ -352,6 +353,14 @@ class HealthPulseController extends Controller
                 'id' => (int) $symptomAnalysis->id,
                 'symptom_entry_count' => (int) $symptomAnalysis->symptom_entry_count,
                 'analysis_text' => $symptomAnalysis->analysis_text,
+                'details' => [
+                    'trend_summary' => $symptomAnalysis->ai_payload['trend_summary'] ?? null,
+                    'latest_symptom_note' => $symptomAnalysis->ai_payload['latest_symptom_note'] ?? null,
+                    'repeated_symptoms' => $symptomAnalysis->ai_payload['repeated_symptoms'] ?? [],
+                    'possible_pattern' => $symptomAnalysis->ai_payload['possible_pattern'] ?? null,
+                    'next_steps' => $symptomAnalysis->ai_payload['next_steps'] ?? [],
+                    'disclaimer' => $symptomAnalysis->ai_payload['disclaimer'] ?? null,
+                ],
                 'flag_level' => $symptomAnalysis->flag_level,
                 'recommended_action' => $symptomAnalysis->recommended_action,
                 'analyzed_at' => $symptomAnalysis->analyzed_at?->toDateTimeString(),
@@ -436,6 +445,29 @@ class HealthPulseController extends Controller
     {
         $text = trim((string) $value);
         return $text === '' ? null : $text;
+    }
+
+    private function hasMeaningfulSymptoms($value): bool
+    {
+        $text = strtolower(trim((string) $value));
+        $text = preg_replace('/[^a-z0-9]+/', ' ', $text);
+        $text = trim((string) $text);
+
+        return $text !== '' && !in_array($text, [
+            'no',
+            'none',
+            'nil',
+            'na',
+            'n a',
+            'normal',
+            'no symptom',
+            'no symptoms',
+            'none symptoms',
+            'no issues',
+            'no issue',
+            'nothing',
+            'all good',
+        ], true);
     }
 
     private function dateString($value): string

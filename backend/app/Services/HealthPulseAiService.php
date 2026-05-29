@@ -67,7 +67,7 @@ class HealthPulseAiService
 
     public function analyzeSymptomTrend(Pet $pet, array $symptomEntries): array
     {
-        $symptomEntries = array_values(array_filter($symptomEntries, fn ($entry) => trim((string) ($entry['symptoms'] ?? '')) !== ''));
+        $symptomEntries = array_values(array_filter($symptomEntries, fn ($entry) => $this->hasMeaningfulSymptoms($entry['symptoms'] ?? null)));
         $entryCount = count($symptomEntries);
         $petName = trim((string) ($pet->name ?? 'your pet')) ?: 'your pet';
         $fallback = $this->fallbackSymptomTrend($petName, $symptomEntries);
@@ -87,9 +87,10 @@ class HealthPulseAiService
         ], $symptomEntries);
 
         $prompt = "You are a pet health journaling assistant for Snoutiq. Do not diagnose, prescribe, or claim the pet is sick.\n"
-            ."Analyze the pet parent's symptom notes across all provided daily entries and return JSON only with keys: analysis_text, flag_level, recommended_action.\n"
+            ."Analyze the pet parent's symptom notes across all provided daily entries and return JSON only with keys: analysis_text, trend_summary, latest_symptom_note, repeated_symptoms, possible_pattern, flag_level, recommended_action, next_steps, disclaimer.\n"
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n"
-            ."Focus only on repeated, worsening, or newly mentioned symptoms. If symptoms look isolated, say that simply.\n"
+            ."next_steps must be an array of 2 to 4 short practical strings. repeated_symptoms must be an array of strings.\n"
+            ."Focus only on repeated, worsening, or newly mentioned symptoms. If symptoms look isolated, say that simply. Ignore entries meaning no symptoms.\n"
             ."Use the pet name {$petName}. Keep it short, warm, and useful for the pet parent.\n\n"
             .'Symptom entries: '.json_encode($payload);
 
@@ -103,7 +104,7 @@ class HealthPulseAiService
 
     private function fallbackAnalysis(HealthPulseEntry $entry, int $loggedDays, string $petName): array
     {
-        $symptoms = trim((string) $entry->symptoms);
+        $symptoms = $this->hasMeaningfulSymptoms($entry->symptoms) ? trim((string) $entry->symptoms) : '';
         $food = strtolower((string) $entry->food);
         $energy = strtolower((string) $entry->energy);
         $water = strtolower((string) $entry->water);
@@ -141,17 +142,19 @@ class HealthPulseAiService
 
     private function entryPrompt(HealthPulseEntry $entry, int $loggedDays, string $petName): string
     {
+        $symptoms = $this->hasMeaningfulSymptoms($entry->symptoms) ? $entry->symptoms : null;
+
         return "You are a pet health journaling assistant for Snoutiq. You must not diagnose or say the pet is sick.\n"
             ."Analyze one daily check-in and return JSON only with keys: short_summary, pattern_observation, flag_level, recommended_action.\n"
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n\n"
             ."Use only these five fields. Do not use pet profile, date, previous entries, FCM token, or any other metadata.\n"
             ."Use the pet name {$petName} in short_summary. Sound warm, simple, informal, and motivating. Congratulate the pet parent for completing today's care update and mention {$loggedDays} days in. Make them feel good about entering the data. Do not use the words pulse, logging, logged, or log.\n"
-            ."If symptoms is not empty, mention the symptom text naturally in short_summary. If digestion_issue is true, mention the tummy/poop update in a caring, human way. Do not say marked as a concern. If both exist, mention both briefly.\n"
+            ."Treat empty symptoms, none, no symptoms, nil, normal, and no symptom as no symptom. If symptoms is not empty, mention the symptom text naturally in short_summary. If digestion_issue is true, mention the tummy/poop update in a caring, human way. Do not say marked as a concern. If both exist, mention both briefly.\n"
             .'Pulse fields: '.json_encode([
                 'food' => $entry->food,
                 'energy' => $entry->energy,
                 'water' => $entry->water,
-                'symptoms' => $entry->symptoms,
+                'symptoms' => $symptoms,
                 'digestion_issue' => $entry->digestion_issue,
             ]);
     }
@@ -162,9 +165,18 @@ class HealthPulseAiService
 
         if ($entryCount === 0) {
             return [
-                'analysis_text' => "No symptom notes have been added for {$petName} yet.",
+                'analysis_text' => "No active symptom pattern is showing for {$petName} right now.",
+                'trend_summary' => "The saved entries do not include meaningful symptom notes yet.",
+                'latest_symptom_note' => null,
+                'repeated_symptoms' => [],
+                'possible_pattern' => "No repeated symptom pattern is available from the current notes.",
                 'flag_level' => 'None',
                 'recommended_action' => "Keep adding any new symptom notes so {$petName}'s changes are easier to follow.",
+                'next_steps' => [
+                    "Continue daily food, energy, water, symptom, and digestion updates.",
+                    "Add a short note if any new symptom appears.",
+                ],
+                'disclaimer' => "This is not a diagnosis and is based only on the symptom notes entered.",
             ];
         }
 
@@ -172,15 +184,35 @@ class HealthPulseAiService
         $normalized = array_map(fn ($entry) => strtolower(trim((string) ($entry['symptoms'] ?? ''))), $symptomEntries);
         $repeatCount = count($normalized) - count(array_unique($normalized));
         $flag = $entryCount >= 3 || $repeatCount > 0 ? 'Watch' : 'None';
+        $repeatedSymptoms = array_values(array_unique(array_diff_assoc($normalized, array_unique($normalized))));
 
         return [
             'analysis_text' => $entryCount === 1
                 ? "The latest symptom note for {$petName} mentions {$latest}. One note alone is not a pattern yet, but it is useful to track."
                 : "{$petName} has {$entryCount} symptom notes so far. The latest mentions {$latest}; watch whether this repeats or changes.",
+            'trend_summary' => $entryCount === 1
+                ? "One meaningful symptom note is available."
+                : "{$entryCount} meaningful symptom notes are available for comparison.",
+            'latest_symptom_note' => $latest,
+            'repeated_symptoms' => $repeatedSymptoms,
+            'possible_pattern' => $repeatCount > 0
+                ? "At least one symptom note appears more than once."
+                : "No exact repeated symptom text is visible, but the latest note should be compared with the next update.",
             'flag_level' => $flag,
             'recommended_action' => $flag === 'Watch'
                 ? "Keep an eye on {$petName}; if the same symptom keeps showing up, gets worse, or feels unusual, a vet check is a good idea."
                 : "Check {$petName} again later today or tomorrow and add any change you notice.",
+            'next_steps' => $flag === 'Watch'
+                ? [
+                    "Check whether the symptom is improving, unchanged, or getting worse.",
+                    "Note timing, frequency, appetite, energy, water intake, and digestion changes.",
+                    "Consider a vet check if it repeats, worsens, or feels unusual.",
+                ]
+                : [
+                    "Keep tracking any change in the next daily update.",
+                    "Add a fresh symptom note only if something new appears.",
+                ],
+            'disclaimer' => "This is not a diagnosis and is based only on the symptom notes entered.",
         ];
     }
 
@@ -193,8 +225,14 @@ class HealthPulseAiService
 
         return [
             'analysis_text' => trim((string) ($result['analysis_text'] ?? '')) ?: $fallback['analysis_text'],
+            'trend_summary' => trim((string) ($result['trend_summary'] ?? '')) ?: $fallback['trend_summary'],
+            'latest_symptom_note' => $this->nullableString($result['latest_symptom_note'] ?? $fallback['latest_symptom_note']),
+            'repeated_symptoms' => $this->stringList($result['repeated_symptoms'] ?? $fallback['repeated_symptoms']),
+            'possible_pattern' => trim((string) ($result['possible_pattern'] ?? '')) ?: $fallback['possible_pattern'],
             'flag_level' => $flag,
             'recommended_action' => trim((string) ($result['recommended_action'] ?? '')) ?: $fallback['recommended_action'],
+            'next_steps' => $this->stringList($result['next_steps'] ?? $fallback['next_steps']),
+            'disclaimer' => trim((string) ($result['disclaimer'] ?? '')) ?: $fallback['disclaimer'],
         ];
     }
 
@@ -203,7 +241,7 @@ class HealthPulseAiService
         $notes = [];
         $symptoms = trim((string) $entry->symptoms);
 
-        if ($symptoms !== '') {
+        if ($this->hasMeaningfulSymptoms($symptoms)) {
             $notes[] = "You mentioned {$symptoms}, so keep an eye on that";
         }
 
@@ -216,6 +254,48 @@ class HealthPulseAiService
         }
 
         return ucfirst(implode(', and ', $notes)).'.';
+    }
+
+    private function hasMeaningfulSymptoms($value): bool
+    {
+        $text = strtolower(trim((string) $value));
+        $text = preg_replace('/[^a-z0-9]+/', ' ', $text);
+        $text = trim((string) $text);
+
+        return $text !== '' && !in_array($text, [
+            'no',
+            'none',
+            'nil',
+            'na',
+            'n a',
+            'normal',
+            'no symptom',
+            'no symptoms',
+            'none symptoms',
+            'no issues',
+            'no issue',
+            'nothing',
+            'all good',
+        ], true);
+    }
+
+    private function nullableString($value): ?string
+    {
+        $text = trim((string) $value);
+
+        return $text === '' ? null : $text;
+    }
+
+    private function stringList($value): array
+    {
+        if (!is_array($value)) {
+            $value = [$value];
+        }
+
+        return array_values(array_filter(array_map(
+            fn ($item) => trim((string) $item),
+            $value
+        ), fn ($item) => $item !== ''));
     }
 
     private function callGemini(string $prompt): ?array

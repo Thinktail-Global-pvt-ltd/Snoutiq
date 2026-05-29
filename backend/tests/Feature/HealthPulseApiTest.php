@@ -30,8 +30,17 @@ class HealthPulseApiTest extends TestCase
                 ]))
                 ->push($this->geminiJson([
                     'analysis_text' => 'Sheriff has repeated itching notes across recent entries, so it is worth monitoring.',
+                    'trend_summary' => 'Two meaningful symptom notes mention itching around the ear area.',
+                    'latest_symptom_note' => 'itching near ear again',
+                    'repeated_symptoms' => ['itching'],
+                    'possible_pattern' => 'Itching appears in more than one entry.',
                     'flag_level' => 'Watch',
                     'recommended_action' => 'If itching continues or gets worse, consider a vet check.',
+                    'next_steps' => [
+                        'Watch whether the itching improves or repeats.',
+                        'Note any redness, discharge, or change in energy.',
+                    ],
+                    'disclaimer' => 'This is not a diagnosis.',
                 ])),
         ]);
 
@@ -80,13 +89,84 @@ class HealthPulseApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.symptom_analysis.symptom_entry_count', 2)
             ->assertJsonPath('data.symptom_analysis.flag_level', 'Watch')
-            ->assertJsonPath('data.symptom_analysis.analysis_text', 'Sheriff has repeated itching notes across recent entries, so it is worth monitoring.');
+            ->assertJsonPath('data.symptom_analysis.analysis_text', 'Sheriff has repeated itching notes across recent entries, so it is worth monitoring.')
+            ->assertJsonPath('data.symptom_analysis.details.trend_summary', 'Two meaningful symptom notes mention itching around the ear area.')
+            ->assertJsonPath('data.symptom_analysis.details.repeated_symptoms.0', 'itching')
+            ->assertJsonPath('data.symptom_analysis.details.next_steps.0', 'Watch whether the itching improves or repeats.');
 
         $this->assertDatabaseHas('health_pulse_symptom_analyses', [
             'pet_id' => 1318,
             'entry_date' => '2026-05-29',
             'symptom_entry_count' => 2,
             'flag_level' => 'Watch',
+        ]);
+    }
+
+    public function test_no_symptoms_is_not_treated_as_a_symptom_pattern(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::sequence()
+                ->push($this->geminiJson([
+                    'short_summary' => 'Care update done for Sheriff.',
+                    'pattern_observation' => 'Today looks steady.',
+                    'flag_level' => 'None',
+                    'recommended_action' => 'Keep tracking changes.',
+                ])),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 1436,
+            'name' => 'Pet Parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1318,
+            'user_id' => 1436,
+            'name' => 'Sheriff',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('health_pulse_entries')->insert([
+            'id' => 10,
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'entry_date' => '2026-05-28',
+            'food' => 'good',
+            'energy' => 'active',
+            'water' => 'normal',
+            'symptoms' => 'No symptoms',
+            'digestion_issue' => false,
+            'ai_flag_level' => 'None',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v1/pulse/entry', [
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'entry_date' => '2026-05-29',
+            'food' => 'good',
+            'energy' => 'active',
+            'water' => 'normal',
+            'symptoms' => 'No symptoms',
+            'digestion_issue' => false,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.ai.flag_level', 'None')
+            ->assertJsonPath('data.symptom_analysis.symptom_entry_count', 0)
+            ->assertJsonPath('data.symptom_analysis.flag_level', 'None')
+            ->assertJsonPath('data.symptom_analysis.details.latest_symptom_note', null)
+            ->assertJsonPath('data.symptom_analysis.details.repeated_symptoms', []);
+
+        $this->assertDatabaseHas('health_pulse_symptom_analyses', [
+            'pet_id' => 1318,
+            'entry_date' => '2026-05-29',
+            'symptom_entry_count' => 0,
+            'flag_level' => 'None',
         ]);
     }
 
