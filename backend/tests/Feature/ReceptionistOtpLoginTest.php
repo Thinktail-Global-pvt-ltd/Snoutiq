@@ -130,4 +130,29 @@ class ReceptionistOtpLoginTest extends TestCase
         $this->assertSame(1, Otp::query()->where('is_verified', 1)->count());
         $this->assertSame(1, \DB::table('chat_rooms')->count());
     }
+
+    public function test_receptionist_special_phone_gets_fixed_otp(): void
+    {
+        Receptionist::query()->create([
+            'name' => 'Fixed OTP Desk',
+            'email' => 'fixed-otp@example.com',
+            'phone' => '8799730966',
+            'role' => 'receptionist',
+        ]);
+
+        $response = $this->postJson('/api/auth/receptionist/otp/request', [
+            'phone' => '8799730966',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('otps', [
+            'type' => 'receptionist_whatsapp',
+            'value' => '8799730966',
+            'otp' => '000000',
+            'is_verified' => 0,
+        ]);
+    }
 }
