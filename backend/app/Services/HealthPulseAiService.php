@@ -67,7 +67,7 @@ class HealthPulseAiService
 
     public function analyzeSymptomTrend(Pet $pet, array $symptomEntries): array
     {
-        $symptomEntries = array_values(array_filter($symptomEntries, fn ($entry) => $this->hasMeaningfulSymptoms($entry['symptoms'] ?? null)));
+        $symptomEntries = array_values(array_filter($symptomEntries, fn ($entry) => trim((string) ($entry['symptoms'] ?? '')) !== ''));
         $entryCount = count($symptomEntries);
         $petName = trim((string) ($pet->name ?? 'your pet')) ?: 'your pet';
         $fallback = $this->fallbackSymptomTrend($petName, $symptomEntries);
@@ -84,15 +84,17 @@ class HealthPulseAiService
         $payload = array_map(fn ($entry) => [
             'date' => $entry['entry_date'] ?? null,
             'symptoms' => $entry['symptoms'] ?? null,
+            'symptom_status' => $this->hasMeaningfulSymptoms($entry['symptoms'] ?? null) ? 'symptom_note' : 'no_symptom_or_not_applicable',
         ], $symptomEntries);
 
         $prompt = "You are a pet health journaling assistant for Snoutiq. Do not diagnose, prescribe, or claim the pet is sick.\n"
-            ."Analyze the pet parent's symptom notes across all provided daily entries and return JSON only with keys: analysis_text, trend_summary, latest_symptom_note, repeated_symptoms, possible_pattern, flag_level, recommended_action, next_steps, disclaimer.\n"
+            ."Analyze every symptom entry in the timeline, including entries that mean no symptoms. Return JSON only with keys: analysis_text, overall_assessment, current_status, timeline_summary, key_patterns, watch_points, reassuring_signals, latest_symptom_note, repeated_symptoms, possible_pattern, flag_level, recommended_action, next_steps, disclaimer.\n"
             ."flag_level must be one of None, Watch, Alert. Use safe language like worth monitoring or worth a vet check.\n"
-            ."next_steps must be an array of 2 to 4 short practical strings. repeated_symptoms must be an array of strings.\n"
-            ."Focus only on repeated, worsening, or newly mentioned symptoms. If symptoms look isolated, say that simply. Ignore entries meaning no symptoms.\n"
-            ."Use the pet name {$petName}. Keep it short, warm, and useful for the pet parent.\n\n"
-            .'Symptom entries: '.json_encode($payload);
+            ."key_patterns, watch_points, reassuring_signals, next_steps, and repeated_symptoms must be arrays of short practical strings.\n"
+            ."Interpret No, No symptoms, Na, N/A, none, nil, normal, and no issues as no active symptom, but still use them as reassuring timeline context.\n"
+            ."Make the analysis personalized to {$petName}: mention actual logged themes such as skin, nails, toes, paws, licking, panting, poop, or digestion when present. Do not give a generic template.\n"
+            ."Use dates only when useful. Keep it detailed but concise enough for an API response.\n\n"
+            .'Complete symptom timeline: '.json_encode($payload);
 
         $result = $this->callGemini($prompt);
         if (!is_array($result)) {
@@ -162,16 +164,27 @@ class HealthPulseAiService
     private function fallbackSymptomTrend(string $petName, array $symptomEntries): array
     {
         $entryCount = count($symptomEntries);
+        $meaningfulEntries = array_values(array_filter($symptomEntries, fn ($entry) => $this->hasMeaningfulSymptoms($entry['symptoms'] ?? null)));
+        $meaningfulCount = count($meaningfulEntries);
+        $noSymptomCount = $entryCount - $meaningfulCount;
 
         if ($entryCount === 0) {
             return [
                 'analysis_text' => "No active symptom pattern is showing for {$petName} right now.",
-                'trend_summary' => "The saved entries do not include meaningful symptom notes yet.",
+                'overall_assessment' => "There are no symptom notes to analyze yet.",
+                'current_status' => "No symptom timeline has been started.",
+                'timeline_summary' => "The saved entries do not include symptom notes yet.",
+                'key_patterns' => [],
+                'watch_points' => [],
+                'reassuring_signals' => [],
                 'latest_symptom_note' => null,
                 'repeated_symptoms' => [],
                 'possible_pattern' => "No repeated symptom pattern is available from the current notes.",
                 'flag_level' => 'None',
                 'recommended_action' => "Keep adding any new symptom notes so {$petName}'s changes are easier to follow.",
+                'total_symptom_entries' => 0,
+                'meaningful_symptom_entry_count' => 0,
+                'no_symptom_entry_count' => 0,
                 'next_steps' => [
                     "Continue daily food, energy, water, symptom, and digestion updates.",
                     "Add a short note if any new symptom appears.",
@@ -180,28 +193,69 @@ class HealthPulseAiService
             ];
         }
 
-        $latest = trim((string) ($symptomEntries[$entryCount - 1]['symptoms'] ?? ''));
-        $normalized = array_map(fn ($entry) => strtolower(trim((string) ($entry['symptoms'] ?? ''))), $symptomEntries);
+        if ($meaningfulCount === 0) {
+            return [
+                'analysis_text' => "{$petName}'s symptom timeline currently shows {$entryCount} entries, and they all read like no active symptoms or not-applicable notes.",
+                'overall_assessment' => "No active symptom pattern is visible from the saved symptom timeline.",
+                'current_status' => "Latest entry does not report an active symptom.",
+                'timeline_summary' => "{$entryCount} symptom rows were reviewed; {$noSymptomCount} are reassuring no-symptom/not-applicable entries.",
+                'key_patterns' => [],
+                'watch_points' => [],
+                'reassuring_signals' => [
+                    "Recent symptom entries are marked as no symptoms or not applicable.",
+                    "No repeated active symptom note is present in the current symptom timeline.",
+                ],
+                'latest_symptom_note' => null,
+                'repeated_symptoms' => [],
+                'possible_pattern' => "No repeated active symptom pattern is available from the current notes.",
+                'flag_level' => 'None',
+                'recommended_action' => "Keep adding a short note if anything new appears for {$petName}.",
+                'total_symptom_entries' => $entryCount,
+                'meaningful_symptom_entry_count' => 0,
+                'no_symptom_entry_count' => $noSymptomCount,
+                'next_steps' => [
+                    "Continue daily updates for food, energy, water, symptoms, and digestion.",
+                    "Use the symptom field only for a clear change, such as itching, limping, panting, vomiting, stool changes, or skin concerns.",
+                ],
+                'disclaimer' => "This is not a diagnosis and is based only on the symptom notes entered.",
+            ];
+        }
+
+        $latest = trim((string) ($meaningfulEntries[$meaningfulCount - 1]['symptoms'] ?? ''));
+        $normalized = array_map(fn ($entry) => strtolower(trim((string) ($entry['symptoms'] ?? ''))), $meaningfulEntries);
         $repeatCount = count($normalized) - count(array_unique($normalized));
-        $flag = $entryCount >= 3 || $repeatCount > 0 ? 'Watch' : 'None';
+        $flag = $meaningfulCount >= 3 || $repeatCount > 0 ? 'Watch' : 'None';
         $repeatedSymptoms = array_values(array_unique(array_diff_assoc($normalized, array_unique($normalized))));
+        $themes = $this->symptomThemes($meaningfulEntries);
+        $themeText = empty($themes) ? 'the noted changes' : implode(', ', $themes);
+        $firstMeaningful = trim((string) ($meaningfulEntries[0]['symptoms'] ?? ''));
 
         return [
-            'analysis_text' => $entryCount === 1
-                ? "The latest symptom note for {$petName} mentions {$latest}. One note alone is not a pattern yet, but it is useful to track."
-                : "{$petName} has {$entryCount} symptom notes so far. The latest mentions {$latest}; watch whether this repeats or changes.",
-            'trend_summary' => $entryCount === 1
-                ? "One meaningful symptom note is available."
-                : "{$entryCount} meaningful symptom notes are available for comparison.",
+            'analysis_text' => "{$petName}'s full symptom timeline has {$entryCount} logged rows: {$meaningfulCount} active symptom notes and {$noSymptomCount} no-symptom/not-applicable entries. The active notes point mainly to {$themeText}. The first active note was \"{$firstMeaningful}\" and the latest active note is \"{$latest}\".",
+            'overall_assessment' => "{$petName}'s active symptom notes are worth watching because there are multiple logged observations, but this is not a diagnosis.",
+            'current_status' => "Latest active symptom note: {$latest}.",
+            'timeline_summary' => "{$entryCount} rows reviewed from the symptom timeline; {$meaningfulCount} contain active symptom detail and {$noSymptomCount} are no-symptom/not-applicable entries.",
+            'key_patterns' => $this->patternBullets($themes, $meaningfulEntries),
+            'watch_points' => [
+                "Whether {$themeText} repeats in the next update.",
+                "Whether appetite, energy, water intake, or digestion changes along with the symptom notes.",
+                "Whether any note becomes more frequent, more intense, or starts affecting comfort.",
+            ],
+            'reassuring_signals' => $noSymptomCount > 0
+                ? ["{$noSymptomCount} entries are marked as no symptoms or not applicable, which is useful context."]
+                : [],
             'latest_symptom_note' => $latest,
             'repeated_symptoms' => $repeatedSymptoms,
             'possible_pattern' => $repeatCount > 0
                 ? "At least one symptom note appears more than once."
-                : "No exact repeated symptom text is visible, but the latest note should be compared with the next update.",
+                : "No exact repeated symptom text is visible, but related themes like {$themeText} should be compared across future updates.",
             'flag_level' => $flag,
             'recommended_action' => $flag === 'Watch'
                 ? "Keep an eye on {$petName}; if the same symptom keeps showing up, gets worse, or feels unusual, a vet check is a good idea."
                 : "Check {$petName} again later today or tomorrow and add any change you notice.",
+            'total_symptom_entries' => $entryCount,
+            'meaningful_symptom_entry_count' => $meaningfulCount,
+            'no_symptom_entry_count' => $noSymptomCount,
             'next_steps' => $flag === 'Watch'
                 ? [
                     "Check whether the symptom is improving, unchanged, or getting worse.",
@@ -225,12 +279,20 @@ class HealthPulseAiService
 
         return [
             'analysis_text' => trim((string) ($result['analysis_text'] ?? '')) ?: $fallback['analysis_text'],
-            'trend_summary' => trim((string) ($result['trend_summary'] ?? '')) ?: $fallback['trend_summary'],
+            'overall_assessment' => trim((string) ($result['overall_assessment'] ?? '')) ?: $fallback['overall_assessment'],
+            'current_status' => trim((string) ($result['current_status'] ?? '')) ?: $fallback['current_status'],
+            'timeline_summary' => trim((string) ($result['timeline_summary'] ?? $result['trend_summary'] ?? '')) ?: $fallback['timeline_summary'],
+            'key_patterns' => $this->stringList($result['key_patterns'] ?? $fallback['key_patterns']),
+            'watch_points' => $this->stringList($result['watch_points'] ?? $fallback['watch_points']),
+            'reassuring_signals' => $this->stringList($result['reassuring_signals'] ?? $fallback['reassuring_signals']),
             'latest_symptom_note' => $this->nullableString($result['latest_symptom_note'] ?? $fallback['latest_symptom_note']),
             'repeated_symptoms' => $this->stringList($result['repeated_symptoms'] ?? $fallback['repeated_symptoms']),
             'possible_pattern' => trim((string) ($result['possible_pattern'] ?? '')) ?: $fallback['possible_pattern'],
             'flag_level' => $flag,
             'recommended_action' => trim((string) ($result['recommended_action'] ?? '')) ?: $fallback['recommended_action'],
+            'total_symptom_entries' => $fallback['total_symptom_entries'],
+            'meaningful_symptom_entry_count' => $fallback['meaningful_symptom_entry_count'],
+            'no_symptom_entry_count' => $fallback['no_symptom_entry_count'],
             'next_steps' => $this->stringList($result['next_steps'] ?? $fallback['next_steps']),
             'disclaimer' => trim((string) ($result['disclaimer'] ?? '')) ?: $fallback['disclaimer'],
         ];
@@ -277,6 +339,43 @@ class HealthPulseAiService
             'nothing',
             'all good',
         ], true);
+    }
+
+    private function symptomThemes(array $entries): array
+    {
+        $themes = [];
+        foreach ($entries as $entry) {
+            $text = strtolower((string) ($entry['symptoms'] ?? ''));
+            if (str_contains($text, 'skin') || str_contains($text, 'nail') || str_contains($text, 'toe')) {
+                $themes[] = 'skin/nail/toe changes';
+            }
+            if (str_contains($text, 'paw') || str_contains($text, 'lick')) {
+                $themes[] = 'paw licking or paw discomfort';
+            }
+            if (str_contains($text, 'pant')) {
+                $themes[] = 'panting';
+            }
+            if (str_contains($text, 'poop') || str_contains($text, 'stool') || str_contains($text, 'motion')) {
+                $themes[] = 'poop/digestion changes';
+            }
+        }
+
+        return array_values(array_unique($themes));
+    }
+
+    private function patternBullets(array $themes, array $entries): array
+    {
+        if (empty($themes)) {
+            return array_map(
+                fn ($entry) => trim((string) ($entry['entry_date'] ?? 'One entry')).': '.trim((string) ($entry['symptoms'] ?? '')),
+                array_slice($entries, -3)
+            );
+        }
+
+        return array_map(
+            fn ($theme) => ucfirst($theme).' appears in the symptom timeline.',
+            $themes
+        );
     }
 
     private function nullableString($value): ?string

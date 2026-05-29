@@ -296,8 +296,8 @@ class HealthPulseController extends Controller
                 'id' => (int) $entry->id,
                 'entry_date' => $entry->entry_date?->toDateString(),
                 'symptoms' => $entry->symptoms,
+                'is_meaningful_symptom' => $this->hasMeaningfulSymptoms($entry->symptoms),
             ])
-            ->filter(fn ($entry) => $this->hasMeaningfulSymptoms($entry['symptoms'] ?? null))
             ->values()
             ->all();
     }
@@ -354,10 +354,18 @@ class HealthPulseController extends Controller
                 'symptom_entry_count' => (int) $symptomAnalysis->symptom_entry_count,
                 'analysis_text' => $symptomAnalysis->analysis_text,
                 'details' => [
-                    'trend_summary' => $symptomAnalysis->ai_payload['trend_summary'] ?? null,
+                    'overall_assessment' => $symptomAnalysis->ai_payload['overall_assessment'] ?? null,
+                    'current_status' => $symptomAnalysis->ai_payload['current_status'] ?? null,
+                    'timeline_summary' => $symptomAnalysis->ai_payload['timeline_summary'] ?? $symptomAnalysis->ai_payload['trend_summary'] ?? null,
+                    'key_patterns' => $symptomAnalysis->ai_payload['key_patterns'] ?? [],
+                    'watch_points' => $symptomAnalysis->ai_payload['watch_points'] ?? [],
+                    'reassuring_signals' => $symptomAnalysis->ai_payload['reassuring_signals'] ?? [],
                     'latest_symptom_note' => $symptomAnalysis->ai_payload['latest_symptom_note'] ?? null,
                     'repeated_symptoms' => $symptomAnalysis->ai_payload['repeated_symptoms'] ?? [],
                     'possible_pattern' => $symptomAnalysis->ai_payload['possible_pattern'] ?? null,
+                    'total_symptom_entries' => $symptomAnalysis->ai_payload['total_symptom_entries'] ?? (int) $symptomAnalysis->symptom_entry_count,
+                    'meaningful_symptom_entry_count' => $symptomAnalysis->ai_payload['meaningful_symptom_entry_count'] ?? null,
+                    'no_symptom_entry_count' => $symptomAnalysis->ai_payload['no_symptom_entry_count'] ?? null,
                     'next_steps' => $symptomAnalysis->ai_payload['next_steps'] ?? [],
                     'disclaimer' => $symptomAnalysis->ai_payload['disclaimer'] ?? null,
                 ],
