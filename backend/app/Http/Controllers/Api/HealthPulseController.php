@@ -143,7 +143,11 @@ class HealthPulseController extends Controller
                 ->orderByDesc('id')
                 ->first()
             : null;
-        if (!$latestSymptomAnalysis && $hasSymptomAnalyses && $entries->isNotEmpty()) {
+        if (
+            $hasSymptomAnalyses
+            && $entries->isNotEmpty()
+            && (!$latestSymptomAnalysis || $this->shouldRefreshSymptomAnalysis($latestSymptomAnalysis))
+        ) {
             $latestSymptomAnalysis = $this->storeSymptomAnalysis($pet, $entries->last());
             $entries->last()?->setRelation('symptomAnalysis', $latestSymptomAnalysis);
             $entryPayloads = $entries
@@ -373,6 +377,16 @@ class HealthPulseController extends Controller
             ],
             'symptom_analysis' => $symptomAnalysis ? $this->formatSymptomAnalysis($symptomAnalysis) : null,
         ];
+    }
+
+    private function shouldRefreshSymptomAnalysis(HealthPulseSymptomAnalysis $symptomAnalysis): bool
+    {
+        $analysisText = strtolower(trim((string) $symptomAnalysis->analysis_text));
+
+        return str_contains($analysisText, 'no active symptom pattern is showing')
+            || str_contains($analysisText, 'logged rows')
+            || str_contains($analysisText, 'no-symptom/not-applicable')
+            || !array_key_exists('recent_window_summary', $symptomAnalysis->ai_payload ?? []);
     }
 
     private function formatSymptomAnalysis(HealthPulseSymptomAnalysis $symptomAnalysis): array

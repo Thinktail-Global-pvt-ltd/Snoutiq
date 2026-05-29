@@ -475,6 +475,67 @@ class HealthPulseApiTest extends TestCase
             ->assertJsonPath('data.ai_symptom_summary.flag_level', 'None');
     }
 
+    public function test_report_refreshes_stale_generic_symptom_analysis_text(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1436,
+            'name' => 'Pet Parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1318,
+            'user_id' => 1436,
+            'name' => 'Rocko',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('health_pulse_entries')->insert([
+            'id' => 41,
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'entry_date' => '2026-05-29',
+            'food' => 'good',
+            'energy' => 'normal',
+            'water' => 'normal',
+            'symptoms' => null,
+            'digestion_issue' => true,
+            'ai_flag_level' => 'None',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('health_pulse_symptom_analyses')->insert([
+            'id' => 8,
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'health_pulse_entry_id' => 41,
+            'entry_date' => '2026-05-29',
+            'symptom_entry_count' => 0,
+            'symptoms_snapshot' => json_encode([]),
+            'analysis_text' => 'No active symptom pattern is showing for Rocko right now.',
+            'flag_level' => 'None',
+            'recommended_action' => 'Keep adding any new symptom notes.',
+            'ai_payload' => json_encode([]),
+            'analyzed_at' => '2026-05-29 10:00:00',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/pulse/report/1318?user_id=1436');
+
+        $response->assertOk()
+            ->assertJsonPath('data.analysis_text', "Rocko's symptom updates look clear so far. No symptoms have been added yet, so keep using the daily check-in to note any new change if it appears.")
+            ->assertJsonPath('data.ai_symptom_summary.id', 8);
+
+        $this->assertDatabaseHas('health_pulse_symptom_analyses', [
+            'id' => 8,
+            'analysis_text' => "Rocko's symptom updates look clear so far. No symptoms have been added yet, so keep using the daily check-in to note any new change if it appears.",
+        ]);
+    }
+
     private function geminiJson(array $payload): array
     {
         return [
