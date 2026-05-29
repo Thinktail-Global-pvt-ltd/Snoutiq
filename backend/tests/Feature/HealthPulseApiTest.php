@@ -345,11 +345,89 @@ class HealthPulseApiTest extends TestCase
         $response = $this->getJson('/api/v1/pulse/report/1318?user_id=1436');
 
         $response->assertOk()
+            ->assertJsonPath('data.analysis_text', 'Recent symptom entries are clean, while older notes remain useful context.')
             ->assertJsonPath('data.ai_symptom_summary.id', 7)
             ->assertJsonPath('data.ai_symptom_summary.analysis_text', 'Recent symptom entries are clean, while older notes remain useful context.')
             ->assertJsonPath('data.ai_symptom_summary.details.current_status', 'Latest entry does not report an active symptom.')
             ->assertJsonPath('data.ai_symptom_summary.details.recent_no_symptom_entry_count', 3)
             ->assertJsonPath('data.entries.0.symptom_analysis.id', 7);
+    }
+
+    public function test_report_generates_ai_symptom_summary_when_table_has_no_row(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::sequence()
+                ->push($this->geminiJson([
+                    'analysis_text' => "Sheriff's recent updates look more reassuring, while older paw notes remain useful context.",
+                    'overall_assessment' => 'Recent clean entries reduce concern from older symptom notes.',
+                    'current_status' => 'Latest entry does not report an active symptom.',
+                    'timeline_summary' => 'Three symptom rows were reviewed.',
+                    'recent_window_summary' => 'The latest entries are mostly clean.',
+                    'key_patterns' => ['Older notes mention paw licking.'],
+                    'watch_points' => ['Watch if paw licking returns.'],
+                    'reassuring_signals' => ['Latest entry says no symptoms.'],
+                    'recent_symptom_notes' => [],
+                    'latest_symptom_note' => null,
+                    'repeated_symptoms' => [],
+                    'possible_pattern' => 'No recent active symptom pattern.',
+                    'flag_level' => 'None',
+                    'recommended_action' => 'Keep tracking any new changes.',
+                    'next_steps' => ['Continue daily updates.'],
+                    'disclaimer' => 'This is not a diagnosis.',
+                ]))
+                ->push($this->geminiJson(['summary' => 'Overall health trend looks steady.'])),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 1436,
+            'name' => 'Pet Parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1318,
+            'user_id' => 1436,
+            'name' => 'Sheriff',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach ([
+            ['id' => 39, 'entry_date' => '2026-05-27', 'symptoms' => 'Licking his paws'],
+            ['id' => 40, 'entry_date' => '2026-05-28', 'symptoms' => 'No'],
+            ['id' => 41, 'entry_date' => '2026-05-29', 'symptoms' => 'No symptoms'],
+        ] as $row) {
+            DB::table('health_pulse_entries')->insert([
+                'id' => $row['id'],
+                'user_id' => 1436,
+                'pet_id' => 1318,
+                'entry_date' => $row['entry_date'],
+                'food' => 'good',
+                'energy' => 'active',
+                'water' => 'normal',
+                'symptoms' => $row['symptoms'],
+                'digestion_issue' => false,
+                'ai_flag_level' => 'None',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $response = $this->getJson('/api/v1/pulse/report/1318?user_id=1436');
+
+        $response->assertOk()
+            ->assertJsonPath('data.analysis_text', "Sheriff's recent updates look more reassuring, while older paw notes remain useful context.")
+            ->assertJsonPath('data.ai_symptom_summary.entry_id', 41)
+            ->assertJsonPath('data.ai_symptom_summary.details.current_status', 'Latest entry does not report an active symptom.')
+            ->assertJsonPath('data.entries.2.symptom_analysis.entry_id', 41);
+
+        $this->assertDatabaseHas('health_pulse_symptom_analyses', [
+            'pet_id' => 1318,
+            'health_pulse_entry_id' => 41,
+            'symptom_entry_count' => 3,
+            'flag_level' => 'None',
+        ]);
     }
 
     private function geminiJson(array $payload): array

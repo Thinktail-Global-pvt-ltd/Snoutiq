@@ -143,10 +143,19 @@ class HealthPulseController extends Controller
                 ->orderByDesc('id')
                 ->first()
             : null;
+        if (!$latestSymptomAnalysis && $hasSymptomAnalyses && $entries->isNotEmpty()) {
+            $latestSymptomAnalysis = $this->storeSymptomAnalysis($pet, $entries->last());
+            $entries->last()?->setRelation('symptomAnalysis', $latestSymptomAnalysis);
+            $entryPayloads = $entries
+                ->map(fn (HealthPulseEntry $entry) => $this->formatEntry($entry, $entry->symptomAnalysis))
+                ->values()
+                ->all();
+        }
 
         return response()->json([
             'success' => true,
             'data' => [
+                'analysis_text' => $latestSymptomAnalysis?->analysis_text,
                 'report_unlocked' => $entryCount >= 7,
                 'required_entries' => 7,
                 'entries_remaining' => max(0, 7 - $entryCount),
