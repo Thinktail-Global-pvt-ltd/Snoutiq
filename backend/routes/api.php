@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\Groomer\DashboardController;
 use App\Http\Controllers\Api\EmergencyController;
 use App\Http\Controllers\Api\VetRegisterationTempController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UserLookupController;
 use App\Http\Controllers\Api\PublicController;
 use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\RazorpayController;
@@ -126,6 +127,7 @@ Route::post('/button-clicks/analyze', [UserButtonClickController::class, 'analyz
 Route::get('/documents', [MedicalRecordController::class, 'documents'])->name('api.documents.query');
 Route::post('/documents/upload', [DocumentUploadController::class, 'store'])->name('api.documents.upload');
 Route::get('/documents/{uploadId}/blob', [DocumentUploadController::class, 'blob'])->whereNumber('uploadId')->name('api.documents.blob');
+Route::get('/users/by-phone', [UserLookupController::class, 'byPhone'])->name('api.users.by-phone');
 Route::get('/users/{userId}/exists', function (int $userId) {
     $exists = User::query()->whereKey($userId)->exists();
 
