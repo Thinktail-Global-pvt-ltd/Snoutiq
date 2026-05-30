@@ -30,6 +30,8 @@ class ClinicSpecializedPackageController extends Controller
 
     public function upsert(Request $request)
     {
+        $request->merge($this->normalizeVaccinationPackageAliases($request->all()));
+
         $data = $request->validate([
             'clinic_id' => ['required', 'integer', 'exists:vet_registerations_temp,id'],
             'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
@@ -91,5 +93,53 @@ class ClinicSpecializedPackageController extends Controller
             'message' => 'Specialized package prices saved successfully.',
             'data' => $package,
         ], $package->wasRecentlyCreated ? 201 : 200);
+    }
+
+    private function normalizeVaccinationPackageAliases(array $input): array
+    {
+        $aliasMap = [
+            'puppy_vaccination_package_price' => [
+                'puppy_package_price',
+                'puppy_vaccine_package_price',
+                'puppy_vaccination_price',
+                'puppy vaccination package',
+            ],
+            'adult_dog_vaccination_package_price' => [
+                'adult_dog_package_price',
+                'adult_dog_vaccine_package_price',
+                'adult_dog_vaccination_price',
+                'adult dog package',
+            ],
+            'kitten_vaccination_package_price' => [
+                'kitten_package_price',
+                'kitten_vaccine_package_price',
+                'kitten_vaccination_price',
+                'kitten vaccine package',
+            ],
+            'adult_cat_vaccination_package_price' => [
+                'adult_cat_package_price',
+                'adult_cat_vaccine_package_price',
+                'adult_cat_vaccination_price',
+                'adult cat vaccination package',
+            ],
+        ];
+
+        foreach ($aliasMap as $canonical => $aliases) {
+            $value = $input[$canonical] ?? null;
+
+            foreach ($aliases as $alias) {
+                if ($value !== null && $value !== '') {
+                    break;
+                }
+
+                $value = $input[$alias] ?? null;
+            }
+
+            if ($value !== null && $value !== '') {
+                $input[$canonical] = $value;
+            }
+        }
+
+        return $input;
     }
 }

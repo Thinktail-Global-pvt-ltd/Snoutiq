@@ -325,6 +325,8 @@ class ClinicFullOnboardingController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge($this->normalizeVaccinationPackageAliases($request->all()));
+
         $data = $request->validate([
             'email' => ['nullable', 'email', 'max:255'],
             'mobile' => ['nullable', 'string', 'max:15'],
@@ -962,6 +964,68 @@ class ClinicFullOnboardingController extends Controller
             'cat_neutering_male_price' => $package['cat_neutering_male_price'] ?? $package['cat_neutering_price'] ?? null,
             'cat_neutering_female_price' => $package['cat_neutering_female_price'] ?? $package['cat_neutering_price'] ?? null,
         ]);
+    }
+
+    private function normalizeVaccinationPackageAliases(array $input): array
+    {
+        $package = $input['specialized_package'] ?? [];
+        if (is_string($package)) {
+            $decoded = json_decode($package, true);
+            $package = is_array($decoded) ? $decoded : [];
+        }
+        if (! is_array($package)) {
+            $package = [];
+        }
+
+        $aliasMap = [
+            'puppy_vaccination_package_price' => [
+                'puppy_package_price',
+                'puppy_vaccine_package_price',
+                'puppy_vaccination_price',
+                'puppy vaccination package',
+            ],
+            'adult_dog_vaccination_package_price' => [
+                'adult_dog_package_price',
+                'adult_dog_vaccine_package_price',
+                'adult_dog_vaccination_price',
+                'adult dog package',
+            ],
+            'kitten_vaccination_package_price' => [
+                'kitten_package_price',
+                'kitten_vaccine_package_price',
+                'kitten_vaccination_price',
+                'kitten vaccine package',
+            ],
+            'adult_cat_vaccination_package_price' => [
+                'adult_cat_package_price',
+                'adult_cat_vaccine_package_price',
+                'adult_cat_vaccination_price',
+                'adult cat vaccination package',
+            ],
+        ];
+
+        foreach ($aliasMap as $canonical => $aliases) {
+            $value = $package[$canonical] ?? $input[$canonical] ?? null;
+
+            foreach ($aliases as $alias) {
+                if ($value !== null && $value !== '') {
+                    break;
+                }
+
+                $value = $package[$alias] ?? $input[$alias] ?? null;
+            }
+
+            if ($value !== null && $value !== '') {
+                $package[$canonical] = $value;
+                $input[$canonical] = $value;
+            }
+        }
+
+        if (! empty($package)) {
+            $input['specialized_package'] = $package;
+        }
+
+        return $input;
     }
 
     private function createClinicAvailability($doctors, array $availabilityRows): int
