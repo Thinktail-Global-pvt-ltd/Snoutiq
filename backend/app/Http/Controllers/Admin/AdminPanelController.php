@@ -47,8 +47,13 @@ class AdminPanelController extends Controller
     {
         $activeDoctors = $this->formatActiveDoctorLabels();
         $dashboardSections = $this->adminDashboardSections();
+        $stats = [
+            'total_users' => $this->countModel(User::class),
+            'total_bookings' => $this->countModel(GroomerBooking::class),
+            'total_supports' => $this->countModel(CustomerTicket::class),
+        ];
 
-        return view('admin.dashboard', compact('dashboardSections', 'activeDoctors'));
+        return view('admin.dashboard', compact('dashboardSections', 'activeDoctors', 'stats'));
     }
 
     private function adminDashboardSections(): array
