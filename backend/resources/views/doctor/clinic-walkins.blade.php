@@ -252,7 +252,10 @@
     .modal-tabs{margin-top:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .tab-button{padding:0.45rem 1.1rem;border-radius:999px;font-size:0.9rem;font-weight:600;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;cursor:pointer;transition:background .2s,color .2s,border-color .2s}
     .tab-button.active{background:#0f766e;color:#fff;border-color:#0f766e}
-    .patient-results{display:flex;flex-direction:column;gap:10px;margin-top:10px;max-height:260px;overflow-y:auto;padding-right:4px}
+    .patient-results{display:flex;flex-direction:column;gap:10px;margin-top:10px;max-height:420px;overflow-y:auto;padding-right:4px}
+    .pet-type-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .pet-type-tab{padding:0.45rem 0.75rem;border-radius:0.5rem;font-size:0.875rem;font-weight:600;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;cursor:pointer;transition:background .2s,color .2s,border-color .2s;text-transform:capitalize}
+    .pet-type-tab.active{background:#0f766e;color:#fff;border-color:#0f766e}
     .patient-result{border:1px solid #e2e8f0;background:#fff;border-radius:16px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;cursor:pointer;transition:border-color .2s,box-shadow .2s}
     .patient-result.is-selected{border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,0.12)}
     .patient-result-name{font-weight:700;color:#0f172a}
@@ -487,24 +490,35 @@
             <select id="pet-select" name="pet_id" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500"></select>
             <p class="text-xs text-slate-500 mt-1">Need a new pet? Fill details below and we'll add it automatically.</p>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="space-y-3">
             <div>
-              <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">New Pet Name</label>
+              <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Pet Name</label>
               <input name="inline_pet_name" type="text" placeholder="Pet name" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
             </div>
             <div>
               <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Pet Type</label>
-              <input name="inline_pet_type" type="text" placeholder="Dog, Cat..." class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+              <div class="pet-type-tabs" data-pet-type-group="inline" role="tablist" aria-label="Pet type">
+                <button type="button" class="pet-type-tab active" data-pet-type="dog">Dog</button>
+                <button type="button" class="pet-type-tab" data-pet-type="cat">Cat</button>
+                <button type="button" class="pet-type-tab" data-pet-type="exotic">Exotic</button>
+              </div>
+              <input type="hidden" name="inline_pet_type" value="dog">
             </div>
-            <div>
-              <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Breed</label>
-              <select name="inline_pet_breed" class="breed-select w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
-                <option value="">Select breed</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Gender</label>
-              <input name="inline_pet_gender" type="text" placeholder="Male/Female" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div data-breed-wrap="inline-select">
+                <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Breed</label>
+                <select name="inline_pet_breed" class="breed-select w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+                  <option value="">Select breed</option>
+                </select>
+              </div>
+              <div data-breed-wrap="inline-exotic" class="hidden md:col-span-1">
+                <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Which exotic pet?</label>
+                <input name="inline_pet_exotic_detail" type="text" placeholder="e.g. Parrot, Rabbit, Turtle" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Gender</label>
+                <input name="inline_pet_gender" type="text" placeholder="Male/Female" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+              </div>
             </div>
           </div>
         </div>
@@ -513,34 +527,43 @@
       <div id="booking-submit-fields" class="space-y-4">
         {{-- NEW PATIENT SECTION --}}
         <div id="new-patient-section" class="hidden space-y-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Pet Name</label>
+            <input name="new_pet_name" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label class="block text-sm font-semibold mb-1">Patient Name</label>
+              <label class="block text-sm font-semibold mb-1">Parent name</label>
               <input name="new_patient_name" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
             </div>
             <div>
               <label class="block text-sm font-semibold mb-1">Phone</label>
               <input name="new_patient_phone" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
             </div>
-            <div>
+            <div class="md:col-span-2">
               <label class="block text-sm font-semibold mb-1">Email</label>
               <input name="new_patient_email" type="email" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
             </div>
           </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Pet Type</label>
+            <div class="pet-type-tabs" data-pet-type-group="new" role="tablist" aria-label="Pet type">
+              <button type="button" class="pet-type-tab active" data-pet-type="dog">Dog</button>
+              <button type="button" class="pet-type-tab" data-pet-type="cat">Cat</button>
+              <button type="button" class="pet-type-tab" data-pet-type="exotic">Exotic</button>
+            </div>
+            <input type="hidden" name="new_pet_type" value="dog">
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-semibold mb-1">Pet Name</label>
-              <input name="new_pet_name" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
-            </div>
-            <div>
-              <label class="block text-sm font-semibold mb-1">Pet Type</label>
-              <input name="new_pet_type" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
-            </div>
-            <div>
+            <div data-breed-wrap="new-select">
               <label class="block text-sm font-semibold mb-1">Breed</label>
               <select name="new_pet_breed" class="breed-select w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
                 <option value="">Select breed</option>
               </select>
+            </div>
+            <div data-breed-wrap="new-exotic" class="hidden">
+              <label class="block text-sm font-semibold mb-1">Which exotic pet?</label>
+              <input name="new_pet_exotic_detail" type="text" placeholder="e.g. Parrot, Rabbit, Turtle" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
             </div>
             <div>
               <label class="block text-sm font-semibold mb-1">Gender</label>
@@ -780,9 +803,9 @@
           <div id="medications-list" class="meds-list"></div>
         </div>
         <div class="pv-field">
-          <label class="pv-label" for="home-care"><span class="pv-required">*</span> Home care / precautions</label>
+          <label class="pv-label" for="home-care">Home care / precautions <span class="pv-optional">optional</span></label>
           <textarea id="home-care" name="home_care" class="pv-input pv-textarea" placeholder="Care instructions shown to pet parent"></textarea>
-          <div class="pv-helper">Be clear and specific — this text is shared with the pet parent.</div>
+          <div class="pv-helper">Optional — when filled, this text is shared with the pet parent.</div>
         </div>
       </div>
 
@@ -1573,6 +1596,9 @@ window.PatientStore = (() => {
       fd.append('clinic_id', CLINIC_ID);
       if (!fd.get('doctor_id')) fd.delete('doctor_id');
       if (!fd.get('pet_id'))    fd.delete('pet_id');
+      const homeCare = (fd.get('home_care') || '').toString().trim();
+      if (!homeCare) fd.delete('home_care');
+      else fd.set('home_care', homeCare);
       let url = `${API_BASE}/medical-records`;
       if (state.editingRecordId || fd.get('record_id')) {
         const recId = state.editingRecordId||fd.get('record_id'); fd.append('_method','PUT'); url=`${API_BASE}/medical-records/${recId}`;
@@ -1671,8 +1697,10 @@ window.PatientStore = (() => {
     return data;
   }
 
-  const BREEDS_API_URL = `${API_BASE}/dog-breeds/all`;
-  const BREEDS_CDN     = 'https://snoutiq.com/backend/api/dog-breeds/all';
+  const DOG_BREEDS_API_URL = `${API_BASE}/dog-breeds/all`;
+  const DOG_BREEDS_CDN     = 'https://snoutiq.com/backend/api/dog-breeds/all';
+  const CAT_BREEDS_API_URL = `${API_BASE}/cat-breeds/with-indian`;
+  const CAT_BREEDS_CDN     = 'https://snoutiq.com/backend/api/cat-breeds/with-indian';
   const SELECT2_ASSETS = {
     jquery:    @json(url('vertical/assets/js/jquery.min.js')),
     jqueryCdn: 'https://code.jquery.com/jquery-3.7.1.min.js',
@@ -1705,8 +1733,13 @@ window.PatientStore = (() => {
   let FILTERED_PATIENTS = [];
   let CURRENT_PATIENT= null;
   let PATIENT_MODE   = 'new';
-  let BREED_LIST     = [];
+  let DOG_BREED_LIST = [];
+  let CAT_BREED_LIST = null;
   let select2Loader  = null;
+  const PET_TYPE_GROUPS = {
+    new:    { hidden: 'new_pet_type',    breedSelect: () => newBreedSelect,    selectWrap: '[data-breed-wrap="new-select"]',    exoticWrap: '[data-breed-wrap="new-exotic"]',    exoticInput: 'new_pet_exotic_detail' },
+    inline: { hidden: 'inline_pet_type', breedSelect: () => inlineBreedSelect, selectWrap: '[data-breed-wrap="inline-select"]', exoticWrap: '[data-breed-wrap="inline-exotic"]', exoticInput: 'inline_pet_exotic_detail' },
+  };
 
   // ---- Subscribe to the shared PatientStore ----
   window.PatientStore.subscribe(({ patients }) => {
@@ -1815,6 +1848,7 @@ window.PatientStore = (() => {
     if (patientSearchInput) patientSearchInput.value='';
     if (patientResults) patientResults.innerHTML='';
     setPatientMode('new');
+    resetPetTypeTabs();
   }
 
   function setPatientMode(mode) {
@@ -1876,12 +1910,19 @@ window.PatientStore = (() => {
   doctorSelect?.addEventListener('change', () => fetchDoctorSlots(doctorSelect.value));
   bookingForm?.elements['scheduled_date']?.addEventListener('change', () => fetchDoctorSlots(doctorSelect?.value));
 
-  /* ---- Breeds ---- */
+  /* ---- Pet type tabs & breeds ---- */
   function toTitleCase(v) { return String(v||'').split(/[\s_-]+/).filter(Boolean).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); }
-  function buildBreedList(data) {
+  function buildDogBreedList(data) {
     const s=new Set();
     Object.entries(data||{}).forEach(([breed,subs]) => { const bn=toTitleCase(breed); Array.isArray(subs)&&subs.length ? subs.forEach(sub=>s.add(`${toTitleCase(sub)} ${bn}`.trim())) : s.add(bn); });
     return Array.from(s).sort((a,b)=>a.localeCompare(b));
+  }
+  function buildCatBreedList(payload) {
+    return Array.from(new Set([
+      ...(Array.isArray(payload?.data) ? payload.data : []).map(item => String(item?.name || item?.id || '').trim()),
+      'Indian Cat',
+      'Mixed / Other',
+    ].filter(Boolean))).sort((a,b)=>a.localeCompare(b));
   }
   function populateBreedSelect(sel, breeds, placeholder='Select breed') {
     if (!sel) return;
@@ -1890,15 +1931,85 @@ window.PatientStore = (() => {
     breeds.forEach(b => { const o=document.createElement('option'); o.value=b; o.textContent=b; sel.appendChild(o); });
     if (prev&&breeds.includes(prev)) sel.value=prev;
   }
-  async function fetchDogBreeds() {
-    if (!inlineBreedSelect&&!newBreedSelect) return;
-    populateBreedSelect(inlineBreedSelect,[],'Loading breeds...'); populateBreedSelect(newBreedSelect,[],'Loading breeds...');
-    const tryFetch = async url => { const r=await fetch(url,{headers:{Accept:'application/json'}}); if(!r.ok) throw new Error(); return r.json(); };
+  const tryFetchJson = async url => { const r=await fetch(url,{headers:{Accept:'application/json'}}); if(!r.ok) throw new Error(); return r.json(); };
+  async function ensureDogBreeds() {
+    if (DOG_BREED_LIST.length) return DOG_BREED_LIST;
+    const data = await tryFetchJson(DOG_BREEDS_API_URL).catch(()=>tryFetchJson(DOG_BREEDS_CDN));
+    DOG_BREED_LIST = buildDogBreedList(data?.breeds||{});
+    return DOG_BREED_LIST;
+  }
+  async function ensureCatBreeds() {
+    if (CAT_BREED_LIST) return CAT_BREED_LIST;
+    const data = await tryFetchJson(CAT_BREEDS_API_URL).catch(()=>tryFetchJson(CAT_BREEDS_CDN));
+    CAT_BREED_LIST = buildCatBreedList(data);
+    return CAT_BREED_LIST;
+  }
+  function getPetTypeValue(group) {
+    return (bookingForm?.elements[PET_TYPE_GROUPS[group]?.hidden]?.value || 'dog').toLowerCase();
+  }
+  function getPetBreedValue(group) {
+    const type = getPetTypeValue(group);
+    if (type === 'exotic') {
+      const exoticName = PET_TYPE_GROUPS[group]?.exoticInput;
+      return (bookingForm?.elements[exoticName]?.value || '').trim() || 'Unknown';
+    }
+    const sel = PET_TYPE_GROUPS[group]?.breedSelect?.();
+    return (sel?.value || '').trim() || 'Unknown';
+  }
+  function toggleBreedFields(group, type) {
+    const cfg = PET_TYPE_GROUPS[group];
+    if (!cfg || !bookingForm) return;
+    const selectWrap = bookingForm.querySelector(cfg.selectWrap);
+    const exoticWrap = bookingForm.querySelector(cfg.exoticWrap);
+    const isExotic = type === 'exotic';
+    selectWrap?.classList.toggle('hidden', isExotic);
+    exoticWrap?.classList.toggle('hidden', !isExotic);
+  }
+  async function applyPetType(group, type, { resetBreed = true } = {}) {
+    const cfg = PET_TYPE_GROUPS[group];
+    if (!cfg || !bookingForm) return;
+    const hidden = bookingForm.elements[cfg.hidden];
+    if (hidden) hidden.value = type;
+    const tabList = bookingForm.querySelector(`[data-pet-type-group="${group}"]`);
+    tabList?.querySelectorAll('.pet-type-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.petType === type);
+    });
+    toggleBreedFields(group, type);
+    const sel = cfg.breedSelect();
+    if (!sel || type === 'exotic') {
+      destroyBreedSelect2(sel);
+      if (resetBreed && bookingForm.elements[cfg.exoticInput]) bookingForm.elements[cfg.exoticInput].value = '';
+      return;
+    }
+    if (resetBreed) sel.value = '';
+    populateBreedSelect(sel, [], 'Loading breeds...');
+    initBreedSelect2();
     try {
-      const data = await tryFetch(BREEDS_API_URL).catch(()=>tryFetch(BREEDS_CDN));
-      BREED_LIST = buildBreedList(data?.breeds||{});
-      populateBreedSelect(inlineBreedSelect,BREED_LIST); populateBreedSelect(newBreedSelect,BREED_LIST); initBreedSelect2();
-    } catch(e) { populateBreedSelect(inlineBreedSelect,[],'Breeds unavailable'); populateBreedSelect(newBreedSelect,[],'Breeds unavailable'); initBreedSelect2(); }
+      const breeds = type === 'cat' ? await ensureCatBreeds() : await ensureDogBreeds();
+      populateBreedSelect(sel, breeds);
+      initBreedSelect2();
+    } catch(e) {
+      populateBreedSelect(sel, [], 'Breeds unavailable');
+      initBreedSelect2();
+    }
+  }
+  function resetPetTypeTabs() {
+    ['new', 'inline'].forEach(group => applyPetType(group, 'dog', { resetBreed: true }));
+  }
+  function initPetTypeTabs() {
+    bookingForm?.querySelectorAll('.pet-type-tabs').forEach(tabList => {
+      const group = tabList.dataset.petTypeGroup;
+      if (!group) return;
+      tabList.querySelectorAll('.pet-type-tab').forEach(btn => {
+        btn.addEventListener('click', () => applyPetType(group, btn.dataset.petType || 'dog', { resetBreed: true }));
+      });
+    });
+    resetPetTypeTabs();
+  }
+  function destroyBreedSelect2(sel) {
+    if (!sel || !window.jQuery?.fn?.select2) return;
+    const $sel = window.jQuery(sel);
+    if ($sel.hasClass('select2-hidden-accessible')) $sel.select2('destroy');
   }
 
   function loadScriptOnce(src,id) {
@@ -1961,11 +2072,18 @@ window.PatientStore = (() => {
         const newPetName=bookingForm.elements['new_pet_name'].value.trim();
         if (!name||(!phone&&!email)) { Swal.fire({icon:'warning',title:'Patient details required',text:'Provide name and phone or email.'}); return; }
         if (!newPetName) { Swal.fire({icon:'warning',title:'Pet name required'}); return; }
+        const newPetType = getPetTypeValue('new');
+        if (newPetType === 'exotic' && !(bookingForm.elements['new_pet_exotic_detail']?.value||'').trim()) {
+          Swal.fire({icon:'warning',title:'Exotic pet required',text:'Please specify the exotic pet type (e.g. Parrot, Rabbit).'}); return;
+        }
+        if (newPetType !== 'exotic' && !(bookingForm.elements['new_pet_breed']?.value||'').trim()) {
+          Swal.fire({icon:'warning',title:'Breed required',text:'Please select a breed for your pet.'}); return;
+        }
         const payload=new FormData();
         payload.append('name',name); if(phone) payload.append('phone',phone); if(email) payload.append('email',email);
         payload.append('pet_name',newPetName);
-        payload.append('pet_type',bookingForm.elements['new_pet_type'].value.trim()||'pet');
-        payload.append('pet_breed',bookingForm.elements['new_pet_breed'].value.trim()||'Unknown');
+        payload.append('pet_type',getPetTypeValue('new')||'dog');
+        payload.append('pet_breed',getPetBreedValue('new'));
         payload.append('pet_gender',bookingForm.elements['new_pet_gender'].value.trim()||'unknown');
         if(CLINIC_ID) payload.append('clinic_id',String(CLINIC_ID));
         const res=await apiFetch(`${API_BASE}/receptionist/patients`,{method:'POST',headers:Auth.headers(),body:payload});
@@ -1996,7 +2114,7 @@ window.PatientStore = (() => {
     } catch(error) { Swal.fire({icon:'error',title:'Unable to save appointment',text:error.message||'Unknown error'}); }
   });
 
-  document.addEventListener('DOMContentLoaded', () => { fetchDoctors(); fetchDogBreeds(); });
+  document.addEventListener('DOMContentLoaded', () => { fetchDoctors(); initPetTypeTabs(); });
 })();
 </script>
 
