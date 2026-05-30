@@ -77,7 +77,7 @@
     .pm-left{min-height:640px}
     .pm-right{min-height:680px}
     .pm-searchRow{display:flex;gap:8px;align-items:center;margin-bottom:10px}
-    .pm-input{padding:10px;border-radius:10px;border:1px solid #eef6ff;width:100%;font-size:14px;background:#fff}
+    .pm-input{padding:10px;border-radius:10px;border:1.5px solid #000;width:100%;font-size:14px;background:#fff}
     .pm-select{max-width:190px}
     .pm-tagsRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
     .pm-tagWrap{display:flex;gap:6px;flex-wrap:wrap}
@@ -161,7 +161,7 @@
     .record-grid.narrow{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
     .record-field{display:flex;flex-direction:column;gap:4px}
     .record-label{font-size:12px;font-weight:700;color:#111827}
-    .record-input{width:100%;padding:10px 11px;border-radius:12px;border:1px solid #d7dde6;font-size:14px;background:#fff}
+    .record-input{width:100%;padding:10px 11px;border-radius:12px;border:1.5px solid #000;font-size:14px;background:#fff}
     .record-textarea{min-height:70px;resize:vertical}
     .record-upload{border:2px dashed #c7d2fe;border-radius:12px;padding:12px;text-align:center;font-weight:700;color:#4338ca;cursor:pointer;background:#f8f9ff;display:inline-block}
     .record-note{font-size:12px;color:var(--pm-muted);margin-top:4px}
@@ -201,8 +201,8 @@
     .pv-label{font-size:13px;font-weight:700;color:var(--pv-text);display:flex;align-items:center;gap:6px}
     .pv-required{color:#ef4444}
     .pv-optional{font-size:11px;font-weight:600;color:var(--pv-muted);background:#f1f5f9;padding:2px 6px;border-radius:6px}
-    .pv-input{width:100%;padding:10px 12px;border:1.5px solid var(--pv-border);border-radius:10px;font-size:14px;background:var(--pv-card);transition:border-color .15s,box-shadow .15s}
-    .pv-input:focus{outline:none;border-color:var(--pv-primary);box-shadow:0 0 0 3px rgba(37,99,235,0.12)}
+    .pv-input{width:100%;padding:10px 12px;border:1.5px solid #000;border-radius:10px;font-size:14px;background:var(--pv-card);transition:border-color .15s,box-shadow .15s}
+    .pv-input:focus{outline:none;border-color:#000;box-shadow:0 0 0 2px rgba(0,0,0,0.1)}
     .pv-textarea{min-height:90px;resize:vertical}
     .pv-inputWrap{position:relative}
     .pv-unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--pv-muted)}
@@ -236,16 +236,27 @@
     .pm-record-title,.pm-record-notes{word-break:break-word;white-space:normal}
     .pm-small{font-size:13px;color:var(--pm-muted)}
     @media (max-width:1100px){.pm-content{grid-template-columns:1fr}.pm-left,.pm-right{min-height:unset}.pm-profileHeader{flex-direction:column;align-items:flex-start}.pm-actions{width:100%;justify-content:flex-start}}
-    .modal-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:center;justify-content:center;padding:0;z-index:70}
+    .modal-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:center;justify-content:center;padding:12px 16px;z-index:70}
     .modal-overlay.active{display:flex}
     .modal-card{width:100%;max-width:100%;height:100vh;max-height:100vh;background:#fff;border-radius:0;box-shadow:0 20px 60px rgba(15,23,42,0.25);padding:24px 28px;overflow-y:auto}
+    .modal-card.booking-modal{width:min(640px,100%);max-width:640px;height:auto;max-height:min(90vh,780px);border-radius:16px;padding:14px 16px 12px;display:flex;flex-direction:column;overflow:hidden}
+    .booking-modal-head{flex-shrink:0}
+    .booking-modal .modal-tabs{margin-top:10px;flex-shrink:0}
+    .booking-modal-form{display:flex;flex-direction:column;flex:1;min-height:0;margin-top:8px}
+    .booking-modal-scroll{flex:1;min-height:0;overflow-y:auto;padding-right:4px}
+    .booking-modal-scroll.space-y-4>*+*{margin-top:0.75rem}
+    .booking-modal-footer{flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding-top:10px;margin-top:8px;border-top:1px solid #e2e8f0;background:#fff}
+    .booking-modal .patient-results{max-height:140px}
+    .booking-modal select,.booking-modal input,.booking-modal textarea{min-height:38px}
+    .booking-modal textarea[name="notes"]{min-height:64px}
     .modal-card select{min-height:44px;padding-top:10px;padding-bottom:10px}
+    .booking-modal select{min-height:38px;padding-top:8px;padding-bottom:8px}
     .select2-container{width:100%!important}
-    .select2-container--default .select2-selection--single{height:44px;border-radius:0.5rem;border:1px solid transparent;background:#f8fafc}
+    .select2-container--default .select2-selection--single{height:44px;border-radius:0.5rem;border:1.5px solid #000;background:#fff}
     .select2-container--default .select2-selection--single .select2-selection__rendered{line-height:44px;padding-left:0.75rem;padding-right:2.5rem;font-size:0.875rem;color:#0f172a}
     .select2-container--default .select2-selection--single .select2-selection__placeholder{color:#94a3b8}
     .select2-container--default .select2-selection--single .select2-selection__arrow{height:44px;right:10px}
-    .select2-container--default.select2-container--focus .select2-selection--single{border-color:#14b8a6;box-shadow:0 0 0 2px rgba(20,184,166,0.2)}
+    .select2-container--default.select2-container--focus .select2-selection--single{border-color:#000;box-shadow:0 0 0 2px rgba(0,0,0,0.1)}
     .select2-dropdown{border-radius:12px;border-color:#e2e8f0}
     .select2-results__option--highlighted[aria-selected]{background:#0f766e}
     .select2-container--open{z-index:90}
@@ -277,7 +288,7 @@
     .pm-btn.pm-ghost{border:1px solid #e2e8f0;color:#0f172a}
     .pm-chip{background:#ccfbf1;color:#0f766e}
     .pm-left,.pm-right{background:var(--pm-panel);border:1px solid rgba(148,163,184,0.18);border-radius:22px;}
-    .pm-input{background:#f8fafc;border:1px solid #e2e8f0}
+    .pm-input{background:#fff;border:1.5px solid #000}
     .pm-tag.is-active{background:#0f766e;border-color:#0f766e}
     .pm-row.is-active{border-color:#14b8a6;background:#f0fdfa}
     .pm-avatar{background:#ecfeff;color:#0f766e}
@@ -324,6 +335,18 @@
     .booking-patients-loading{display:flex;align-items:center;gap:8px;padding:10px 4px;font-size:13px;color:#64748b}
     .booking-patients-loading::before{content:"";width:16px;height:16px;border:2px solid #e2e8f0;border-top-color:#0f766e;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
     @keyframes spin{to{transform:rotate(360deg)}}
+    .pm-shell .modal-card :is(input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]), select, textarea),
+    .pm-overlay :is(input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]), select, textarea){
+      border:1.5px solid #000!important;
+      background:#fff;
+    }
+    .pm-shell .modal-card :is(input, select, textarea):focus,
+    .pm-overlay :is(input, select, textarea):focus{
+      outline:none;
+      border-color:#000!important;
+      box-shadow:0 0 0 2px rgba(0,0,0,0.1)!important;
+    }
+    .pm-id-tag{font-weight:700;color:#475569}
   </style>
 @endsection
 
@@ -450,11 +473,11 @@
 
 {{-- ==================== BOOKING MODAL ==================== --}}
 <div id="booking-modal" class="modal-overlay" hidden aria-hidden="true">
-  <div class="modal-card">
-    <div class="flex items-center justify-between">
+  <div class="modal-card booking-modal">
+    <div class="booking-modal-head flex items-center justify-between">
       <div>
         <p class="text-xs font-semibold tracking-wide text-teal-600 uppercase">Front Desk</p>
-        <h3 class="text-xl font-semibold text-slate-900">Create Booking</h3>
+        <h3 class="text-lg font-semibold text-slate-900">Create Booking</h3>
       </div>
       <button type="button" data-close class="text-slate-500 hover:text-slate-700 text-lg">&times;</button>
     </div>
@@ -464,10 +487,11 @@
       <button type="button" class="tab-button" data-patient-mode="existing">Existing Patient</button>
     </div>
 
-    <form id="booking-form" class="space-y-5 mt-3">
+    <form id="booking-form" class="booking-modal-form">
+      <div class="booking-modal-scroll space-y-4">
       <div>
         <label class="block text-sm font-semibold mb-1">What happened?</label>
-        <textarea name="notes" rows="3" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500" placeholder="Share the reason or context for this visit"></textarea>
+        <textarea name="notes" rows="2" class="w-full bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500" placeholder="Share the reason or context for this visit"></textarea>
       </div>
 
       {{-- EXISTING PATIENT SECTION --}}
@@ -477,7 +501,7 @@
           <div class="flex flex-col gap-2">
             <div id="patient-search-block" class="flex flex-col gap-2">
               <input id="patient-search" type="text" placeholder="Search by name or mobile number..."
-                class="bg-slate-50 rounded-lg px-3 py-2 text-sm border border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500">
+                class="bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500">
               <div id="patient-results" class="patient-results"></div>
             </div>
             {{-- Hidden select kept for form value compatibility --}}
@@ -591,18 +615,21 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="block text-sm font-semibold mb-1">Date</label>
-            <input name="scheduled_date" type="date" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+            <input name="scheduled_date" type="date" class="w-full bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500">
           </div>
           <div>
             <label class="block text-sm font-semibold mb-1">Available Slots</label>
-            <select name="scheduled_time" id="slot-select" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+            <select name="scheduled_time" id="slot-select" class="w-full bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500">
               <option value="">Select a time slot</option>
             </select>
             <p id="slot-hint" class="text-xs text-slate-500 mt-1">Select a doctor and date first to load available slots.</p>
           </div>
         </div>
+      </div>
+      </div>
 
-        <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+      <div class="booking-modal-footer">
+        <div class="flex flex-col sm:flex-row justify-end gap-2">
           <button type="button" data-close class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">Cancel</button>
           <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold">Save Booking</button>
         </div>
@@ -1242,11 +1269,13 @@ window.PatientStore = (() => {
 
   const getPrimaryPet    = p => (Array.isArray(p?.pets) && p.pets.length) ? p.pets[0] : null;
   const getPatientPets   = p => (Array.isArray(p?.pets) && p.pets.length) ? p.pets : [];
+  const resolvePetId     = pet => { const raw = pet?.id ?? pet?.pet_id; const num = Number(raw); return Number.isFinite(num) && num > 0 ? num : null; };
+  const formatPetLabel   = (pet, fallback = 'Pet') => { const name = pet?.name || pet?.pet_name || fallback; const id = resolvePetId(pet); return id ? `${name} #${id}` : name; };
 
   function getPetLabel(patient, petId) {
     if (!petId) return null;
     const match = getPatientPets(patient).find(pet => String(pet.id??pet.pet_id) === String(petId));
-    return match ? (match.name||match.pet_name||`Pet #${petId}`) : `Pet #${petId}`;
+    return match ? formatPetLabel(match) : `Pet #${petId}`;
   }
 
   function getSelectedPetId() {
@@ -1314,7 +1343,7 @@ window.PatientStore = (() => {
       const info = document.createElement('div'); info.className='pm-info';
       const name  = document.createElement('div'); name.className='pm-name'; name.textContent=`${patient.name||'Patient'}  #${patient.id}`;
       const meta  = document.createElement('div'); meta.className='pm-meta';
-      const petMeta = primaryPet ? `${escapeHtml(primaryPet.name||'Pet')} | ${escapeHtml(primaryPet.breed||'Breed -')}` : 'No pets on file';
+      const petMeta = primaryPet ? `${escapeHtml(formatPetLabel(primaryPet))} | ${escapeHtml(primaryPet.breed||'Breed -')}` : 'No pets on file';
       meta.innerHTML = `${petMeta}<br>${escapeHtml(patient.phone||'Phone -')} | ${escapeHtml(patient.email||'Email -')}`;
       const badges = document.createElement('div'); badges.className='pm-badges';
       const recBadge = document.createElement('span'); recBadge.className='pm-badge'; recBadge.textContent=`${patient.records_count||0} file${(patient.records_count||0)===1?'':'s'}`;
@@ -1341,10 +1370,10 @@ window.PatientStore = (() => {
     }
     const primaryPet = getPrimaryPet(patient);
     els.profileAvatar.textContent = String(primaryPet?.name||patient.name||'?').charAt(0).toUpperCase();
-    els.profileName.textContent   = patient.name||'Patient';
+    els.profileName.textContent   = `${patient.name||'Patient'} #${patient.id}`;
     if (primaryPet) {
       const petAge = primaryPet.pet_age??primaryPet.age;
-      els.profileSub.textContent = `${primaryPet.name||'Pet'} | ${primaryPet.breed||'Breed -'} | ${primaryPet.gender||primaryPet.pet_gender||'Gender -'} | Age: ${(petAge||petAge===0)?petAge:'-'}`;
+      els.profileSub.textContent = `${formatPetLabel(primaryPet)} | ${primaryPet.breed||'Breed -'} | ${primaryPet.gender||primaryPet.pet_gender||'Gender -'} | Age: ${(petAge||petAge===0)?petAge:'-'}`;
     } else { els.profileSub.textContent = 'No pets on file.'; }
     els.profileMeta.textContent = `Phone: ${patient.phone||'-'} | Email: ${patient.email||'-'}`;
     const cached = state.records.get(Number(patient.id));
@@ -1369,7 +1398,7 @@ window.PatientStore = (() => {
       const wrap=document.createElement('div'); wrap.className='pm-petRow';
       const av=document.createElement('div'); av.className='pm-petAvatar'; av.textContent=String(pet.name||pet.pet_name||'P').charAt(0).toUpperCase();
       const body=document.createElement('div'); body.className='pm-petBody';
-      const title=document.createElement('div'); title.className='pm-petName'; title.textContent=pet.name||pet.pet_name||'Pet';
+      const title=document.createElement('div'); title.className='pm-petName'; title.textContent=formatPetLabel(pet);
       const meta=document.createElement('div'); meta.className='pm-petMeta';
       const mp=[]; if(pet.type) mp.push(pet.type); if(pet.breed) mp.push(pet.breed); const g=pet.gender||pet.pet_gender; if(g) mp.push(`Gender: ${g}`); const a=pet.pet_age??pet.age; if(a||a===0) mp.push(`Age: ${a}`);
       meta.textContent=mp.join(' | ')||'Details not provided';
@@ -1466,7 +1495,7 @@ window.PatientStore = (() => {
     pets.forEach(pet => {
       const v = pet.id??pet.pet_id, nv = Number(v), hasId = v!==null&&v!==undefined&&v!==''&&Number.isFinite(nv);
       const opt = document.createElement('option'); opt.value = hasId?v:'';
-      opt.textContent = `${pet.name||pet.pet_name||'Pet'}${pet.breed?` | ${pet.breed}`:''}${pet.gender?` | ${pet.gender}`:''}`;
+      opt.textContent = `${formatPetLabel(pet)}${pet.breed?` | ${pet.breed}`:''}${pet.gender?` | ${pet.gender}`:''}`;
       opt.dataset.petName = pet.name||pet.pet_name||''; if (!hasId) { opt.disabled=true; opt.textContent+=' (link pet to use)'; }
       els.recordPet.appendChild(opt);
     });
@@ -1544,7 +1573,7 @@ window.PatientStore = (() => {
       els.modalPatient.textContent = `${patient.name||'Patient'} | #${patient.id}`;
       const pp = getPrimaryPet(patient);
       const pa = pp?.pet_age??pp?.age;
-      if (els.modalPet) els.modalPet.textContent = pp ? [pp.name||'Pet',pp.breed,(pa||pa===0)?`Age: ${pa}`:null].filter(Boolean).join(' | ') : '';
+      if (els.modalPet) els.modalPet.textContent = pp ? [formatPetLabel(pp),pp.breed,(pa||pa===0)?`Age: ${pa}`:null].filter(Boolean).join(' | ') : '';
       els.modalUserInput.value = patient.id;
     }
     resetRecordForm();
@@ -1697,6 +1726,9 @@ window.PatientStore = (() => {
     return data;
   }
 
+  const resolvePetId = pet => { const raw = pet?.id ?? pet?.pet_id; const num = Number(raw); return Number.isFinite(num) && num > 0 ? num : null; };
+  const formatPetLabel = (pet, fallback = 'Pet') => { const name = pet?.name || pet?.pet_name || fallback; const id = resolvePetId(pet); return id ? `${name} #${id}` : name; };
+
   const DOG_BREEDS_API_URL = `${API_BASE}/dog-breeds/all`;
   const DOG_BREEDS_CDN     = 'https://snoutiq.com/backend/api/dog-breeds/all';
   const CAT_BREEDS_API_URL = `${API_BASE}/cat-breeds/with-indian`;
@@ -1790,7 +1822,7 @@ window.PatientStore = (() => {
       const pets = Array.isArray(patient.pets) ? patient.pets : [];
       pets.slice(0,2).forEach(pet => {
         const tag = document.createElement('span'); tag.className='patient-result-tag';
-        tag.textContent=`${pet.name||pet.pet_name||'Pet'} (${pet.species||pet.pet_type||pet.type||'Pet'})`;
+        tag.textContent=`${formatPetLabel(pet)} (${pet.species||pet.pet_type||pet.type||'Pet'})`;
         tagsDiv.appendChild(tag);
       });
       info.appendChild(name); info.appendChild(meta); if (tagsDiv.childElementCount) info.appendChild(tagsDiv);
@@ -1818,7 +1850,7 @@ window.PatientStore = (() => {
     if (!pets.length) { petSelect.innerHTML='<option value="">No pets found</option>'; return; }
     pets.forEach(pet => {
       const opt=document.createElement('option'); opt.value=pet.id??pet.pet_id;
-      opt.textContent=`${pet.pet_name||pet.name||'Pet'} | ${pet.pet_type||pet.species||pet.type||''}`;
+      opt.textContent=`${formatPetLabel(pet)} | ${pet.pet_type||pet.species||pet.type||''}`;
       opt.dataset.petName = pet.pet_name||pet.name||'';
       petSelect.appendChild(opt);
     });
