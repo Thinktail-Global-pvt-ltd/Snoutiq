@@ -1660,8 +1660,8 @@ window.PatientStore = (() => {
   };
 
   function appendTarget(fd) {
-    if (CLINIC_ID) { if(!fd.has('clinic_id')) fd.append('clinic_id',String(CLINIC_ID)); if(!fd.has('user_id')) fd.append('user_id',String(CLINIC_ID)); }
-    else if (CURRENT_USER_ID) { if(!fd.has('user_id')) fd.append('user_id',String(CURRENT_USER_ID)); }
+    if (CLINIC_ID) { if(!fd.has('clinic_id')) fd.append('clinic_id',String(CLINIC_ID)); }
+    if (!fd.has('user_id') && CURRENT_USER_ID) { fd.append('user_id',String(CURRENT_USER_ID)); }
   }
 
   async function apiFetch(url, opts={}) {
@@ -1973,6 +1973,7 @@ window.PatientStore = (() => {
         patientId=res?.data?.user?.id; patientName=res?.data?.user?.name||name;
         patientPhone=normalizePhone(res?.data?.user?.phone,phone,res?.data?.user?.email,email);
         petName=res?.data?.pet?.name||newPetName;
+        if (!patientId) { Swal.fire({icon:'error',title:'Could not create patient',text:'Patient registration failed. Please try again.'}); return; }
         // Refresh PatientStore so new patient shows everywhere
         await window.PatientStore.reload();
       } else {
