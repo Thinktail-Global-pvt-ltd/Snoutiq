@@ -556,135 +556,258 @@ class ReceptionistBookingController extends Controller
         return $amountPaise > 0 && $hasValidPaymentId && $hasOrderAndSignature;
     }
 
-    public function storePatient(Request $request)
-    {
-        if ($request->filled('lastVetId') && !$request->filled('last_vet_id')) {
-            $request->merge(['last_vet_id' => $request->input('lastVetId')]);
+   public function storePatient(Request $request)
+{
+    if ($request->filled('lastVetId') && !$request->filled('last_vet_id')) {
+        $request->merge(['last_vet_id' => $request->input('lastVetId')]);
+    }
+
+    if ($request->has('phone')) {
+        $phone = trim((string) $request->input('phone'));
+        $request->merge(['phone' => $phone !== '' ? $phone : null]);
+    }
+
+    if ($request->filled('pet_weight') && !$request->filled('weight')) {
+        $request->merge(['weight' => $request->input('pet_weight')]);
+    }
+
+    $hasRoleColumn      = Schema::hasColumn('users', 'role');
+    $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
+    $existingUser       = null;
+
+    // ✅ Case 1: Frontend sent user_id directly (user_exist=1)
+    if ($request->filled('user_id')) {
+        $existingUserQuery = User::query()->where('id', $request->input('user_id'));
+        if ($hasRoleColumn) {
+            $existingUserQuery->whereIn('role', self::PATIENT_ROLES);
         }
+        $existingUser = $existingUserQuery->first();
+    }
 
-        if ($request->has('phone')) {
-            $phone = trim((string) $request->input('phone'));
-            $request->merge(['phone' => $phone !== '' ? $phone : null]);
-        }
-
-        if ($request->filled('pet_weight') && !$request->filled('weight')) {
-            $request->merge(['weight' => $request->input('pet_weight')]);
-        }
-
-        $hasRoleColumn = Schema::hasColumn('users', 'role');
-        $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
-        $existingUser = null;
-
+    // ✅ Case 2: Fallback — lookup by phone
+    if (!$existingUser) {
         $phone = $request->input('phone');
         if ($phone !== null && $phone !== '') {
             $existingUserQuery = User::query()->where('phone', $phone);
             if ($hasRoleColumn) {
                 $existingUserQuery->whereIn('role', self::PATIENT_ROLES);
             }
-
             $existingUser = $existingUserQuery->first();
         }
+    }
 
-        $phoneRules = ['nullable', 'string', 'max:25'];
-        $phoneUniqueRule = Rule::unique('users', 'phone');
-        if ($existingUser) {
-            $phoneUniqueRule = $phoneUniqueRule->ignore($existingUser->id);
-        }
+    $phoneRules      = ['nullable', 'string', 'max:25'];
+    $phoneUniqueRule = Rule::unique('users', 'phone');
+    if ($existingUser) {
+        $phoneUniqueRule = $phoneUniqueRule->ignore($existingUser->id);
+    }
 
-        if ($hasRoleColumn) {
-            $phoneRules[] = $phoneUniqueRule->where(function ($query) {
-                $query->whereIn('role', self::PATIENT_ROLES);
-            });
-        } else {
-            $phoneRules[] = $phoneUniqueRule;
-        }
+    if ($hasRoleColumn) {
+        $phoneRules[] = $phoneUniqueRule->where(function ($query) {
+            $query->whereIn('role', self::PATIENT_ROLES);
+        });
+    } else {
+        $phoneRules[] = $phoneUniqueRule;
+    }
 
-        $emailRules = ['nullable', 'email'];
-        $emailUniqueRule = Rule::unique('users', 'email');
-        if ($existingUser) {
-            $emailUniqueRule = $emailUniqueRule->ignore($existingUser->id);
-        }
-        $emailRules[] = $emailUniqueRule;
+    $emailRules      = ['nullable', 'email'];
+    $emailUniqueRule = Rule::unique('users', 'email');
+    if ($existingUser) {
+        $emailUniqueRule = $emailUniqueRule->ignore($existingUser->id);
+    }
+    $emailRules[] = $emailUniqueRule;
 
-        $data = $request->validate([
-            'name' => 'nullable|string|max:255',
-            'email' => $emailRules,
-            'phone' => $phoneRules,
-            'pet_name' => 'nullable|string|max:120',
-            'pet_type' => 'nullable|string|max:120',
-            'pet_breed' => 'nullable|string|max:120',
-            'pet_gender' => 'nullable|string|max:50',
-            'pet_age' => 'nullable|integer|min:0|max:255',
-            'pet_age_months' => 'nullable|integer|min:0|max:255',
-            'pet_dob' => 'nullable|date',
-            'weight' => 'nullable|numeric|min:0',
-            'pet_doc1' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
-            'pet_image' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
-            'pet_pic' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
-            'pet_doc2' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
-            'last_vet_id' => 'nullable|integer|exists:vet_registerations_temp,id',
-            'doctor_id' => 'nullable|integer|exists:doctors,id',
-            'amount' => 'nullable|numeric|min:1|max:1000000',
-            'amount_paise' => 'nullable|integer|min:100|max:100000000',
-            'response_time_minutes' => 'nullable|integer|min:1|max:1440',
-        ], [
-            'phone.unique' => 'A patient with this phone number already exists.',
-        ]);
+    $data = $request->validate([
+        'user_exist' => 'nullable|boolean',
+        'user_id'    => 'nullable|integer|exists:users,id',
+        'name'       => 'nullable|string|max:255',
+        'email'      => $emailRules,
+        'phone'      => $phoneRules,
+        // Single pet fields (old flow)
+        'pet_name'        => 'nullable|string|max:120',
+        'pet_type'        => 'nullable|string|max:120',
+        'pet_breed'       => 'nullable|string|max:120',
+        'pet_gender'      => 'nullable|string|max:50',
+        'pet_age'         => 'nullable|integer|min:0|max:255',
+        'pet_age_months'  => 'nullable|integer|min:0|max:255',
+        'pet_dob'         => 'nullable|date',
+        'weight'          => 'nullable|numeric|min:0',
+        'pet_doc1'        => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
+        'pet_image'       => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
+        'pet_pic'         => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
+        'pet_doc2'        => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
+        // Multiple pets array (new flow)
+        'pets'                  => 'nullable|array',
+        'pets.*.pet_name'       => 'required_with:pets|string|max:120',
+        'pets.*.pet_type'       => 'nullable|string|max:120',
+        'pets.*.pet_breed'      => 'nullable|string|max:120',
+        'pets.*.pet_gender'     => 'nullable|string|max:50',
+        'pets.*.pet_age'        => 'nullable|integer|min:0|max:255',
+        'pets.*.pet_age_months' => 'nullable|integer|min:0|max:255',
+        'pets.*.pet_dob'        => 'nullable|date',
+        'pets.*.weight'         => 'nullable|numeric|min:0',
+        // Other fields
+        'last_vet_id'            => 'nullable|integer|exists:vet_registerations_temp,id',
+        'doctor_id'              => 'nullable|integer|exists:doctors,id',
+        'amount'                 => 'nullable|numeric|min:1|max:1000000',
+        'amount_paise'           => 'nullable|integer|min:100|max:100000000',
+        'response_time_minutes'  => 'nullable|integer|min:1|max:1440',
+    ], [
+        'phone.unique'                     => 'A patient with this phone number already exists.',
+        'pets.*.pet_name.required_with'    => 'Pet name is required for each pet.',
+    ]);
 
-        $clinicId = $this->resolveClinicId($request);
+    $clinicId = $this->resolveClinicId($request);
 
-        if (empty($data['email']) && empty($data['phone'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Email or phone is required for a patient record.',
-            ], 422);
-        }
+    // ✅ user_id se existing user mila — email/phone required nahi
+    $isExistingUserById = $request->filled('user_id') && $existingUser;
 
-        $patientName = trim((string) ($data['name'] ?? ''));
+    if (!$isExistingUserById && empty($data['email']) && empty($data['phone'])) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Email or phone is required for a patient record.',
+        ], 422);
+    }
 
-        $userPayload = [];
-        if (array_key_exists('name', $data)) {
-            $userPayload['name'] = $patientName !== '' ? $patientName : null;
-        }
-        if (array_key_exists('email', $data)) {
-            $userPayload['email'] = $data['email'] ?? null;
-        }
-        if (array_key_exists('phone', $data)) {
-            $userPayload['phone'] = $data['phone'] ?? null;
-        }
-        if ($hasRoleColumn && (!$existingUser || empty($existingUser->role))) {
-            $userPayload['role'] = 'pet';
-        }
-        if ($hasLastVetIdColumn) {
-            $lastVetId = $data['last_vet_id'] ?? null;
+    // =========================================================
+    // USER PAYLOAD — last_vet_id always update
+    // =========================================================
 
-            if ($clinicId) {
-                if (Schema::hasTable('vet_registerations_temp')) {
-                    $clinicExists = DB::table('vet_registerations_temp')->where('id', $clinicId)->exists();
-                    if ($clinicExists) {
-                        $lastVetId = $clinicId;
-                    }
-                } else {
+    $patientName = trim((string) ($data['name'] ?? ''));
+
+    $userPayload = [];
+    if (array_key_exists('name', $data) && $patientName !== '') {
+        $userPayload['name'] = $patientName;
+    }
+    if (array_key_exists('email', $data)) {
+        $userPayload['email'] = $data['email'] ?? null;
+    }
+    if (array_key_exists('phone', $data)) {
+        $userPayload['phone'] = $data['phone'] ?? null;
+    }
+    if ($hasRoleColumn && (!$existingUser || empty($existingUser->role))) {
+        $userPayload['role'] = 'pet';
+    }
+    if ($hasLastVetIdColumn) {
+        $lastVetId = $data['last_vet_id'] ?? null;
+
+        if ($clinicId) {
+            if (Schema::hasTable('vet_registerations_temp')) {
+                $clinicExists = DB::table('vet_registerations_temp')->where('id', $clinicId)->exists();
+                if ($clinicExists) {
                     $lastVetId = $clinicId;
                 }
-            }
-
-            if (!$existingUser || $clinicId || array_key_exists('last_vet_id', $data)) {
-                $userPayload['last_vet_id'] = $lastVetId;
+            } else {
+                $lastVetId = $clinicId;
             }
         }
 
-        if ($existingUser) {
-            $existingUser->fill($userPayload);
-            $existingUser->save();
-            $user = $existingUser->fresh();
-        } else {
-            $userPayload['password'] = Hash::make(Str::random(16));
-            $user = User::create($userPayload);
-        }
+        // ✅ Always update last_vet_id — naya ho ya existing
+        $userPayload['last_vet_id'] = $lastVetId;
+    }
 
-        $pet = null;
-        if (!empty($data['pet_name'])) {
+    if ($existingUser) {
+        $existingUser->fill($userPayload);
+        $existingUser->save();
+        $user = $existingUser->fresh();
+    } else {
+        $userPayload['password'] = Hash::make(Str::random(16));
+        $user = User::create($userPayload);
+    }
+
+    // =========================================================
+    // PET HANDLING
+    // =========================================================
+
+    $pets = [];
+
+    $hasPetsArray  = !empty($data['pets']) && is_array($data['pets']);
+    $hasSinglePet  = !empty($data['pet_name']);
+
+    if ($isExistingUserById) {
+
+        // ✅ user_id wala existing user:
+        //    - pets[] array ho toh multiple insert karo
+        //    - pets[] nahi hai toh kuch mat karo (last_vet_id upar update ho chuka)
+
+        if ($hasPetsArray) {
+
+            if (!Schema::hasTable('pets')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pets table is not available.',
+                ], 500);
+            }
+
+            $userColumn = Schema::hasColumn('pets', 'user_id')
+                ? 'user_id'
+                : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+            if (!$userColumn) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pets table is missing user reference column.',
+                ], 500);
+            }
+
+            foreach ($data['pets'] as $petData) {
+                $petPayload = [
+                    $userColumn => $user->id,
+                    'name'      => $petData['pet_name'],
+                    'breed'     => $petData['pet_breed'] ?? 'Unknown',
+                ];
+
+                if (Schema::hasColumn('pets', 'pet_age') && isset($petData['pet_age'])) {
+                    $petPayload['pet_age'] = (int) $petData['pet_age'];
+                }
+                if (Schema::hasColumn('pets', 'pet_age_months') && isset($petData['pet_age_months'])) {
+                    $petPayload['pet_age_months'] = (int) $petData['pet_age_months'];
+                }
+                if (!empty($petData['pet_dob'])) {
+                    if (Schema::hasColumn('pets', 'pet_dob')) {
+                        $petPayload['pet_dob'] = $petData['pet_dob'];
+                    } elseif (Schema::hasColumn('pets', 'dob')) {
+                        $petPayload['dob'] = $petData['pet_dob'];
+                    }
+                }
+                if (Schema::hasColumn('pets', 'weight') && isset($petData['weight'])) {
+                    $petPayload['weight'] = (float) $petData['weight'];
+                }
+                if (Schema::hasColumn('pets', 'type')) {
+                    $petPayload['type'] = $petData['pet_type'] ?? 'dog';
+                } elseif (Schema::hasColumn('pets', 'pet_type')) {
+                    $petPayload['pet_type'] = $petData['pet_type'] ?? 'dog';
+                }
+                if (Schema::hasColumn('pets', 'pet_gender')) {
+                    $petPayload['pet_gender'] = $petData['pet_gender'] ?? 'unknown';
+                } elseif (Schema::hasColumn('pets', 'gender')) {
+                    $petPayload['gender'] = $petData['pet_gender'] ?? 'unknown';
+                }
+
+                $now = now();
+                if (Schema::hasColumn('pets', 'created_at')) {
+                    $petPayload['created_at'] = $now;
+                }
+                if (Schema::hasColumn('pets', 'updated_at')) {
+                    $petPayload['updated_at'] = $now;
+                }
+
+                $petId  = DB::table('pets')->insertGetId($petPayload);
+                $pets[] = (object) [
+                    'id'    => $petId,
+                    'name'  => $petData['pet_name'],
+                    'type'  => $petData['pet_type'] ?? 'dog',
+                    'breed' => $petData['pet_breed'] ?? 'Unknown',
+                ];
+            }
+        }
+        // ✅ No pets[] and no pet_name — sirf last_vet_id update hua, koi pet insert nahi
+
+    } else {
+
+        // ✅ Naya patient ya phone-matched existing user — old single pet flow
+        if ($hasSinglePet) {
+
             if (!Schema::hasTable('pets')) {
                 return response()->json([
                     'success' => false,
@@ -705,8 +828,8 @@ class ReceptionistBookingController extends Controller
 
             $petPayload = [
                 $userColumn => $user->id,
-                'name' => $data['pet_name'],
-                'breed' => $data['pet_breed'] ?? 'Unknown',
+                'name'      => $data['pet_name'],
+                'breed'     => $data['pet_breed'] ?? 'Unknown',
             ];
 
             if (Schema::hasColumn('pets', 'pet_age') && array_key_exists('pet_age', $data) && $data['pet_age'] !== null) {
@@ -725,22 +848,20 @@ class ReceptionistBookingController extends Controller
             if (Schema::hasColumn('pets', 'weight') && array_key_exists('weight', $data) && $data['weight'] !== null) {
                 $petPayload['weight'] = (float) $data['weight'];
             }
-
             if (Schema::hasColumn('pets', 'type')) {
                 $petPayload['type'] = $data['pet_type'] ?? 'dog';
             } elseif (Schema::hasColumn('pets', 'pet_type')) {
                 $petPayload['pet_type'] = $data['pet_type'] ?? 'dog';
             }
-
             if (Schema::hasColumn('pets', 'pet_gender')) {
                 $petPayload['pet_gender'] = $data['pet_gender'] ?? 'unknown';
             } elseif (Schema::hasColumn('pets', 'gender')) {
                 $petPayload['gender'] = $data['pet_gender'] ?? 'unknown';
             }
 
-            $uploadedPetFile = $this->resolvePetUploadFile($request);
+            $uploadedPetFile  = $this->resolvePetUploadFile($request);
             $blobColumnsReady = $this->petDoc2BlobColumnsReady();
-            if ($uploadedPetFile && ! $blobColumnsReady) {
+            if ($uploadedPetFile && !$blobColumnsReady) {
                 return response()->json([
                     'success' => false,
                     'message' => 'pet_doc2 blob columns are missing. Please run migrations.',
@@ -777,62 +898,82 @@ class ReceptionistBookingController extends Controller
                 $petPayload['updated_at'] = $now;
             }
 
-            $petId = DB::table('pets')->insertGetId($petPayload);
-            $pet = (object) [
-                'id' => $petId,
-                'name' => $data['pet_name'],
-                'type' => $data['pet_type'] ?? 'dog',
+            $petId     = DB::table('pets')->insertGetId($petPayload);
+            $singlePet = (object) [
+                'id'    => $petId,
+                'name'  => $data['pet_name'],
+                'type'  => $data['pet_type'] ?? 'dog',
                 'breed' => $data['pet_breed'] ?? 'Unknown',
             ];
             if (isset($petPayload['weight'])) {
-                $pet->weight = $petPayload['weight'];
+                $singlePet->weight = $petPayload['weight'];
             }
             if (isset($petPayload['pet_doc1'])) {
-                $pet->pet_doc1 = url($petPayload['pet_doc1']);
+                $singlePet->pet_doc1 = url($petPayload['pet_doc1']);
             }
             if (isset($petPayload['pic_link'])) {
-                $pet->pic_link = url($petPayload['pic_link']);
+                $singlePet->pic_link = url($petPayload['pic_link']);
             }
             if ($petDocBlob !== null) {
-                $pet->pet_doc2_blob_url = route('api.pets.pet-doc2-blob', ['pet' => $petId], true);
+                $singlePet->pet_doc2_blob_url = route('api.pets.pet-doc2-blob', ['pet' => $petId], true);
             }
+
+            $pets[] = $singlePet;
         }
-
-        $consultSession = $this->consultSessions->createForPatient(
-            user: $user,
-            pet: $pet,
-            data: $data,
-            clinicId: $clinicId,
-        );
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'role' => $user->role,
-                    'last_vet_id' => $hasLastVetIdColumn ? $user->last_vet_id : null,
-                ],
-                'pet' => $pet ? [
-                    'id' => $pet->id,
-                    'name' => $pet->name,
-                    'type' => $pet->type,
-                    'breed' => $pet->breed,
-                    'pet_doc2_blob_url' => $pet->pet_doc2_blob_url ?? null,
-                    'pet_image_url' => $pet->pet_doc2_blob_url ?? $pet->pet_doc1 ?? $pet->pic_link ?? null,
-                ] : null,
-                'consult_session' => $this->consultSessions->formatForResponse($consultSession),
-                'payment_link_whatsapp' => [
-                    'sent' => false,
-                    'skipped' => true,
-                    'reason' => 'awaiting_parent_initiation',
-                ],
-            ],
-        ], 201);
     }
+
+    // Backward compat
+    $pet = !empty($pets) ? $pets[0] : null;
+
+    $consultSession = $this->consultSessions->createForPatient(
+        user: $user,
+        pet: $pet,
+        data: $data,
+        clinicId: $clinicId,
+    );
+
+    return response()->json([
+        'success' => true,
+        'data'    => [
+            'user_exist' => $existingUser ? 1 : 0,
+            'user_id'    => $user->id,
+            'user'       => [
+                'id'          => $user->id,
+                'name'        => $user->name,
+                'email'       => $user->email,
+                'phone'       => $user->phone,
+                'role'        => $user->role,
+                'last_vet_id' => $hasLastVetIdColumn ? $user->last_vet_id : null,
+            ],
+            // ✅ Array — single ya multiple dono
+            'pets' => array_map(function ($p) {
+                return [
+                    'id'                => $p->id,
+                    'name'              => $p->name,
+                    'type'              => $p->type,
+                    'breed'             => $p->breed,
+                    'pet_doc2_blob_url' => $p->pet_doc2_blob_url ?? null,
+                    'pet_image_url'     => $p->pet_doc2_blob_url ?? $p->pet_doc1 ?? $p->pic_link ?? null,
+                ];
+            }, $pets),
+            // ✅ Backward compat
+            'pet' => $pet ? [
+                'id'                => $pet->id,
+                'name'              => $pet->name,
+                'type'              => $pet->type,
+                'breed'             => $pet->breed,
+                'pet_doc2_blob_url' => $pet->pet_doc2_blob_url ?? null,
+                'pet_image_url'     => $pet->pet_doc2_blob_url ?? $pet->pet_doc1 ?? $pet->pic_link ?? null,
+            ] : null,
+            'consult_session'       => $this->consultSessions->formatForResponse($consultSession),
+            'payment_link_whatsapp' => [
+                'sent'    => false,
+                'skipped' => true,
+                'reason'  => 'awaiting_parent_initiation',
+            ],
+        ],
+    ], 201);
+}
 
     public function sendExistingPatientPaymentLink(Request $request)
     {
