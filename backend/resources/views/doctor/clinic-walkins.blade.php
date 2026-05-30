@@ -246,7 +246,8 @@
     .booking-modal-scroll{flex:1;min-height:0;overflow-y:auto;padding-right:4px}
     .booking-modal-scroll.space-y-4>*+*{margin-top:0.75rem}
     .booking-modal-footer{flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding-top:10px;margin-top:8px;border-top:1px solid #e2e8f0;background:#fff}
-    .booking-modal .patient-results{max-height:140px}
+    .booking-modal .patient-results{min-height:220px;max-height:300px}
+    .booking-modal #existing-patient-section .patient-results{min-height:240px;max-height:320px}
     .booking-modal select,.booking-modal input,.booking-modal textarea{min-height:38px}
     .booking-modal textarea[name="notes"]{min-height:64px}
     .modal-card select{min-height:44px;padding-top:10px;padding-bottom:10px}
@@ -936,7 +937,45 @@ window.PatientStore = (() => {
   function getClinicId() { return CLINIC_ID; }
   function getApiBase()  { return API_BASE; }
 
-  return { load, reload, subscribe, getAll, getClinicId, getApiBase };
+  /** Match patient/pet by name, phone, email, user id, pet id (e.g. "13" matches #1382). */
+  function matchesSearch(patient, query) {
+    const q = String(query ?? '').trim().toLowerCase();
+    if (!q) return true;
+    const qDigits = q.replace(/\D+/g, '');
+
+    const fieldMatches = (value) => {
+      if (value === null || value === undefined || value === '') return false;
+      const text = String(value).toLowerCase();
+      if (text.includes(q)) return true;
+      if (qDigits) {
+        const digits = text.replace(/\D+/g, '');
+        if (digits.includes(qDigits)) return true;
+      }
+      return false;
+    };
+
+    if (
+      fieldMatches(patient?.name) ||
+      fieldMatches(patient?.email) ||
+      fieldMatches(patient?.phone) ||
+      fieldMatches(patient?.id)
+    ) {
+      return true;
+    }
+
+    const pets = Array.isArray(patient?.pets) ? patient.pets : [];
+    return pets.some(pet =>
+      fieldMatches(pet?.name) ||
+      fieldMatches(pet?.pet_name) ||
+      fieldMatches(pet?.breed) ||
+      fieldMatches(pet?.type) ||
+      fieldMatches(pet?.pet_type) ||
+      fieldMatches(pet?.id) ||
+      fieldMatches(pet?.pet_id)
+    );
+  }
+
+  return { load, reload, subscribe, getAll, getClinicId, getApiBase, matchesSearch };
 })();
 </script>
 
@@ -1314,8 +1353,7 @@ window.PatientStore = (() => {
   function applyFilters(list) {
     let f = list.slice();
     if (state.search) {
-      const q = state.search.toLowerCase();
-      f = f.filter(p => (p.name||'').toLowerCase().includes(q)||(p.email||'').toLowerCase().includes(q)||(p.phone||'').toLowerCase().includes(q)||(Array.isArray(p.pets)&&p.pets.some(pet => (pet.name||pet.pet_name||'').toLowerCase().includes(q)||(pet.breed||'').toLowerCase().includes(q))));
+      f = f.filter(p => window.PatientStore.matchesSearch(p, state.search));
     }
     if (state.tagFilters.includes('hasRecords')) f = f.filter(p => (p.records_count||0)>0);
     if (state.tagFilters.includes('noRecords'))  f = f.filter(p => (p.records_count||0)===0);
@@ -1785,13 +1823,7 @@ window.PatientStore = (() => {
 
   function filterPatients(query='') {
     if (!query.trim()) return ALL_PATIENTS;
-    const q = query.toLowerCase();
-    return ALL_PATIENTS.filter(p =>
-      (p.name||'').toLowerCase().includes(q) ||
-      (p.phone||'').toLowerCase().includes(q) ||
-      (p.email||'').toLowerCase().includes(q) ||
-      (Array.isArray(p.pets) && p.pets.some(pet => (pet.name||pet.pet_name||'').toLowerCase().includes(q)))
-    );
+    return ALL_PATIENTS.filter(p => window.PatientStore.matchesSearch(p, query));
   }
 
   function filterAndRenderPatients(query='') {
