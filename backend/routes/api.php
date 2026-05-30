@@ -2997,9 +2997,9 @@ Route::post('groomer/service', [GroomerServiceController::class, 'store']);
 
 Route::get('/clinic-service-presets', [ClinicServicePresetController::class, 'index']);
 Route::post('/clinic-service-presets', [ClinicServicePresetController::class, 'store']);
-Route::post('/clinic-onboarding-extras', [ClinicOnboardingExtrasController::class, 'upsert']);
+Route::match(['post', 'put', 'patch'], '/clinic-onboarding-extras', [ClinicOnboardingExtrasController::class, 'upsert']);
 Route::get('/clinic-specialized-packages', [ClinicSpecializedPackageController::class, 'show']);
-Route::post('/clinic-specialized-packages', [ClinicSpecializedPackageController::class, 'upsert']);
+Route::match(['post', 'put', 'patch'], '/clinic-specialized-packages', [ClinicSpecializedPackageController::class, 'upsert']);
 Route::get('/vet-at-home-services', [VetAtHomeServiceController::class, 'show']);
 Route::post('/vet-at-home-services', [VetAtHomeServiceController::class, 'upsert']);
 
