@@ -76,6 +76,38 @@ class UserLookupByPhoneApiTest extends TestCase
             ->assertJsonPath('data.pets.1.name', 'Bruno');
     }
 
+    public function test_user_lookup_by_phone_matches_indian_country_code_and_plain_ten_digit_number(): void
+    {
+        DB::table('users')->insert([
+            'id' => 20,
+            'name' => 'Local Parent',
+            'phone' => '8602180052',
+            'email' => 'local@example.com',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 60,
+            'user_id' => 20,
+            'name' => 'Sheru',
+            'breed' => 'Indie',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $withCountryCode = $this->getJson('/api/users/by-phone?phone=918602180052');
+        $plainTenDigit = $this->getJson('/api/users/by-phone?phone=8602180052');
+
+        $withCountryCode->assertOk()
+            ->assertJsonPath('data.user.id', 20)
+            ->assertJsonPath('data.pets.0.id', 60);
+
+        $plainTenDigit->assertOk()
+            ->assertJsonPath('data.user.id', 20)
+            ->assertJsonPath('data.pets.0.id', 60);
+    }
+
     public function test_user_lookup_by_phone_returns_not_found_when_phone_does_not_exist(): void
     {
         $response = $this->getJson('/api/users/by-phone?phone=9000000000');

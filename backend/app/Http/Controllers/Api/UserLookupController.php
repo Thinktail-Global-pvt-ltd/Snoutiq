@@ -27,7 +27,8 @@ class UserLookupController extends Controller
             ], 422);
         }
 
-        $user = $this->findUserByPhone($phone, $digits);
+        $phoneVariants = $this->phoneVariants($digits);
+        $user = $this->findUserByPhone($phone, $phoneVariants);
 
         if (! $user) {
             return response()->json([
@@ -51,11 +52,11 @@ class UserLookupController extends Controller
         ]);
     }
 
-    private function findUserByPhone(string $phone, string $digits): ?User
+    private function findUserByPhone(string $phone, array $phoneVariants): ?User
     {
         $user = User::query()
             ->where('phone', $phone)
-            ->orWhere('phone', $digits)
+            ->orWhereIn('phone', $phoneVariants)
             ->first();
 
         if ($user) {
@@ -65,18 +66,36 @@ class UserLookupController extends Controller
         $driver = DB::connection()->getDriverName();
         if (in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)) {
             return User::query()
-                ->whereRaw("REGEXP_REPLACE(phone, '[^0-9]', '') = ?", [$digits])
+                ->whereIn(DB::raw("REGEXP_REPLACE(phone, '[^0-9]', '')"), $phoneVariants)
                 ->first();
         }
 
         return User::query()
             ->whereNotNull('phone')
             ->get()
-            ->first(fn (User $candidate) => $this->normalizePhone($candidate->phone) === $digits);
+            ->first(fn (User $candidate) => count(array_intersect(
+                $this->phoneVariants($this->normalizePhone($candidate->phone)),
+                $phoneVariants
+            )) > 0);
     }
 
     private function normalizePhone(?string $phone): string
     {
         return preg_replace('/\D+/', '', (string) $phone) ?: '';
+    }
+
+    private function phoneVariants(string $digits): array
+    {
+        $variants = [$digits];
+
+        if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
+            $variants[] = substr($digits, 2);
+        }
+
+        if (strlen($digits) === 10) {
+            $variants[] = '91'.$digits;
+        }
+
+        return array_values(array_unique($variants));
     }
 }
