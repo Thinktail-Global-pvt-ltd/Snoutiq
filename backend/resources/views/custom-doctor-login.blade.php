@@ -670,7 +670,7 @@
   const POST_LOGIN_REDIRECT = IS_LOCAL
     ? `${ORIGIN}/dashboard/services?open=create&onboarding=1&step=1`
     : `${ORIGIN}/backend/dashboard/services?open=create&onboarding=1&step=1`;
-  const RECEPTIONIST_REDIRECT = `${WEB_BASE}/receptionist/front-desk`;
+  const RECEPTIONIST_REDIRECT = `${WEB_BASE}/receptionist/clinic-walkins`;
 
   const ROUTES = {
     login:        `${API_BASE}/auth/role-login`,
