@@ -21,7 +21,6 @@
       data_get(session('auth_full'), 'user.vet_registeration_id'),
   ];
 
-  // For receptionists, keep clinic context (avoid overriding with their own user_id)
   if (!in_array($sessionRole, ['doctor', 'receptionist'], true)) {
       array_unshift(
           $clinicCandidates,
@@ -32,14 +31,9 @@
 
   $resolvedClinicId = null;
   foreach ($clinicCandidates as $candidate) {
-      if ($candidate === null || $candidate === '') {
-          continue;
-      }
+      if ($candidate === null || $candidate === '') continue;
       $num = (int) $candidate;
-      if ($num > 0) {
-          $resolvedClinicId = $num;
-          break;
-      }
+      if ($num > 0) { $resolvedClinicId = $num; break; }
   }
 
   $sessionDoctorId = session('doctor_id')
@@ -48,7 +42,6 @@
       ?? data_get(session('auth_full'), 'user.doctor_id')
       ?? ($sessionRole === 'doctor' ? (session('user_id') ?? data_get(session('user'), 'id')) : null);
 
-  // Receptionist: fallback to clinic from receptionist record when session misses it
   if (!$resolvedClinicId && $sessionRole === 'receptionist') {
       $receptionistId = session('receptionist_id')
           ?? data_get(session('auth_full'), 'receptionist_id')
@@ -188,7 +181,6 @@
     .meds-preview{background:#f1f5f9;border-radius:10px;padding:8px 10px;font-size:12px;color:#0f172a;margin-top:6px}
     .meds-remove{color:#b91c1c;border:1px solid #fecdd3;background:#fff1f2;padding:6px 10px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;margin-top:8px}
     .meds-empty{font-size:12px;color:#94a3b8;margin-bottom:6px}
-    /* Post-visit UI refresh */
     .pv-shell{--pv-primary:#2563eb;--pv-primary-dark:#1e40af;--pv-bg:#f8fafc;--pv-card:#ffffff;--pv-text:#0f172a;--pv-muted:#64748b;--pv-border:#e2e8f0;--pv-radius:12px;--pv-shadow:0 10px 18px rgba(15,23,42,0.06);background:var(--pv-bg);color:var(--pv-text);font-family:'DM Sans','Inter',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
     .pv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
     .pv-overline{font-size:13px;font-weight:700;color:var(--pv-primary);letter-spacing:.01em}
@@ -227,18 +219,7 @@
     .meds-hidden-text{display:none}
     .record-critical{display:block}
     .record-critical.is-visible{display:block}
-    .record-actions{
-      display:flex;
-      justify-content:flex-end;
-      gap:10px;
-      margin-top:12px;
-      position:sticky;
-      bottom:0;
-      background:#fff;
-      padding-top:10px;
-      padding-bottom:6px;
-      border-top:1px solid #e5e7eb;
-    }
+    .record-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px;position:sticky;bottom:0;background:#fff;padding-top:10px;padding-bottom:6px;border-top:1px solid #e5e7eb;}
     .pm-petList{display:flex;flex-direction:column;gap:10px}
     .pm-petRow{display:flex;align-items:flex-start;gap:10px;padding:10px;border-radius:12px;border:1px solid #eef6ff;background:#f8fafc}
     .pm-petAvatar{width:40px;height:40px;border-radius:10px;background:#e0e7ff;color:#1f2937;font-weight:800;display:flex;align-items:center;justify-content:center}
@@ -250,18 +231,9 @@
     .pm-petDelete:hover{background:#fee2e2}
     .pm-petDelete:disabled{opacity:.5;cursor:not-allowed}
     .pm-pill{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700;background:#eef2ff;color:#4338ca;border:1px solid #e0e7ff;margin-right:6px}
-    /* Make long filenames/notes wrap so content fits without horizontal scroll */
-    .pm-records,
-    .pm-card,
-    .pm-right{
-      overflow-x: visible;
-    }
+    .pm-records,.pm-card,.pm-right{overflow-x:visible}
     .pm-record-head{flex-wrap:wrap}
-    .pm-record-title,
-    .pm-record-notes{
-      word-break: break-word;
-      white-space: normal;
-    }
+    .pm-record-title,.pm-record-notes{word-break:break-word;white-space:normal}
     .pm-small{font-size:13px;color:var(--pm-muted)}
     @media (max-width:1100px){.pm-content{grid-template-columns:1fr}.pm-left,.pm-right{min-height:unset}.pm-profileHeader{flex-direction:column;align-items:flex-start}.pm-actions{width:100%;justify-content:flex-start}}
     .modal-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:center;justify-content:center;padding:0;z-index:70}
@@ -280,7 +252,7 @@
     .modal-tabs{margin-top:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .tab-button{padding:0.45rem 1.1rem;border-radius:999px;font-size:0.9rem;font-weight:600;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;cursor:pointer;transition:background .2s,color .2s,border-color .2s}
     .tab-button.active{background:#0f766e;color:#fff;border-color:#0f766e}
-    .patient-results{display:flex;flex-direction:column;gap:10px;margin-top:10px;max-height:220px;overflow-y:auto;padding-right:4px}
+    .patient-results{display:flex;flex-direction:column;gap:10px;margin-top:10px;max-height:260px;overflow-y:auto;padding-right:4px}
     .patient-result{border:1px solid #e2e8f0;background:#fff;border-radius:16px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;cursor:pointer;transition:border-color .2s,box-shadow .2s}
     .patient-result.is-selected{border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,0.12)}
     .patient-result-name{font-weight:700;color:#0f172a}
@@ -289,83 +261,27 @@
     .patient-result-tag{font-size:11px;font-weight:700;border-radius:999px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;padding:2px 8px}
     .patient-result-action{font-weight:700;color:#2563eb;background:none;border:none;cursor:pointer}
     .patient-results-empty{font-size:12px;color:#94a3b8;padding:6px 4px}
-    .modal-card form .space-y-4>* + *{margin-top:1rem}
-    .pm-shell{
-      --pm-bg:#f8fafc;
-      --pm-panel:rgba(255,255,255,0.92);
-      --pm-muted:#64748b;
-      --pm-blue:#0f766e;
-      --pm-purple:#38bdf8;
-      --pm-green:#10b981;
-      --pm-orange:#f97316;
-      --pm-radius:20px;
-      --pm-shadow:0 18px 44px rgba(15,23,42,0.1);
-      background:linear-gradient(180deg,#f8fafc 0%, #eef6ff 100%);
-      border-radius:26px;
-      padding:22px;
-      position:relative;
-      overflow:hidden;
-    }
-    .pm-shell::before{
-      content:"";
-      position:absolute;
-      top:-120px;
-      right:-80px;
-      width:320px;
-      height:320px;
-      border-radius:999px;
-      background:radial-gradient(circle at top, rgba(56,189,248,0.22), rgba(255,255,255,0));
-      pointer-events:none;
-    }
-    .pm-shell::after{
-      content:"";
-      position:absolute;
-      bottom:-140px;
-      left:-120px;
-      width:300px;
-      height:300px;
-      border-radius:999px;
-      background:radial-gradient(circle at top, rgba(15,118,110,0.18), rgba(255,255,255,0));
-      pointer-events:none;
-    }
-    .pm-shell > *{position:relative;z-index:1}
-    .pm-header{
-      background:var(--pm-panel);
-      padding:18px 20px;
-      border-radius:22px;
-      border:1px solid rgba(148,163,184,0.2);
-      box-shadow:var(--pm-shadow);
-      margin-bottom:16px;
-    }
+    .modal-card form .space-y-4>*+*{margin-top:1rem}
+    /* Themed overrides */
+    .pm-shell{--pm-bg:#f8fafc;--pm-panel:rgba(255,255,255,0.92);--pm-muted:#64748b;--pm-blue:#0f766e;--pm-purple:#38bdf8;--pm-green:#10b981;--pm-orange:#f97316;--pm-radius:20px;--pm-shadow:0 18px 44px rgba(15,23,42,0.1);background:linear-gradient(180deg,#f8fafc 0%,#eef6ff 100%);border-radius:26px;padding:22px;position:relative;overflow:hidden;}
+    .pm-shell::before{content:"";position:absolute;top:-120px;right:-80px;width:320px;height:320px;border-radius:999px;background:radial-gradient(circle at top,rgba(56,189,248,0.22),rgba(255,255,255,0));pointer-events:none;}
+    .pm-shell::after{content:"";position:absolute;bottom:-140px;left:-120px;width:300px;height:300px;border-radius:999px;background:radial-gradient(circle at top,rgba(15,118,110,0.18),rgba(255,255,255,0));pointer-events:none;}
+    .pm-shell>*{position:relative;z-index:1}
+    .pm-header{background:var(--pm-panel);padding:18px 20px;border-radius:22px;border:1px solid rgba(148,163,184,0.2);box-shadow:var(--pm-shadow);margin-bottom:16px;}
     .pm-title{color:#0f172a}
     .pm-subtitle{color:var(--pm-muted)}
-    .pm-btn.pm-primary{
-      background:linear-gradient(135deg,#0f766e,#38bdf8);
-      box-shadow:0 12px 24px rgba(15,118,110,0.18);
-    }
+    .pm-btn.pm-primary{background:linear-gradient(135deg,#0f766e,#38bdf8);box-shadow:0 12px 24px rgba(15,118,110,0.18);}
     .pm-btn.pm-ghost{border:1px solid #e2e8f0;color:#0f172a}
     .pm-chip{background:#ccfbf1;color:#0f766e}
-    .pm-left,.pm-right{
-      background:var(--pm-panel);
-      border:1px solid rgba(148,163,184,0.18);
-      border-radius:22px;
-    }
+    .pm-left,.pm-right{background:var(--pm-panel);border:1px solid rgba(148,163,184,0.18);border-radius:22px;}
     .pm-input{background:#f8fafc;border:1px solid #e2e8f0}
     .pm-tag.is-active{background:#0f766e;border-color:#0f766e}
     .pm-row.is-active{border-color:#14b8a6;background:#f0fdfa}
     .pm-avatar{background:#ecfeff;color:#0f766e}
     .pm-avatar-large{background:#f8fafc;border-color:#e2e8f0}
     .pm-badge{background:#ecfeff;color:#0f766e;border:1px solid #99f6e4}
-    .pm-card{
-      background:linear-gradient(145deg,rgba(15,118,110,0.1),rgba(56,189,248,0.08));
-      border-color:rgba(15,118,110,0.18);
-      box-shadow:0 14px 32px rgba(15,118,110,0.12);
-    }
-    .pm-record{
-      background:#ffffff;
-      border-color:rgba(15,118,110,0.2);
-      box-shadow:0 14px 26px rgba(15,118,110,0.12);
-    }
+    .pm-card{background:linear-gradient(145deg,rgba(15,118,110,0.1),rgba(56,189,248,0.08));border-color:rgba(15,118,110,0.18);box-shadow:0 14px 32px rgba(15,118,110,0.12);}
+    .pm-record{background:#ffffff;border-color:rgba(15,118,110,0.2);box-shadow:0 14px 26px rgba(15,118,110,0.12);}
     .pm-record-notes{background:#f8fafc}
     .pm-tag-soft{border-color:rgba(15,118,110,0.3);background:rgba(15,118,110,0.12);color:#0f766e}
     .pm-record-row{border-color:#dbeafe;background:#f8fafc}
@@ -383,24 +299,12 @@
     .cw-brand{display:flex;flex-direction:column;gap:2px;min-width:160px}
     .cw-brand-title{font-size:18px;font-weight:700;color:#0f766e}
     .cw-brand-date{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#94a3b8;font-weight:600}
-    .cw-search{position:relative;flex:1;min-width:220px;max-width:520px}
-    .cw-search-input{width:100%;border-radius:999px;border:1px solid #e2e8f0;background:#f8fafc;padding:10px 14px 10px 40px;font-size:14px;color:#0f172a;outline:none}
-    .cw-search-input:focus{border-color:#5eead4;box-shadow:0 0 0 3px rgba(45,212,191,0.25)}
-    .cw-search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#94a3b8}
-    .cw-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .cw-primary-btn{display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border-radius:999px;border:none;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-weight:700;cursor:pointer;box-shadow:0 12px 24px rgba(15,118,110,0.18)}
-    .cw-primary-btn:active{transform:scale(0.98)}
-    .cw-plus{font-size:18px;line-height:1}
-    .cw-icon-btn{width:40px;height:40px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;display:flex;align-items:center;justify-content:center;position:relative;color:#475569}
-    .cw-dot{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:999px;background:#f87171;border:2px solid #fff}
-    .cw-divider{width:1px;height:28px;background:#e2e8f0}
-    .cw-avatar{width:36px;height:36px;border-radius:999px;background:#ccfbf1;color:#0f766e;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:12px}
     .cw-hero{margin-top:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .cw-hero-title{font-size:32px;font-weight:300;color:#94a3b8}
     .cw-hero-title span{font-weight:700;color:#0f172a;font-style:italic}
     .cw-hero-sub{margin-top:6px;color:#64748b;font-size:14px}
     .cw-tiles{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
-    .cw-tile{background:#fff;border-radius:20px;border:1px solid #e2e8f0;padding:18px;display:flex;gap:14px;align-items:flex-start;text-align:left;transition:transform .2s ease, box-shadow .2s ease;cursor:pointer}
+    .cw-tile{background:#fff;border-radius:20px;border:1px solid #e2e8f0;padding:18px;display:flex;gap:14px;align-items:flex-start;text-align:left;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer}
     .cw-tile:hover{transform:translateY(-2px);box-shadow:0 16px 30px rgba(15,23,42,0.08)}
     .cw-tile-icon{width:44px;height:44px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;border:1px solid #e2e8f0;color:#0f766e}
     .cw-tile-icon svg{width:22px;height:22px}
@@ -410,46 +314,13 @@
     .cw-tile.mint .cw-tile-icon{border-color:#99f6e4;color:#0f766e}
     .cw-tile.sky{background:#eff6ff;border-color:#bfdbfe}
     .cw-tile.sky .cw-tile-icon{border-color:#bfdbfe;color:#2563eb}
-    .cw-tile.sun{background:#fff7ed;border-color:#fed7aa}
-    .cw-tile.sun .cw-tile-icon{border-color:#fed7aa;color:#f97316}
-    .cw-tile.lilac{background:#f5f3ff;border-color:#ddd6fe}
-    .cw-tile.lilac .cw-tile-icon{border-color:#ddd6fe;color:#7c3aed}
-    .cw-slots{margin-top:20px;background:var(--pm-panel);border:1px solid #e2e8f0;border-radius:22px;padding:18px;box-shadow:var(--pm-shadow)}
-    .cw-slots-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-    .cw-slots-title{font-size:18px;font-weight:700;color:#0f172a}
-    .cw-slots-sub{font-size:12px;color:#64748b;margin-top:4px}
-    .cw-slots-stats{display:flex;align-items:center;gap:14px;font-size:13px;color:#475569;font-weight:600;flex-wrap:wrap}
-    .cw-stat-dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
-    .cw-stat-dot.available{background:#22c55e}
-    .cw-stat-dot.booked{background:#3b82f6}
-    .cw-stat-dot.inclinic{background:#ef4444}
-    .cw-secondary-btn{padding:8px 14px;border-radius:999px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:700;color:#475569}
-    .cw-slots-bar{margin-top:14px;display:grid;grid-template-columns:repeat(16,1fr);gap:6px}
-    .cw-slot{height:8px;border-radius:999px;background:#d1fae5}
-    .cw-slot.booked{background:#93c5fd}
-    .cw-slot.inclinic{background:#fca5a5}
-    .cw-queue{margin-top:20px;background:var(--pm-panel);border:1px solid #e2e8f0;border-radius:22px;padding:18px;box-shadow:var(--pm-shadow)}
-    .cw-queue-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-    .cw-queue-title{font-size:18px;font-weight:700;color:#0f172a}
-    .cw-queue-pill{padding:6px 12px;border-radius:999px;background:#f1f5f9;font-size:12px;font-weight:700;color:#475569}
-    .cw-queue-table{margin-top:12px}
-    .cw-queue-row{display:grid;grid-template-columns:2fr 2fr 1fr 1fr;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #e2e8f0;font-size:14px}
-    .cw-queue-row.header{font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#94a3b8;font-weight:700}
-    .cw-queue-name{font-weight:700;color:#0f172a}
-    .cw-queue-sub{font-size:12px;color:#94a3b8}
-    .cw-status{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
-    .cw-status.waiting{background:#fef3c7;color:#b45309}
-    .cw-status.doctor{background:#e0f2fe;color:#0369a1}
-    .cw-queue-action{background:none;border:none;color:#0f766e;font-weight:700;cursor:pointer}
-    @media (max-width:900px){
-      .cw-queue-row{grid-template-columns:1.4fr 1.4fr 1fr;grid-auto-rows:auto}
-      .cw-queue-row div:last-child{grid-column:1 / -1}
-    }
     @keyframes pmFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
     .pm-row,.pm-record,.pm-petRow{animation:pmFadeUp .4s ease both}
-    @media (prefers-reduced-motion: reduce){
-      .pm-row,.pm-record,.pm-petRow{animation:none}
-    }
+    @media (prefers-reduced-motion:reduce){.pm-row,.pm-record,.pm-petRow{animation:none}}
+    /* Booking modal patient search loading state */
+    .booking-patients-loading{display:flex;align-items:center;gap:8px;padding:10px 4px;font-size:13px;color:#64748b}
+    .booking-patients-loading::before{content:"";width:16px;height:16px;border:2px solid #e2e8f0;border-top-color:#0f766e;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+    @keyframes spin{to{transform:rotate(360deg)}}
   </style>
 @endsection
 
@@ -498,12 +369,10 @@
       <div class="pm-title">Walk-in Patients</div>
       <div class="pm-subtitle">Patient list, pet profiles, and medical documents</div>
     </div>
-    <div class="pm-controls">
-    </div>
+    <div class="pm-controls"></div>
   </div>
 
   <div class="pm-content">
-    </div>
     <div class="pm-left">
       <div class="pm-searchRow">
         <input id="pm-search" class="pm-input" type="search" placeholder="Search patient, pet, phone...">
@@ -574,9 +443,9 @@
       </div>
     </div>
   </div>
-  </div>
 </div>
 
+{{-- ==================== BOOKING MODAL ==================== --}}
 <div id="booking-modal" class="modal-overlay" hidden aria-hidden="true">
   <div class="modal-card">
     <div class="flex items-center justify-between">
@@ -597,15 +466,19 @@
         <label class="block text-sm font-semibold mb-1">What happened?</label>
         <textarea name="notes" rows="3" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500" placeholder="Share the reason or context for this visit"></textarea>
       </div>
+
+      {{-- EXISTING PATIENT SECTION --}}
       <div id="existing-patient-section" class="space-y-4">
         <div>
           <label class="block text-sm font-semibold mb-1">Patient</label>
           <div class="flex flex-col gap-2">
             <div id="patient-search-block" class="flex flex-col gap-2">
-              <input id="patient-search" type="text" placeholder="Search by name or mobile number..." class="bg-slate-50 rounded-lg px-3 py-2 text-sm border border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500">
+              <input id="patient-search" type="text" placeholder="Search by name or mobile number..."
+                class="bg-slate-50 rounded-lg px-3 py-2 text-sm border border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500">
               <div id="patient-results" class="patient-results"></div>
             </div>
-            <select id="patient-select" name="patient_id" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500"></select>
+            {{-- Hidden select kept for form value compatibility --}}
+            <select id="patient-select" name="patient_id" class="hidden"></select>
           </div>
         </div>
         <div id="existing-patient-details" class="space-y-4 hidden">
@@ -638,6 +511,7 @@
       </div>
 
       <div id="booking-submit-fields" class="space-y-4">
+        {{-- NEW PATIENT SECTION --}}
         <div id="new-patient-section" class="hidden space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
@@ -670,7 +544,7 @@
             </div>
             <div>
               <label class="block text-sm font-semibold mb-1">Gender</label>
-              <input name="new_pet_gender" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+              <input name="new_pet_gender" type="text" placeholder="Male/Female" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
             </div>
           </div>
           <p class="text-xs text-slate-500">Provide at least a phone number or email for the patient, and pet details so we can attach the booking.</p>
@@ -701,9 +575,7 @@
             <select name="scheduled_time" id="slot-select" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
               <option value="">Select a time slot</option>
             </select>
-            <p id="slot-hint" class="text-xs text-slate-500 mt-1">
-              Select a doctor and date first to load available slots.
-            </p>
+            <p id="slot-hint" class="text-xs text-slate-500 mt-1">Select a doctor and date first to load available slots.</p>
           </div>
         </div>
 
@@ -716,6 +588,7 @@
   </div>
 </div>
 
+{{-- ==================== PET MODAL ==================== --}}
 <div id="pet-modal" class="pm-overlay">
   <div class="pm-modal" role="dialog" aria-modal="true">
     <div class="record-header">
@@ -765,6 +638,7 @@
   </div>
 </div>
 
+{{-- ==================== RECORD MODAL ==================== --}}
 <div class="pm-overlay" id="record-modal">
   <div class="pm-modal record-modal pv-shell" role="dialog" aria-modal="true">
     <div class="pv-header">
@@ -788,9 +662,7 @@
 
       <div class="pv-card pv-context" id="pv-followup-context" style="display:none">
         <div class="pv-context-head">
-          <div class="pv-context-title">
-            <span>Previous consultation snapshot</span>
-          </div>
+          <div class="pv-context-title"><span>Previous consultation snapshot</span></div>
           <div class="pv-context-meta" id="pv-followup-context-meta"></div>
         </div>
         <div class="pv-context-grid" id="pv-followup-context-body"></div>
@@ -898,13 +770,13 @@
           <div class="meds-head">
             <div>
               <div class="pv-label" style="margin-bottom:2px">Medicines (structured)</div>
-              <div class="meds-hint">Type medicine name → choose frequency & timing → set dosage and duration. Data is saved for each medicine.</div>
+              <div class="meds-hint">Type medicine name → choose frequency &amp; timing → set dosage and duration.</div>
             </div>
             <button class="meds-add pm-btn pm-primary" type="button" data-role="add-medicine">+ Add medicine</button>
           </div>
           <input type="hidden" id="medications-json" name="medications_json">
           <textarea id="medicines-text" name="medicines" class="pv-input pv-textarea meds-hidden-text" style="display:none"></textarea>
-          <div id="medications-empty" class="meds-empty">No medicines added yet. Click “Add medicine”.</div>
+          <div id="medications-empty" class="meds-empty">No medicines added yet. Click "Add medicine".</div>
           <div id="medications-list" class="meds-list"></div>
         </div>
         <div class="pv-field">
@@ -948,12 +820,81 @@
 
 <script src="{{ url('vertical/assets/js/jquery.min.js') }}"></script>
 <script src="{{ url('vertical/assets/plugins/select2/js/select2.min.js') }}"></script>
+
+{{-- ==================== SHARED PATIENT STORE ==================== --}}
 <script>
-(() => {
-  const ORIGIN = window.location.origin;
+/**
+ * PatientStore — single source of truth for patients loaded from
+ * GET /api/clinics/{CLINIC_ID}/patients
+ * Both the walk-in list and the booking modal subscribe to this.
+ */
+window.PatientStore = (() => {
+  const ORIGIN  = window.location.origin;
   const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(location.hostname);
   const API_BASE = IS_LOCAL ? `${ORIGIN}/api` : `${ORIGIN}/backend/api`;
   const CLINIC_ID = Number(@json($resolvedClinicId ?? null)) || null;
+
+  let _patients  = [];
+  let _loading   = false;
+  let _loaded    = false;
+  let _error     = null;
+  const _listeners = [];
+
+  function notify() {
+    _listeners.forEach(fn => fn({ patients: _patients, loading: _loading, loaded: _loaded, error: _error }));
+  }
+
+  async function load(force = false) {
+    if (!CLINIC_ID) return;
+    if (_loading) return;
+    if (_loaded && !force) { notify(); return; }
+    _loading = true;
+    _error   = null;
+    notify();
+    try {
+      const res  = await fetch(`${API_BASE}/clinics/${CLINIC_ID}/patients`, {
+        headers: { Accept: 'application/json' },
+      });
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (_) {}
+      if (!res.ok) throw new Error(data?.message || data?.error || 'Failed to load patients');
+      _patients = Array.isArray(data?.patients) ? data.patients : [];
+      _loaded   = true;
+    } catch (err) {
+      _error    = err.message || 'Unknown error';
+      _patients = [];
+    } finally {
+      _loading = false;
+      notify();
+    }
+  }
+
+  /** Force-reload (e.g. after adding a patient/pet) */
+  function reload() { return load(true); }
+
+  /** Subscribe: fn({ patients, loading, loaded, error }) */
+  function subscribe(fn) {
+    _listeners.push(fn);
+    // Immediately deliver current state if already loaded
+    if (_loaded || _error) {
+      fn({ patients: _patients, loading: _loading, loaded: _loaded, error: _error });
+    }
+  }
+
+  function getAll()    { return _patients; }
+  function getClinicId() { return CLINIC_ID; }
+  function getApiBase()  { return API_BASE; }
+
+  return { load, reload, subscribe, getAll, getClinicId, getApiBase };
+})();
+</script>
+
+{{-- ==================== WALK-IN LIST MODULE ==================== --}}
+<script>
+(() => {
+  const API_BASE   = window.PatientStore.getApiBase();
+  const CLINIC_ID  = window.PatientStore.getClinicId();
   const DEFAULT_DOCTOR_ID = Number(@json($sessionDoctorId ?? null)) || null;
 
   const state = {
@@ -971,112 +912,94 @@
 
   const TAGS = [
     { id: 'hasRecords', label: 'Has records' },
-    { id: 'noRecords', label: 'No records' },
-    { id: 'recent', label: 'Updated recently' },
+    { id: 'noRecords',  label: 'No records'  },
+    { id: 'recent',     label: 'Updated recently' },
   ];
 
   const els = {
-    search: document.getElementById('pm-search'),
-    sort: document.getElementById('pm-sort'),
-    tagFilters: document.getElementById('pm-tag-filters'),
-    list: document.getElementById('pm-list'),
-    listCount: document.getElementById('pm-list-count'),
-    loading: document.getElementById('pm-loading'),
-    profileAvatar: document.getElementById('pm-profile-avatar'),
-    profileName: document.getElementById('pm-profile-name'),
-    profileSub: document.getElementById('pm-profile-sub'),
-    profileMeta: document.getElementById('pm-profile-meta'),
-    statRecords: document.getElementById('pm-stat-records'),
-    statLastRecord: document.getElementById('pm-stat-last-record'),
-    statContact: document.getElementById('pm-stat-contact'),
-    statEmail: document.getElementById('pm-stat-email'),
-    recordCount: document.getElementById('pm-record-count'),
-    recordEmpty: document.getElementById('pm-records-empty'),
-    recordList: document.getElementById('pm-records-list'),
-    petCount: document.getElementById('pm-pet-count'),
-    petEmpty: document.getElementById('pm-pets-empty'),
-    petList: document.getElementById('pm-pets-list'),
+    search:              document.getElementById('pm-search'),
+    sort:                document.getElementById('pm-sort'),
+    tagFilters:          document.getElementById('pm-tag-filters'),
+    list:                document.getElementById('pm-list'),
+    listCount:           document.getElementById('pm-list-count'),
+    profileAvatar:       document.getElementById('pm-profile-avatar'),
+    profileName:         document.getElementById('pm-profile-name'),
+    profileSub:          document.getElementById('pm-profile-sub'),
+    profileMeta:         document.getElementById('pm-profile-meta'),
+    statRecords:         document.getElementById('pm-stat-records'),
+    statLastRecord:      document.getElementById('pm-stat-last-record'),
+    statContact:         document.getElementById('pm-stat-contact'),
+    statEmail:           document.getElementById('pm-stat-email'),
+    recordCount:         document.getElementById('pm-record-count'),
+    recordEmpty:         document.getElementById('pm-records-empty'),
+    recordList:          document.getElementById('pm-records-list'),
+    petCount:            document.getElementById('pm-pet-count'),
+    petEmpty:            document.getElementById('pm-pets-empty'),
+    petList:             document.getElementById('pm-pets-list'),
     followupContextCard: document.getElementById('pv-followup-context'),
     followupContextBody: document.getElementById('pv-followup-context-body'),
     followupContextMeta: document.getElementById('pv-followup-context-meta'),
-    refreshBtn: document.getElementById('pm-refresh'),
-    refreshProfile: document.getElementById('pm-refresh-profile'),
-    openUploadBtns: Array.from(document.querySelectorAll('[data-role="open-upload"]')),
-    openPetBtns: Array.from(document.querySelectorAll('[data-role="open-pet"]')),
-    modal: document.getElementById('record-modal'),
-    modalPatient: document.getElementById('record-modal-patient'),
-    modalPet: document.getElementById('record-modal-pet'),
-    modalUserInput: document.getElementById('record-user-id'),
-    recordForm: document.getElementById('record-form'),
-    doctorSelect: document.getElementById('doctor-select'),
-    recordPet: document.getElementById('record-pet'),
-    recordNotes: document.getElementById('record-notes'),
-    medicationsList: document.getElementById('medications-list'),
-    medicationsEmpty: document.getElementById('medications-empty'),
-    medicationsJson: document.getElementById('medications-json'),
-    medicinesText: document.getElementById('medicines-text'),
-    addMedicineBtn: document.querySelector('[data-role="add-medicine"]'),
-    visitCategory: document.getElementById('visit-category'),
-    clinicalCard: document.getElementById('pv-clinical-card'),
-    diagnosisCard: document.getElementById('pv-diagnosis-card'),
-    treatmentCard: document.getElementById('pv-treatment-card'),
-    followupCard: document.getElementById('pv-followup-card'),
-    notesCard: document.getElementById('pv-notes-card'),
-    caseSeverity: document.getElementById('case-severity'),
-    criticalSections: Array.from(document.querySelectorAll('[data-critical]')),
-    petModal: document.getElementById('pet-modal'),
-    petForm: document.getElementById('pet-form'),
-    petPatient: document.getElementById('pet-modal-patient'),
-    petUserInput: document.getElementById('pet-user-id'),
+    openUploadBtns:      Array.from(document.querySelectorAll('[data-role="open-upload"]')),
+    openPetBtns:         Array.from(document.querySelectorAll('[data-role="open-pet"]')),
+    modal:               document.getElementById('record-modal'),
+    modalPatient:        document.getElementById('record-modal-patient'),
+    modalPet:            document.getElementById('record-modal-pet'),
+    modalUserInput:      document.getElementById('record-user-id'),
+    recordForm:          document.getElementById('record-form'),
+    doctorSelect:        document.getElementById('doctor-select'),
+    recordPet:           document.getElementById('record-pet'),
+    recordNotes:         document.getElementById('record-notes'),
+    medicationsList:     document.getElementById('medications-list'),
+    medicationsEmpty:    document.getElementById('medications-empty'),
+    medicationsJson:     document.getElementById('medications-json'),
+    medicinesText:       document.getElementById('medicines-text'),
+    addMedicineBtn:      document.querySelector('[data-role="add-medicine"]'),
+    visitCategory:       document.getElementById('visit-category'),
+    clinicalCard:        document.getElementById('pv-clinical-card'),
+    diagnosisCard:       document.getElementById('pv-diagnosis-card'),
+    treatmentCard:       document.getElementById('pv-treatment-card'),
+    followupCard:        document.getElementById('pv-followup-card'),
+    caseSeverity:        document.getElementById('case-severity'),
+    criticalSections:    Array.from(document.querySelectorAll('[data-critical]')),
+    petModal:            document.getElementById('pet-modal'),
+    petForm:             document.getElementById('pet-form'),
+    petPatient:          document.getElementById('pet-modal-patient'),
+    petUserInput:        document.getElementById('pet-user-id'),
   };
 
   let lastRecordError = null;
 
+  /* ---- MEDICATION helpers (unchanged from original) ---- */
   const MED_FREQUENCIES = [
     { value: 'OD (Once daily)', label: 'OD (Once daily)' },
     { value: 'BD (Twice daily)', label: 'BD (Twice daily)' },
-    { value: 'TDS (3 times)', label: 'TDS (3 times)' },
-    { value: 'QID (4 times)', label: 'QID (4 times)' },
+    { value: 'TDS (3 times)',    label: 'TDS (3 times)'    },
+    { value: 'QID (4 times)',    label: 'QID (4 times)'    },
   ];
   const MED_TIMINGS = [
-    { value: 'Morning', label: 'Morning' },
+    { value: 'Morning',   label: 'Morning'   },
     { value: 'Afternoon', label: 'Afternoon' },
-    { value: 'Evening', label: 'Evening' },
-    { value: 'Night', label: 'Night' },
+    { value: 'Evening',   label: 'Evening'   },
+    { value: 'Night',     label: 'Night'     },
   ];
   const MED_FOOD = [
     { value: 'Before food (AC)', label: 'Before food (AC)' },
-    { value: 'After food (PC)', label: 'After food (PC)' },
-    { value: 'With food', label: 'With food' },
-    { value: 'Empty stomach', label: 'Empty stomach' },
+    { value: 'After food (PC)',  label: 'After food (PC)'  },
+    { value: 'With food',        label: 'With food'        },
+    { value: 'Empty stomach',    label: 'Empty stomach'    },
   ];
   let medications = [];
 
-  const cleanTimings = (value) => Array.isArray(value)
-    ? Array.from(new Set(value.map((t) => t && t.toString().trim()).filter(Boolean)))
-    : [];
-
-  function newMedication(initial = {}) {
-    return {
-      name: '',
-      dose: '',
-      frequency: '',
-      duration: '',
-      route: '',
-      notes: '',
-      timings: [],
-      food_relation: '',
-      ...initial,
-    };
-  }
+  const cleanTimings = v => Array.isArray(v) ? Array.from(new Set(v.map(t => t && t.toString().trim()).filter(Boolean))) : [];
+  const newMedication = (init = {}) => ({ name:'', dose:'', frequency:'', duration:'', route:'', notes:'', timings:[], food_relation:'', ...init });
 
   function medPreviewLine(med) {
     const parts = [];
     if (med.name) parts.push(med.name);
     if (med.dose) parts.push(med.dose);
     if (med.frequency) parts.push(med.frequency);
-    const timings = cleanTimings(med.timings);
-    if (timings.length) parts.push(`Timing: ${timings.join(', ')}`);
+    const t = cleanTimings(med.timings);
+    if (t.length) parts.push(`Timing: ${t.join(', ')}`);
     if (med.food_relation) parts.push(med.food_relation);
     if (med.duration) parts.push(`Duration: ${med.duration}`);
     if (med.notes) parts.push(`Notes: ${med.notes}`);
@@ -1085,1987 +1008,995 @@
 
   function normalizeMedicationState(raw) {
     const meds = normalizeMedications(raw);
-    if (!meds.length) return [];
-    return meds.map((med) => newMedication({
-      name: med.name || med.medicine || med.title || '',
-      dose: med.dose || '',
-      frequency: med.frequency || '',
-      duration: med.duration || '',
-      route: med.route || '',
-      notes: med.notes || '',
-      timings: cleanTimings(med.timings || med.timing || []),
-      food_relation: med.food_relation || med.food || '',
-    })).filter((m) => medPreviewLine(m).trim() !== 'Fill in details to see prescription');
+    return meds.map(med => newMedication({
+      name: med.name||med.medicine||med.title||'',
+      dose: med.dose||'', frequency: med.frequency||'', duration: med.duration||'',
+      route: med.route||'', notes: med.notes||'',
+      timings: cleanTimings(med.timings||med.timing||[]),
+      food_relation: med.food_relation||med.food||'',
+    })).filter(m => medPreviewLine(m).trim() !== 'Fill in details to see prescription');
   }
 
   function syncMedicationPayload() {
-    const payload = medications
-      .map((med) => ({
-        ...med,
-        timings: cleanTimings(med.timings),
-        food_relation: (med.food_relation || '').trim(),
-      }))
-      .filter((med) => {
-        return Boolean(
-          (med.name || '').trim()
-          || (med.dose || '').trim()
-          || (med.frequency || '').trim()
-          || (med.duration || '').trim()
-          || cleanTimings(med.timings).length
-          || (med.food_relation || '').trim()
-          || (med.notes || '').trim()
-        );
-      });
-
-    if (els.medicationsJson) {
-      els.medicationsJson.value = payload.length ? JSON.stringify(payload) : '';
-    }
-
-    if (els.medicinesText) {
-      const fallbackLines = payload.map((med) => medPreviewLine(med));
-      els.medicinesText.value = fallbackLines.join(';\n');
-    }
-
-    if (els.medicationsEmpty) {
-      els.medicationsEmpty.style.display = payload.length ? 'none' : 'block';
-    }
+    const payload = medications.map(med => ({ ...med, timings: cleanTimings(med.timings), food_relation: (med.food_relation||'').trim() }))
+      .filter(med => Boolean((med.name||'').trim()||(med.dose||'').trim()||(med.frequency||'').trim()||(med.duration||'').trim()||cleanTimings(med.timings).length||(med.food_relation||'').trim()||(med.notes||'').trim()));
+    if (els.medicationsJson) els.medicationsJson.value = payload.length ? JSON.stringify(payload) : '';
+    if (els.medicinesText)   els.medicinesText.value   = payload.map(m => medPreviewLine(m)).join(';\n');
+    if (els.medicationsEmpty) els.medicationsEmpty.style.display = payload.length ? 'none' : 'block';
   }
 
-  function buildChipRow(label, options, { multi = false, med, field, onChange }) {
-    const row = document.createElement('div');
-    row.className = 'meds-chipRow';
-    const lab = document.createElement('div');
-    lab.className = 'meds-chipLabel';
-    lab.textContent = label;
-    const group = document.createElement('div');
-    group.className = 'meds-chipGroup';
-    options.forEach((opt) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      const isActive = multi
-        ? cleanTimings(med[field]).includes(opt.value)
-        : (med[field] || '') === opt.value;
+  function buildChipRow(label, options, { multi=false, med, field, onChange }) {
+    const row = document.createElement('div'); row.className = 'meds-chipRow';
+    const lab = document.createElement('div'); lab.className = 'meds-chipLabel'; lab.textContent = label;
+    const group = document.createElement('div'); group.className = 'meds-chipGroup';
+    options.forEach(opt => {
+      const btn = document.createElement('button'); btn.type = 'button';
+      const isActive = multi ? cleanTimings(med[field]).includes(opt.value) : (med[field]||'') === opt.value;
       btn.className = 'meds-chip' + (isActive ? ' is-active' : '');
       btn.textContent = opt.label;
       btn.addEventListener('click', () => {
         if (multi) {
           const next = new Set(cleanTimings(med[field]));
-          if (next.has(opt.value)) {
-            next.delete(opt.value);
-          } else {
-            next.add(opt.value);
-          }
-          const arr = Array.from(next);
-          med[field] = arr;
-          btn.classList.toggle('is-active');
-          onChange(arr);
+          next.has(opt.value) ? next.delete(opt.value) : next.add(opt.value);
+          med[field] = Array.from(next); btn.classList.toggle('is-active'); onChange(med[field]);
         } else {
-          med[field] = opt.value;
-          group.querySelectorAll('.meds-chip').forEach((chip) => chip.classList.remove('is-active'));
-          btn.classList.add('is-active');
-          onChange(opt.value);
+          med[field] = opt.value; group.querySelectorAll('.meds-chip').forEach(c => c.classList.remove('is-active')); btn.classList.add('is-active'); onChange(opt.value);
         }
       });
       group.appendChild(btn);
     });
-    row.appendChild(lab);
-    row.appendChild(group);
-    return row;
+    row.appendChild(lab); row.appendChild(group); return row;
   }
 
   function buildMedicationCard(med, index) {
-    const card = document.createElement('div');
-    card.className = 'meds-card';
+    const card = document.createElement('div'); card.className = 'meds-card';
     let preview = null;
-
-    const row = document.createElement('div');
-    row.className = 'meds-row';
-
-    const fields = [
-      { label: 'Medicine Name', field: 'name', placeholder: 'Start typing medicine name...' },
-      { label: 'Dosage', field: 'dose', placeholder: 'e.g., 1 tab' },
-      { label: 'Duration', field: 'duration', placeholder: 'e.g., 5 days' },
-    ];
-
-    fields.forEach((cfg) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'meds-field';
-      const lab = document.createElement('label');
-      lab.textContent = cfg.label;
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.value = med[cfg.field] || '';
-      input.placeholder = cfg.placeholder;
-      input.className = 'record-input';
-      input.addEventListener('input', (event) => {
-        med[cfg.field] = event.target.value;
-        if (preview) preview.textContent = medPreviewLine(med);
-        syncMedicationPayload();
-      });
-      wrap.appendChild(lab);
-      wrap.appendChild(input);
-      row.appendChild(wrap);
+    const row = document.createElement('div'); row.className = 'meds-row';
+    [{ label:'Medicine Name', field:'name', placeholder:'Start typing medicine name...' },
+     { label:'Dosage',        field:'dose', placeholder:'e.g., 1 tab'                   },
+     { label:'Duration',      field:'duration', placeholder:'e.g., 5 days'              }].forEach(cfg => {
+      const wrap = document.createElement('div'); wrap.className = 'meds-field';
+      const lab  = document.createElement('label'); lab.textContent = cfg.label;
+      const input = document.createElement('input'); input.type = 'text'; input.value = med[cfg.field]||''; input.placeholder = cfg.placeholder; input.className = 'record-input';
+      input.addEventListener('input', ev => { med[cfg.field] = ev.target.value; if (preview) preview.textContent = medPreviewLine(med); syncMedicationPayload(); });
+      wrap.appendChild(lab); wrap.appendChild(input); row.appendChild(wrap);
     });
-
     card.appendChild(row);
-
-    const freqRow = buildChipRow('Frequency', MED_FREQUENCIES, {
-      med,
-      field: 'frequency',
-      onChange: () => { preview.textContent = medPreviewLine(med); syncMedicationPayload(); },
-    });
-    const timeRow = buildChipRow('Timing', MED_TIMINGS, {
-      med,
-      field: 'timings',
-      multi: true,
-      onChange: () => { preview.textContent = medPreviewLine(med); syncMedicationPayload(); },
-    });
-    const foodRow = buildChipRow('Food Relation', MED_FOOD, {
-      med,
-      field: 'food_relation',
-      onChange: () => { preview.textContent = medPreviewLine(med); syncMedicationPayload(); },
-    });
-
-    card.appendChild(freqRow);
-    card.appendChild(timeRow);
-    card.appendChild(foodRow);
-
-    preview = document.createElement('div');
-    preview.className = 'meds-preview';
-    preview.textContent = medPreviewLine(med);
+    const upd = () => { preview.textContent = medPreviewLine(med); syncMedicationPayload(); };
+    card.appendChild(buildChipRow('Frequency',    MED_FREQUENCIES, { med, field:'frequency',    onChange: upd }));
+    card.appendChild(buildChipRow('Timing',       MED_TIMINGS,     { med, field:'timings',       multi:true, onChange: upd }));
+    card.appendChild(buildChipRow('Food Relation',MED_FOOD,        { med, field:'food_relation', onChange: upd }));
+    preview = document.createElement('div'); preview.className = 'meds-preview'; preview.textContent = medPreviewLine(med);
     card.appendChild(preview);
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'meds-remove';
-    removeBtn.textContent = 'Remove';
-    removeBtn.addEventListener('click', () => {
-      medications.splice(index, 1);
-      renderMedicationCards();
-      syncMedicationPayload();
-    });
+    const removeBtn = document.createElement('button'); removeBtn.type = 'button'; removeBtn.className = 'meds-remove'; removeBtn.textContent = 'Remove';
+    removeBtn.addEventListener('click', () => { medications.splice(index,1); renderMedicationCards(); syncMedicationPayload(); });
     card.appendChild(removeBtn);
-
     return card;
   }
 
   function renderMedicationCards() {
     if (!els.medicationsList) return;
     els.medicationsList.innerHTML = '';
-    medications.forEach((med, idx) => {
-      els.medicationsList.appendChild(buildMedicationCard(med, idx));
-    });
-    if (els.medicationsEmpty) {
-      els.medicationsEmpty.style.display = medications.length ? 'none' : 'block';
-    }
+    medications.forEach((med, idx) => els.medicationsList.appendChild(buildMedicationCard(med, idx)));
+    if (els.medicationsEmpty) els.medicationsEmpty.style.display = medications.length ? 'none' : 'block';
   }
 
-  function addMedication(prefill = {}) {
-    medications.push(newMedication(prefill));
-    renderMedicationCards();
-    syncMedicationPayload();
-  }
+  function addMedication(prefill={})  { medications.push(newMedication(prefill)); renderMedicationCards(); syncMedicationPayload(); }
+  function resetMedications()         { medications = []; renderMedicationCards(); syncMedicationPayload(); }
 
-  function resetMedications() {
-    medications = [];
-    renderMedicationCards();
-    syncMedicationPayload();
-  }
+  function toggleCriticalSections()   { (els.criticalSections||[]).forEach(s => { s.style.display='block'; s.classList.add('is-visible'); }); }
+  function setCardVisible(card, vis)  { if (!card) return; card.classList.toggle('pv-hidden', !vis); }
 
-  function toggleCriticalSections(value) {
-    (els.criticalSections || []).forEach((section) => {
-      section.style.display = 'block';
-      section.classList.add('is-visible');
-    });
-  }
-
-  function setCardVisible(card, visible) {
-    if (!card) return;
-    card.classList.toggle('pv-hidden', !visible);
-  }
-
-  function normalizeVisitCategoryValue(value) {
-    const raw = String(value ?? '').trim().toLowerCase();
+  function normalizeVisitCategoryValue(v) {
+    const raw = String(v??'').trim().toLowerCase();
     if (!raw) return '';
-    if (raw === 'follow_up' || raw === 'followup') return 'followup';
-    if (raw === 'video_consult' || raw === 'video-consult' || raw === 'video_consultation' || raw === 'video consultation') {
-      return 'video_consultation';
-    }
+    if (raw==='follow_up'||raw==='followup') return 'followup';
+    if (['video_consult','video-consult','video_consultation','video consultation'].includes(raw)) return 'video_consultation';
     return raw;
   }
 
   function updateVisitCategoryUI(category) {
-    const cat = normalizeVisitCategoryValue(category || els.visitCategory?.value || '');
-    if (!cat) {
-      setCardVisible(els.clinicalCard, true);
-      setCardVisible(els.diagnosisCard, true);
-      setCardVisible(els.treatmentCard, true);
-      setCardVisible(els.followupCard, true);
-      return;
-    }
-    const isVaccination = cat === 'vaccination';
-    const isVideoConsultation = cat === 'video_consultation';
-    const isFollowUp = cat === 'followup' || cat === 'follow_up';
-
-    setCardVisible(els.clinicalCard, !isVaccination && !isVideoConsultation);
-    setCardVisible(els.diagnosisCard, !isVaccination && !isVideoConsultation);
-    setCardVisible(els.treatmentCard, !isVaccination || isVideoConsultation);
-    setCardVisible(els.followupCard, true); // always shown but contextual
-
-    if (isFollowUp && els['diagnosis-status']) {
-      els['diagnosis-status'].value = els['diagnosis-status'].value || 'ongoing';
-    }
+    const cat = normalizeVisitCategoryValue(category||els.visitCategory?.value||'');
+    if (!cat) { setCardVisible(els.clinicalCard,true); setCardVisible(els.diagnosisCard,true); setCardVisible(els.treatmentCard,true); setCardVisible(els.followupCard,true); return; }
+    const isVacc  = cat === 'vaccination';
+    const isVideo = cat === 'video_consultation';
+    setCardVisible(els.clinicalCard,  !isVacc && !isVideo);
+    setCardVisible(els.diagnosisCard, !isVacc && !isVideo);
+    setCardVisible(els.treatmentCard, !isVacc || isVideo);
+    setCardVisible(els.followupCard,  true);
     renderFollowupContext();
   }
 
-  function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    })[char]);
+  function escapeHtml(v) {
+    return String(v??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   }
 
-  function formatDate(value, withTime = true) {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    const opts = withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' };
-    return new Intl.DateTimeFormat(undefined, opts).format(date);
+  function formatDate(v, withTime=true) {
+    if (!v) return '-';
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return v;
+    return new Intl.DateTimeFormat(undefined, withTime ? { dateStyle:'medium', timeStyle:'short' } : { dateStyle:'medium' }).format(d);
   }
 
   function normalizeMedications(raw) {
     if (!raw) return [];
     if (Array.isArray(raw)) return raw;
-    if (typeof raw === 'string') {
-      try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (_) {
-        return [];
-      }
-    }
+    if (typeof raw === 'string') { try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch(_) { return []; } }
     return [];
   }
 
   function formatMedicationList(raw) {
     const meds = normalizeMedications(raw);
     if (!meds.length) return '';
-    const items = meds.map((med) => {
+    const items = meds.map(med => {
       if (!med) return '';
-      if (typeof med === 'string') {
-        const line = escapeHtml(med);
-        return line ? `<li>${line}</li>` : '';
-      }
+      if (typeof med === 'string') { const l = escapeHtml(med); return l ? `<li>${l}</li>` : ''; }
       const parts = [];
-      const name = med.name || med.medicine || med.title;
+      const name = med.name||med.medicine||med.title;
       if (name) parts.push(escapeHtml(name));
       if (med.dose) parts.push(`Dose: ${escapeHtml(med.dose)}`);
       if (med.frequency) parts.push(`Frequency: ${escapeHtml(med.frequency)}`);
       const timings = Array.isArray(med.timings) ? med.timings : (med.timing ? [med.timing] : []);
       if (timings.length) parts.push(`Timing: ${escapeHtml(timings.join(', '))}`);
-      if (med.food_relation || med.food) parts.push(`Food: ${escapeHtml(med.food_relation || med.food)}`);
+      if (med.food_relation||med.food) parts.push(`Food: ${escapeHtml(med.food_relation||med.food)}`);
       if (med.duration) parts.push(`Duration: ${escapeHtml(med.duration)}`);
-      if (med.route) parts.push(`Route: ${escapeHtml(med.route)}`);
-      if (med.notes) parts.push(`Notes: ${escapeHtml(med.notes)}`);
-      const line = parts.filter(Boolean).join(' | ');
-      return line ? `<li>${line}</li>` : '';
+      if (med.route)    parts.push(`Route: ${escapeHtml(med.route)}`);
+      if (med.notes)    parts.push(`Notes: ${escapeHtml(med.notes)}`);
+      const l = parts.filter(Boolean).join(' | ');
+      return l ? `<li>${l}</li>` : '';
     }).filter(Boolean);
-    if (!items.length) return '';
-    return `<ul class="pm-record-list">${items.join('')}</ul>`;
+    return items.length ? `<ul class="pm-record-list">${items.join('')}</ul>` : '';
   }
 
-  function extractLastPostOp(records = [], petId = null) {
-    if (!Array.isArray(records) || !records.length) return null;
-    const recent = records.find((r) => {
-      if (!r || !r.prescription) return false;
-      if (petId === null) return true;
-      const recPet = r.prescription.pet_id ?? r.pet_id ?? null;
-      return Number(recPet) === Number(petId);
+  function extractLastPostOp(records=[], petId=null) {
+    if (!Array.isArray(records)||!records.length) return null;
+    const recent = records.find(r => {
+      if (!r||!r.prescription) return false;
+      if (petId===null) return true;
+      return Number(r.prescription.pet_id??r.pet_id??null) === Number(petId);
     }) || null;
-    if (!recent || !recent.prescription) return null;
+    if (!recent||!recent.prescription) return null;
     const rx = recent.prescription;
     return {
-      raw: recent,
-      visit_category: rx.visit_category || '',
-      case_severity: rx.case_severity || '',
-      visit_notes: rx.visit_notes || '',
-      diagnosis: rx.diagnosis || '',
-      diagnosis_status: rx.diagnosis_status || '',
-      doctor_treatment: rx.doctor_treatment || '',
-      treatment_plan: rx.treatment_plan || '',
-      home_care: rx.home_care || '',
-      medications_html: formatMedicationList(rx.medications_json),
-      follow_up_date: rx.follow_up_date || '',
-      follow_up_type: rx.follow_up_type || '',
-      date: recent.uploaded_at || rx.created_at || null,
+      raw: recent, visit_category: rx.visit_category||'', case_severity: rx.case_severity||'',
+      visit_notes: rx.visit_notes||'', diagnosis: rx.diagnosis||'', diagnosis_status: rx.diagnosis_status||'',
+      doctor_treatment: rx.doctor_treatment||'', treatment_plan: rx.treatment_plan||'',
+      home_care: rx.home_care||'', medications_html: formatMedicationList(rx.medications_json),
+      follow_up_date: rx.follow_up_date||'', follow_up_type: rx.follow_up_type||'',
+      date: recent.uploaded_at||rx.created_at||null,
     };
   }
 
   function recomputeLastPostOp() {
-    if (!state.selectedId) {
-      state.lastPostOp = null;
-      renderFollowupContext();
-      return;
-    }
+    if (!state.selectedId) { state.lastPostOp = null; renderFollowupContext(); return; }
     const records = state.records.get(Number(state.selectedId)) || [];
-    const petId = getSelectedPetId();
-    state.lastPostOp = extractLastPostOp(records, petId);
+    state.lastPostOp = extractLastPostOp(records, getSelectedPetId());
     renderFollowupContext();
   }
 
   function renderFollowupContext() {
-    const card = els.followupContextCard;
-    const body = els.followupContextBody;
-    const meta = els.followupContextMeta;
-    if (!card || !body || !meta) return;
-    const cat = els.visitCategory?.value || '';
-    const isFollowUp = cat === 'followup' || cat === 'follow_up';
-    if (!isFollowUp || !state.selectedId) {
-      card.style.display = 'none';
-      return;
-    }
+    const { followupContextCard: card, followupContextBody: body, followupContextMeta: meta } = els;
+    if (!card||!body||!meta) return;
+    const cat = els.visitCategory?.value||'';
+    if (!['followup','follow_up'].includes(cat) || !state.selectedId) { card.style.display='none'; return; }
     const ctx = state.lastPostOp;
-    body.innerHTML = '';
-    meta.textContent = '';
-    if (!ctx) {
-      body.innerHTML = '<div class=\"pv-context-empty\">No previous consultation found for this patient.</div>';
-      card.style.display = 'block';
-      return;
-    }
-    meta.textContent = ctx.date ? `Last record: ${formatDate(ctx.date, true)}` : 'Last record';
+    body.innerHTML = ''; meta.textContent = '';
+    if (!ctx) { body.innerHTML = '<div class="pv-context-empty">No previous consultation found.</div>'; card.style.display='block'; return; }
+    meta.textContent = ctx.date ? `Last record: ${formatDate(ctx.date,true)}` : 'Last record';
     const rows = [];
-    if (ctx.visit_category || ctx.case_severity) {
-      rows.push({ label: 'Visit', value: `${escapeHtml(ctx.visit_category || '-')}${ctx.case_severity ? ' • ' + escapeHtml(ctx.case_severity) : ''}` });
+    if (ctx.visit_category||ctx.case_severity) rows.push({ label:'Visit', value:`${escapeHtml(ctx.visit_category||'-')}${ctx.case_severity?' • '+escapeHtml(ctx.case_severity):''}` });
+    if (ctx.visit_notes)      rows.push({ label:'Visit notes',      value: escapeHtml(ctx.visit_notes)      });
+    if (ctx.diagnosis||ctx.diagnosis_status) rows.push({ label:'Diagnosis', value:`${escapeHtml(ctx.diagnosis||'-')}${ctx.diagnosis_status?' ('+escapeHtml(ctx.diagnosis_status)+')':''}` });
+    if (ctx.doctor_treatment) rows.push({ label:'Doctor treatment', value: escapeHtml(ctx.doctor_treatment) });
+    if (ctx.treatment_plan)   rows.push({ label:'Treatment',        value: escapeHtml(ctx.treatment_plan)   });
+    if (ctx.home_care)        rows.push({ label:'Home care',         value: escapeHtml(ctx.home_care)        });
+    if (ctx.follow_up_date||ctx.follow_up_type) {
+      const bits = []; if (ctx.follow_up_date) bits.push(`Date: ${escapeHtml(ctx.follow_up_date)}`); if (ctx.follow_up_type) bits.push(`Type: ${escapeHtml(ctx.follow_up_type)}`);
+      rows.push({ label:'Follow-up', value: bits.join(' | ') });
     }
-    if (ctx.visit_notes) rows.push({ label: 'Visit notes', value: escapeHtml(ctx.visit_notes) });
-    if (ctx.diagnosis || ctx.diagnosis_status) {
-      rows.push({ label: 'Diagnosis', value: `${escapeHtml(ctx.diagnosis || '-')}${ctx.diagnosis_status ? ' (' + escapeHtml(ctx.diagnosis_status) + ')' : ''}` });
-    }
-    if (ctx.doctor_treatment) rows.push({ label: 'Doctor treatment', value: escapeHtml(ctx.doctor_treatment) });
-    if (ctx.treatment_plan) rows.push({ label: 'Treatment', value: escapeHtml(ctx.treatment_plan) });
-    if (ctx.home_care) rows.push({ label: 'Home care', value: escapeHtml(ctx.home_care) });
-    if (ctx.follow_up_date || ctx.follow_up_type) {
-      const bits = [];
-      if (ctx.follow_up_date) bits.push(`Date: ${escapeHtml(ctx.follow_up_date)}`);
-      if (ctx.follow_up_type) bits.push(`Type: ${escapeHtml(ctx.follow_up_type)}`);
-      rows.push({ label: 'Follow-up', value: bits.join(' | ') });
-    }
-    if (ctx.medications_html) {
-      rows.push({ label: 'Medicines', value: ctx.medications_html });
-    }
-    if (!rows.length) {
-      body.innerHTML = '<div class=\"pv-context-empty\">Latest record has no clinical details.</div>';
-      card.style.display = 'block';
-      return;
-    }
-    const html = rows.map((row) => {
-      return `<div class=\"pv-context-row\"><div class=\"pv-context-label\">${row.label}</div><div class=\"pv-context-value\">${row.value}</div></div>`;
-    }).join('');
-    body.innerHTML = html;
+    if (ctx.medications_html) rows.push({ label:'Medicines', value: ctx.medications_html });
+    if (!rows.length) { body.innerHTML='<div class="pv-context-empty">Latest record has no clinical details.</div>'; card.style.display='block'; return; }
+    body.innerHTML = rows.map(r => `<div class="pv-context-row"><div class="pv-context-label">${r.label}</div><div class="pv-context-value">${r.value}</div></div>`).join('');
     card.style.display = 'block';
   }
 
   function buildRecordPreview(rec) {
     if (!rec?.url) return '';
-    const url = escapeHtml(rec.url);
-    const fileName = escapeHtml(rec.file_name || 'Document');
-    const mime = String(rec.mime_type || '').toLowerCase();
-    if (mime.startsWith('image/')) {
-      return `<div class="pm-record-media"><img src="${url}" alt="${fileName}" loading="lazy"></div>`;
-    }
-    if (mime === 'application/pdf') {
-      return `<div class="pm-record-media"><iframe src="${url}" title="${fileName}"></iframe></div>`;
-    }
-    return `<div class="pm-record-media"><a class="pm-record-link" href="${url}" target="_blank" rel="noopener">View document</a><div class="pm-record-file">${fileName}</div></div>`;
+    const url = escapeHtml(rec.url), fn = escapeHtml(rec.file_name||'Document'), mime = String(rec.mime_type||'').toLowerCase();
+    if (mime.startsWith('image/'))         return `<div class="pm-record-media"><img src="${url}" alt="${fn}" loading="lazy"></div>`;
+    if (mime==='application/pdf')          return `<div class="pm-record-media"><iframe src="${url}" title="${fn}"></iframe></div>`;
+    return `<div class="pm-record-media"><a class="pm-record-link" href="${url}" target="_blank" rel="noopener">View document</a><div class="pm-record-file">${fn}</div></div>`;
   }
 
-  async function request(url, options = {}) {
-    const headers = Object.assign({ 'Accept': 'application/json' }, options.headers || {});
+  async function request(url, options={}) {
+    const headers = { Accept:'application/json', ...(options.headers||{}) };
     const res = await fetch(url, { ...options, headers });
     const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (err) { data = null; }
-    if (!res.ok) {
-      const message = data?.error || data?.message || text || 'Request failed';
-      throw new Error(message);
-    }
+    let data = null; try { data = text ? JSON.parse(text) : null; } catch(_) {}
+    if (!res.ok) throw new Error(data?.error||data?.message||text||'Request failed');
     return data;
   }
 
-  function getPrimaryPet(patient) {
-    if (!patient) return null;
-    if (Array.isArray(patient.pets) && patient.pets.length) {
-      return patient.pets[0];
-    }
-    return null;
-  }
-
-  function getPatientPets(patient) {
-    if (!patient) return [];
-    if (Array.isArray(patient.pets) && patient.pets.length) {
-      return patient.pets;
-    }
-    return [];
-  }
+  const getPrimaryPet    = p => (Array.isArray(p?.pets) && p.pets.length) ? p.pets[0] : null;
+  const getPatientPets   = p => (Array.isArray(p?.pets) && p.pets.length) ? p.pets : [];
 
   function getPetLabel(patient, petId) {
     if (!petId) return null;
-    const pets = getPatientPets(patient);
-    const match = pets.find((pet) => String(pet.id ?? pet.pet_id) === String(petId));
-    if (match) {
-      return match.name || match.pet_name || `Pet #${petId}`;
-    }
-    return `Pet #${petId}`;
+    const match = getPatientPets(patient).find(pet => String(pet.id??pet.pet_id) === String(petId));
+    return match ? (match.name||match.pet_name||`Pet #${petId}`) : `Pet #${petId}`;
   }
 
   function getSelectedPetId() {
-    const raw = els.recordPet?.value || '';
-    if (!raw) return null;
-    const num = Number(raw);
-    return Number.isFinite(num) ? num : null;
+    const raw = els.recordPet?.value||''; if (!raw) return null;
+    const n = Number(raw); return Number.isFinite(n) ? n : null;
   }
 
   function getSelectedPet() {
-    const selectedPetId = getSelectedPetId();
-    if (!selectedPetId || !state.selectedId) return null;
-    const patient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
-    if (!patient) return null;
-    return getPatientPets(patient).find((pet) => Number(pet.id ?? pet.pet_id) === Number(selectedPetId)) || null;
+    const pid = getSelectedPetId(); if (!pid||!state.selectedId) return null;
+    const patient = state.patients.find(p => Number(p.id)===Number(state.selectedId));
+    return getPatientPets(patient).find(pet => Number(pet.id??pet.pet_id)===Number(pid)) || null;
   }
 
-  function autofillVisitNotesFromSelectedPet({ onlyWhenEmpty = true } = {}) {
+  function autofillVisitNotesFromSelectedPet({ onlyWhenEmpty=true }={}) {
     if (!els.recordNotes) return;
-    const selectedPet = getSelectedPet();
-    const symptom = String(selectedPet?.reported_symptom ?? '').trim();
-    const currentValue = String(els.recordNotes.value ?? '').trim();
-    const previousAutofill = String(els.recordNotes.dataset.autofillSymptom ?? '').trim();
-
-    if (!symptom) {
-      if (previousAutofill && currentValue === previousAutofill) {
-        els.recordNotes.value = '';
-      }
-      delete els.recordNotes.dataset.autofillSymptom;
-      return;
-    }
-
-    if (onlyWhenEmpty && currentValue && currentValue !== previousAutofill) {
-      return;
-    }
-
-    els.recordNotes.value = symptom;
-    els.recordNotes.dataset.autofillSymptom = symptom;
+    const symptom  = String(getSelectedPet()?.reported_symptom??'').trim();
+    const current  = String(els.recordNotes.value??'').trim();
+    const previous = String(els.recordNotes.dataset.autofillSymptom??'').trim();
+    if (!symptom) { if (previous && current===previous) { els.recordNotes.value=''; } delete els.recordNotes.dataset.autofillSymptom; return; }
+    if (onlyWhenEmpty && current && current!==previous) return;
+    els.recordNotes.value = symptom; els.recordNotes.dataset.autofillSymptom = symptom;
   }
 
   function renderTagFilters() {
     if (!els.tagFilters) return;
     els.tagFilters.innerHTML = '';
-    TAGS.forEach((tag) => {
+    TAGS.forEach(tag => {
       const el = document.createElement('div');
       el.className = 'pm-tag' + (state.tagFilters.includes(tag.id) ? ' is-active' : '');
       el.textContent = tag.label;
-      el.onclick = () => {
-        const idx = state.tagFilters.indexOf(tag.id);
-        if (idx > -1) state.tagFilters.splice(idx, 1); else state.tagFilters.push(tag.id);
-        renderPatientList();
-      };
+      el.onclick = () => { const i = state.tagFilters.indexOf(tag.id); i>-1 ? state.tagFilters.splice(i,1) : state.tagFilters.push(tag.id); renderPatientList(); };
       els.tagFilters.appendChild(el);
     });
   }
 
   function applyFilters(list) {
-    let filtered = list.slice();
+    let f = list.slice();
     if (state.search) {
       const q = state.search.toLowerCase();
-      filtered = filtered.filter((p) => {
-        return (p.name || '').toLowerCase().includes(q)
-          || (p.email || '').toLowerCase().includes(q)
-          || (p.phone || '').toLowerCase().includes(q)
-          || (Array.isArray(p.pets) && p.pets.some((pet) => {
-            const petName = (pet.name || pet.pet_name || '').toLowerCase();
-            const petBreed = (pet.breed || '').toLowerCase();
-            return petName.includes(q) || petBreed.includes(q);
-          }));
-      });
+      f = f.filter(p => (p.name||'').toLowerCase().includes(q)||(p.email||'').toLowerCase().includes(q)||(p.phone||'').toLowerCase().includes(q)||(Array.isArray(p.pets)&&p.pets.some(pet => (pet.name||pet.pet_name||'').toLowerCase().includes(q)||(pet.breed||'').toLowerCase().includes(q))));
     }
-
-    if (state.tagFilters.includes('hasRecords')) {
-      filtered = filtered.filter((p) => (p.records_count || 0) > 0);
-    }
-    if (state.tagFilters.includes('noRecords')) {
-      filtered = filtered.filter((p) => (p.records_count || 0) === 0);
-    }
-    if (state.tagFilters.includes('recent')) {
-      const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
-      filtered = filtered.filter((p) => {
-        const ts = new Date(p.updated_at || p.last_record_at || p.created_at || '').getTime();
-        return !Number.isNaN(ts) && ts >= cutoff;
-      });
-    }
-
-    if (state.sort === 'records') {
-      filtered.sort((a, b) => (b.records_count || 0) - (a.records_count || 0));
-    } else if (state.sort === 'name') {
-      filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    } else {
-      filtered.sort((a, b) => new Date(b.last_record_at || b.updated_at || 0) - new Date(a.last_record_at || a.updated_at || 0));
-    }
-    return filtered;
+    if (state.tagFilters.includes('hasRecords')) f = f.filter(p => (p.records_count||0)>0);
+    if (state.tagFilters.includes('noRecords'))  f = f.filter(p => (p.records_count||0)===0);
+    if (state.tagFilters.includes('recent'))     f = f.filter(p => { const ts=new Date(p.updated_at||p.last_record_at||p.created_at||'').getTime(); return !isNaN(ts)&&ts>=(Date.now()-30*24*60*60*1000); });
+    if (state.sort==='records')    f.sort((a,b)=>(b.records_count||0)-(a.records_count||0));
+    else if (state.sort==='name')  f.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    else                            f.sort((a,b)=>new Date(b.last_record_at||b.updated_at||0)-new Date(a.last_record_at||a.updated_at||0));
+    return f;
   }
 
   function renderPatientList() {
     if (!els.list) return;
     els.list.innerHTML = '';
-
-    if (!CLINIC_ID) {
-      els.list.innerHTML = '<div class="pm-empty">Clinic ID missing. Cannot load patients.</div>';
-      els.listCount.textContent = '';
-      return;
-    }
-
-    if (state.loadingPatients) {
-      els.list.appendChild(createEmptyRow('Loading patients...'));
-      els.listCount.textContent = '';
-      return;
-    }
-
-    if (!state.patients.length) {
-      els.list.appendChild(createEmptyRow('No patients found for this clinic yet.'));
-      els.listCount.textContent = '0 patients';
-      return;
-    }
-
+    if (!CLINIC_ID)                { els.list.appendChild(createEmptyRow('Clinic ID missing.')); els.listCount.textContent=''; return; }
+    if (state.loadingPatients)     { els.list.appendChild(createEmptyRow('Loading patients...')); els.listCount.textContent=''; return; }
+    if (!state.patients.length)    { els.list.appendChild(createEmptyRow('No patients found for this clinic yet.')); els.listCount.textContent='0 patients'; return; }
     const list = applyFilters(state.patients);
-    if (!list.length) {
-      els.list.appendChild(createEmptyRow('No patients match your filters.'));
-      els.listCount.textContent = '0 patients';
-      return;
-    }
-
-    list.forEach((patient) => {
+    if (!list.length) { els.list.appendChild(createEmptyRow('No patients match your filters.')); els.listCount.textContent='0 patients'; return; }
+    list.forEach(patient => {
       const row = document.createElement('div');
-      row.className = 'pm-row' + (Number(patient.id) === Number(state.selectedId) ? ' is-active' : '');
+      row.className = 'pm-row' + (Number(patient.id)===Number(state.selectedId) ? ' is-active' : '');
       row.onclick = () => selectPatient(patient.id);
-
       const primaryPet = getPrimaryPet(patient);
-
-      const avatar = document.createElement('div');
-      avatar.className = 'pm-avatar';
-      avatar.textContent = String(primaryPet?.name || patient.name || '?').charAt(0).toUpperCase();
-
-      const info = document.createElement('div');
-      info.className = 'pm-info';
-      const name = document.createElement('div');
-      name.className = 'pm-name';
-      name.textContent = `${patient.name || 'Patient'}  #${patient.id}`;
-      const meta = document.createElement('div');
-      meta.className = 'pm-meta';
-      const petMeta = primaryPet
-        ? `${escapeHtml(primaryPet.name || 'Pet')} | ${escapeHtml(primaryPet.breed || 'Breed -')}`
-        : 'No pets on file';
-      meta.innerHTML = `${petMeta}<br>${escapeHtml(patient.phone || 'Phone -')} | ${escapeHtml(patient.email || 'Email -')}`;
-      const badges = document.createElement('div');
-      badges.className = 'pm-badges';
-      const recBadge = document.createElement('span');
-      recBadge.className = 'pm-badge';
-      recBadge.textContent = `${patient.records_count || 0} file${(patient.records_count || 0) === 1 ? '' : 's'}`;
-      const lastBadge = document.createElement('span');
-      lastBadge.className = 'pm-badge';
-      lastBadge.textContent = patient.last_record_at ? `Last: ${formatDate(patient.last_record_at, false)}` : 'No uploads';
-      badges.appendChild(recBadge);
-      badges.appendChild(lastBadge);
-
-      info.appendChild(name);
-      info.appendChild(meta);
-      info.appendChild(badges);
-
-      row.appendChild(avatar);
-      row.appendChild(info);
+      const avatar = document.createElement('div'); avatar.className='pm-avatar'; avatar.textContent=String(primaryPet?.name||patient.name||'?').charAt(0).toUpperCase();
+      const info = document.createElement('div'); info.className='pm-info';
+      const name  = document.createElement('div'); name.className='pm-name'; name.textContent=`${patient.name||'Patient'}  #${patient.id}`;
+      const meta  = document.createElement('div'); meta.className='pm-meta';
+      const petMeta = primaryPet ? `${escapeHtml(primaryPet.name||'Pet')} | ${escapeHtml(primaryPet.breed||'Breed -')}` : 'No pets on file';
+      meta.innerHTML = `${petMeta}<br>${escapeHtml(patient.phone||'Phone -')} | ${escapeHtml(patient.email||'Email -')}`;
+      const badges = document.createElement('div'); badges.className='pm-badges';
+      const recBadge = document.createElement('span'); recBadge.className='pm-badge'; recBadge.textContent=`${patient.records_count||0} file${(patient.records_count||0)===1?'':'s'}`;
+      const lastBadge = document.createElement('span'); lastBadge.className='pm-badge'; lastBadge.textContent=patient.last_record_at?`Last: ${formatDate(patient.last_record_at,false)}`:'No uploads';
+      badges.appendChild(recBadge); badges.appendChild(lastBadge);
+      info.appendChild(name); info.appendChild(meta); info.appendChild(badges);
+      row.appendChild(avatar); row.appendChild(info);
       els.list.appendChild(row);
     });
-
-    els.listCount.textContent = `${list.length} patient${list.length === 1 ? '' : 's'}`;
+    const lc = document.getElementById('pm-list-count');
+    if (lc) lc.textContent = `${list.length} patient${list.length===1?'':'s'}`;
   }
 
-  function createEmptyRow(text) {
-    const div = document.createElement('div');
-    div.className = 'pm-empty';
-    div.textContent = text;
-    return div;
-  }
+  function createEmptyRow(text) { const d=document.createElement('div'); d.className='pm-empty'; d.textContent=text; return d; }
 
   function renderProfile() {
-    if (!els.profileName) return;
-    const patient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
+    const patient = state.patients.find(p => Number(p.id)===Number(state.selectedId));
     if (!patient) {
-      els.profileAvatar.textContent = 'CW';
-      els.profileName.textContent = 'Select a patient';
-      els.profileSub.textContent = 'Patient and pet details will appear here.';
-      els.profileMeta.textContent = '';
-      els.statRecords.textContent = '-';
-      els.statLastRecord.textContent = 'Last upload -';
-      els.statContact.textContent = '-';
-      els.statEmail.textContent = '-';
-      els.recordCount.textContent = '-';
-      renderPetSelect(null);
-      renderRecords();
-      renderPets();
-      return;
+      els.profileAvatar.textContent='CW'; els.profileName.textContent='Select a patient';
+      els.profileSub.textContent='Patient and pet details will appear here.'; els.profileMeta.textContent='';
+      els.statRecords.textContent='-'; els.statLastRecord.textContent='Last upload -';
+      els.statContact.textContent='-'; els.statEmail.textContent='-'; els.recordCount.textContent='-';
+      renderPetSelect(null); renderRecords(); renderPets(); return;
     }
-
     const primaryPet = getPrimaryPet(patient);
-
-    els.profileAvatar.textContent = String(primaryPet?.name || patient.name || '?').charAt(0).toUpperCase();
-    els.profileName.textContent = patient.name || 'Patient';
+    els.profileAvatar.textContent = String(primaryPet?.name||patient.name||'?').charAt(0).toUpperCase();
+    els.profileName.textContent   = patient.name||'Patient';
     if (primaryPet) {
-      const petName = primaryPet.name || 'Pet';
-      const petBreed = primaryPet.breed || 'Breed -';
-      const petGender = primaryPet.gender || primaryPet.pet_gender || 'Gender -';
-      const petAge = primaryPet.pet_age ?? primaryPet.age;
-      const petAgeLabel = (petAge || petAge === 0) ? petAge : '-';
-      els.profileSub.textContent = `${petName} | ${petBreed} | ${petGender} | Age: ${petAgeLabel}`;
-    } else {
-      els.profileSub.textContent = 'No pets on file.';
-    }
-    els.profileMeta.textContent = `Phone: ${patient.phone || '-'} | Email: ${patient.email || '-'}`;
-    const cachedRecords = state.records.get(Number(patient.id));
-    const recordTotal = Array.isArray(cachedRecords) ? cachedRecords.length : (patient.records_count || 0);
-    els.statRecords.textContent = `${recordTotal}`;
-    const latestRecord = Array.isArray(cachedRecords) && cachedRecords.length ? cachedRecords[0]?.uploaded_at : patient.last_record_at;
-    els.statLastRecord.textContent = latestRecord ? `Last upload ${formatDate(latestRecord)}` : 'No uploads yet';
-    els.statContact.textContent = patient.phone || '-';
-    els.statEmail.textContent = patient.email || '-';
-    renderPetSelect(patient, primaryPet?.id);
+      const petAge = primaryPet.pet_age??primaryPet.age;
+      els.profileSub.textContent = `${primaryPet.name||'Pet'} | ${primaryPet.breed||'Breed -'} | ${primaryPet.gender||primaryPet.pet_gender||'Gender -'} | Age: ${(petAge||petAge===0)?petAge:'-'}`;
+    } else { els.profileSub.textContent = 'No pets on file.'; }
+    els.profileMeta.textContent = `Phone: ${patient.phone||'-'} | Email: ${patient.email||'-'}`;
+    const cached = state.records.get(Number(patient.id));
+    const total  = Array.isArray(cached) ? cached.length : (patient.records_count||0);
+    els.statRecords.textContent   = `${total}`;
+    els.statLastRecord.textContent = (Array.isArray(cached)&&cached.length&&cached[0]?.uploaded_at) ? `Last upload ${formatDate(cached[0].uploaded_at)}` : (patient.last_record_at ? `Last upload ${formatDate(patient.last_record_at)}` : 'No uploads yet');
+    els.statContact.textContent   = patient.phone||'-';
+    els.statEmail.textContent     = patient.email||'-';
+    renderPetSelect(patient, getPrimaryPet(patient)?.id);
     renderPets(patient);
     renderRecords();
   }
 
-  function renderPets(patient = null) {
-    if (!els.petList || !els.petEmpty) return;
+  function renderPets(patient=null) {
+    if (!els.petList||!els.petEmpty) return;
     els.petList.innerHTML = '';
-
-    if (!patient) {
-      els.petEmpty.textContent = 'Select a patient to see pets.';
-      els.petEmpty.style.display = 'block';
-      if (els.petCount) els.petCount.textContent = '-';
-      return;
-    }
-
+    if (!patient) { els.petEmpty.textContent='Select a patient to see pets.'; els.petEmpty.style.display='block'; if (els.petCount) els.petCount.textContent='-'; return; }
     const pets = Array.isArray(patient.pets) ? patient.pets : [];
-
-    if (!pets.length) {
-      els.petEmpty.textContent = 'No pets yet for this patient.';
-      els.petEmpty.style.display = 'block';
-      if (els.petCount) els.petCount.textContent = '0 pets';
-      return;
-    }
-
-    els.petEmpty.style.display = 'none';
-    pets.forEach((pet) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'pm-petRow';
-      const avatar = document.createElement('div');
-      avatar.className = 'pm-petAvatar';
-      avatar.textContent = String(pet.name || pet.pet_name || 'P').charAt(0).toUpperCase();
-      const body = document.createElement('div');
-      body.className = 'pm-petBody';
-      const title = document.createElement('div');
-      title.className = 'pm-petName';
-      title.textContent = pet.name || pet.pet_name || 'Pet';
-      const meta = document.createElement('div');
-      meta.className = 'pm-petMeta';
-      const metaParts = [];
-      if (pet.type) metaParts.push(pet.type);
-      if (pet.breed) metaParts.push(pet.breed);
-      const gender = pet.gender || pet.pet_gender;
-      if (gender) metaParts.push(`Gender: ${gender}`);
-      const age = pet.pet_age ?? pet.age;
-      if (age || age === 0) metaParts.push(`Age: ${age}`);
-      meta.textContent = metaParts.join(' | ') || 'Details not provided';
-      body.appendChild(title);
-      body.appendChild(meta);
-      wrap.appendChild(avatar);
-      wrap.appendChild(body);
-      const petId = Number(pet.id ?? pet.pet_id);
+    if (!pets.length) { els.petEmpty.textContent='No pets yet for this patient.'; els.petEmpty.style.display='block'; if (els.petCount) els.petCount.textContent='0 pets'; return; }
+    els.petEmpty.style.display='none';
+    pets.forEach(pet => {
+      const wrap=document.createElement('div'); wrap.className='pm-petRow';
+      const av=document.createElement('div'); av.className='pm-petAvatar'; av.textContent=String(pet.name||pet.pet_name||'P').charAt(0).toUpperCase();
+      const body=document.createElement('div'); body.className='pm-petBody';
+      const title=document.createElement('div'); title.className='pm-petName'; title.textContent=pet.name||pet.pet_name||'Pet';
+      const meta=document.createElement('div'); meta.className='pm-petMeta';
+      const mp=[]; if(pet.type) mp.push(pet.type); if(pet.breed) mp.push(pet.breed); const g=pet.gender||pet.pet_gender; if(g) mp.push(`Gender: ${g}`); const a=pet.pet_age??pet.age; if(a||a===0) mp.push(`Age: ${a}`);
+      meta.textContent=mp.join(' | ')||'Details not provided';
+      body.appendChild(title); body.appendChild(meta); wrap.appendChild(av); wrap.appendChild(body);
+      const petId = Number(pet.id??pet.pet_id);
       if (Number.isFinite(petId)) {
-        const actions = document.createElement('div');
-        actions.className = 'pm-petActions';
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'pm-petDelete';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.setAttribute('aria-label', `Delete ${pet.name || pet.pet_name || 'pet'}`);
-        deleteBtn.addEventListener('click', (event) => {
-          event.stopPropagation();
-          handlePetDelete({ ...pet, id: petId }, patient);
-        });
-        actions.appendChild(deleteBtn);
-        wrap.appendChild(actions);
+        const actions=document.createElement('div'); actions.className='pm-petActions';
+        const del=document.createElement('button'); del.type='button'; del.className='pm-petDelete'; del.textContent='Delete'; del.setAttribute('aria-label',`Delete ${pet.name||pet.pet_name||'pet'}`);
+        del.addEventListener('click', ev => { ev.stopPropagation(); handlePetDelete({...pet,id:petId},patient); });
+        actions.appendChild(del); wrap.appendChild(actions);
       }
       els.petList.appendChild(wrap);
     });
-    if (els.petCount) {
-      els.petCount.textContent = `${pets.length} pet${pets.length === 1 ? '' : 's'}`;
-    }
+    if (els.petCount) els.petCount.textContent=`${pets.length} pet${pets.length===1?'':'s'}`;
   }
 
   async function handlePetDelete(pet, patient) {
     if (!pet?.id) return;
-    const petName = pet.name || pet.pet_name || `Pet #${pet.id}`;
-    const patientName = patient?.name || 'this patient';
-    const result = await Swal.fire({
-      icon: 'warning',
-      title: `Delete ${petName}?`,
-      text: `This will remove ${petName} from ${patientName}.`,
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
-    });
+    const result = await Swal.fire({ icon:'warning', title:`Delete ${pet.name||pet.pet_name||`Pet #${pet.id}`}?`, text:`This will remove this pet from ${patient?.name||'this patient'}.`, showCancelButton:true, confirmButtonText:'Delete', confirmButtonColor:'#ef4444' });
     if (!result.isConfirmed) return;
     try {
-      await request(`${API_BASE}/pets/${pet.id}`, { method: 'DELETE' });
-      Swal.fire({ icon: 'success', title: 'Pet deleted', timer: 1500, showConfirmButton: false });
-      if (patient?.id || state.selectedId) {
-        state.selectedId = Number(patient?.id ?? state.selectedId);
-      }
-      await loadPatients();
+      await request(`${API_BASE}/pets/${pet.id}`, { method:'DELETE' });
+      Swal.fire({ icon:'success', title:'Pet deleted', timer:1500, showConfirmButton:false });
+      state.selectedId = Number(patient?.id??state.selectedId);
+      await window.PatientStore.reload();
     } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Delete failed', text: error.message || 'Request failed' });
+      Swal.fire({ icon:'error', title:'Delete failed', text:error.message||'Request failed' });
     }
   }
 
   function renderRecords() {
-    if (!els.recordList || !els.recordEmpty) return;
+    if (!els.recordList||!els.recordEmpty) return;
     els.recordList.innerHTML = '';
-    const activePatient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
-
-    if (!state.selectedId) {
-      els.recordEmpty.textContent = 'Select a patient to see uploaded files.';
-      els.recordEmpty.style.display = 'block';
-      els.recordEmpty.style.color = 'var(--pm-muted)';
-      els.recordCount.textContent = '-';
-      if (els.statRecords) {
-        els.statRecords.textContent = '-';
-      }
-      return;
-    }
-
-    if (state.loadingRecords) {
-      els.recordEmpty.textContent = 'Loading records...';
-      els.recordEmpty.style.display = 'block';
-      els.recordEmpty.style.color = 'var(--pm-muted)';
-      els.recordCount.textContent = '-';
-      if (els.statRecords) {
-        els.statRecords.textContent = '-';
-      }
-      return;
-    }
-
-    if (lastRecordError) {
-      els.recordEmpty.textContent = lastRecordError;
-      els.recordEmpty.style.display = 'block';
-      els.recordEmpty.style.color = '#b91c1c';
-      els.recordCount.textContent = '-';
-      if (els.statRecords) {
-        els.statRecords.textContent = '-';
-      }
-      return;
-    }
-
+    const activePatient = state.patients.find(p => Number(p.id)===Number(state.selectedId));
+    if (!state.selectedId)     { els.recordEmpty.textContent='Select a patient to see uploaded files.'; els.recordEmpty.style.display='block'; els.recordEmpty.style.color='var(--pm-muted)'; els.recordCount.textContent='-'; if (els.statRecords) els.statRecords.textContent='-'; return; }
+    if (state.loadingRecords)  { els.recordEmpty.textContent='Loading records...'; els.recordEmpty.style.display='block'; els.recordEmpty.style.color='var(--pm-muted)'; els.recordCount.textContent='-'; return; }
+    if (lastRecordError)       { els.recordEmpty.textContent=lastRecordError; els.recordEmpty.style.display='block'; els.recordEmpty.style.color='#b91c1c'; els.recordCount.textContent='-'; return; }
     const records = state.records.get(Number(state.selectedId)) || [];
-    if (!records.length) {
-      els.recordEmpty.textContent = 'No medical records uploaded yet.';
-      els.recordEmpty.style.display = 'block';
-      els.recordEmpty.style.color = 'var(--pm-muted)';
-      els.recordCount.textContent = '0 files';
-      if (els.statRecords) {
-        els.statRecords.textContent = '0';
-      }
-      return;
-    }
-
-    els.recordEmpty.style.display = 'none';
-    records.forEach((rec) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'pm-record pm-record-card';
-      const prescription = rec.prescription || {};
-      const petId = rec.pet_id ?? prescription.pet_id ?? null;
-      const petLabel = activePatient ? getPetLabel(activePatient, petId) : null;
+    if (!records.length) { els.recordEmpty.textContent='No medical records uploaded yet.'; els.recordEmpty.style.display='block'; els.recordEmpty.style.color='var(--pm-muted)'; els.recordCount.textContent='0 files'; if (els.statRecords) els.statRecords.textContent='0'; return; }
+    els.recordEmpty.style.display='none';
+    records.forEach(rec => {
+      const wrap = document.createElement('div'); wrap.className='pm-record pm-record-card';
+      const rx = rec.prescription||{};
+      const petId = rec.pet_id??rx.pet_id??null;
+      const petLabel = activePatient ? getPetLabel(activePatient,petId) : null;
       const detailPairs = [];
-      if (prescription.visit_category || prescription.case_severity) {
-        detailPairs.push({ label: 'Visit', value: `${escapeHtml(prescription.visit_category || '-')} | ${escapeHtml(prescription.case_severity || '-')}` });
+      if (rx.visit_category||rx.case_severity) detailPairs.push({label:'Visit',value:`${escapeHtml(rx.visit_category||'-')} | ${escapeHtml(rx.case_severity||'-')}`});
+      if (rx.visit_notes)    detailPairs.push({label:'Visit notes',   value:escapeHtml(rx.visit_notes)});
+      if (rx.temperature||rx.weight||rx.heart_rate) {
+        const vs=[rx.temperature?`Temp: ${escapeHtml(rx.temperature)}°`:null, rx.weight?`Weight: ${escapeHtml(rx.weight)}kg`:null, rx.heart_rate?`Heart: ${escapeHtml(rx.heart_rate)}`:null].filter(Boolean);
+        detailPairs.push({label:'Vitals',value:vs.join(' | ')});
       }
-      if (prescription.visit_notes) {
-        detailPairs.push({ label: 'Visit notes', value: escapeHtml(prescription.visit_notes) });
+      if (rx.exam_notes)     detailPairs.push({label:'Exam',          value:escapeHtml(rx.exam_notes)});
+      if (rx.diagnosis||rx.diagnosis_status) detailPairs.push({label:'Diagnosis',value:`${escapeHtml(rx.diagnosis||'-')} (${escapeHtml(rx.diagnosis_status||'-')})`});
+      if (rx.doctor_treatment) detailPairs.push({label:'Doctor treatment',value:escapeHtml(rx.doctor_treatment)});
+      if (rx.treatment_plan) detailPairs.push({label:'Treatment',     value:escapeHtml(rx.treatment_plan)});
+      if (rx.home_care)      detailPairs.push({label:'Home care',      value:escapeHtml(rx.home_care)});
+      const medsHtml = formatMedicationList(rx.medications_json);
+      if (medsHtml)          detailPairs.push({label:'Medicines',      value:medsHtml});
+      if (rx.follow_up_date||rx.follow_up_type) {
+        const fp=[]; if(rx.follow_up_date) fp.push(`Date: ${escapeHtml(rx.follow_up_date)}`); if(rx.follow_up_type) fp.push(`Type: ${escapeHtml(rx.follow_up_type)}`);
+        detailPairs.push({label:'Follow-up',value:fp.join(' | ')});
       }
-      if (prescription.temperature || prescription.weight || prescription.heart_rate) {
-        const temp = prescription.temperature ? `Temp: ${escapeHtml(prescription.temperature)}${prescription.temperature_unit ? escapeHtml(prescription.temperature_unit) : ''}` : null;
-        const wt = prescription.weight ? `Weight: ${escapeHtml(prescription.weight)}kg` : null;
-        const hr = prescription.heart_rate ? `Heart: ${escapeHtml(prescription.heart_rate)}` : null;
-        detailPairs.push({ label: 'Vitals', value: [temp, wt, hr].filter(Boolean).join(' | ') });
-      }
-      if (prescription.exam_notes) {
-        detailPairs.push({ label: 'Exam', value: escapeHtml(prescription.exam_notes) });
-      }
-      if (prescription.diagnosis || prescription.diagnosis_status) {
-        detailPairs.push({ label: 'Diagnosis', value: `${escapeHtml(prescription.diagnosis || '-')} (${escapeHtml(prescription.diagnosis_status || '-')})` });
-      }
-      if (prescription.doctor_treatment) {
-        detailPairs.push({ label: 'Doctor treatment', value: escapeHtml(prescription.doctor_treatment) });
-      }
-      if (prescription.treatment_plan) {
-        detailPairs.push({ label: 'Treatment', value: escapeHtml(prescription.treatment_plan) });
-      }
-      if (prescription.home_care) {
-        detailPairs.push({ label: 'Home care', value: escapeHtml(prescription.home_care) });
-      }
-      const medsHtml = formatMedicationList(prescription.medications_json);
-      if (medsHtml) {
-        detailPairs.push({ label: 'Medicines', value: medsHtml });
-      }
-      if (prescription.follow_up_date || prescription.follow_up_type) {
-        const fuParts = [];
-        if (prescription.follow_up_date) fuParts.push(`Date: ${escapeHtml(prescription.follow_up_date)}`);
-        if (prescription.follow_up_type) fuParts.push(`Type: ${escapeHtml(prescription.follow_up_type)}`);
-        detailPairs.push({ label: 'Follow-up', value: fuParts.join(' | ') });
-      }
-      if (petLabel) {
-        detailPairs.unshift({ label: 'Pet', value: escapeHtml(petLabel) });
-      }
-      const detailHtml = detailPairs.length
-        ? `<div class="pm-record-details">${detailPairs.map(pair => `<div class="pm-record-row"><div class="pm-record-label">${pair.label}</div><div class="pm-record-value">${pair.value}</div></div>`).join('')}</div>`
-        : '';
-      const previewHtml = buildRecordPreview(rec);
-      const tags = [];
-      if (prescription.case_severity) tags.push(`<span class="pm-tag-soft">${escapeHtml(prescription.case_severity)}</span>`);
-      if (prescription.visit_category) tags.push(`<span class="pm-tag-soft">${escapeHtml(prescription.visit_category)}</span>`);
-
+      if (petLabel) detailPairs.unshift({label:'Pet',value:escapeHtml(petLabel)});
+      const detailHtml  = detailPairs.length ? `<div class="pm-record-details">${detailPairs.map(p=>`<div class="pm-record-row"><div class="pm-record-label">${p.label}</div><div class="pm-record-value">${p.value}</div></div>`).join('')}</div>` : '';
+      const tags = [rx.case_severity?`<span class="pm-tag-soft">${escapeHtml(rx.case_severity)}</span>`:'', rx.visit_category?`<span class="pm-tag-soft">${escapeHtml(rx.visit_category)}</span>`:''].filter(Boolean);
       wrap.innerHTML = `
         <div class="pm-record-head">
           <div>
-            <div class="pm-record-title">${escapeHtml(rec.file_name || 'Medical file')}</div>
-            <div class="pm-record-meta">${formatDate(rec.uploaded_at)}${rec.doctor_id ? ` | Doctor #${rec.doctor_id}` : ''}${petLabel ? ` | Pet: ${escapeHtml(petLabel)}` : ''}</div>
+            <div class="pm-record-title">${escapeHtml(rec.file_name||'Medical file')}</div>
+            <div class="pm-record-meta">${formatDate(rec.uploaded_at)}${rec.doctor_id?` | Doctor #${rec.doctor_id}`:''}${petLabel?` | Pet: ${escapeHtml(petLabel)}`:''}</div>
           </div>
-          ${tags.length ? `<div class="pm-record-tags">${tags.join('')}</div>` : ''}
+          ${tags.length?`<div class="pm-record-tags">${tags.join('')}</div>`:''}
         </div>
-        <div class="pm-record-notes">${escapeHtml(rec.notes || 'No notes')}</div>
+        <div class="pm-record-notes">${escapeHtml(rec.notes||'No notes')}</div>
         ${detailHtml}
-        ${previewHtml}
+        ${buildRecordPreview(rec)}
         <div class="pm-record-actions">
           <button type="button" class="pm-btn pm-primary" data-role="edit-record" data-id="${rec.id}" style="padding:6px 12px">Edit</button>
           <a href="${rec.url}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a>
-        </div>
-      `;
-      const editBtn = wrap.querySelector('[data-role="edit-record"]');
-      if (editBtn) {
-        editBtn.addEventListener('click', () => {
-          selectPatient(rec.user_id);
-          openUploadModal();
-          fillRecordFormFromRecord(rec);
-        });
-      }
+        </div>`;
+      wrap.querySelector('[data-role="edit-record"]')?.addEventListener('click', () => { selectPatient(rec.user_id); openUploadModal(); fillRecordFormFromRecord(rec); });
       els.recordList.appendChild(wrap);
     });
-    els.recordCount.textContent = `${records.length} file${records.length === 1 ? '' : 's'}`;
-    if (els.statRecords) {
-      els.statRecords.textContent = `${records.length}`;
-    }
+    els.recordCount.textContent = `${records.length} file${records.length===1?'':'s'}`;
+    if (els.statRecords) els.statRecords.textContent = `${records.length}`;
   }
 
-  function renderPetSelect(patient, selectedPetId = null) {
+  function renderPetSelect(patient, selectedPetId=null) {
     if (!els.recordPet) return;
     const pets = getPatientPets(patient);
     els.recordPet.innerHTML = '';
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = pets.length ? 'Select pet' : 'No pets found';
-    els.recordPet.appendChild(placeholder);
-    pets.forEach((pet) => {
-      const petValue = pet.id ?? pet.pet_id;
-      const numericValue = Number(petValue);
-      const hasId = petValue !== null && petValue !== undefined && petValue !== '' && Number.isFinite(numericValue);
-      const opt = document.createElement('option');
-      opt.value = hasId ? petValue : '';
-      opt.textContent = `${pet.name || pet.pet_name || 'Pet'}${pet.breed ? ` | ${pet.breed}` : ''}`;
-      if (pet.gender) opt.textContent += ` | ${pet.gender}`;
-      opt.dataset.petName = pet.name || pet.pet_name || '';
-      if (!hasId) {
-        opt.disabled = true;
-        opt.textContent += ' (link pet to use)';
-      }
+    const ph = document.createElement('option'); ph.value=''; ph.textContent=pets.length?'Select pet':'No pets found'; els.recordPet.appendChild(ph);
+    pets.forEach(pet => {
+      const v = pet.id??pet.pet_id, nv = Number(v), hasId = v!==null&&v!==undefined&&v!==''&&Number.isFinite(nv);
+      const opt = document.createElement('option'); opt.value = hasId?v:'';
+      opt.textContent = `${pet.name||pet.pet_name||'Pet'}${pet.breed?` | ${pet.breed}`:''}${pet.gender?` | ${pet.gender}`:''}`;
+      opt.dataset.petName = pet.name||pet.pet_name||''; if (!hasId) { opt.disabled=true; opt.textContent+=' (link pet to use)'; }
       els.recordPet.appendChild(opt);
     });
-    if (selectedPetId) {
-      els.recordPet.value = String(selectedPetId);
-    } else if (pets.length === 1) {
-      const onlyValue = pets[0].id ?? pets[0].pet_id;
-      const onlyNumeric = Number(onlyValue);
-      if (onlyValue !== null && onlyValue !== undefined && onlyValue !== '' && Number.isFinite(onlyNumeric)) {
-        els.recordPet.value = String(onlyValue);
-      }
-    } else {
-      els.recordPet.value = '';
-    }
-  }
-
-  async function loadPatients() {
-    if (!CLINIC_ID) {
-      renderPatientList();
-      return;
-    }
-    state.loadingPatients = true;
-    renderPatientList();
-    try {
-      const data = await request(`${API_BASE}/clinics/${CLINIC_ID}/patients`);
-      state.patients = Array.isArray(data?.patients) ? data.patients : [];
-      const exists = state.selectedId && state.patients.some((p) => Number(p.id) === Number(state.selectedId));
-      if (!exists) {
-        state.selectedId = null;
-      }
-    } catch (error) {
-      state.patients = [];
-      els.list.innerHTML = '';
-      els.list.appendChild(createEmptyRow(escapeHtml(error.message)));
-      els.listCount.textContent = '0 patients';
-    } finally {
-      state.loadingPatients = false;
-      renderTagFilters();
-      renderPatientList();
-      renderProfile();
-    }
+    if (selectedPetId) { els.recordPet.value = String(selectedPetId); }
+    else if (pets.length===1) { const ov=pets[0].id??pets[0].pet_id; if (ov!==null&&ov!==undefined&&ov!==''&&Number.isFinite(Number(ov))) els.recordPet.value=String(ov); }
+    else { els.recordPet.value=''; }
   }
 
   async function loadDoctors() {
-    if (!CLINIC_ID || !els.doctorSelect) return;
+    if (!CLINIC_ID||!els.doctorSelect) return;
     try {
       const data = await request(`${API_BASE}/clinics/${CLINIC_ID}/doctors`);
       const doctors = Array.isArray(data?.doctors) ? data.doctors : [];
-      els.doctorSelect.innerHTML = '<option value="">Select doctor</option>';
-      doctors.forEach((doc) => {
-        const option = document.createElement('option');
-        option.value = doc.id;
-        option.textContent = doc.name || doc.doctor_name || `Doctor #${doc.id}`;
-        els.doctorSelect.appendChild(option);
-      });
-      if (DEFAULT_DOCTOR_ID) {
-        els.doctorSelect.value = DEFAULT_DOCTOR_ID;
-      }
-    } catch (error) {
-      console.error('Failed to load doctors', error);
-    }
+      els.doctorSelect.innerHTML='<option value="">Select doctor</option>';
+      doctors.forEach(doc => { const o=document.createElement('option'); o.value=doc.id; o.textContent=doc.name||doc.doctor_name||`Doctor #${doc.id}`; els.doctorSelect.appendChild(o); });
+      if (DEFAULT_DOCTOR_ID) els.doctorSelect.value=DEFAULT_DOCTOR_ID;
+    } catch (e) { console.error('loadDoctors',e); }
   }
 
   async function loadRecords(patientId) {
-    if (!CLINIC_ID || !patientId) {
-      renderRecords();
-      return;
-    }
-    state.loadingRecords = true;
-    lastRecordError = null;
-    renderRecords();
+    if (!CLINIC_ID||!patientId) { renderRecords(); return; }
+    state.loadingRecords=true; lastRecordError=null; renderRecords();
     try {
       const data = await request(`${API_BASE}/users/${patientId}/medical-records?clinic_id=${CLINIC_ID}`);
       const records = Array.isArray(data?.data?.records) ? data.data.records : [];
       state.records.set(Number(patientId), records);
       recomputeLastPostOp();
-    } catch (error) {
-      lastRecordError = escapeHtml(error.message);
-      state.records.set(Number(patientId), []);
-      state.lastPostOp = null;
-    } finally {
-      state.loadingRecords = false;
-      renderRecords();
-      renderFollowupContext();
-    }
+    } catch (error) { lastRecordError=escapeHtml(error.message); state.records.set(Number(patientId),[]); state.lastPostOp=null; }
+    finally { state.loadingRecords=false; renderRecords(); renderFollowupContext(); }
   }
 
   function selectPatient(patientId) {
-    state.selectedId = Number(patientId);
-    state.lastPostOp = null;
-    state.loadingRecords = true;
-    lastRecordError = null;
-    renderPatientList();
-    renderProfile();
-    renderFollowupContext();
-    loadRecords(patientId);
+    state.selectedId=Number(patientId); state.lastPostOp=null; state.loadingRecords=true; lastRecordError=null;
+    renderPatientList(); renderProfile(); renderFollowupContext(); loadRecords(patientId);
   }
 
   function resetRecordForm() {
-    state.editingRecordId = null;
-    els.recordForm?.reset();
-    if (els.recordNotes) {
-      delete els.recordNotes.dataset.autofillSymptom;
-    }
-    if (els.caseSeverity) {
-      els.caseSeverity.value = 'general';
-    }
-    if (els.visitCategory) {
-      els.visitCategory.value = '';
-    }
-    resetMedications();
-    toggleCriticalSections(els.caseSeverity?.value || 'general');
-    updateVisitCategoryUI(els.visitCategory?.value || '');
-    const recordIdInput = document.getElementById('record-id');
-    if (recordIdInput) recordIdInput.value = '';
-    const recordFile = document.getElementById('record-file');
-    if (recordFile) recordFile.required = true;
-  }
-
-  function resetPetForm() {
-    if (els.petForm) {
-      els.petForm.reset();
-    }
-    if (els.petUserInput) {
-      els.petUserInput.value = state.selectedId || '';
-    }
+    state.editingRecordId=null; els.recordForm?.reset();
+    if (els.recordNotes) delete els.recordNotes.dataset.autofillSymptom;
+    if (els.caseSeverity) els.caseSeverity.value='general';
+    if (els.visitCategory) els.visitCategory.value='';
+    resetMedications(); toggleCriticalSections(); updateVisitCategoryUI(els.visitCategory?.value||'');
+    const ri=document.getElementById('record-id'); if(ri) ri.value='';
+    const rf=document.getElementById('record-file'); if(rf) rf.required=true;
   }
 
   function fillRecordFormFromRecord(rec) {
     if (!rec) return;
-    const prescription = rec.prescription || {};
+    const rx = rec.prescription||{};
     state.editingRecordId = rec.id;
-    const recordIdInput = document.getElementById('record-id');
-    if (recordIdInput) recordIdInput.value = rec.id;
-    const recordUserInput = document.getElementById('record-user-id');
-    if (recordUserInput) recordUserInput.value = rec.user_id;
-    const recordFile = document.getElementById('record-file');
-    if (recordFile) recordFile.required = false;
-    const mapValue = (id, value) => {
-      const el = document.getElementById(id);
-      if (el) el.value = value ?? '';
-    };
-    mapValue('record-notes', rec.notes ?? prescription.visit_notes ?? '');
-    if (els.recordNotes) {
-      delete els.recordNotes.dataset.autofillSymptom;
-    }
-    mapValue('visit-category', normalizeVisitCategoryValue(prescription.visit_category));
-    mapValue('case-severity', prescription.case_severity ?? '');
-    mapValue('doctor-select', rec.doctor_id ?? prescription.doctor_id ?? DEFAULT_DOCTOR_ID ?? '');
-    mapValue('temperature', prescription.temperature ?? '');
-    mapValue('weight', prescription.weight ?? '');
-    mapValue('heart-rate', prescription.heart_rate ?? '');
-    mapValue('exam-notes', prescription.exam_notes ?? '');
-    mapValue('diagnosis', prescription.diagnosis ?? '');
-    mapValue('diagnosis-status', prescription.diagnosis_status ?? '');
-    mapValue('doctor-treatment', prescription.doctor_treatment ?? '');
-    mapValue('treatment-plan', prescription.treatment_plan ?? '');
-    mapValue('home-care', prescription.home_care ?? '');
-    mapValue('follow-up-date', prescription.follow_up_date ?? '');
-    mapValue('follow-up-type', prescription.follow_up_type ?? '');
-    mapValue('record-pet', prescription.pet_id ?? rec.pet_id ?? '');
-    updateVisitCategoryUI(els.visitCategory?.value || '');
-    recomputeLastPostOp();
-    medications = normalizeMedicationState(prescription.medications_json || []);
-    renderMedicationCards();
-    syncMedicationPayload();
-    if (!medications.length) {
-      addMedication();
-    }
-    toggleCriticalSections(els.caseSeverity?.value || 'general');
-    updateVisitCategoryUI(els.visitCategory?.value || '');
+    const ri=document.getElementById('record-id'); if(ri) ri.value=rec.id;
+    const ru=document.getElementById('record-user-id'); if(ru) ru.value=rec.user_id;
+    const rf=document.getElementById('record-file'); if(rf) rf.required=false;
+    const mv = (id,v) => { const el=document.getElementById(id); if(el) el.value=v??''; };
+    mv('record-notes',     rec.notes??rx.visit_notes??'');
+    if (els.recordNotes) delete els.recordNotes.dataset.autofillSymptom;
+    mv('visit-category',   normalizeVisitCategoryValue(rx.visit_category));
+    mv('case-severity',    rx.case_severity??'');
+    mv('doctor-select',    rec.doctor_id??rx.doctor_id??DEFAULT_DOCTOR_ID??'');
+    mv('temperature',      rx.temperature??''); mv('weight',rx.weight??''); mv('heart-rate',rx.heart_rate??'');
+    mv('exam-notes',       rx.exam_notes??''); mv('diagnosis',rx.diagnosis??''); mv('diagnosis-status',rx.diagnosis_status??'');
+    mv('doctor-treatment', rx.doctor_treatment??''); mv('treatment-plan',rx.treatment_plan??'');
+    mv('home-care',        rx.home_care??''); mv('follow-up-date',rx.follow_up_date??''); mv('follow-up-type',rx.follow_up_type??'');
+    mv('record-pet',       rx.pet_id??rec.pet_id??'');
+    updateVisitCategoryUI(els.visitCategory?.value||''); recomputeLastPostOp();
+    medications = normalizeMedicationState(rx.medications_json||[]); renderMedicationCards(); syncMedicationPayload();
+    if (!medications.length) addMedication();
+    toggleCriticalSections(); updateVisitCategoryUI(els.visitCategory?.value||'');
   }
 
-  function openUploadModal(forceFollowup = false) {
-    if (!state.selectedId) {
-      Swal.fire({ icon: 'info', title: 'Select a patient', text: 'Pick a patient from the list before uploading.' });
-      return;
-    }
-    const patient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
+  function openUploadModal(forceFollowup=false) {
+    if (!state.selectedId) { Swal.fire({icon:'info',title:'Select a patient',text:'Pick a patient from the list before uploading.'}); return; }
+    const patient = state.patients.find(p => Number(p.id)===Number(state.selectedId));
     if (patient) {
-      els.modalPatient.textContent = `${patient.name || 'Patient'} | #${patient.id}`;
-      const primaryPet = getPrimaryPet(patient);
-      const petAge = primaryPet?.pet_age ?? primaryPet?.age;
-      const petLine = primaryPet
-        ? [primaryPet.name || 'Pet', primaryPet.breed, (petAge || petAge === 0) ? `Age: ${petAge}` : null]
-          .filter(Boolean)
-          .join(' | ')
-        : '';
-      if (els.modalPet) {
-        els.modalPet.textContent = petLine || '';
-      }
+      els.modalPatient.textContent = `${patient.name||'Patient'} | #${patient.id}`;
+      const pp = getPrimaryPet(patient);
+      const pa = pp?.pet_age??pp?.age;
+      if (els.modalPet) els.modalPet.textContent = pp ? [pp.name||'Pet',pp.breed,(pa||pa===0)?`Age: ${pa}`:null].filter(Boolean).join(' | ') : '';
       els.modalUserInput.value = patient.id;
     }
     resetRecordForm();
-    if (forceFollowup && els.visitCategory) {
-      els.visitCategory.value = 'followup';
-      updateVisitCategoryUI('followup');
-    }
-    if (!medications.length) {
-      addMedication();
-    }
-    renderPetSelect(patient);
-    autofillVisitNotesFromSelectedPet({ onlyWhenEmpty: true });
-    recomputeLastPostOp();
-    if (els.doctorSelect && DEFAULT_DOCTOR_ID) {
-      els.doctorSelect.value = DEFAULT_DOCTOR_ID;
-    }
+    if (forceFollowup && els.visitCategory) { els.visitCategory.value='followup'; updateVisitCategoryUI('followup'); }
+    if (!medications.length) addMedication();
+    renderPetSelect(patient); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); recomputeLastPostOp();
+    if (els.doctorSelect && DEFAULT_DOCTOR_ID) els.doctorSelect.value=DEFAULT_DOCTOR_ID;
     els.modal.classList.add('is-visible');
   }
 
   function closeModal() {
-    els.modal.classList.remove('is-visible');
-    resetRecordForm();
-    if (els.doctorSelect) {
-      els.doctorSelect.value = DEFAULT_DOCTOR_ID || '';
-    }
-    if (els.modalPet) {
-      els.modalPet.textContent = '';
-    }
+    els.modal.classList.remove('is-visible'); resetRecordForm();
+    if (els.doctorSelect) els.doctorSelect.value=DEFAULT_DOCTOR_ID||'';
+    if (els.modalPet) els.modalPet.textContent='';
   }
 
   function openPetModal() {
-    if (!state.selectedId) {
-      Swal.fire({ icon: 'info', title: 'Select a patient', text: 'Pick a patient before adding a pet.' });
-      return;
-    }
-    resetPetForm();
-    const patient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
-    if (patient) {
-      if (els.petPatient) {
-        els.petPatient.textContent = `${patient.name || 'Patient'} | #${patient.id}`;
-      }
-      if (els.petUserInput) {
-        els.petUserInput.value = patient.id;
-      }
-    }
-    if (els.petModal) {
-      els.petModal.classList.add('is-visible');
-    }
+    if (!state.selectedId) { Swal.fire({icon:'info',title:'Select a patient',text:'Pick a patient before adding a pet.'}); return; }
+    if (els.petForm) els.petForm.reset();
+    const patient = state.patients.find(p => Number(p.id)===Number(state.selectedId));
+    if (patient) { if (els.petPatient) els.petPatient.textContent=`${patient.name||'Patient'} | #${patient.id}`; if (els.petUserInput) els.petUserInput.value=patient.id; }
+    els.petModal?.classList.add('is-visible');
   }
-
-  function closePetModal() {
-    if (els.petModal) {
-      els.petModal.classList.remove('is-visible');
-    }
-    if (els.petPatient) {
-      els.petPatient.textContent = 'Patient | -';
-    }
-    resetPetForm();
-  }
+  function closePetModal() { els.petModal?.classList.remove('is-visible'); if (els.petPatient) els.petPatient.textContent='Patient | -'; if (els.petForm) els.petForm.reset(); }
 
   function wireEvents() {
-    els.search?.addEventListener('input', (e) => { state.search = e.target.value || ''; renderPatientList(); });
-    els.sort?.addEventListener('change', (e) => { state.sort = e.target.value; renderPatientList(); });
-    els.refreshBtn?.addEventListener('click', () => loadPatients());
-    els.refreshProfile?.addEventListener('click', () => {
-      if (state.selectedId) {
-        loadRecords(state.selectedId);
-      }
-      loadPatients();
-    });
-    els.openUploadBtns.forEach((btn) => btn.addEventListener('click', (ev) => {
-      const forceFollowup = ev.currentTarget?.dataset?.followup === '1';
-      openUploadModal(forceFollowup);
-    }));
-    els.openPetBtns.forEach((btn) => btn.addEventListener('click', openPetModal));
-    document.querySelectorAll('[data-role="close-record-modal"]').forEach((btn) => btn.addEventListener('click', closeModal));
-    document.querySelectorAll('[data-role="close-pet-modal"]').forEach((btn) => btn.addEventListener('click', closePetModal));
-    els.caseSeverity?.addEventListener('change', (event) => {
-      toggleCriticalSections(event.target.value || 'general');
-    });
+    els.search?.addEventListener('input', e => { state.search=e.target.value||''; renderPatientList(); });
+    els.sort?.addEventListener('change', e => { state.sort=e.target.value; renderPatientList(); });
+    els.openUploadBtns.forEach(btn => btn.addEventListener('click', ev => openUploadModal(ev.currentTarget?.dataset?.followup==='1')));
+    els.openPetBtns.forEach(btn => btn.addEventListener('click', openPetModal));
+    document.querySelectorAll('[data-role="close-record-modal"]').forEach(btn => btn.addEventListener('click', closeModal));
+    document.querySelectorAll('[data-role="close-pet-modal"]').forEach(btn => btn.addEventListener('click', closePetModal));
+    els.caseSeverity?.addEventListener('change', () => toggleCriticalSections());
     els.addMedicineBtn?.addEventListener('click', () => addMedication());
-    els.visitCategory?.addEventListener('change', (event) => {
-      updateVisitCategoryUI(event.target.value);
-    });
-    els.recordPet?.addEventListener('change', () => {
-      recomputeLastPostOp();
-      autofillVisitNotesFromSelectedPet({ onlyWhenEmpty: true });
-    });
+    els.visitCategory?.addEventListener('change', e => updateVisitCategoryUI(e.target.value));
+    els.recordPet?.addEventListener('change', () => { recomputeLastPostOp(); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); });
     els.recordNotes?.addEventListener('input', () => {
-      const autoFilled = String(els.recordNotes.dataset.autofillSymptom ?? '').trim();
-      if (!autoFilled) return;
-      if (String(els.recordNotes.value ?? '').trim() !== autoFilled) {
-        delete els.recordNotes.dataset.autofillSymptom;
-      }
+      const auto = String(els.recordNotes.dataset.autofillSymptom??'').trim();
+      if (auto && String(els.recordNotes.value??'').trim()!==auto) delete els.recordNotes.dataset.autofillSymptom;
     });
-    renderFollowupContext();
 
-    els.recordForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (!CLINIC_ID) {
-        Swal.fire({ icon: 'error', title: 'Clinic missing', text: 'Clinic ID not detected. Reload dashboard.' });
-        return;
-      }
+    els.recordForm?.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      if (!CLINIC_ID) { Swal.fire({icon:'error',title:'Clinic missing',text:'Clinic ID not detected. Reload dashboard.'}); return; }
       const patientId = els.modalUserInput.value;
-      if (!patientId) {
-        Swal.fire({ icon: 'error', title: 'Patient missing', text: 'Select a patient before uploading.' });
-        return;
-      }
+      if (!patientId) { Swal.fire({icon:'error',title:'Patient missing',text:'Select a patient before uploading.'}); return; }
       syncMedicationPayload();
-      const formData = new FormData(els.recordForm);
-      formData.append('clinic_id', CLINIC_ID);
-      if (!formData.get('doctor_id')) {
-        formData.delete('doctor_id');
-      }
-      if (!formData.get('pet_id')) {
-        formData.delete('pet_id');
-      }
+      const fd = new FormData(els.recordForm);
+      fd.append('clinic_id', CLINIC_ID);
+      if (!fd.get('doctor_id')) fd.delete('doctor_id');
+      if (!fd.get('pet_id'))    fd.delete('pet_id');
       let url = `${API_BASE}/medical-records`;
-      if (state.editingRecordId || formData.get('record_id')) {
-        const recId = state.editingRecordId || formData.get('record_id');
-        formData.append('_method', 'PUT');
-        url = `${API_BASE}/medical-records/${recId}`;
-        const file = formData.get('record_file');
-        if (!(file instanceof File) || !file?.size) {
-          formData.delete('record_file');
-        }
+      if (state.editingRecordId || fd.get('record_id')) {
+        const recId = state.editingRecordId||fd.get('record_id'); fd.append('_method','PUT'); url=`${API_BASE}/medical-records/${recId}`;
+        const f=fd.get('record_file'); if(!(f instanceof File)||!f?.size) fd.delete('record_file');
       }
       try {
-        await request(url, { method: 'POST', body: formData });
-        Swal.fire({ icon: 'success', title: state.editingRecordId ? 'Updated' : 'Uploaded', timer: 1500, showConfirmButton: false });
+        await request(url, { method:'POST', body:fd });
+        Swal.fire({icon:'success',title:state.editingRecordId?'Updated':'Uploaded',timer:1500,showConfirmButton:false});
         closeModal();
-        await loadPatients();
-        if (state.selectedId === Number(patientId)) {
-          await loadRecords(patientId);
-        }
-      } catch (error) {
-        Swal.fire({ icon: 'error', title: 'Upload failed', text: error.message || 'Could not upload file' });
-      }
+        await window.PatientStore.reload();
+        if (state.selectedId===Number(patientId)) await loadRecords(patientId);
+      } catch (error) { Swal.fire({icon:'error',title:'Upload failed',text:error.message||'Could not upload file'}); }
     });
 
-    els.petForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const patientId = state.selectedId || els.petUserInput?.value;
-      if (!patientId) {
-        Swal.fire({ icon: 'info', title: 'Select a patient', text: 'Choose a patient before adding a pet.' });
-        return;
-      }
-      const formData = new FormData(els.petForm);
-      const name = (formData.get('name') || '').trim();
-      const breed = (formData.get('breed') || '').trim();
-      const gender = (formData.get('pet_gender') || '').trim();
-      const ageRaw = formData.get('pet_age');
-      const age = Number(ageRaw);
-      if (!name || !breed || !gender || ageRaw === null || ageRaw === undefined || ageRaw === '') {
-        Swal.fire({ icon: 'warning', title: 'Missing details', text: 'Name, breed, age and gender are required.' });
-        return;
-      }
-      if (Number.isNaN(age) || age < 0) {
-        Swal.fire({ icon: 'warning', title: 'Check age', text: 'Please enter a valid age (0 or higher).' });
-        return;
-      }
-      formData.set('name', name);
-      formData.set('breed', breed);
-      formData.set('pet_gender', gender);
-      formData.set('pet_age', String(age));
-      formData.set('user_id', patientId);
-      ['microchip_number', 'mcd_registration_number'].forEach((key) => {
-        const val = (formData.get(key) || '').toString().trim();
-        if (val) {
-          formData.set(key, val);
-        } else {
-          formData.delete(key);
-        }
-      });
+    els.petForm?.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const patientId = state.selectedId||els.petUserInput?.value;
+      if (!patientId) { Swal.fire({icon:'info',title:'Select a patient'}); return; }
+      const fd = new FormData(els.petForm);
+      const name=( fd.get('name')||'').trim(), breed=(fd.get('breed')||'').trim(), gender=(fd.get('pet_gender')||'').trim(), ageRaw=fd.get('pet_age'), age=Number(ageRaw);
+      if (!name||!breed||!gender||ageRaw===null||ageRaw===undefined||ageRaw==='') { Swal.fire({icon:'warning',title:'Missing details',text:'Name, breed, age and gender are required.'}); return; }
+      if (isNaN(age)||age<0) { Swal.fire({icon:'warning',title:'Check age',text:'Please enter a valid age (0 or higher).'}); return; }
+      fd.set('name',name); fd.set('breed',breed); fd.set('pet_gender',gender); fd.set('pet_age',String(age)); fd.set('user_id',patientId);
+      ['microchip_number','mcd_registration_number'].forEach(k => { const v=(fd.get(k)||'').toString().trim(); if(v) fd.set(k,v); else fd.delete(k); });
       try {
-        await request(`${API_BASE}/users/${patientId}/pets`, { method: 'POST', body: formData });
-        Swal.fire({ icon: 'success', title: 'Pet added', timer: 1500, showConfirmButton: false });
+        await request(`${API_BASE}/users/${patientId}/pets`, { method:'POST', body:fd });
+        Swal.fire({icon:'success',title:'Pet added',timer:1500,showConfirmButton:false});
         closePetModal();
-        await loadPatients();
+        await window.PatientStore.reload();
         selectPatient(patientId);
-      } catch (error) {
-        Swal.fire({ icon: 'error', title: 'Could not add pet', text: error.message || 'Request failed' });
-      }
+      } catch (error) { Swal.fire({icon:'error',title:'Could not add pet',text:error.message||'Request failed'}); }
     });
   }
 
-  renderTagFilters();
-  renderPatientList();
-  renderProfile();
-  renderMedicationCards();
-  syncMedicationPayload();
-  wireEvents();
-  toggleCriticalSections(els.caseSeverity?.value || 'general');
-  loadPatients();
+  // Subscribe to PatientStore — keeps walk-in list in sync
+  window.PatientStore.subscribe(({ patients, loading, error }) => {
+    state.patients       = patients;
+    state.loadingPatients = loading;
+    const exists = state.selectedId && patients.some(p => Number(p.id)===Number(state.selectedId));
+    if (!exists) state.selectedId = null;
+    renderTagFilters();
+    renderPatientList();
+    renderProfile();
+  });
+
+  renderTagFilters(); renderPatientList(); renderProfile(); renderMedicationCards(); syncMedicationPayload();
+  wireEvents(); toggleCriticalSections();
+  window.PatientStore.load();
   loadDoctors();
 })();
 </script>
 
+{{-- ==================== BOOKING MODAL MODULE ==================== --}}
 <script>
 (() => {
-  const CLINIC_ID = Number(@json($resolvedClinicId ?? null)) || null;
-  const CURRENT_USER_ID = Number(@json(auth()->id() ?? session('user_id') ?? data_get(session('user'),'id') ?? null)) || null;
-  const PATH_PREFIX = window.location.pathname.startsWith('/backend') ? '/backend' : '';
+  const CLINIC_ID      = window.PatientStore.getClinicId();
+  const API_BASE       = window.PatientStore.getApiBase();
+  const CURRENT_USER_ID= Number(@json(auth()->id() ?? session('user_id') ?? data_get(session('user'),'id') ?? null)) || null;
+  const PATH_PREFIX    = window.location.pathname.startsWith('/backend') ? '/backend' : '';
   const CONFIG = {
-    API_BASE: `${window.location.origin}${PATH_PREFIX}/api`,
     CSRF_URL: `${window.location.origin}${PATH_PREFIX}/sanctum/csrf-cookie`,
   };
 
-  const STORED_AUTH_FULL = (() => {
-    try {
-      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
-      return raw ? JSON.parse(raw) : null;
-    } catch (_) {
-      return null;
-    }
-  })();
-
-  function getCookie(name) {
-    return document.cookie.split('; ').find(row => row.startsWith(name + '='))?.split('=')[1] ?? '';
-  }
+  function getCookie(name) { return document.cookie.split('; ').find(r=>r.startsWith(name+'='))?.split('=')[1]??''; }
 
   const Auth = {
     mode: 'unknown',
     async bootstrap() {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (token) {
-        this.mode = 'bearer';
-        return { mode: 'bearer' };
-      }
+      const token = localStorage.getItem('token')||sessionStorage.getItem('token');
+      if (token) { this.mode='bearer'; return; }
       try {
-        await fetch(CONFIG.CSRF_URL, { credentials: 'include' });
-        const xsrf = getCookie('XSRF-TOKEN');
-        if (xsrf) {
-          this.mode = 'cookie';
-          return { mode: 'cookie', xsrf };
-        }
-      } catch (_) {}
-      this.mode = 'none';
-      return { mode: 'none' };
+        await fetch(CONFIG.CSRF_URL, { credentials:'include' });
+        if (getCookie('XSRF-TOKEN')) { this.mode='cookie'; return; }
+      } catch(_) {}
+      this.mode='none';
     },
-    headers(base = {}) {
-      const headers = { Accept: 'application/json', ...base };
-      if (CLINIC_ID) {
-        headers['X-Clinic-Id'] = String(CLINIC_ID);
-        headers['X-User-Id'] = String(CLINIC_ID);
-      } else if (CURRENT_USER_ID) {
-        headers['X-User-Id'] = String(CURRENT_USER_ID);
-      }
-      if (this.mode === 'bearer') {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (token) headers['Authorization'] = 'Bearer ' + token;
-      } else if (this.mode === 'cookie') {
-        headers['X-Requested-With'] = 'XMLHttpRequest';
-        const xsrf = decodeURIComponent(getCookie('XSRF-TOKEN') || '');
-        if (xsrf) headers['X-XSRF-TOKEN'] = xsrf;
-      }
-      return headers;
+    headers(base={}) {
+      const h = { Accept:'application/json', ...base };
+      if (CLINIC_ID) { h['X-Clinic-Id']=String(CLINIC_ID); h['X-User-Id']=String(CLINIC_ID); }
+      else if (CURRENT_USER_ID) { h['X-User-Id']=String(CURRENT_USER_ID); }
+      if (this.mode==='bearer') { const t=localStorage.getItem('token')||sessionStorage.getItem('token'); if(t) h['Authorization']='Bearer '+t; }
+      else if (this.mode==='cookie') { h['X-Requested-With']='XMLHttpRequest'; const x=decodeURIComponent(getCookie('XSRF-TOKEN')||''); if(x) h['X-XSRF-TOKEN']=x; }
+      return h;
     },
   };
 
-  function targetQuery(extra = {}) {
-    const params = new URLSearchParams();
-    if (CLINIC_ID) {
-      params.set('clinic_id', String(CLINIC_ID));
-      params.set('user_id', String(CLINIC_ID));
-    } else if (CURRENT_USER_ID) {
-      params.set('user_id', String(CURRENT_USER_ID));
-    }
-    Object.entries(extra).forEach(([key, value]) => {
-      if (value === undefined || value === null || value === '') return;
-      params.set(key, String(value));
-    });
-    const qs = params.toString();
-    return qs ? `?${qs}` : '';
+  function appendTarget(fd) {
+    if (CLINIC_ID) { if(!fd.has('clinic_id')) fd.append('clinic_id',String(CLINIC_ID)); if(!fd.has('user_id')) fd.append('user_id',String(CLINIC_ID)); }
+    else if (CURRENT_USER_ID) { if(!fd.has('user_id')) fd.append('user_id',String(CURRENT_USER_ID)); }
   }
 
-  function appendTarget(formData) {
-    if (CLINIC_ID) {
-      if (!formData.has('clinic_id')) formData.append('clinic_id', String(CLINIC_ID));
-      if (!formData.has('user_id')) formData.append('user_id', String(CLINIC_ID));
-    } else if (CURRENT_USER_ID) {
-      if (!formData.has('user_id')) formData.append('user_id', String(CURRENT_USER_ID));
-    }
-  }
-
-  async function apiFetch(url, opts = {}) {
-    const res = await fetch(url, { credentials: 'include', ...opts });
-    const contentType = res.headers.get('content-type') || '';
-    const data = contentType.includes('application/json') ? await res.json() : await res.text();
-    if (!res.ok) {
-      const message = typeof data === 'string' ? data : data?.message || 'Request failed';
-      throw new Error(message);
-    }
+  async function apiFetch(url, opts={}) {
+    const res = await fetch(url, { credentials:'include', ...opts });
+    const ct  = res.headers.get('content-type')||'';
+    const data = ct.includes('application/json') ? await res.json() : await res.text();
+    if (!res.ok) throw new Error(typeof data==='string' ? data : data?.message||'Request failed');
     return data;
   }
 
-  const API = {
-    patients: (query = '') => `${CONFIG.API_BASE}/receptionist/patients${targetQuery(query ? { q: query } : {})}`,
-    patientPets: (userId) => `${CONFIG.API_BASE}/receptionist/patients/${userId}/pets${targetQuery()}`,
-    doctors: () => `${CONFIG.API_BASE}/receptionist/doctors${targetQuery()}`,
-    doctorSlotsSummary: (doctorId, extra = {}) => `${CONFIG.API_BASE}/doctors/${doctorId}/slots/summary${targetQuery(extra)}`,
-    createPatient: `${CONFIG.API_BASE}/receptionist/patients`,
-    createAppointment: `${CONFIG.API_BASE}/appointments/submit`,
-  };
-  const BREEDS_API_URL_PRIMARY = `${CONFIG.API_BASE}/dog-breeds/all`;
-  const BREEDS_API_URL_FALLBACK = 'https://snoutiq.com/backend/api/dog-breeds/all';
+  const BREEDS_API_URL = `${API_BASE}/dog-breeds/all`;
+  const BREEDS_CDN     = 'https://snoutiq.com/backend/api/dog-breeds/all';
   const SELECT2_ASSETS = {
-    jquery: @json(url('vertical/assets/js/jquery.min.js')),
+    jquery:    @json(url('vertical/assets/js/jquery.min.js')),
     jqueryCdn: 'https://code.jquery.com/jquery-3.7.1.min.js',
-    select2: @json(url('vertical/assets/plugins/select2/js/select2.min.js')),
-    select2Cdn: 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js',
+    select2:   @json(url('vertical/assets/plugins/select2/js/select2.min.js')),
+    select2Cdn:'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js',
   };
 
-  const bookingModal = document.getElementById('booking-modal');
-  const bookingForm = document.getElementById('booking-form');
-  const patientSelect = document.getElementById('patient-select');
-  const patientSearchInput = document.getElementById('patient-search');
-  const patientSearchBlock = document.getElementById('patient-search-block');
-  const patientResults = document.getElementById('patient-results');
-  const petSelect = document.getElementById('pet-select');
-  const doctorSelect = document.getElementById('booking-doctor-select');
-  const slotSelect = document.getElementById('slot-select');
-  const slotHint = document.getElementById('slot-hint');
+  const bookingModal      = document.getElementById('booking-modal');
+  const bookingForm       = document.getElementById('booking-form');
+  const patientSearchInput= document.getElementById('patient-search');
+  const patientResults    = document.getElementById('patient-results');
+  const patientSelect     = document.getElementById('patient-select'); // hidden, holds value
+  const patientSearchBlock= document.getElementById('patient-search-block');
+  const petSelect         = document.getElementById('pet-select');
+  const doctorSelect      = document.getElementById('booking-doctor-select');
+  const slotSelect        = document.getElementById('slot-select');
+  const slotHint          = document.getElementById('slot-hint');
+  const existingSection   = document.getElementById('existing-patient-section');
+  const newSection        = document.getElementById('new-patient-section');
+  const existingDetails   = document.getElementById('existing-patient-details');
+  const bookingSubmitFields=document.getElementById('booking-submit-fields');
+  const modeButtons       = Array.from(document.querySelectorAll('[data-patient-mode]'));
+  const bookingNew        = document.querySelector('[data-role="booking-new"]');
+  const bookingExisting   = document.querySelector('[data-role="booking-existing"]');
   const inlineBreedSelect = bookingForm?.elements['inline_pet_breed'];
-  const newBreedSelect = bookingForm?.elements['new_pet_breed'];
-  const breedSelects = [inlineBreedSelect, newBreedSelect].filter(Boolean);
-  const modeButtons = Array.from(document.querySelectorAll('[data-patient-mode]'));
-  const existingSection = document.getElementById('existing-patient-section');
-  const newSection = document.getElementById('new-patient-section');
-  const existingDetails = document.getElementById('existing-patient-details');
-  const bookingSubmitFields = document.getElementById('booking-submit-fields');
-  const bookingNew = document.querySelector('[data-role="booking-new"]');
-  const bookingExisting = document.querySelector('[data-role="booking-existing"]');
+  const newBreedSelect    = bookingForm?.elements['new_pet_breed'];
+  const breedSelects      = [inlineBreedSelect, newBreedSelect].filter(Boolean);
 
-  const STORED_FULL = STORED_AUTH_FULL || {};
+  let ALL_PATIENTS   = [];   // populated from PatientStore (same API)
+  let FILTERED_PATIENTS = [];
+  let CURRENT_PATIENT= null;
+  let PATIENT_MODE   = 'new';
+  let BREED_LIST     = [];
+  let select2Loader  = null;
 
-  let PATIENTS = [];
-  let CURRENT_PATIENT = null;
-  let PATIENT_MODE = 'new';
-  let PREFERRED_PATIENT_ID = null;
-  let BREED_LIST = [];
-  let select2Loader = null;
-
-  const closeButtons = bookingModal ? Array.from(bookingModal.querySelectorAll('[data-close]')) : [];
-
-  function openBooking() {
-    if (!bookingModal) return;
-    if (!CLINIC_ID && !CURRENT_USER_ID) {
-      Swal.fire({ icon: 'warning', title: 'Clinic missing', text: 'Open this page from the clinic dashboard.' });
-      return;
+  // ---- Subscribe to the shared PatientStore ----
+  window.PatientStore.subscribe(({ patients }) => {
+    ALL_PATIENTS      = patients;
+    FILTERED_PATIENTS = patients;
+    // Re-render results only when modal is open
+    if (bookingModal?.classList.contains('active')) {
+      filterAndRenderPatients(patientSearchInput?.value||'');
     }
-    bookingModal.classList.add('active');
-    bookingModal.removeAttribute('hidden');
-    bookingModal.setAttribute('aria-hidden', 'false');
-    const dateField = bookingForm?.elements['scheduled_date'];
-    if (dateField && !dateField.value) {
-      dateField.value = new Date().toISOString().split('T')[0];
-    }
-    initBreedSelect2();
-    if (!PATIENTS.length) fetchPatients();
-    if (!doctorSelect?.value) fetchDoctors();
+  });
+
+  function filterPatients(query='') {
+    if (!query.trim()) return ALL_PATIENTS;
+    const q = query.toLowerCase();
+    return ALL_PATIENTS.filter(p =>
+      (p.name||'').toLowerCase().includes(q) ||
+      (p.phone||'').toLowerCase().includes(q) ||
+      (p.email||'').toLowerCase().includes(q) ||
+      (Array.isArray(p.pets) && p.pets.some(pet => (pet.name||pet.pet_name||'').toLowerCase().includes(q)))
+    );
   }
 
-  function closeBooking() {
-    if (!bookingModal) return;
-    bookingModal.classList.remove('active');
-    bookingModal.setAttribute('hidden', 'hidden');
-    bookingModal.setAttribute('aria-hidden', 'true');
-    bookingForm?.reset();
-    petSelect.innerHTML = '';
-    slotSelect.innerHTML = '<option value="">Select a time slot</option>';
-    slotHint.textContent = 'Select a doctor and date first to load available slots.';
-    setPatientMode('new');
+  function filterAndRenderPatients(query='') {
+    FILTERED_PATIENTS = filterPatients(query);
+    renderPatientResults(FILTERED_PATIENTS);
   }
 
-  function setPatientMode(mode) {
-    PATIENT_MODE = mode;
-    modeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.patientMode === mode));
-    existingSection?.classList.toggle('hidden', mode !== 'existing');
-    newSection?.classList.toggle('hidden', mode !== 'new');
-    updateBookingSections();
-  }
-
-  function updateBookingSections() {
-    const isExisting = PATIENT_MODE === 'existing';
-    const hasPatient = Boolean(patientSelect?.value);
-    const hideSearch = isExisting && hasPatient;
-    existingDetails?.classList.toggle('hidden', !isExisting || !hasPatient);
-    bookingSubmitFields?.classList.toggle('hidden', isExisting && !hasPatient);
-    patientSearchBlock?.classList.toggle('hidden', hideSearch);
-  }
-
-  const openBookingWithMode = (mode) => {
-    openBooking();
-    setPatientMode(mode);
-  };
-
-  modeButtons.forEach((btn) => btn.addEventListener('click', () => setPatientMode(btn.dataset.patientMode)));
-  closeButtons.forEach((btn) => btn.addEventListener('click', closeBooking));
-  bookingNew?.addEventListener('click', () => openBookingWithMode('new'));
-  bookingExisting?.addEventListener('click', () => openBookingWithMode('existing'));
-
-  function normalizePhone(...candidates) {
-    for (const value of candidates) {
-      if (typeof value !== 'string') continue;
-      const trimmed = value.trim();
-      if (!trimmed || trimmed.includes('@')) continue;
-      const digits = trimmed.replace(/\D+/g, '');
-      if (!digits) continue;
-      if (digits.startsWith('91') && digits.length >= 12) {
-        return digits.slice(0, 12);
-      }
-      if (digits.length === 10) {
-        return `91${digits}`;
-      }
-      return digits;
-    }
-    return null;
-  }
-
-  async function fetchPatients(query = '') {
-    try {
-      await Auth.bootstrap();
-      const res = await apiFetch(API.patients(query), { headers: Auth.headers() });
-      PATIENTS = res?.data || [];
-      populatePatientSelect();
-    } catch (error) {
-      console.error('Failed to load patients', error);
-    }
-  }
-
-  function populatePatientSelect() {
-    if (!patientSelect) return;
-    patientSelect.innerHTML = '';
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Select patient';
-    patientSelect.appendChild(placeholder);
-    PATIENTS.forEach((patient) => {
-      const option = document.createElement('option');
-      option.value = patient.id;
-      option.textContent = `${patient.name || 'Patient'} | ${patient.phone || patient.email || ''}`;
-      patientSelect.appendChild(option);
-    });
-    const targetId = PREFERRED_PATIENT_ID && PATIENTS.some((p) => String(p.id) === String(PREFERRED_PATIENT_ID))
-      ? PREFERRED_PATIENT_ID
-      : '';
-    PREFERRED_PATIENT_ID = null;
-    patientSelect.value = targetId || '';
-    handlePatientChange();
-  }
-
-  function selectPatientId(patientId) {
-    if (!patientSelect) return;
-    patientSelect.value = patientId;
-    CURRENT_PATIENT = PATIENTS.find((p) => String(p.id) === String(patientId)) || null;
-    PREFERRED_PATIENT_ID = patientId;
-    handlePatientChange();
-  }
-
-  function renderPatientResults() {
+  function renderPatientResults(list) {
     if (!patientResults) return;
     patientResults.innerHTML = '';
 
-    if (!PATIENTS.length) {
-      patientResults.innerHTML = '<div class="patient-results-empty">No patients found.</div>';
-      return;
+    if (window.PatientStore.getAll().length === 0 && !CLINIC_ID) {
+      patientResults.innerHTML = '<div class="patient-results-empty">No clinic detected.</div>'; return;
+    }
+    if (!list || !list.length) {
+      patientResults.innerHTML = '<div class="patient-results-empty">No patients found.</div>'; return;
     }
 
-    PATIENTS.forEach((patient) => {
+    list.forEach(patient => {
       const card = document.createElement('div');
-      const isSelected = String(patientSelect?.value || '') === String(patient.id);
-      card.className = `patient-result${isSelected ? ' is-selected' : ''}`;
+      const isSelected = String(patientSelect?.value||'') === String(patient.id);
+      card.className = `patient-result${isSelected?' is-selected':''}`;
 
       const info = document.createElement('div');
-      const name = document.createElement('div');
-      name.className = 'patient-result-name';
-      name.textContent = patient.name || 'Patient';
-
-      const meta = document.createElement('div');
-      meta.className = 'patient-result-meta';
-      meta.textContent = patient.phone || patient.email || '';
-
-      const tags = document.createElement('div');
-      tags.className = 'patient-result-tags';
+      const name = document.createElement('div'); name.className='patient-result-name'; name.textContent=patient.name||'Patient';
+      const meta = document.createElement('div'); meta.className='patient-result-meta'; meta.textContent=patient.phone||patient.email||'';
+      const tagsDiv = document.createElement('div'); tagsDiv.className='patient-result-tags';
       const pets = Array.isArray(patient.pets) ? patient.pets : [];
-      if (pets.length) {
-        pets.slice(0, 2).forEach((pet) => {
-          const tag = document.createElement('span');
-          tag.className = 'patient-result-tag';
-          tag.textContent = `${pet.name || pet.pet_name || 'Pet'} (${pet.species || pet.pet_type || pet.type || 'Pet'})`;
-          tags.appendChild(tag);
-        });
-      }
-
-      info.appendChild(name);
-      info.appendChild(meta);
-      if (tags.childElementCount) info.appendChild(tags);
-
-      const action = document.createElement('button');
-      action.type = 'button';
-      action.className = 'patient-result-action';
-      action.textContent = 'Select ->';
-      action.addEventListener('click', (event) => {
-        event.stopPropagation();
-        selectPatientId(patient.id);
+      pets.slice(0,2).forEach(pet => {
+        const tag = document.createElement('span'); tag.className='patient-result-tag';
+        tag.textContent=`${pet.name||pet.pet_name||'Pet'} (${pet.species||pet.pet_type||pet.type||'Pet'})`;
+        tagsDiv.appendChild(tag);
       });
+      info.appendChild(name); info.appendChild(meta); if (tagsDiv.childElementCount) info.appendChild(tagsDiv);
 
-      card.appendChild(info);
-      card.appendChild(action);
-      card.addEventListener('click', () => selectPatientId(patient.id));
-
+      const action = document.createElement('button'); action.type='button'; action.className='patient-result-action'; action.textContent='Select ->';
+      action.addEventListener('click', ev => { ev.stopPropagation(); selectPatientInModal(patient); });
+      card.appendChild(info); card.appendChild(action);
+      card.addEventListener('click', () => selectPatientInModal(patient));
       patientResults.appendChild(card);
     });
   }
 
-  async function fetchPatientPets(userId) {
-    if (!userId || !petSelect) {
-      petSelect.innerHTML = '';
-      return;
-    }
-    try {
-      await Auth.bootstrap();
-      const res = await apiFetch(API.patientPets(userId), { headers: Auth.headers() });
-      renderPetOptions(res?.data || []);
-    } catch (error) {
-      console.error('Failed to load pets', error);
-      petSelect.innerHTML = '';
-    }
+  function selectPatientInModal(patient) {
+    CURRENT_PATIENT = patient;
+    if (patientSelect) { patientSelect.innerHTML = `<option value="${patient.id}" selected>${patient.name}</option>`; patientSelect.value = patient.id; }
+    // Load pets from the already-fetched patient object (it has `pets` array from PatientStore)
+    renderPetOptions(Array.isArray(patient.pets) ? patient.pets : []);
+    updateBookingSections();
+    renderPatientResults(FILTERED_PATIENTS); // re-render to highlight selected
   }
 
   function renderPetOptions(pets) {
+    if (!petSelect) return;
     petSelect.innerHTML = '';
-    if (!pets.length) {
-      petSelect.innerHTML = '<option value="">No pets found</option>';
-      return;
-    }
-    pets.forEach((pet) => {
-      const option = document.createElement('option');
-      option.value = pet.id;
-      option.textContent = `${pet.pet_name || pet.name || 'Pet'} | ${pet.pet_type || pet.species || ''}`;
-      option.dataset.petName = pet.pet_name || pet.name || '';
-      petSelect.appendChild(option);
+    if (!pets.length) { petSelect.innerHTML='<option value="">No pets found</option>'; return; }
+    pets.forEach(pet => {
+      const opt=document.createElement('option'); opt.value=pet.id??pet.pet_id;
+      opt.textContent=`${pet.pet_name||pet.name||'Pet'} | ${pet.pet_type||pet.species||pet.type||''}`;
+      opt.dataset.petName = pet.pet_name||pet.name||'';
+      petSelect.appendChild(opt);
     });
   }
 
-  function toTitleCase(value) {
-    return String(value || '')
-      .split(/[\s_-]+/)
-      .filter(Boolean)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+  function openBooking() {
+    if (!bookingModal) return;
+    if (!CLINIC_ID && !CURRENT_USER_ID) { Swal.fire({icon:'warning',title:'Clinic missing',text:'Open this page from the clinic dashboard.'}); return; }
+    bookingModal.classList.add('active'); bookingModal.removeAttribute('hidden'); bookingModal.setAttribute('aria-hidden','false');
+    const dateField = bookingForm?.elements['scheduled_date'];
+    if (dateField && !dateField.value) dateField.value = new Date().toISOString().split('T')[0];
+    initBreedSelect2();
+    // PatientStore already loaded; if not yet, trigger load
+    window.PatientStore.load();
+    filterAndRenderPatients(patientSearchInput?.value||'');
+    if (!doctorSelect?.options?.length || doctorSelect.options.length <= 1) fetchDoctors();
   }
 
-  function buildBreedList(data) {
-    const list = new Set();
-    Object.entries(data || {}).forEach(([breed, subBreeds]) => {
-      const breedName = toTitleCase(breed);
-      if (Array.isArray(subBreeds) && subBreeds.length) {
-        subBreeds.forEach((sub) => list.add(`${toTitleCase(sub)} ${breedName}`.trim()));
-      } else {
-        list.add(breedName);
-      }
-    });
-    return Array.from(list).sort((a, b) => a.localeCompare(b));
+  function closeBooking() {
+    if (!bookingModal) return;
+    bookingModal.classList.remove('active'); bookingModal.setAttribute('hidden','hidden'); bookingModal.setAttribute('aria-hidden','true');
+    bookingForm?.reset(); CURRENT_PATIENT=null;
+    if (patientSelect) patientSelect.innerHTML='';
+    if (petSelect)     petSelect.innerHTML='';
+    if (slotSelect)    slotSelect.innerHTML='<option value="">Select a time slot</option>';
+    if (slotHint)      slotHint.textContent='Select a doctor and date first to load available slots.';
+    if (patientSearchInput) patientSearchInput.value='';
+    if (patientResults) patientResults.innerHTML='';
+    setPatientMode('new');
   }
 
-  function populateBreedSelect(select, breeds, placeholderText = 'Select breed') {
-    if (!select) return;
-    const previous = select.value;
-    select.innerHTML = '';
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = placeholderText;
-    select.appendChild(placeholder);
-    breeds.forEach((breed) => {
-      const opt = document.createElement('option');
-      opt.value = breed;
-      opt.textContent = breed;
-      select.appendChild(opt);
-    });
-    if (previous && breeds.includes(previous)) {
-      select.value = previous;
-    }
+  function setPatientMode(mode) {
+    PATIENT_MODE=mode;
+    modeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.patientMode===mode));
+    existingSection?.classList.toggle('hidden', mode!=='existing');
+    newSection?.classList.toggle('hidden', mode!=='new');
+    updateBookingSections();
+    if (mode==='existing') filterAndRenderPatients(patientSearchInput?.value||'');
   }
 
-  function loadScriptOnce(src, id) {
-    return new Promise((resolve, reject) => {
-      if (id && document.getElementById(id)) {
-        resolve();
-        return;
-      }
-      const script = document.createElement('script');
-      if (id) script.id = id;
-      script.src = src;
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error(`Failed to load ${src}`));
-      document.head.appendChild(script);
-    });
+  function updateBookingSections() {
+    const isExisting = PATIENT_MODE==='existing', hasPatient=Boolean(patientSelect?.value);
+    existingDetails?.classList.toggle('hidden', !isExisting||!hasPatient);
+    bookingSubmitFields?.classList.toggle('hidden', isExisting&&!hasPatient);
+    patientSearchBlock?.classList.toggle('hidden', isExisting&&hasPatient);
   }
 
-  function ensureSelect2Ready() {
-    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
-      return Promise.resolve(true);
-    }
-    if (select2Loader) return select2Loader;
-    select2Loader = (async () => {
-      try {
-        if (!window.jQuery || !window.jQuery.fn) {
-          try {
-            await loadScriptOnce(SELECT2_ASSETS.jquery, 'snoutiq-jquery');
-          } catch (_) {
-            await loadScriptOnce(SELECT2_ASSETS.jqueryCdn, 'snoutiq-jquery-cdn');
-          }
-        }
-        if (!window.jQuery || !window.jQuery.fn) return false;
-        if (!window.jQuery.fn.select2) {
-          try {
-            await loadScriptOnce(SELECT2_ASSETS.select2, 'snoutiq-select2');
-          } catch (_) {
-            await loadScriptOnce(SELECT2_ASSETS.select2Cdn, 'snoutiq-select2-cdn');
-          }
-        }
-        return Boolean(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2);
-      } catch (error) {
-        console.error('Select2 load failed', error);
-        return false;
-      }
-    })();
-    return select2Loader;
-  }
+  modeButtons.forEach(btn => btn.addEventListener('click', () => setPatientMode(btn.dataset.patientMode)));
+  Array.from(bookingModal?.querySelectorAll('[data-close]')||[]).forEach(btn => btn.addEventListener('click', closeBooking));
+  bookingNew?.addEventListener('click', () => { openBooking(); setPatientMode('new'); });
+  bookingExisting?.addEventListener('click', () => { openBooking(); setPatientMode('existing'); });
 
-  function initBreedSelect2() {
-    ensureSelect2Ready().then((ready) => {
-      if (!ready || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
-      const dropdownParent = bookingModal ? window.jQuery(bookingModal) : window.jQuery(document.body);
-      breedSelects.forEach((select) => {
-        if (!select) return;
-        const $select = window.jQuery(select);
-        const currentValue = select.value;
-        if ($select.hasClass('select2-hidden-accessible')) {
-          $select.select2('destroy');
-        }
-        $select.select2({
-          width: '100%',
-          placeholder: 'Select breed',
-          allowClear: true,
-          minimumResultsForSearch: 0,
-          dropdownParent,
-        });
-        if (currentValue) {
-          $select.val(currentValue).trigger('change.select2');
-        }
-      });
-    });
-  }
+  // Live search filters the already-loaded PatientStore data (no extra API call)
+  let searchTimer;
+  patientSearchInput?.addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => filterAndRenderPatients(e.target.value), 200);
+  });
 
-  async function fetchDogBreeds() {
-    if (!inlineBreedSelect && !newBreedSelect) return;
-    populateBreedSelect(inlineBreedSelect, [], 'Loading breeds...');
-    populateBreedSelect(newBreedSelect, [], 'Loading breeds...');
-    try {
-      const res = await fetch(BREEDS_API_URL_PRIMARY, { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error(`Failed to fetch breeds (${res.status})`);
-      const data = await res.json();
-      const breeds = buildBreedList(data?.breeds || {});
-      if (!breeds.length && BREEDS_API_URL_FALLBACK) {
-        throw new Error('Empty breeds list');
-      }
-      BREED_LIST = breeds;
-      populateBreedSelect(inlineBreedSelect, BREED_LIST);
-      populateBreedSelect(newBreedSelect, BREED_LIST);
-      initBreedSelect2();
-    } catch (error) {
-      console.error('Failed to load dog breeds from primary', error);
-      if (BREEDS_API_URL_FALLBACK && BREEDS_API_URL_FALLBACK !== BREEDS_API_URL_PRIMARY) {
-        try {
-          const res = await fetch(BREEDS_API_URL_FALLBACK, { headers: { Accept: 'application/json' } });
-          if (!res.ok) throw new Error(`Failed to fetch breeds (${res.status})`);
-          const data = await res.json();
-          const breeds = buildBreedList(data?.breeds || {});
-          BREED_LIST = breeds;
-          populateBreedSelect(inlineBreedSelect, BREED_LIST);
-          populateBreedSelect(newBreedSelect, BREED_LIST);
-          initBreedSelect2();
-          return;
-        } catch (fallbackErr) {
-          console.error('Fallback breed fetch failed', fallbackErr);
-        }
-      }
-      populateBreedSelect(inlineBreedSelect, [], 'Breeds unavailable');
-      populateBreedSelect(newBreedSelect, [], 'Breeds unavailable');
-      initBreedSelect2();
-    }
-  }
-
+  /* ---- Doctors & slots (unchanged) ---- */
   async function fetchDoctors() {
     if (!doctorSelect) return;
     try {
       await Auth.bootstrap();
-      const res = await apiFetch(API.doctors(), { headers: Auth.headers() });
+      const res  = await apiFetch(`${API_BASE}/receptionist/doctors?clinic_id=${CLINIC_ID||CURRENT_USER_ID||''}`, { headers: Auth.headers() });
       const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-      renderDoctorOptions(list);
-    } catch (error) {
-      console.error('Failed to load doctors', error);
-    }
-  }
-
-  function renderDoctorOptions(list) {
-    if (!doctorSelect) return;
-    doctorSelect.innerHTML = '<option value="">Any available doctor</option>';
-    list.forEach((doc) => {
-      const option = document.createElement('option');
-      option.value = doc.id;
-      option.textContent = doc.doctor_name || doc.name || `Doctor ${doc.id}`;
-      doctorSelect.appendChild(option);
-    });
+      doctorSelect.innerHTML='<option value="">Any available doctor</option>';
+      list.forEach(doc => { const o=document.createElement('option'); o.value=doc.id; o.textContent=doc.doctor_name||doc.name||`Doctor ${doc.id}`; doctorSelect.appendChild(o); });
+    } catch(e) { console.error('fetchDoctors',e); }
   }
 
   async function fetchDoctorSlots(doctorId) {
     if (!slotSelect) return;
-    if (!doctorId) {
-      slotSelect.innerHTML = '<option value="">Select a time slot</option>';
-      slotHint.textContent = 'Select a doctor and date first to load available slots.';
-      return;
-    }
+    if (!doctorId) { slotSelect.innerHTML='<option value="">Select a time slot</option>'; slotHint.textContent='Select a doctor and date first.'; return; }
     const date = bookingForm.elements['scheduled_date'].value;
-    if (!date) {
-      slotSelect.innerHTML = '<option value="">Select a time slot</option>';
-      slotHint.textContent = 'Select a doctor and date first to load available slots.';
-      return;
-    }
+    if (!date) { slotSelect.innerHTML='<option value="">Select a time slot</option>'; slotHint.textContent='Select a doctor and date first.'; return; }
     try {
       await Auth.bootstrap();
-      const res = await apiFetch(API.doctorSlotsSummary(doctorId, { date, service_type: bookingForm.elements['service_type'].value || 'in_clinic' }), { headers: Auth.headers() });
-      const slots = res?.free_slots || [];
-      slotSelect.innerHTML = '<option value="">Select a time slot</option>';
-      slots.forEach((slot) => {
-        const opt = document.createElement('option');
-        const time = typeof slot === 'string' ? slot : (slot.time || slot.time_slot || slot.slot || '');
-        const status = typeof slot === 'string' ? 'free' : (slot.status || 'free');
-        opt.value = time;
-        opt.textContent = `${time} (${status})`;
-        slotSelect.appendChild(opt);
-      });
+      const url = `${API_BASE}/doctors/${doctorId}/slots/summary?clinic_id=${CLINIC_ID||''}&user_id=${CLINIC_ID||CURRENT_USER_ID||''}&date=${date}&service_type=${bookingForm.elements['service_type'].value||'in_clinic'}`;
+      const res  = await apiFetch(url, { headers: Auth.headers() });
+      const slots = res?.free_slots||[];
+      slotSelect.innerHTML='<option value="">Select a time slot</option>';
+      slots.forEach(slot => { const t=typeof slot==='string'?slot:(slot.time||slot.time_slot||slot.slot||''); const s=typeof slot==='string'?'free':(slot.status||'free'); const o=document.createElement('option'); o.value=t; o.textContent=`${t} (${s})`; slotSelect.appendChild(o); });
       slotHint.textContent = slots.length ? `${slots.length} slots available` : 'No slots available for this date';
-    } catch (error) {
-      console.error('Failed to load slots', error);
-      slotSelect.innerHTML = '<option value="">Select a time slot</option>';
-      slotHint.textContent = 'Failed to load slots';
+    } catch(e) { console.error('fetchDoctorSlots',e); slotSelect.innerHTML='<option value="">Select a time slot</option>'; slotHint.textContent='Failed to load slots'; }
+  }
+
+  doctorSelect?.addEventListener('change', () => fetchDoctorSlots(doctorSelect.value));
+  bookingForm?.elements['scheduled_date']?.addEventListener('change', () => fetchDoctorSlots(doctorSelect?.value));
+
+  /* ---- Breeds ---- */
+  function toTitleCase(v) { return String(v||'').split(/[\s_-]+/).filter(Boolean).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); }
+  function buildBreedList(data) {
+    const s=new Set();
+    Object.entries(data||{}).forEach(([breed,subs]) => { const bn=toTitleCase(breed); Array.isArray(subs)&&subs.length ? subs.forEach(sub=>s.add(`${toTitleCase(sub)} ${bn}`.trim())) : s.add(bn); });
+    return Array.from(s).sort((a,b)=>a.localeCompare(b));
+  }
+  function populateBreedSelect(sel, breeds, placeholder='Select breed') {
+    if (!sel) return;
+    const prev=sel.value; sel.innerHTML='';
+    const ph=document.createElement('option'); ph.value=''; ph.textContent=placeholder; sel.appendChild(ph);
+    breeds.forEach(b => { const o=document.createElement('option'); o.value=b; o.textContent=b; sel.appendChild(o); });
+    if (prev&&breeds.includes(prev)) sel.value=prev;
+  }
+  async function fetchDogBreeds() {
+    if (!inlineBreedSelect&&!newBreedSelect) return;
+    populateBreedSelect(inlineBreedSelect,[],'Loading breeds...'); populateBreedSelect(newBreedSelect,[],'Loading breeds...');
+    const tryFetch = async url => { const r=await fetch(url,{headers:{Accept:'application/json'}}); if(!r.ok) throw new Error(); return r.json(); };
+    try {
+      const data = await tryFetch(BREEDS_API_URL).catch(()=>tryFetch(BREEDS_CDN));
+      BREED_LIST = buildBreedList(data?.breeds||{});
+      populateBreedSelect(inlineBreedSelect,BREED_LIST); populateBreedSelect(newBreedSelect,BREED_LIST); initBreedSelect2();
+    } catch(e) { populateBreedSelect(inlineBreedSelect,[],'Breeds unavailable'); populateBreedSelect(newBreedSelect,[],'Breeds unavailable'); initBreedSelect2(); }
+  }
+
+  function loadScriptOnce(src,id) {
+    return new Promise((res,rej)=>{ if(id&&document.getElementById(id)){res();return;} const s=document.createElement('script'); if(id)s.id=id; s.src=src; s.async=true; s.onload=()=>res(); s.onerror=()=>rej(); document.head.appendChild(s); });
+  }
+  function ensureSelect2Ready() {
+    if (window.jQuery?.fn?.select2) return Promise.resolve(true);
+    if (select2Loader) return select2Loader;
+    select2Loader = (async()=>{
+      try {
+        if (!window.jQuery?.fn) await loadScriptOnce(SELECT2_ASSETS.jquery,'snoutiq-jquery').catch(()=>loadScriptOnce(SELECT2_ASSETS.jqueryCdn,'snoutiq-jquery-cdn'));
+        if (!window.jQuery?.fn?.select2) await loadScriptOnce(SELECT2_ASSETS.select2,'snoutiq-select2').catch(()=>loadScriptOnce(SELECT2_ASSETS.select2Cdn,'snoutiq-select2-cdn'));
+        return Boolean(window.jQuery?.fn?.select2);
+      } catch(e){ return false; }
+    })();
+    return select2Loader;
+  }
+  function initBreedSelect2() {
+    ensureSelect2Ready().then(ready => {
+      if (!ready||!window.jQuery?.fn?.select2) return;
+      const dp = bookingModal ? window.jQuery(bookingModal) : window.jQuery(document.body);
+      breedSelects.forEach(sel => {
+        if (!sel) return;
+        const $sel=window.jQuery(sel), prev=sel.value;
+        if ($sel.hasClass('select2-hidden-accessible')) $sel.select2('destroy');
+        $sel.select2({ width:'100%', placeholder:'Select breed', allowClear:true, minimumResultsForSearch:0, dropdownParent:dp });
+        if (prev) $sel.val(prev).trigger('change.select2');
+      });
+    });
+  }
+
+  /* ---- Form submit ---- */
+  function normalizePhone(...candidates) {
+    for (const v of candidates) {
+      if (typeof v!=='string') continue;
+      const t=v.trim(); if(!t||t.includes('@')) continue;
+      const d=t.replace(/\D+/g,''); if(!d) continue;
+      if (d.startsWith('91')&&d.length>=12) return d.slice(0,12);
+      if (d.length===10) return `91${d}`;
+      return d;
     }
+    return null;
   }
 
-  function handleDoctorChange() {
-    const doctorId = doctorSelect?.value;
-    fetchDoctorSlots(doctorId);
-  }
-
-  function handlePatientChange() {
-    const patientId = patientSelect?.value;
-    CURRENT_PATIENT = PATIENTS.find((p) => String(p.id) === String(patientId)) || null;
-    fetchPatientPets(patientId);
-    renderPatientResults();
-    updateBookingSections();
-  }
-
-  patientSelect?.addEventListener('change', handlePatientChange);
-  doctorSelect?.addEventListener('change', handleDoctorChange);
-  bookingForm?.elements['scheduled_date']?.addEventListener('change', () => handleDoctorChange());
-
-  let searchTimer;
-  patientSearchInput?.addEventListener('input', (event) => {
-    const query = event.target.value.trim();
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => fetchPatients(query), 350);
-  });
-
-  bookingForm?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!CLINIC_ID && !CURRENT_USER_ID) {
-      Swal.fire({ icon: 'warning', title: 'Clinic missing', text: 'Reload from clinic dashboard.' });
-      return;
-    }
+  bookingForm?.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    if (!CLINIC_ID&&!CURRENT_USER_ID) { Swal.fire({icon:'warning',title:'Clinic missing',text:'Reload from clinic dashboard.'}); return; }
     const doctorId = bookingForm.elements['doctor_id'].value;
-    const date = bookingForm.elements['scheduled_date'].value;
+    const date     = bookingForm.elements['scheduled_date'].value;
     const timeSlot = bookingForm.elements['scheduled_time'].value;
-    if (!doctorId || !date || !timeSlot) {
-      Swal.fire({ icon: 'warning', title: 'Required fields missing', text: 'Doctor, date and slot are mandatory.' });
-      return;
-    }
+    if (!doctorId||!date||!timeSlot) { Swal.fire({icon:'warning',title:'Required fields missing',text:'Doctor, date and slot are mandatory.'}); return; }
     try {
       await Auth.bootstrap();
-      let patientId = patientSelect?.value || null;
-      let patientName = CURRENT_PATIENT?.name || '';
-      let patientPhone = normalizePhone(
-        CURRENT_PATIENT?.phone,
-        CURRENT_PATIENT?.email,
-        STORED_FULL?.user?.phone,
-        STORED_FULL?.user?.email
-      );
-      let petName = null;
-      if (!patientPhone) {
-        patientPhone = normalizePhone(STORED_FULL?.user?.phone, STORED_FULL?.user?.email);
-      }
-      if (PATIENT_MODE === 'new') {
-        const name = bookingForm.elements['new_patient_name'].value.trim();
-        const phone = normalizePhone(bookingForm.elements['new_patient_phone'].value);
-        const email = bookingForm.elements['new_patient_email'].value.trim();
-        const newPetName = bookingForm.elements['new_pet_name'].value.trim();
-        if (!name || (!phone && !email)) {
-          Swal.fire({ icon: 'warning', title: 'Patient details required', text: 'Provide name and phone or email.' });
-          return;
-        }
-        if (!newPetName) {
-          Swal.fire({ icon: 'warning', title: 'Pet name required' });
-          return;
-        }
-        const payload = new FormData();
-        payload.append('name', name);
-        if (phone) payload.append('phone', phone);
-        if (email) payload.append('email', email);
-        payload.append('pet_name', newPetName);
-        payload.append('pet_type', bookingForm.elements['new_pet_type'].value.trim() || 'pet');
-        payload.append('pet_breed', bookingForm.elements['new_pet_breed'].value.trim() || 'Unknown');
-        payload.append('pet_gender', bookingForm.elements['new_pet_gender'].value.trim() || 'unknown');
+      let patientId=patientSelect?.value||null, patientName=CURRENT_PATIENT?.name||'', patientPhone=null, petName=null;
+
+      if (PATIENT_MODE==='new') {
+        const name=bookingForm.elements['new_patient_name'].value.trim();
+        const phone=normalizePhone(bookingForm.elements['new_patient_phone'].value);
+        const email=bookingForm.elements['new_patient_email'].value.trim();
+        const newPetName=bookingForm.elements['new_pet_name'].value.trim();
+        if (!name||(!phone&&!email)) { Swal.fire({icon:'warning',title:'Patient details required',text:'Provide name and phone or email.'}); return; }
+        if (!newPetName) { Swal.fire({icon:'warning',title:'Pet name required'}); return; }
+        const payload=new FormData();
+        payload.append('name',name); if(phone) payload.append('phone',phone); if(email) payload.append('email',email);
+        payload.append('pet_name',newPetName);
+        payload.append('pet_type',bookingForm.elements['new_pet_type'].value.trim()||'pet');
+        payload.append('pet_breed',bookingForm.elements['new_pet_breed'].value.trim()||'Unknown');
+        payload.append('pet_gender',bookingForm.elements['new_pet_gender'].value.trim()||'unknown');
         appendTarget(payload);
-        const patientRes = await apiFetch(API.createPatient, {
-          method: 'POST',
-          headers: Auth.headers(),
-          body: payload,
-        });
-        patientId = patientRes?.data?.user?.id;
-        patientName = patientRes?.data?.user?.name || name;
-        patientPhone = normalizePhone(patientRes?.data?.user?.phone, phone, patientRes?.data?.user?.email, email);
-        petName = patientRes?.data?.pet?.name || newPetName;
-        CURRENT_PATIENT = { id: patientId, name: patientName, phone: patientPhone };
-        PREFERRED_PATIENT_ID = patientId;
-        fetchPatients();
+        const res=await apiFetch(`${API_BASE}/receptionist/patients`,{method:'POST',headers:Auth.headers(),body:payload});
+        patientId=res?.data?.user?.id; patientName=res?.data?.user?.name||name;
+        patientPhone=normalizePhone(res?.data?.user?.phone,phone,res?.data?.user?.email,email);
+        petName=res?.data?.pet?.name||newPetName;
+        // Refresh PatientStore so new patient shows everywhere
+        await window.PatientStore.reload();
       } else {
-        if (!patientId) {
-          Swal.fire({ icon: 'warning', title: 'Select a patient' });
-          return;
-        }
-        const selectedPetOption = petSelect?.options[petSelect.selectedIndex];
-        petName = selectedPetOption?.dataset?.petName || selectedPetOption?.textContent || null;
-        const inlinePetName = bookingForm.elements['inline_pet_name']?.value.trim();
-        if (inlinePetName) petName = inlinePetName;
+        if (!patientId) { Swal.fire({icon:'warning',title:'Select a patient'}); return; }
+        patientPhone = normalizePhone(CURRENT_PATIENT?.phone,CURRENT_PATIENT?.email);
+        const sel=petSelect?.options[petSelect.selectedIndex]; petName=sel?.dataset?.petName||sel?.textContent||null;
+        const inlinePet=bookingForm.elements['inline_pet_name']?.value.trim(); if(inlinePet) petName=inlinePet;
       }
-      const payload = new FormData();
-      if (patientId) payload.append('user_id', patientId);
-      if (CLINIC_ID) payload.append('clinic_id', String(CLINIC_ID));
-      payload.append('doctor_id', doctorId);
-      payload.append('patient_name', patientName);
-      if (patientPhone) payload.append('patient_phone', patientPhone);
-      if (petName) payload.append('pet_name', petName);
-      payload.append('date', date);
-      payload.append('time_slot', timeSlot);
-      if (bookingForm.elements['notes'].value.trim()) {
-        payload.append('notes', bookingForm.elements['notes'].value.trim());
-      }
+      const payload=new FormData();
+      if(patientId)    payload.append('user_id',patientId);
+      if(CLINIC_ID)    payload.append('clinic_id',String(CLINIC_ID));
+      payload.append('doctor_id',doctorId); payload.append('patient_name',patientName);
+      if(patientPhone) payload.append('patient_phone',patientPhone);
+      if(petName)      payload.append('pet_name',petName);
+      payload.append('date',date); payload.append('time_slot',timeSlot);
+      const notes=bookingForm.elements['notes'].value.trim(); if(notes) payload.append('notes',notes);
       appendTarget(payload);
-      await apiFetch(API.createAppointment, {
-        method: 'POST',
-        headers: Auth.headers(),
-        body: payload,
-      });
-      Swal.fire({ icon: 'success', title: 'Appointment saved', timer: 1500, showConfirmButton: false });
-      closeBooking();
-      handleDoctorChange();
-      handlePatientChange();
-    } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Unable to save appointment', text: error.message || 'Unknown error' });
-    }
+      await apiFetch(`${API_BASE}/appointments/submit`,{method:'POST',headers:Auth.headers(),body:payload});
+      Swal.fire({icon:'success',title:'Appointment saved',timer:1500,showConfirmButton:false});
+      closeBooking(); fetchDoctorSlots(doctorId);
+    } catch(error) { Swal.fire({icon:'error',title:'Unable to save appointment',text:error.message||'Unknown error'}); }
   });
 
-  document.addEventListener('DOMContentLoaded', () => {
-    fetchDoctors();
-    fetchPatients();
-    fetchDogBreeds();
-  });
+  document.addEventListener('DOMContentLoaded', () => { fetchDoctors(); fetchDogBreeds(); });
 })();
 </script>
 
