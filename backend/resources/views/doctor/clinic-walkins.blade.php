@@ -72,6 +72,7 @@
     .pm-btn{padding:8px 12px;border-radius:10px;border:0;cursor:pointer;font-weight:700;font-size:13px}
     .pm-btn.pm-primary{background:linear-gradient(90deg,var(--pm-blue),var(--pm-purple));color:white}
     .pm-btn.pm-ghost{background:#fff;border:1px solid #eef6ff;color:#1f2937}
+    .pm-btn:disabled{opacity:.55;cursor:not-allowed;pointer-events:none}
     .pm-content{display:grid;grid-template-columns:380px 1fr;gap:18px;margin-top:12px;align-items:start}
     .pm-left,.pm-right{background:var(--pm-panel);padding:14px;border-radius:var(--pm-radius);box-shadow:var(--pm-shadow)}
     .pm-left{min-height:640px}
@@ -409,10 +410,6 @@
           <option value="name">Patient name (A->Z)</option>
         </select>
       </div>
-      <div class="pm-tagsRow">
-        <div class="pm-small">Quick filters:</div>
-        <div id="pm-tag-filters" class="pm-tagWrap"></div>
-      </div>
       <div id="pm-list" class="pm-list" role="list">
         <div class="pm-empty" id="pm-loading">Loading patients...</div>
       </div>
@@ -450,6 +447,8 @@
             <div class="pm-small" id="pm-pet-count">-</div>
             <button class="pm-btn pm-primary" data-role="open-pet">+ Add Pet</button>
             <button class="pm-btn pm-primary" data-role="open-upload" data-followup="1">Post Op Form</button>
+            <button type="button" class="pm-btn pm-primary" id="pm-upload-document-btn" data-role="upload-document" disabled>Upload Document</button>
+            <input type="file" id="pm-document-upload-input" hidden accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,application/pdf,image/*">
           </div>
         </div>
         <div class="pm-card">
@@ -542,7 +541,11 @@
               </div>
               <div>
                 <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Gender</label>
-                <input name="inline_pet_gender" type="text" placeholder="Male/Female" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+                <select name="inline_pet_gender" class="w-full bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500">
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
               </div>
             </div>
           </div>
@@ -592,7 +595,11 @@
             </div>
             <div>
               <label class="block text-sm font-semibold mb-1">Gender</label>
-              <input name="new_pet_gender" type="text" placeholder="Male/Female" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
+              <select name="new_pet_gender" class="w-full bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500">
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
             </div>
           </div>
           <p class="text-xs text-slate-500">Provide at least a phone number or email for the patient, and pet details so we can attach the booking.</p>
@@ -985,12 +992,14 @@ window.PatientStore = (() => {
   const API_BASE   = window.PatientStore.getApiBase();
   const CLINIC_ID  = window.PatientStore.getClinicId();
   const DEFAULT_DOCTOR_ID = Number(@json($sessionDoctorId ?? null)) || null;
+  const DOCUMENT_UPLOAD_POST_ENDPOINT = '/documents/upload';
+  const DOCUMENT_UPLOAD_POST_URL = `${API_BASE}${DOCUMENT_UPLOAD_POST_ENDPOINT}`;
+  const DOCUMENT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 
   const state = {
     patients: [],
     search: '',
     sort: 'recent',
-    tagFilters: [],
     selectedId: null,
     records: new Map(),
     lastPostOp: null,
@@ -999,16 +1008,9 @@ window.PatientStore = (() => {
     editingRecordId: null,
   };
 
-  const TAGS = [
-    { id: 'hasRecords', label: 'Has records' },
-    { id: 'noRecords',  label: 'No records'  },
-    { id: 'recent',     label: 'Updated recently' },
-  ];
-
   const els = {
     search:              document.getElementById('pm-search'),
     sort:                document.getElementById('pm-sort'),
-    tagFilters:          document.getElementById('pm-tag-filters'),
     list:                document.getElementById('pm-list'),
     listCount:           document.getElementById('pm-list-count'),
     profileAvatar:       document.getElementById('pm-profile-avatar'),
@@ -1030,6 +1032,8 @@ window.PatientStore = (() => {
     followupContextMeta: document.getElementById('pv-followup-context-meta'),
     openUploadBtns:      Array.from(document.querySelectorAll('[data-role="open-upload"]')),
     openPetBtns:         Array.from(document.querySelectorAll('[data-role="open-pet"]')),
+    documentUploadBtn:   document.getElementById('pm-upload-document-btn'),
+    documentUploadInput: document.getElementById('pm-document-upload-input'),
     modal:               document.getElementById('record-modal'),
     modalPatient:        document.getElementById('record-modal-patient'),
     modalPet:            document.getElementById('record-modal-pet'),
@@ -1338,26 +1342,11 @@ window.PatientStore = (() => {
     els.recordNotes.value = symptom; els.recordNotes.dataset.autofillSymptom = symptom;
   }
 
-  function renderTagFilters() {
-    if (!els.tagFilters) return;
-    els.tagFilters.innerHTML = '';
-    TAGS.forEach(tag => {
-      const el = document.createElement('div');
-      el.className = 'pm-tag' + (state.tagFilters.includes(tag.id) ? ' is-active' : '');
-      el.textContent = tag.label;
-      el.onclick = () => { const i = state.tagFilters.indexOf(tag.id); i>-1 ? state.tagFilters.splice(i,1) : state.tagFilters.push(tag.id); renderPatientList(); };
-      els.tagFilters.appendChild(el);
-    });
-  }
-
   function applyFilters(list) {
     let f = list.slice();
     if (state.search) {
       f = f.filter(p => window.PatientStore.matchesSearch(p, state.search));
     }
-    if (state.tagFilters.includes('hasRecords')) f = f.filter(p => (p.records_count||0)>0);
-    if (state.tagFilters.includes('noRecords'))  f = f.filter(p => (p.records_count||0)===0);
-    if (state.tagFilters.includes('recent'))     f = f.filter(p => { const ts=new Date(p.updated_at||p.last_record_at||p.created_at||'').getTime(); return !isNaN(ts)&&ts>=(Date.now()-30*24*60*60*1000); });
     if (state.sort==='records')    f.sort((a,b)=>(b.records_count||0)-(a.records_count||0));
     else if (state.sort==='name')  f.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
     else                            f.sort((a,b)=>new Date(b.last_record_at||b.updated_at||0)-new Date(a.last_record_at||a.updated_at||0));
@@ -1397,6 +1386,83 @@ window.PatientStore = (() => {
 
   function createEmptyRow(text) { const d=document.createElement('div'); d.className='pm-empty'; d.textContent=text; return d; }
 
+  function updateDocumentUploadButton() {
+    if (!els.documentUploadBtn) return;
+    els.documentUploadBtn.disabled = !state.selectedId;
+  }
+
+  function resolveUploadPetId(patient) {
+    if (!patient) return null;
+    const pets = getPatientPets(patient);
+    if (!pets.length) return null;
+    const primary = getPrimaryPet(patient);
+    return resolvePetId(primary) || resolvePetId(pets[0]) || null;
+  }
+
+  function triggerDocumentUploadPicker() {
+    if (!state.selectedId) {
+      Swal.fire({ icon:'info', title:'Select a patient', text:'Pick a patient before uploading a document.' });
+      return;
+    }
+    els.documentUploadInput?.click();
+  }
+
+  async function uploadPatientDocument(file) {
+    const patient = state.patients.find(p => Number(p.id) === Number(state.selectedId));
+    if (!patient || !file) return;
+
+    if (file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
+      Swal.fire({ icon:'warning', title:'File too large', text:'Maximum file size is 10 MB.' });
+      return;
+    }
+
+    const petId = resolveUploadPetId(patient);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('user_id', String(patient.id));
+    if (petId) fd.append('pet_id', String(petId));
+    fd.append('record_type', 'clinic_walkin');
+    fd.append('record_label', (file.name || 'Uploaded document').slice(0, 150));
+    fd.append('source', 'clinic_walkins');
+    fd.append('file_count', '1');
+
+    const prevLabel = els.documentUploadBtn?.textContent;
+    if (els.documentUploadBtn) {
+      els.documentUploadBtn.disabled = true;
+      els.documentUploadBtn.textContent = 'Uploading...';
+    }
+
+    try {
+      const res = await fetch(DOCUMENT_UPLOAD_POST_URL, {
+        method: 'POST',
+        body: fd,
+        credentials: 'include',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (_) {}
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || text || 'Upload failed');
+      }
+      Swal.fire({
+        icon: 'success',
+        title: 'Document uploaded',
+        text: data?.data?.file_name || file.name || 'Saved to database',
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      Swal.fire({ icon:'error', title:'Upload failed', text: error.message || 'Could not upload document' });
+    } finally {
+      if (els.documentUploadBtn) {
+        els.documentUploadBtn.textContent = prevLabel || 'Upload Document';
+        updateDocumentUploadButton();
+      }
+      if (els.documentUploadInput) els.documentUploadInput.value = '';
+    }
+  }
+
   function renderProfile() {
     const patient = state.patients.find(p => Number(p.id)===Number(state.selectedId));
     if (!patient) {
@@ -1404,7 +1470,7 @@ window.PatientStore = (() => {
       els.profileSub.textContent='Patient and pet details will appear here.'; els.profileMeta.textContent='';
       els.statRecords.textContent='-'; els.statLastRecord.textContent='Last upload -';
       els.statContact.textContent='-'; els.statEmail.textContent='-'; els.recordCount.textContent='-';
-      renderPetSelect(null); renderRecords(); renderPets(); return;
+      renderPetSelect(null); renderRecords(); renderPets(); updateDocumentUploadButton(); return;
     }
     const primaryPet = getPrimaryPet(patient);
     els.profileAvatar.textContent = String(primaryPet?.name||patient.name||'?').charAt(0).toUpperCase();
@@ -1423,6 +1489,7 @@ window.PatientStore = (() => {
     renderPetSelect(patient, getPrimaryPet(patient)?.id);
     renderPets(patient);
     renderRecords();
+    updateDocumentUploadButton();
   }
 
   function renderPets(patient=null) {
@@ -1642,6 +1709,11 @@ window.PatientStore = (() => {
     els.sort?.addEventListener('change', e => { state.sort=e.target.value; renderPatientList(); });
     els.openUploadBtns.forEach(btn => btn.addEventListener('click', ev => openUploadModal(ev.currentTarget?.dataset?.followup==='1')));
     els.openPetBtns.forEach(btn => btn.addEventListener('click', openPetModal));
+    els.documentUploadBtn?.addEventListener('click', triggerDocumentUploadPicker);
+    els.documentUploadInput?.addEventListener('change', ev => {
+      const file = ev.target?.files?.[0];
+      if (file) uploadPatientDocument(file);
+    });
     document.querySelectorAll('[data-role="close-record-modal"]').forEach(btn => btn.addEventListener('click', closeModal));
     document.querySelectorAll('[data-role="close-pet-modal"]').forEach(btn => btn.addEventListener('click', closePetModal));
     els.caseSeverity?.addEventListener('change', () => toggleCriticalSections());
@@ -1706,12 +1778,11 @@ window.PatientStore = (() => {
     state.loadingPatients = loading;
     const exists = state.selectedId && patients.some(p => Number(p.id)===Number(state.selectedId));
     if (!exists) state.selectedId = null;
-    renderTagFilters();
     renderPatientList();
     renderProfile();
   });
 
-  renderTagFilters(); renderPatientList(); renderProfile(); renderMedicationCards(); syncMedicationPayload();
+  renderPatientList(); renderProfile(); renderMedicationCards(); syncMedicationPayload();
   wireEvents(); toggleCriticalSections();
   window.PatientStore.load();
   loadDoctors();
