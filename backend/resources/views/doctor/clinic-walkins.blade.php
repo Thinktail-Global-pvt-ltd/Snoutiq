@@ -789,7 +789,7 @@
       <div class="pv-card" id="pv-documents-card">
         <div class="pv-cardTitle">Documents <span class="pv-optional">optional</span></div>
         <label class="pv-upload" for="record-file"><span>📎</span> Upload prescription / lab report</label>
-        <input id="record-file" name="record_file" type="file" class="pv-input" required>
+        <input id="record-file" name="record_file" type="file" class="pv-input">
         <div class="pv-helper">PDF, JPG, PNG, DOC up to 10 MB.</div>
       </div>
 
@@ -1487,7 +1487,7 @@ window.PatientStore = (() => {
     if (els.visitCategory) els.visitCategory.value='';
     resetMedications(); toggleCriticalSections(); updateVisitCategoryUI(els.visitCategory?.value||'');
     const ri=document.getElementById('record-id'); if(ri) ri.value='';
-    const rf=document.getElementById('record-file'); if(rf) rf.required=true;
+    const rf=document.getElementById('record-file'); if(rf) rf.required=false;
   }
 
   function fillRecordFormFromRecord(rec) {
