@@ -971,11 +971,12 @@ Route::post('/doctor/otp/request', function (Request $request, WhatsAppService $
         return response()->json(['success' => false, 'message' => 'Doctor not found, please register first.'], 404);
     }
 
-    $otp = (string) random_int(100000, 999999);
+    $isDemoLogin = $phone === '8602180052';
+    $otp = $isDemoLogin ? '000000' : (string) random_int(100000, 999999);
     $token = (string) \Illuminate\Support\Str::uuid();
     $expiresAt = now()->addMinutes(10);
 
-    if ($whatsApp->isConfigured()) {
+    if ($whatsApp->isConfigured() && ! $isDemoLogin) {
         try {
             $whatsApp->sendOtpTemplate($phone, $otp);
         } catch (\Throwable $e) {
@@ -1027,11 +1028,12 @@ Route::post('/doctor/otp/request-any', function (Request $request, WhatsAppServi
         );
     }
 
-    $otp = (string) random_int(100000, 999999);
+    $isDemoLogin = $phone === '8602180052';
+    $otp = $isDemoLogin ? '000000' : (string) random_int(100000, 999999);
     $token = (string) \Illuminate\Support\Str::uuid();
     $expiresAt = now()->addMinutes(10);
 
-    if ($whatsApp->isConfigured()) {
+    if ($whatsApp->isConfigured() && ! $isDemoLogin) {
         try {
             $whatsApp->sendOtpTemplate($phone, $otp);
         } catch (\Throwable $e) {
