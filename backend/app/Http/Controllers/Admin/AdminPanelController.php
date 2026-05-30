@@ -45,18 +45,227 @@ class AdminPanelController extends Controller
 
     public function index(): View
     {
-        $stats = [
-            'total_users' => User::count(),
-            'total_bookings' => GroomerBooking::count(),
-            'total_supports' => CustomerTicket::count(),
-        ];
-
-        $onlineClinics = $this->getOnlineClinics();
         $activeDoctors = $this->formatActiveDoctorLabels();
-        $callMetrics   = $this->callAnalyticsService->summary();
-        $recentCalls   = $this->callAnalyticsService->recentSessions();
+        $dashboardSections = $this->adminDashboardSections();
 
-        return view('admin.dashboard', compact('stats', 'onlineClinics', 'activeDoctors', 'callMetrics', 'recentCalls'));
+        return view('admin.dashboard', compact('dashboardSections', 'activeDoctors'));
+    }
+
+    private function adminDashboardSections(): array
+    {
+        return [
+            [
+                'eyebrow' => 'Clinic operations',
+                'title' => 'Onboarding workspace',
+                'description' => 'Counts mapped to onboarding and provider setup pages in the sidebar.',
+                'cards' => [
+                    $this->dashboardCard('Onboarding Panel', $this->countModel(VetRegisterationTemp::class), 'Clinic registrations being tracked.', 'admin.onboarding.panel', 'bi-clipboard2-check', 'indigo'),
+                    $this->dashboardCard('Full Onboarding', $this->fullOnboardingCount(), 'Clinics in the full onboarding review window.', 'admin.full-onboarding', 'bi-ui-checks-grid', 'cyan'),
+                    $this->dashboardCard('Pincode Heatmap', $this->pincodeCoverageCount(), 'Pincodes available for video slot coverage.', 'admin.analytics.pincode-heatmap', 'bi-geo-alt', 'amber'),
+                ],
+            ],
+            [
+                'eyebrow' => 'Users and CRM',
+                'title' => 'Customer data controls',
+                'description' => 'User, profile, feedback, and lead-management modules from the sidebar.',
+                'cards' => [
+                    $this->dashboardCard('Users Data Hub', $this->countModel(User::class), 'All users available in the data hub.', 'admin.users.data-hub', 'bi-database', 'blue'),
+                    $this->dashboardCard('User Bulk Delete', $this->countModel(User::class), 'Users eligible for admin cleanup workflows.', 'admin.users.bulk-delete', 'bi-trash3', 'rose'),
+                    $this->dashboardCard('User Profile Completion', $this->profileCompletionUserCount(), 'App-installed users checked for completion.', 'admin.users.profile-completion', 'bi-person-check', 'green'),
+                    $this->dashboardCard('Pet Feedback', $this->tableCount('pet_feedback'), 'Feedback rows captured from pet journeys.', 'admin.pet-feedback', 'bi-chat-square-heart', 'pink'),
+                    $this->dashboardCard('Lead Management', $this->countModel(User::class), 'Users in the CRM lead pool.', 'admin.lead-management', 'bi-kanban', 'violet'),
+                ],
+            ],
+            [
+                'eyebrow' => 'Revenue and analytics',
+                'title' => 'Transactions and insight pages',
+                'description' => 'Live counts for transaction, doctor reassignment, page analytics, and lifecycle pages.',
+                'cards' => [
+                    $this->dashboardCard('Campaign Transactions', $this->excelExportTransactionCount(), 'Excel campaign transaction records.', 'admin.transactions.excell-export', 'bi-receipt', 'orange'),
+                    $this->dashboardCard('Captured Transactions', $this->capturedTransactionCount(), 'Captured public-report transactions above Rs 1.', 'captured-transactions.public', 'bi-cash-coin', 'green'),
+                    $this->dashboardCard('Change Doctor', $this->appointmentTransactionCount(), 'Appointment transactions available for reassignment.', 'admin.transactions.appointments', 'bi-arrow-left-right', 'slate'),
+                    $this->dashboardCard('Page Analytics', $this->pageVisitCount(), 'Page visits recorded in the last 30 days.', 'admin.analytics.pages', 'bi-window-stack', 'blue'),
+                    $this->dashboardCard('Consultation Lifecycle Analytics', $this->appointmentTransactionCount(), 'Consultation transactions in lifecycle tracking.', 'admin.analytics.consultation-lifecycle', 'bi-diagram-3', 'indigo'),
+                ],
+            ],
+        ];
+    }
+
+    private function dashboardCard(
+        string $label,
+        int $value,
+        string $description,
+        string $route,
+        string $icon,
+        string $tone
+    ): array {
+        return [
+            'label' => $label,
+            'value' => $value,
+            'description' => $description,
+            'href' => route($route),
+            'icon' => $icon,
+            'tone' => $tone,
+        ];
+    }
+
+    private function countModel(string $modelClass): int
+    {
+        try {
+            return (int) $modelClass::query()->count();
+        } catch (\Throwable $e) {
+            report($e);
+            return 0;
+        }
+    }
+
+    private function tableCount(string $table, ?string $column = null, mixed $value = null): int
+    {
+        if (! Schema::hasTable($table)) {
+            return 0;
+        }
+
+        if ($column !== null && ! Schema::hasColumn($table, $column)) {
+            return 0;
+        }
+
+        $query = DB::table($table);
+
+        if ($column !== null) {
+            $query->where($column, $value);
+        }
+
+        return (int) $query->count();
+    }
+
+    private function profileCompletionUserCount(): int
+    {
+        if (
+            ! Schema::hasTable('device_tokens')
+            || ! Schema::hasColumn('device_tokens', 'user_id')
+            || ! Schema::hasColumn('device_tokens', 'token')
+        ) {
+            return 0;
+        }
+
+        return (int) DB::table('device_tokens')
+            ->whereNotNull('user_id')
+            ->whereNotNull('token')
+            ->whereRaw("TRIM(token) <> ''")
+            ->distinct('user_id')
+            ->count('user_id');
+    }
+
+    private function fullOnboardingCount(): int
+    {
+        if (! Schema::hasTable('vet_registerations_temp')) {
+            return 0;
+        }
+
+        $query = VetRegisterationTemp::query();
+
+        if (Schema::hasColumn('vet_registerations_temp', 'created_at')) {
+            $query->where('created_at', '>=', '2026-05-10 00:00:00');
+        }
+
+        return (int) $query->count();
+    }
+
+    private function pincodeCoverageCount(): int
+    {
+        if (Schema::hasTable('geo_pincodes') && Schema::hasColumn('geo_pincodes', 'pincode')) {
+            return (int) DB::table('geo_pincodes')
+                ->whereNotNull('pincode')
+                ->distinct('pincode')
+                ->count('pincode');
+        }
+
+        if (Schema::hasTable('vet_registerations_temp') && Schema::hasColumn('vet_registerations_temp', 'pincode')) {
+            return (int) DB::table('vet_registerations_temp')
+                ->whereNotNull('pincode')
+                ->where('pincode', '!=', '')
+                ->distinct('pincode')
+                ->count('pincode');
+        }
+
+        return 0;
+    }
+
+    private function pageVisitCount(): int
+    {
+        if (! Schema::hasTable('user_page_visits')) {
+            return 0;
+        }
+
+        $query = DB::table('user_page_visits');
+
+        if (Schema::hasColumn('user_page_visits', 'entered_at')) {
+            $query->where('entered_at', '>=', now()->subDays(30)->startOfDay());
+        }
+
+        return (int) $query->count();
+    }
+
+    private function excelExportTransactionCount(): int
+    {
+        if (! Schema::hasTable('transactions') || ! Schema::hasColumn('transactions', 'type')) {
+            return 0;
+        }
+
+        return (int) Transaction::query()
+            ->where('type', 'excell_export_campaign')
+            ->count();
+    }
+
+    private function appointmentTransactionCount(): int
+    {
+        if (! Schema::hasTable('transactions')) {
+            return 0;
+        }
+
+        $hasType = Schema::hasColumn('transactions', 'type');
+        $hasMetadata = Schema::hasColumn('transactions', 'metadata');
+
+        if (! $hasType && ! $hasMetadata) {
+            return 0;
+        }
+
+        return (int) Transaction::query()
+            ->where(function (Builder $query) use ($hasType, $hasMetadata): void {
+                $hasCondition = false;
+
+                if ($hasType) {
+                    $query->whereIn('type', ['video_consult', 'excell_export_campaign']);
+                    $hasCondition = true;
+                }
+
+                if ($hasMetadata) {
+                    $method = $hasCondition ? 'orWhere' : 'where';
+                    $query->{$method}('metadata->order_type', 'video_consult')
+                        ->orWhere('metadata->order_type', 'excell_export_campaign');
+                }
+            })
+            ->count();
+    }
+
+    private function capturedTransactionCount(): int
+    {
+        if (
+            ! Schema::hasTable('transactions')
+            || ! Schema::hasTable('users')
+            || ! Schema::hasColumn('transactions', 'user_id')
+            || ! Schema::hasColumn('transactions', 'status')
+            || ! Schema::hasColumn('transactions', 'amount_paise')
+        ) {
+            return 0;
+        }
+
+        return (int) Transaction::query()
+            ->where('status', 'captured')
+            ->where('amount_paise', '!=', 100)
+            ->whereNotNull('user_id')
+            ->whereHas('user')
+            ->count();
     }
 
     public function users(): View
@@ -4998,10 +5207,10 @@ class AdminPanelController extends Controller
     public function updateFullOnboardingDoctorPackages(Request $request, Doctor $doctor): RedirectResponse
     {
         $validated = $request->validate([
-            'dog_vaccination_male_package_price' => ['nullable', 'numeric', 'min:0'],
-            'dog_vaccination_female_package_price' => ['nullable', 'numeric', 'min:0'],
-            'cat_vaccination_male_package_price' => ['nullable', 'numeric', 'min:0'],
-            'cat_vaccination_female_package_price' => ['nullable', 'numeric', 'min:0'],
+            'puppy_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
+            'adult_dog_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
+            'kitten_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
+            'adult_cat_vaccination_package_price' => ['nullable', 'numeric', 'min:0'],
             'dog_neutering_male_price' => ['nullable', 'numeric', 'min:0'],
             'dog_neutering_female_price' => ['nullable', 'numeric', 'min:0'],
             'cat_neutering_male_price' => ['nullable', 'numeric', 'min:0'],
@@ -5020,8 +5229,8 @@ class AdminPanelController extends Controller
         $data = [
             'clinic_id' => $clinicId,
             'doctor_id' => (int) $doctor->id,
-            'dog_vaccination_package_price' => $validated['dog_vaccination_male_package_price'] ?? $validated['dog_vaccination_female_package_price'] ?? null,
-            'cat_vaccination_package_price' => $validated['cat_vaccination_male_package_price'] ?? $validated['cat_vaccination_female_package_price'] ?? null,
+            'dog_vaccination_package_price' => $validated['puppy_vaccination_package_price'] ?? $validated['adult_dog_vaccination_package_price'] ?? null,
+            'cat_vaccination_package_price' => $validated['kitten_vaccination_package_price'] ?? $validated['adult_cat_vaccination_package_price'] ?? null,
             'dog_neutering_price' => $validated['dog_neutering_male_price'] ?? $validated['dog_neutering_female_price'] ?? null,
             'cat_neutering_price' => $validated['cat_neutering_male_price'] ?? $validated['cat_neutering_female_price'] ?? null,
             'updated_at' => now(),
