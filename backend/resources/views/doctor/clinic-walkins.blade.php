@@ -489,15 +489,16 @@
 
     <form id="booking-form" class="booking-modal-form">
       <div class="booking-modal-scroll space-y-4">
-      <div>
+      <div id="booking-notes-block">
         <label class="block text-sm font-semibold mb-1">What happened?</label>
         <textarea name="notes" rows="2" class="w-full bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500" placeholder="Share the reason or context for this visit"></textarea>
       </div>
 
       {{-- EXISTING PATIENT SECTION --}}
-      <div id="existing-patient-section" class="space-y-4">
+      <div id="existing-patient-section" class="space-y-4 hidden">
         <div>
-          <label class="block text-sm font-semibold mb-1">Patient</label>
+          <label id="patient-picker-label" class="block text-sm font-semibold mb-1">Patient</label>
+          <div id="existing-patient-display-name" class="hidden text-sm font-semibold text-slate-800 mb-2"></div>
           <div class="flex flex-col gap-2">
             <div id="patient-search-block" class="flex flex-col gap-2">
               <input id="patient-search" type="text" placeholder="Search by name or mobile number..."
@@ -509,14 +510,12 @@
           </div>
         </div>
         <div id="existing-patient-details" class="space-y-4 hidden">
-          {{-- ADDED: patient name display --}}
-          <div id="existing-patient-display-name" class="text-sm font-semibold text-slate-800 mb-1"></div>
           <div>
             <label class="block text-sm font-semibold mb-1">Pet</label>
             <select id="pet-select" name="pet_id" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500"></select>
-            <p class="text-xs text-slate-500 mt-1">Need a new pet? Fill details below and we'll add it automatically.</p>
           </div>
-          <div class="space-y-3">
+          {{-- Hidden fields kept for programmatic values / adding a new pet via API if needed later --}}
+          <div id="existing-inline-pet-fields" class="space-y-3 hidden" aria-hidden="true">
             <div>
               <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Pet Name</label>
               <input name="inline_pet_name" type="text" placeholder="Pet name" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500">
@@ -1864,6 +1863,10 @@ window.PatientStore = (() => {
   const existingSection   = document.getElementById('existing-patient-section');
   const newSection        = document.getElementById('new-patient-section');
   const existingDetails   = document.getElementById('existing-patient-details');
+  const bookingNotesBlock = document.getElementById('booking-notes-block');
+  const existingInlinePetFields = document.getElementById('existing-inline-pet-fields');
+  const patientPickerLabel = document.getElementById('patient-picker-label');
+  const existingPatientDisplay = document.getElementById('existing-patient-display-name');
   const bookingSubmitFields=document.getElementById('booking-submit-fields');
   const modeButtons       = Array.from(document.querySelectorAll('[data-patient-mode]'));
   const bookingNew        = document.querySelector('[data-role="booking-new"]');
@@ -1947,11 +1950,11 @@ window.PatientStore = (() => {
     renderPetOptions(Array.isArray(patient.pets) ? patient.pets : []);
     updateBookingSections();
     renderPatientResults(FILTERED_PATIENTS); // re-render to highlight selected
-    // Show patient name in the dedicated element
-    const displayEl = document.getElementById('existing-patient-display-name');
-    if (displayEl) {
-      displayEl.textContent = `Patient: ${patient.name || 'Unknown'}`;
+    if (existingPatientDisplay) {
+      existingPatientDisplay.textContent = patient.name || 'Unknown';
+      existingPatientDisplay.classList.remove('hidden');
     }
+    patientPickerLabel?.classList.add('hidden');
   }
 
   function normalizeInlinePetType(raw) {
@@ -2077,9 +2080,11 @@ window.PatientStore = (() => {
     window.PatientStore.load();
     filterAndRenderPatients(patientSearchInput?.value||'');
     if (!doctorSelect?.options?.length || doctorSelect.options.length <= 1) fetchDoctors();
-    // Clear the patient name display on open
-    const displayEl = document.getElementById('existing-patient-display-name');
-    if (displayEl) displayEl.textContent = '';
+    if (existingPatientDisplay) {
+      existingPatientDisplay.textContent = '';
+      existingPatientDisplay.classList.add('hidden');
+    }
+    patientPickerLabel?.classList.remove('hidden');
   }
 
   function closeBooking() {
@@ -2094,8 +2099,11 @@ window.PatientStore = (() => {
     if (patientResults) patientResults.innerHTML='';
     setPatientMode('new');
     resetPetTypeTabs();
-    const displayEl = document.getElementById('existing-patient-display-name');
-    if (displayEl) displayEl.textContent = '';
+    if (existingPatientDisplay) {
+      existingPatientDisplay.textContent = '';
+      existingPatientDisplay.classList.add('hidden');
+    }
+    patientPickerLabel?.classList.remove('hidden');
   }
 
   function setPatientMode(mode) {
@@ -2108,10 +2116,20 @@ window.PatientStore = (() => {
   }
 
   function updateBookingSections() {
-    const isExisting = PATIENT_MODE==='existing', hasPatient=Boolean(patientSelect?.value);
-    existingDetails?.classList.toggle('hidden', !isExisting||!hasPatient);
-    bookingSubmitFields?.classList.toggle('hidden', isExisting&&!hasPatient);
-    patientSearchBlock?.classList.toggle('hidden', isExisting&&hasPatient);
+    const isExisting = PATIENT_MODE === 'existing';
+    const hasPatient = Boolean(patientSelect?.value);
+    existingDetails?.classList.toggle('hidden', !isExisting || !hasPatient);
+    bookingSubmitFields?.classList.toggle('hidden', isExisting && !hasPatient);
+    patientSearchBlock?.classList.toggle('hidden', isExisting && hasPatient);
+    bookingNotesBlock?.classList.toggle('hidden', isExisting);
+    existingInlinePetFields?.classList.add('hidden');
+    if (isExisting && hasPatient) {
+      patientPickerLabel?.classList.add('hidden');
+      existingPatientDisplay?.classList.remove('hidden');
+    } else if (isExisting) {
+      patientPickerLabel?.classList.remove('hidden');
+      existingPatientDisplay?.classList.add('hidden');
+    }
   }
 
   modeButtons.forEach(btn => btn.addEventListener('click', () => setPatientMode(btn.dataset.patientMode)));
@@ -2348,8 +2366,8 @@ if (date && !timeSlot) { Swal.fire({icon:'warning',title:'Time slot required',te
       } else {
         if (!patientId) { Swal.fire({icon:'warning',title:'Select a patient'}); return; }
         patientPhone = normalizePhone(CURRENT_PATIENT?.phone,CURRENT_PATIENT?.email);
-        const sel=petSelect?.options[petSelect.selectedIndex]; petName=sel?.dataset?.petName||sel?.textContent||null;
-        const inlinePet=bookingForm.elements['inline_pet_name']?.value.trim(); if(inlinePet) petName=inlinePet;
+        const sel = petSelect?.options[petSelect.selectedIndex];
+        petName = sel?.dataset?.petName || (sel?.textContent ? sel.textContent.split('|')[0].trim() : null);
       }
       const payload=new FormData();
       if(patientId)    payload.append('user_id',patientId);
