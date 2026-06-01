@@ -509,6 +509,8 @@
           </div>
         </div>
         <div id="existing-patient-details" class="space-y-4 hidden">
+          {{-- ADDED: patient name display --}}
+          <div id="existing-patient-display-name" class="text-sm font-semibold text-slate-800 mb-1"></div>
           <div>
             <label class="block text-sm font-semibold mb-1">Pet</label>
             <select id="pet-select" name="pet_id" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-teal-500"></select>
@@ -1545,7 +1547,7 @@ window.PatientStore = (() => {
     if (!records.length) { els.recordEmpty.textContent='No medical records uploaded yet.'; els.recordEmpty.style.display='block'; els.recordEmpty.style.color='var(--pm-muted)'; els.recordCount.textContent='0 files'; if (els.statRecords) els.statRecords.textContent='0'; return; }
     els.recordEmpty.style.display='none';
     records.forEach(rec => {
-      const wrap = document.createElement('div'); wrap.className='pm-record pm-record-card';
+      const wrap = document.createElement('div'); wrap.className = 'pm-record pm-record-card';
       const rx = rec.prescription||{};
       const petId = rec.pet_id??rx.pet_id??null;
       const petLabel = activePatient ? getPetLabel(activePatient,petId) : null;
@@ -1945,6 +1947,11 @@ window.PatientStore = (() => {
     renderPetOptions(Array.isArray(patient.pets) ? patient.pets : []);
     updateBookingSections();
     renderPatientResults(FILTERED_PATIENTS); // re-render to highlight selected
+    // Show patient name in the dedicated element
+    const displayEl = document.getElementById('existing-patient-display-name');
+    if (displayEl) {
+      displayEl.textContent = `Patient: ${patient.name || 'Unknown'}`;
+    }
   }
 
   function renderPetOptions(pets) {
@@ -1959,6 +1966,69 @@ window.PatientStore = (() => {
     });
   }
 
+  // Auto-fill inline pet fields when a pet is selected
+  petSelect?.addEventListener('change', async function () {
+    const petId = this.value;
+    if (!petId || !CURRENT_PATIENT) return;
+
+    const pet = (CURRENT_PATIENT.pets || []).find(
+      p => String(p.id ?? p.pet_id) === String(petId)
+    );
+    if (!pet) return;
+
+    // ---------- Pet Name ----------
+    const petNameInput = document.querySelector('[name="inline_pet_name"]');
+    if (petNameInput) petNameInput.value = pet.pet_name || pet.name || '';
+
+    // ---------- Pet Type ----------
+    const petType = (pet.pet_type || pet.species || pet.type || 'dog').toLowerCase();
+    const hiddenType = document.querySelector('[name="inline_pet_type"]');
+    if (hiddenType) hiddenType.value = petType;
+
+    // Activate the correct pet‑type tab
+    const tabContainer = document.querySelector('.pet-type-tabs[data-pet-type-group="inline"]');
+    if (tabContainer) {
+      tabContainer.querySelectorAll('.pet-type-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.petType === petType);
+      });
+    }
+
+    // Toggle breed / exotic fields
+    toggleBreedFields('inline', petType);
+
+    // ---------- Breed / Exotic detail ----------
+    if (petType === 'exotic') {
+      const exoticInput = document.querySelector('[name="inline_pet_exotic_detail"]');
+      if (exoticInput) exoticInput.value = pet.breed || pet.exotic_detail || '';
+    } else {
+      const breedSelect = document.querySelector('[name="inline_pet_breed"]');
+      if (breedSelect) {
+        // Load the correct breed list asynchronously
+        try {
+          const breeds = petType === 'cat'
+            ? await ensureCatBreeds()
+            : await ensureDogBreeds();
+          populateBreedSelect(breedSelect, breeds);
+          if (pet.breed) breedSelect.value = pet.breed;
+          initBreedSelect2();   // re‑attach Select2 if needed
+        } catch (e) {
+          populateBreedSelect(breedSelect, []);
+        }
+      }
+    }
+
+    // ---------- Gender ----------
+    const genderSelect = document.querySelector('[name="inline_pet_gender"]');
+    if (genderSelect) {
+      const gender = (pet.gender || pet.pet_gender || '').toLowerCase();
+      if (['male', 'female'].includes(gender)) {
+        genderSelect.value = gender;
+      } else {
+        genderSelect.value = '';   // fallback to “Select gender”
+      }
+    }
+  });
+
   function openBooking() {
     if (!bookingModal) return;
     if (!CLINIC_ID && !CURRENT_USER_ID) { Swal.fire({icon:'warning',title:'Clinic missing',text:'Open this page from the clinic dashboard.'}); return; }
@@ -1970,6 +2040,9 @@ window.PatientStore = (() => {
     window.PatientStore.load();
     filterAndRenderPatients(patientSearchInput?.value||'');
     if (!doctorSelect?.options?.length || doctorSelect.options.length <= 1) fetchDoctors();
+    // Clear the patient name display on open
+    const displayEl = document.getElementById('existing-patient-display-name');
+    if (displayEl) displayEl.textContent = '';
   }
 
   function closeBooking() {
@@ -1984,6 +2057,8 @@ window.PatientStore = (() => {
     if (patientResults) patientResults.innerHTML='';
     setPatientMode('new');
     resetPetTypeTabs();
+    const displayEl = document.getElementById('existing-patient-display-name');
+    if (displayEl) displayEl.textContent = '';
   }
 
   function setPatientMode(mode) {
