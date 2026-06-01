@@ -1954,80 +1954,117 @@ window.PatientStore = (() => {
     }
   }
 
+  function normalizeInlinePetType(raw) {
+    const t = String(raw ?? '').trim().toLowerCase();
+    if (!t) return 'dog';
+    if (t === 'dog' || t === 'dogs' || t === 'canine' || t === 'puppy') return 'dog';
+    if (t === 'cat' || t === 'cats' || t === 'feline' || t === 'kitten') return 'cat';
+    if (t === 'exotic' || t === 'bird' || t === 'rabbit' || t === 'parrot' || t === 'turtle' || t === 'hamster' || t === 'reptile') return 'exotic';
+    if (['dog', 'cat', 'exotic'].includes(t)) return t;
+    if (/\bdog\b/.test(t)) return 'dog';
+    if (/\bcat\b/.test(t)) return 'cat';
+    return 'dog';
+  }
+
+  function normalizeInlinePetGender(raw) {
+    const g = String(raw ?? '').trim().toLowerCase();
+    if (g === 'm' || g === 'male' || g === 'boy') return 'male';
+    if (g === 'f' || g === 'female' || g === 'girl') return 'female';
+    return ['male', 'female'].includes(g) ? g : '';
+  }
+
+  function matchBreedOption(breed, breeds) {
+    const needle = String(breed ?? '').trim();
+    if (!needle || !Array.isArray(breeds) || !breeds.length) return needle;
+    const exact = breeds.find(b => b === needle);
+    if (exact) return exact;
+    const lower = needle.toLowerCase();
+    return breeds.find(b => String(b).toLowerCase() === lower) || needle;
+  }
+
+  function findPatientPet(petId) {
+    if (!petId || !CURRENT_PATIENT) return null;
+    const pets = Array.isArray(CURRENT_PATIENT.pets) ? CURRENT_PATIENT.pets : [];
+    return pets.find(p => String(p.id ?? p.pet_id) === String(petId)) || null;
+  }
+
+  async function fillInlinePetFieldsFromPet(pet) {
+    if (!pet) return;
+
+    const petNameInput = bookingForm?.elements['inline_pet_name'];
+    if (petNameInput) petNameInput.value = pet.pet_name || pet.name || '';
+
+    const petType = normalizeInlinePetType(pet.pet_type || pet.species || pet.type);
+    const hiddenType = bookingForm?.elements['inline_pet_type'];
+    if (hiddenType) hiddenType.value = petType;
+
+    const tabContainer = bookingForm?.querySelector('.pet-type-tabs[data-pet-type-group="inline"]');
+    tabContainer?.querySelectorAll('.pet-type-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.petType === petType);
+    });
+    toggleBreedFields('inline', petType);
+
+    if (petType === 'exotic') {
+      const exoticInput = bookingForm?.elements['inline_pet_exotic_detail'];
+      if (exoticInput) exoticInput.value = pet.breed || pet.exotic_detail || '';
+      const breedSelect = bookingForm?.elements['inline_pet_breed'];
+      if (breedSelect) {
+        populateBreedSelect(breedSelect, []);
+        destroyBreedSelect2(breedSelect);
+      }
+    } else {
+      const breedSelect = bookingForm?.elements['inline_pet_breed'];
+      if (breedSelect) {
+        try {
+          const breeds = petType === 'cat' ? await ensureCatBreeds() : await ensureDogBreeds();
+          populateBreedSelect(breedSelect, breeds);
+          const matchedBreed = matchBreedOption(pet.breed, breeds);
+          if (matchedBreed) breedSelect.value = matchedBreed;
+          initBreedSelect2();
+        } catch (e) {
+          populateBreedSelect(breedSelect, []);
+          if (pet.breed) breedSelect.value = pet.breed;
+          initBreedSelect2();
+        }
+      }
+      const exoticInput = bookingForm?.elements['inline_pet_exotic_detail'];
+      if (exoticInput) exoticInput.value = '';
+    }
+
+    const genderSelect = bookingForm?.elements['inline_pet_gender'];
+    if (genderSelect) {
+      genderSelect.value = normalizeInlinePetGender(pet.gender || pet.pet_gender);
+    }
+  }
+
+  async function syncInlinePetFromSelection() {
+    const petId = petSelect?.value;
+    if (!petId) return;
+    await fillInlinePetFieldsFromPet(findPatientPet(petId));
+  }
+
   function renderPetOptions(pets) {
     if (!petSelect) return;
     petSelect.innerHTML = '';
-    if (!pets.length) { petSelect.innerHTML='<option value="">No pets found</option>'; return; }
+    if (!pets.length) {
+      petSelect.innerHTML = '<option value="">No pets found</option>';
+      return;
+    }
     pets.forEach(pet => {
-      const opt=document.createElement('option'); opt.value=pet.id??pet.pet_id;
-      opt.textContent=`${formatPetLabel(pet)} | ${pet.pet_type||pet.species||pet.type||''}`;
-      opt.dataset.petName = pet.pet_name||pet.name||'';
+      const opt = document.createElement('option');
+      opt.value = pet.id ?? pet.pet_id;
+      opt.textContent = `${formatPetLabel(pet)} | ${pet.pet_type || pet.species || pet.type || ''}`;
+      opt.dataset.petName = pet.pet_name || pet.name || '';
       petSelect.appendChild(opt);
     });
+    const firstId = pets[0]?.id ?? pets[0]?.pet_id;
+    if (firstId != null && firstId !== '') {
+      petSelect.value = String(firstId);
+      void syncInlinePetFromSelection();
+    }
   }
 
-  // Auto-fill inline pet fields when a pet is selected
-  petSelect?.addEventListener('change', async function () {
-    const petId = this.value;
-    if (!petId || !CURRENT_PATIENT) return;
-
-    const pet = (CURRENT_PATIENT.pets || []).find(
-      p => String(p.id ?? p.pet_id) === String(petId)
-    );
-    if (!pet) return;
-
-    // ---------- Pet Name ----------
-    const petNameInput = document.querySelector('[name="inline_pet_name"]');
-    if (petNameInput) petNameInput.value = pet.pet_name || pet.name || '';
-
-    // ---------- Pet Type ----------
-    const petType = (pet.pet_type || pet.species || pet.type || 'dog').toLowerCase();
-    const hiddenType = document.querySelector('[name="inline_pet_type"]');
-    if (hiddenType) hiddenType.value = petType;
-
-    // Activate the correct pet‑type tab
-    const tabContainer = document.querySelector('.pet-type-tabs[data-pet-type-group="inline"]');
-    if (tabContainer) {
-      tabContainer.querySelectorAll('.pet-type-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.petType === petType);
-      });
-    }
-
-    // Toggle breed / exotic fields
-    toggleBreedFields('inline', petType);
-
-    // ---------- Breed / Exotic detail ----------
-    if (petType === 'exotic') {
-      const exoticInput = document.querySelector('[name="inline_pet_exotic_detail"]');
-      if (exoticInput) exoticInput.value = pet.breed || pet.exotic_detail || '';
-    } else {
-      const breedSelect = document.querySelector('[name="inline_pet_breed"]');
-      if (breedSelect) {
-        // Load the correct breed list asynchronously
-        try {
-          const breeds = petType === 'cat'
-            ? await ensureCatBreeds()
-            : await ensureDogBreeds();
-          populateBreedSelect(breedSelect, breeds);
-          if (pet.breed) breedSelect.value = pet.breed;
-          initBreedSelect2();   // re‑attach Select2 if needed
-        } catch (e) {
-          populateBreedSelect(breedSelect, []);
-        }
-      }
-    }
-
-    // ---------- Gender ----------
-    const genderSelect = document.querySelector('[name="inline_pet_gender"]');
-    if (genderSelect) {
-      const gender = (pet.gender || pet.pet_gender || '').toLowerCase();
-      if (['male', 'female'].includes(gender)) {
-        genderSelect.value = gender;
-      } else {
-        genderSelect.value = '';   // fallback to “Select gender”
-      }
-    }
-  });
+  petSelect?.addEventListener('change', () => { void syncInlinePetFromSelection(); });
 
   function openBooking() {
     if (!bookingModal) return;
