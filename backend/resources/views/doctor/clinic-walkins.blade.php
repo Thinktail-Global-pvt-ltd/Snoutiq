@@ -622,8 +622,8 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label class="block text-sm font-semibold mb-1">Date</label>
-            <input name="scheduled_date" type="date" class="w-full bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500">
+<label class="block text-sm font-semibold mb-1">Date <span class="text-xs font-normal text-slate-400">(optional)</span></label>
+<input name="scheduled_date" type="date" class="w-full bg-white rounded-lg px-3 py-2 text-sm border border-black focus:ring-2 focus:ring-teal-500">
           </div>
           <div>
             <label class="block text-sm font-semibold mb-1">Available Slots</label>
@@ -1963,8 +1963,8 @@ window.PatientStore = (() => {
     if (!bookingModal) return;
     if (!CLINIC_ID && !CURRENT_USER_ID) { Swal.fire({icon:'warning',title:'Clinic missing',text:'Open this page from the clinic dashboard.'}); return; }
     bookingModal.classList.add('active'); bookingModal.removeAttribute('hidden'); bookingModal.setAttribute('aria-hidden','false');
-    const dateField = bookingForm?.elements['scheduled_date'];
-    if (dateField && !dateField.value) dateField.value = new Date().toISOString().split('T')[0];
+    // const dateField = bookingForm?.elements['scheduled_date'];
+    // if (dateField && !dateField.value) dateField.value = new Date().toISOString().split('T')[0];
     initBreedSelect2();
     // PatientStore already loaded; if not yet, trigger load
     window.PatientStore.load();
@@ -2192,10 +2192,15 @@ window.PatientStore = (() => {
   bookingForm?.addEventListener('submit', async ev => {
     ev.preventDefault();
     if (!CLINIC_ID&&!CURRENT_USER_ID) { Swal.fire({icon:'warning',title:'Clinic missing',text:'Reload from clinic dashboard.'}); return; }
+    // const doctorId = bookingForm.elements['doctor_id'].value;
+    // const date     = bookingForm.elements['scheduled_date'].value;
+    // const timeSlot = bookingForm.elements['scheduled_time'].value;
+    // if (!doctorId||!date||!timeSlot) { Swal.fire({icon:'warning',title:'Required fields missing',text:'Doctor, date and slot are mandatory.'}); return; }
     const doctorId = bookingForm.elements['doctor_id'].value;
-    const date     = bookingForm.elements['scheduled_date'].value;
-    const timeSlot = bookingForm.elements['scheduled_time'].value;
-    if (!doctorId||!date||!timeSlot) { Swal.fire({icon:'warning',title:'Required fields missing',text:'Doctor, date and slot are mandatory.'}); return; }
+const date     = bookingForm.elements['scheduled_date'].value;
+const timeSlot = bookingForm.elements['scheduled_time'].value;
+if (!doctorId) { Swal.fire({icon:'warning',title:'Required fields missing',text:'Please select a doctor.'}); return; }
+if (date && !timeSlot) { Swal.fire({icon:'warning',title:'Time slot required',text:'Please select a time slot for the chosen date.'}); return; }
     try {
       await Auth.bootstrap();
       let patientId=patientSelect?.value||null, patientName=CURRENT_PATIENT?.name||'', patientPhone=null, petName=null;
@@ -2240,7 +2245,9 @@ window.PatientStore = (() => {
       payload.append('doctor_id',doctorId); payload.append('patient_name',patientName);
       if(patientPhone) payload.append('patient_phone',patientPhone);
       if(petName)      payload.append('pet_name',petName);
-      payload.append('date',date); payload.append('time_slot',timeSlot);
+      if (date)     payload.append('date', date);
+if (timeSlot) payload.append('time_slot', timeSlot);
+
       const notes=bookingForm.elements['notes'].value.trim(); if(notes) payload.append('notes',notes);
       appendTarget(payload);
       await apiFetch(`${API_BASE}/appointments/submit`,{method:'POST',headers:Auth.headers(),body:payload});

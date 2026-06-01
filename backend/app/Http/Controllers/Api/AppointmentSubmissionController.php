@@ -40,24 +40,25 @@ class AppointmentSubmissionController extends Controller
         }
 
         $validated = $request->validate([
-            'user_id' => ['nullable', 'integer'],
-            'patient_id' => ['nullable', 'integer'],
-            'clinic_id' => ['nullable', 'integer', 'exists:vet_registerations_temp,id'],
-            'doctor_id' => ['nullable', 'integer', 'exists:doctors,id'],
-            'patient_name' => ['required', 'string', 'max:255'],
-            'patient_phone' => ['nullable', 'string', 'max:20'],
-            'patient_email' => ['nullable', 'email', 'max:191'],
-            'pet_name' => ['nullable', 'string', 'max:255'],
-            'pet_id' => $petValidation,
-            'appointment_type' => ['sometimes', 'nullable', Rule::in(['neutering', 'deworming'])],
-            'date' => ['required', 'date'],
-            'time_slot' => ['required', 'string', 'max:50'],
-            'amount' => ['nullable', 'integer'],
-            'currency' => ['nullable', 'string', 'max:10'],
-            'razorpay_payment_id' => ['nullable', 'string', 'max:191'],
-            'razorpay_order_id' => ['nullable', 'string', 'max:191'],
-            'razorpay_signature' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
+            'user_id'              => ['nullable', 'integer'],
+            'patient_id'           => ['nullable', 'integer'],
+            'clinic_id'            => ['nullable', 'integer', 'exists:vet_registerations_temp,id'],
+            'doctor_id'            => ['nullable', 'integer', 'exists:doctors,id'],
+            'patient_name'         => ['required', 'string', 'max:255'],
+            'patient_phone'        => ['nullable', 'string', 'max:20'],
+            'patient_email'        => ['nullable', 'email', 'max:191'],
+            'pet_name'             => ['nullable', 'string', 'max:255'],
+            'pet_id'               => $petValidation,
+            'appointment_type'     => ['sometimes', 'nullable', Rule::in(['neutering', 'deworming'])],
+            // date and time_slot are now optional — if absent, only the user record is created
+            'date'                 => ['nullable', 'date'],
+            'time_slot'            => ['nullable', 'string', 'max:50'],
+            'amount'               => ['nullable', 'integer'],
+            'currency'             => ['nullable', 'string', 'max:10'],
+            'razorpay_payment_id'  => ['nullable', 'string', 'max:191'],
+            'razorpay_order_id'    => ['nullable', 'string', 'max:191'],
+            'razorpay_signature'   => ['nullable', 'string', 'max:255'],
+            'notes'                => ['nullable', 'string'],
         ]);
 
         if (array_key_exists('appointment_type', $validated) && ! $this->appointmentTypeColumnExists()) {
@@ -82,7 +83,7 @@ class AppointmentSubmissionController extends Controller
         }
 
         $patientId = $request->input('user_id') ?? $request->input('patient_id');
-        $user = $patientId ? User::find((int) $patientId) : null;
+        $user      = $patientId ? User::find((int) $patientId) : null;
 
         if (!$user) {
             $phone = $validated['patient_phone'] ?? null;
@@ -98,9 +99,9 @@ class AppointmentSubmissionController extends Controller
 
             if (!$user) {
                 $payload = [
-                    'name' => $validated['patient_name'],
-                    'email' => $email,
-                    'phone' => $phone,
+                    'name'     => $validated['patient_name'],
+                    'email'    => $email,
+                    'phone'    => $phone,
                     'password' => Hash::make(Str::random(16)),
                 ];
 
@@ -130,17 +131,43 @@ class AppointmentSubmissionController extends Controller
             ], 422);
         }
 
+        // ---------------------------------------------------------------
+        // If no date (and therefore no time_slot) was provided, skip
+        // creating an appointment row and return only the user record.
+        // ---------------------------------------------------------------
+        $hasDate     = !empty($validated['date']);
+        $hasTimeSlot = !empty($validated['time_slot']);
+
+        if (!$hasDate || !$hasTimeSlot) {
+            return response()->json([
+                'success' => true,
+                'appointment_created' => false,
+                'message' => 'Patient registered successfully. No appointment was created because date/time slot was not provided.',
+                'data' => [
+                    'user' => [
+                        'id'    => $user->id,
+                        'name'  => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                    ],
+                ],
+            ], 201);
+        }
+
+        // ---------------------------------------------------------------
+        // Full flow: date + time_slot present — create the appointment.
+        // ---------------------------------------------------------------
         $notesPayload = [
-            'clinic_name' => $clinic?->name,
-            'clinic_id' => $clinic?->id,
-            'doctor_name' => $doctor?->doctor_name ?? $doctor?->name ?? null,
-            'doctor_id' => $doctor?->id,
-            'patient_user_id' => $user->id,
-            'patient_email' => $user->email,
-            'amount_paise' => $validated['amount'] ?? null,
-            'currency' => $validated['currency'] ?? 'INR',
-            'razorpay_payment_id' => $validated['razorpay_payment_id'] ?? null,
-            'razorpay_order_id' => $validated['razorpay_order_id'] ?? null,
+            'clinic_name'        => $clinic?->name,
+            'clinic_id'          => $clinic?->id,
+            'doctor_name'        => $doctor?->doctor_name ?? $doctor?->name ?? null,
+            'doctor_id'          => $doctor?->id,
+            'patient_user_id'    => $user->id,
+            'patient_email'      => $user->email,
+            'amount_paise'       => $validated['amount'] ?? null,
+            'currency'           => $validated['currency'] ?? 'INR',
+            'razorpay_payment_id'=> $validated['razorpay_payment_id'] ?? null,
+            'razorpay_order_id'  => $validated['razorpay_order_id'] ?? null,
             'razorpay_signature' => $validated['razorpay_signature'] ?? null,
         ];
 
@@ -164,15 +191,15 @@ class AppointmentSubmissionController extends Controller
 
         $appointmentPayload = [
             'vet_registeration_id' => $clinic?->id,
-            'doctor_id' => $doctor?->id,
-            'pet_id' => $validated['pet_id'] ?? null,
-            'name' => $validated['patient_name'],
-            'mobile' => $validated['patient_phone'] ?? ($user->phone ?? 'N/A'),
-            'pet_name' => $validated['pet_name'] ?? null,
-            'appointment_date' => $validated['date'],
-            'appointment_time' => $validated['time_slot'],
-            'status' => 'confirmed',
-            'notes' => json_encode($notesPayload),
+            'doctor_id'            => $doctor?->id,
+            'pet_id'               => $validated['pet_id'] ?? null,
+            'name'                 => $validated['patient_name'],
+            'mobile'               => $validated['patient_phone'] ?? ($user->phone ?? 'N/A'),
+            'pet_name'             => $validated['pet_name'] ?? null,
+            'appointment_date'     => $validated['date'],
+            'appointment_time'     => $validated['time_slot'],
+            'status'               => 'confirmed',
+            'notes'                => json_encode($notesPayload),
         ];
 
         if ($this->appointmentTypeColumnExists()) {
@@ -196,7 +223,7 @@ class AppointmentSubmissionController extends Controller
 
     public function patientDetails(Appointment $appointment): JsonResponse
     {
-        $notes = $this->decodeNotes($appointment->notes);
+        $notes         = $this->decodeNotes($appointment->notes);
         $patientUserId = $notes['patient_user_id'] ?? null;
         if (!is_numeric($patientUserId)) {
             $patientUserId = $this->resolvePatientUserId($appointment, $notes);
@@ -217,9 +244,8 @@ class AppointmentSubmissionController extends Controller
             ], 404);
         }
 
-        // Prefer the pet attached to the appointment; fall back to legacy user-pet lookup.
         $appointmentPet = $this->fetchAppointmentPet($appointment);
-        $petsPayload = $appointmentPet
+        $petsPayload    = $appointmentPet
             ? ['source' => 'appointment_pet', 'pets' => [$appointmentPet]]
             : $this->fetchPetsForUser($user->id);
 
@@ -234,33 +260,33 @@ class AppointmentSubmissionController extends Controller
 
         $payload = [
             'success' => true,
-            'data' => [
+            'data'    => [
                 'appointment' => [
-                    'id' => $appointment->id,
+                    'id'               => $appointment->id,
                     'appointment_type' => $appointment->appointment_type,
-                    'date' => $appointment->appointment_date,
-                    'time_slot' => $appointment->appointment_time,
-                    'status' => $appointment->status,
-                    'appointment_table' => $this->appointmentTablePayload($appointment, $notes),
+                    'date'             => $appointment->appointment_date,
+                    'time_slot'        => $appointment->appointment_time,
+                    'status'           => $appointment->status,
+                    'appointment_table'=> $this->appointmentTablePayload($appointment, $notes),
                 ],
                 'patient_user_id' => (int) $user->id,
-                'user' => $user->toArray(),
-                'pet' => $appointmentPet,
-                'patient' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'role' => $user->role ?? null,
-                    'pet_name' => $user->pet_name ?? null,
+                'user'            => $user->toArray(),
+                'pet'             => $appointmentPet,
+                'patient'         => [
+                    'id'         => $user->id,
+                    'name'       => $user->name,
+                    'email'      => $user->email,
+                    'phone'      => $user->phone,
+                    'role'       => $user->role ?? null,
+                    'pet_name'   => $user->pet_name ?? null,
                     'pet_gender' => $user->pet_gender ?? null,
-                    'pet_age' => $user->pet_age ?? null,
-                    'breed' => $user->breed ?? null,
-                    'latitude' => $user->latitude ?? null,
-                    'longitude' => $user->longitude ?? null,
+                    'pet_age'    => $user->pet_age ?? null,
+                    'breed'      => $user->breed ?? null,
+                    'latitude'   => $user->latitude ?? null,
+                    'longitude'  => $user->longitude ?? null,
                 ],
-                'pets_source' => $petsPayload['source'],
-                'pets' => $petsPayload['pets'],
+                'pets_source'   => $petsPayload['source'],
+                'pets'          => $petsPayload['pets'],
                 'prescriptions' => $prescriptions,
             ],
         ];
@@ -276,22 +302,22 @@ class AppointmentSubmissionController extends Controller
         }
 
         $validated = $request->validate([
-            'user_id' => ['sometimes', 'required', 'integer', 'exists:users,id'],
-            'clinic_id' => ['sometimes', 'required', 'integer', 'exists:vet_registerations_temp,id'],
-            'doctor_id' => ['sometimes', 'required', 'integer', 'exists:doctors,id'],
-            'patient_name' => ['sometimes', 'required', 'string', 'max:255'],
-            'patient_phone' => ['sometimes', 'nullable', 'string', 'max:20'],
-            'pet_name' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'pet_id' => $petValidation,
-            'appointment_type' => ['sometimes', 'nullable', Rule::in(['neutering', 'deworming'])],
-            'date' => ['sometimes', 'required', 'date'],
-            'time_slot' => ['sometimes', 'required', 'string', 'max:50'],
-            'status' => ['sometimes', 'required', 'string', 'max:24'],
-            'amount' => ['sometimes', 'nullable', 'integer'],
-            'currency' => ['sometimes', 'nullable', 'string', 'max:10'],
-            'razorpay_payment_id' => ['sometimes', 'nullable', 'string', 'max:191'],
-            'razorpay_order_id' => ['sometimes', 'nullable', 'string', 'max:191'],
-            'razorpay_signature' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'user_id'              => ['sometimes', 'required', 'integer', 'exists:users,id'],
+            'clinic_id'            => ['sometimes', 'required', 'integer', 'exists:vet_registerations_temp,id'],
+            'doctor_id'            => ['sometimes', 'required', 'integer', 'exists:doctors,id'],
+            'patient_name'         => ['sometimes', 'required', 'string', 'max:255'],
+            'patient_phone'        => ['sometimes', 'nullable', 'string', 'max:20'],
+            'pet_name'             => ['sometimes', 'nullable', 'string', 'max:255'],
+            'pet_id'               => $petValidation,
+            'appointment_type'     => ['sometimes', 'nullable', Rule::in(['neutering', 'deworming'])],
+            'date'                 => ['sometimes', 'required', 'date'],
+            'time_slot'            => ['sometimes', 'required', 'string', 'max:50'],
+            'status'               => ['sometimes', 'required', 'string', 'max:24'],
+            'amount'               => ['sometimes', 'nullable', 'integer'],
+            'currency'             => ['sometimes', 'nullable', 'string', 'max:10'],
+            'razorpay_payment_id'  => ['sometimes', 'nullable', 'string', 'max:191'],
+            'razorpay_order_id'    => ['sometimes', 'nullable', 'string', 'max:191'],
+            'razorpay_signature'   => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
         if (empty($validated)) {
@@ -325,51 +351,23 @@ class AppointmentSubmissionController extends Controller
             $user = User::findOrFail($validated['user_id']);
         }
 
-        if (array_key_exists('patient_name', $validated)) {
-            $appointment->name = $validated['patient_name'];
-        }
-
-        if (array_key_exists('patient_phone', $validated)) {
-            $appointment->mobile = $validated['patient_phone'];
-        }
-
-        if (array_key_exists('pet_name', $validated)) {
-            $appointment->pet_name = $validated['pet_name'];
-        }
-
-        if (array_key_exists('pet_id', $validated)) {
-            $appointment->pet_id = $validated['pet_id'];
-        }
-
-        if (array_key_exists('appointment_type', $validated)) {
-            $appointment->appointment_type = $validated['appointment_type'];
-        }
-
-        if (array_key_exists('date', $validated)) {
-            $appointment->appointment_date = $validated['date'];
-        }
-
-        if (array_key_exists('time_slot', $validated)) {
-            $appointment->appointment_time = $validated['time_slot'];
-        }
-
-        if (array_key_exists('status', $validated)) {
-            $appointment->status = $validated['status'];
-        }
+        if (array_key_exists('patient_name', $validated))  { $appointment->name       = $validated['patient_name'];  }
+        if (array_key_exists('patient_phone', $validated)) { $appointment->mobile      = $validated['patient_phone']; }
+        if (array_key_exists('pet_name', $validated))      { $appointment->pet_name    = $validated['pet_name'];      }
+        if (array_key_exists('pet_id', $validated))        { $appointment->pet_id      = $validated['pet_id'];        }
+        if (array_key_exists('appointment_type', $validated)) { $appointment->appointment_type = $validated['appointment_type']; }
+        if (array_key_exists('date', $validated))          { $appointment->appointment_date = $validated['date'];     }
+        if (array_key_exists('time_slot', $validated))     { $appointment->appointment_time = $validated['time_slot'];}
+        if (array_key_exists('status', $validated))        { $appointment->status      = $validated['status'];        }
 
         $notesPayload = $this->decodeNotes($appointment->notes);
 
-        if ($clinic) {
-            $notesPayload['clinic_name'] = $clinic->name;
-        }
-
-        if ($doctor) {
-            $notesPayload['doctor_name'] = $doctor->doctor_name ?? $doctor->name ?? null;
-        }
+        if ($clinic) { $notesPayload['clinic_name'] = $clinic->name; }
+        if ($doctor) { $notesPayload['doctor_name'] = $doctor->doctor_name ?? $doctor->name ?? null; }
 
         if ($user) {
             $notesPayload['patient_user_id'] = $user->id;
-            $notesPayload['patient_email'] = $user->email;
+            $notesPayload['patient_email']   = $user->email;
             if (!array_key_exists('patient_phone', $validated) && $user->phone) {
                 $appointment->mobile = $appointment->mobile ?? $user->phone;
             }
@@ -396,7 +394,6 @@ class AppointmentSubmissionController extends Controller
             ->orderByDesc('appointment_time')
             ->get();
 
-        // Video call history for the same doctor
         $videoCalls = CallSession::query()
             ->with(['patient'])
             ->where('doctor_id', $doctor->id)
@@ -408,15 +405,15 @@ class AppointmentSubmissionController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
+            'data'    => [
                 'doctor' => [
-                    'id' => $doctor->id,
+                    'id'   => $doctor->id,
                     'name' => $doctor->doctor_name ?? $doctor->name ?? null,
                 ],
-                'count' => $appointments->count(),
-                'appointments' => $this->formatAppointments($appointments),
+                'count'            => $appointments->count(),
+                'appointments'     => $this->formatAppointments($appointments),
                 'video_call_count' => $videoCalls->count(),
-                'video_calls' => $this->formatVideoCalls($videoCalls),
+                'video_calls'      => $this->formatVideoCalls($videoCalls),
             ],
         ]);
     }
@@ -430,39 +427,31 @@ class AppointmentSubmissionController extends Controller
             ->orderBy('appointment_time')
             ->get();
 
-        $timezone = config('app.timezone', 'UTC');
-        $now = Carbon::now($timezone);
+        $timezone         = config('app.timezone', 'UTC');
+        $now              = Carbon::now($timezone);
         $waitingRoomUntil = $now->copy()->addMinutes(30);
-
-        $waitingRoom = collect();
-        $upcoming = collect();
+        $waitingRoom      = collect();
+        $upcoming         = collect();
 
         foreach ($appointments as $appointment) {
             $slot = $this->appointmentDateTime($appointment, $timezone);
-            if (!$slot || $slot->lt($now)) {
-                continue;
-            }
-
-            if ($slot->lte($waitingRoomUntil)) {
-                $waitingRoom->push($appointment);
-            } else {
-                $upcoming->push($appointment);
-            }
+            if (!$slot || $slot->lt($now)) { continue; }
+            $slot->lte($waitingRoomUntil) ? $waitingRoom->push($appointment) : $upcoming->push($appointment);
         }
 
         return response()->json([
             'success' => true,
-            'data' => [
+            'data'    => [
                 'doctor' => [
-                    'id' => $doctor->id,
+                    'id'   => $doctor->id,
                     'name' => $doctor->doctor_name ?? $doctor->name ?? null,
                 ],
-                'current_time' => $now->toDateTimeString(),
-                'waiting_room_until' => $waitingRoomUntil->toDateTimeString(),
-                'waiting_room_count' => $waitingRoom->count(),
-                'upcoming_count' => $upcoming->count(),
-                'waiting_room' => $this->formatAppointments($waitingRoom),
-                'upcoming' => $this->formatAppointments($upcoming),
+                'current_time'        => $now->toDateTimeString(),
+                'waiting_room_until'  => $waitingRoomUntil->toDateTimeString(),
+                'waiting_room_count'  => $waitingRoom->count(),
+                'upcoming_count'      => $upcoming->count(),
+                'waiting_room'        => $this->formatAppointments($waitingRoom),
+                'upcoming'            => $this->formatAppointments($upcoming),
             ],
         ]);
     }
@@ -472,15 +461,9 @@ class AppointmentSubmissionController extends Controller
         $pets = collect();
         if (Schema::hasTable('pets')) {
             if (Schema::hasColumn('pets', 'user_id')) {
-                $pets = Pet::query()
-                    ->where('user_id', $user->id)
-                    ->orderByDesc('id')
-                    ->get();
+                $pets = Pet::query()->where('user_id', $user->id)->orderByDesc('id')->get();
             } elseif (Schema::hasColumn('pets', 'owner_id')) {
-                $pets = Pet::query()
-                    ->where('owner_id', $user->id)
-                    ->orderByDesc('id')
-                    ->get();
+                $pets = Pet::query()->where('owner_id', $user->id)->orderByDesc('id')->get();
             }
         }
 
@@ -507,17 +490,18 @@ class AppointmentSubmissionController extends Controller
             $petPayloadById[(int) $petModel->id] = $payload;
         }
 
-        $primaryPet = $pets->first();
+        $primaryPet        = $pets->first();
         $primaryPetPayload = $primaryPet ? ($petPayloadById[(int) $primaryPet->id] ?? null) : null;
 
-        $userLookup = $this->buildUserLookup($appointments);
-        $appointmentUserIds = [];
-        $patientUserByAppointment = [];
+        $userLookup                  = $this->buildUserLookup($appointments);
+        $appointmentUserIds          = [];
+        $patientUserByAppointment    = [];
+
         foreach ($appointments as $appointment) {
-            $notes = $this->decodeNotes($appointment->notes);
+            $notes         = $this->decodeNotes($appointment->notes);
             $patientUserId = $this->resolvePatientUserId($appointment, $notes, $userLookup);
             if ($patientUserId) {
-                $appointmentUserIds[] = (int) $patientUserId;
+                $appointmentUserIds[]                        = (int) $patientUserId;
                 $patientUserByAppointment[$appointment->id] = (int) $patientUserId;
             }
         }
@@ -532,80 +516,64 @@ class AppointmentSubmissionController extends Controller
             $usersById = User::query()->whereIn('id', $allUserIds)->get()->keyBy('id');
         }
 
-        $appointmentIds = $appointments->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $prescriptionsFull = $this->fetchPrescriptionsForPetAppointments($petIds, $allUserIds, $appointmentIds);
-
+        $appointmentIds         = $appointments->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $prescriptionsFull      = $this->fetchPrescriptionsForPetAppointments($petIds, $allUserIds, $appointmentIds);
         $prescriptionsByAppointment = [];
         foreach ($prescriptionsFull as $prescription) {
-            $appointmentId = $prescription['video_appointment_id'] ?? null;
-            if (is_numeric($appointmentId)) {
-                $prescriptionsByAppointment[(int) $appointmentId][] = $prescription;
+            $apptId = $prescription['video_appointment_id'] ?? null;
+            if (is_numeric($apptId)) {
+                $prescriptionsByAppointment[(int) $apptId][] = $prescription;
             }
         }
 
         $appointmentsFull = $appointments->map(function (Appointment $appointment) use ($patientUserByAppointment, $usersById, $user, $petPayloadById, $prescriptionsByAppointment) {
             $patientUserId = $patientUserByAppointment[$appointment->id] ?? null;
-            $resolvedUser = null;
-            if ($patientUserId && $usersById->has($patientUserId)) {
-                $resolvedUser = $usersById->get($patientUserId)?->toArray();
-            } else {
-                $resolvedUser = $user->toArray();
-            }
+            $resolvedUser  = ($patientUserId && $usersById->has($patientUserId))
+                ? $usersById->get($patientUserId)?->toArray()
+                : $user->toArray();
 
-            $notes = $this->decodeNotes($appointment->notes);
-            $appointmentPayload = $this->appointmentTablePayload($appointment, $notes);
+            $notes             = $this->decodeNotes($appointment->notes);
+            $appointmentPayload= $this->appointmentTablePayload($appointment, $notes);
 
             return [
-                'appointment' => $appointmentPayload,
-                'pet' => $petPayloadById[(int) $appointment->pet_id] ?? null,
-                'user' => $resolvedUser,
-                'clinic' => $appointment->clinic?->toArray(),
-                'doctor' => $this->doctorPayload($appointment->doctor),
+                'appointment'   => $appointmentPayload,
+                'pet'           => $petPayloadById[(int) $appointment->pet_id] ?? null,
+                'user'          => $resolvedUser,
+                'clinic'        => $appointment->clinic?->toArray(),
+                'doctor'        => $this->doctorPayload($appointment->doctor),
                 'prescriptions' => $prescriptionsByAppointment[$appointment->id] ?? [],
             ];
         })->values()->all();
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                ],
-                'pet' => $primaryPet ? [
-                    'id' => $primaryPet->id,
-                    'name' => $primaryPet->name,
-                    'breed' => $primaryPet->breed ?? null,
-                ] : null,
-                'pets' => $pets->map(function (Pet $petModel) {
-                    return [
-                        'id' => $petModel->id,
-                        'name' => $petModel->name,
-                        'breed' => $petModel->breed ?? null,
-                    ];
-                })->values()->all(),
-                'owner' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                ],
-                'count' => $appointments->count(),
-                'appointments' => $this->formatAppointments($appointments),
-                'user_full' => $user->toArray(),
-                'pet_full' => $primaryPetPayload,
-                'pets_full' => array_values($petPayloadById),
-                'owner_full' => $user->toArray(),
-                'users_full' => $usersById->map(fn (User $user) => $user->toArray())->values()->all(),
-                'prescriptions_full' => $prescriptionsFull,
-                'appointments_full' => $appointmentsFull,
+            'data'    => [
+                'user'        => ['id' => $user->id, 'name' => $user->name],
+                'pet'         => $primaryPet ? ['id' => $primaryPet->id, 'name' => $primaryPet->name, 'breed' => $primaryPet->breed ?? null] : null,
+                'pets'        => $pets->map(fn (Pet $p) => ['id' => $p->id, 'name' => $p->name, 'breed' => $p->breed ?? null])->values()->all(),
+                'owner'       => ['id' => $user->id, 'name' => $user->name],
+                'count'       => $appointments->count(),
+                'appointments'=> $this->formatAppointments($appointments),
+                'user_full'   => $user->toArray(),
+                'pet_full'    => $primaryPetPayload,
+                'pets_full'   => array_values($petPayloadById),
+                'owner_full'  => $user->toArray(),
+                'users_full'  => $usersById->map(fn (User $u) => $u->toArray())->values()->all(),
+                'prescriptions_full'  => $prescriptionsFull,
+                'appointments_full'   => $appointmentsFull,
             ],
         ]);
     }
+
+    // =========================================================================
+    // Private helpers (unchanged from original)
+    // =========================================================================
 
     private function respondWithAppointment(Appointment $appointment, int $status = 200): JsonResponse
     {
         return response()->json([
             'success' => true,
-            'data' => [
+            'data'    => [
                 'appointment' => $this->formatAppointment($appointment),
             ],
         ], $status);
@@ -614,85 +582,69 @@ class AppointmentSubmissionController extends Controller
     private function formatAppointment(Appointment $appointment, array $userLookup = []): array
     {
         $appointment->loadMissing(['clinic', 'doctor']);
-        $notes = $this->decodeNotes($appointment->notes);
+        $notes         = $this->decodeNotes($appointment->notes);
         $patientUserId = $this->resolvePatientUserId($appointment, $notes, $userLookup);
 
         return [
-            'id' => $appointment->id,
+            'id'     => $appointment->id,
             'clinic' => [
-                'id' => $appointment->clinic?->id ?? $appointment->vet_registeration_id,
+                'id'   => $appointment->clinic?->id ?? $appointment->vet_registeration_id,
                 'name' => $appointment->clinic?->name ?? ($notes['clinic_name'] ?? null),
             ],
             'doctor' => [
-                'id' => $appointment->doctor?->id ?? $appointment->doctor_id,
-                'name' => $appointment->doctor?->doctor_name ?? $appointment->doctor?->name ?? ($notes['doctor_name'] ?? null),
+                'id'           => $appointment->doctor?->id ?? $appointment->doctor_id,
+                'name'         => $appointment->doctor?->doctor_name ?? $appointment->doctor?->name ?? ($notes['doctor_name'] ?? null),
                 'doctor_image' => $this->doctorImageUrl($appointment->doctor),
             ],
             'patient' => [
                 'user_id' => $patientUserId,
-                'name' => $appointment->name,
-                'phone' => $appointment->mobile,
-                'email' => $notes['patient_email'] ?? null,
+                'name'    => $appointment->name,
+                'phone'   => $appointment->mobile,
+                'email'   => $notes['patient_email'] ?? null,
             ],
-            'pet_id' => $appointment->pet_id,
+            'pet_id'           => $appointment->pet_id,
             'appointment_type' => $appointment->appointment_type,
-            'date' => $appointment->appointment_date,
-            'time_slot' => $appointment->appointment_time,
-            'status' => $appointment->status,
-            'amount' => $notes['amount_paise'] ?? null,
-            'currency' => $notes['currency'] ?? 'INR',
-            'appointment_table' => $this->appointmentTablePayload($appointment, $notes),
+            'date'             => $appointment->appointment_date,
+            'time_slot'        => $appointment->appointment_time,
+            'status'           => $appointment->status,
+            'amount'           => $notes['amount_paise'] ?? null,
+            'currency'         => $notes['currency'] ?? 'INR',
+            'appointment_table'=> $this->appointmentTablePayload($appointment, $notes),
         ];
     }
 
     private function doctorPayload(?Doctor $doctor): ?array
     {
-        if (!$doctor) {
-            return null;
-        }
-
+        if (!$doctor) { return null; }
         $payload = $doctor->toArray();
-        $payload['doctor_image'] = $this->doctorImageUrl($doctor);
+        $payload['doctor_image']          = $this->doctorImageUrl($doctor);
         $payload['doctor_image_blob_url'] = $this->doctorImageBlobUrl($doctor);
         unset($payload['doctor_image_blob']);
-
         return $payload;
     }
 
     private function doctorImageUrl(?Doctor $doctor): ?string
     {
-        if (!$doctor) {
-            return null;
-        }
-
+        if (!$doctor) { return null; }
         return $this->doctorImageBlobUrl($doctor) ?: $doctor->doctor_image;
     }
 
     private function doctorImageBlobUrl(?Doctor $doctor): ?string
     {
-        if (!$doctor || empty($doctor->doctor_image_blob)) {
-            return null;
-        }
-
+        if (!$doctor || empty($doctor->doctor_image_blob)) { return null; }
         return route('api.doctors.blob-image', ['doctor' => $doctor->id]);
     }
 
-    /**
-     * @param  Collection<int, Appointment>  $appointments
-     */
+    /** @param Collection<int, Appointment> $appointments */
     private function formatAppointments(Collection $appointments): array
     {
         $userLookup = $this->buildUserLookup($appointments);
-
-        return $appointments->map(function (Appointment $appointment) use ($userLookup) {
-            return $this->formatAppointment($appointment, $userLookup);
-        })->all();
+        return $appointments->map(fn (Appointment $a) => $this->formatAppointment($a, $userLookup))->all();
     }
 
     private function decodeNotes(?string $notes): array
     {
         $decoded = json_decode($notes ?? '{}', true);
-
         return is_array($decoded) ? $decoded : [];
     }
 
@@ -700,55 +652,36 @@ class AppointmentSubmissionController extends Controller
     {
         static $columns = null;
         if ($columns === null) {
-            $columns = Schema::hasTable('appointments')
-                ? Schema::getColumnListing('appointments')
-                : [];
+            $columns = Schema::hasTable('appointments') ? Schema::getColumnListing('appointments') : [];
         }
-
         $payload = [];
-        foreach ($columns as $column) {
-            $payload[$column] = $appointment->{$column} ?? null;
-        }
-
+        foreach ($columns as $column) { $payload[$column] = $appointment->{$column} ?? null; }
         $payload['notes_decoded'] = !empty($notes) ? $notes : $this->decodeNotes($appointment->notes);
-
         return $payload;
     }
 
     private function appointmentTypeColumnExists(): bool
     {
         static $hasColumn = null;
-
         if ($hasColumn === null) {
-            $hasColumn = Schema::hasTable('appointments')
-                && Schema::hasColumn('appointments', 'appointment_type');
+            $hasColumn = Schema::hasTable('appointments') && Schema::hasColumn('appointments', 'appointment_type');
         }
-
         return $hasColumn;
     }
 
     private function resolvePatientUserId(Appointment $appointment, array $notes = [], array $userLookup = []): ?int
     {
         $fromNotes = $notes['patient_user_id'] ?? null;
-        if (is_numeric($fromNotes)) {
-            return (int) $fromNotes;
-        }
+        if (is_numeric($fromNotes)) { return (int) $fromNotes; }
 
         $fromColumn = $appointment->patient_user_id ?? null;
-        if (is_numeric($fromColumn)) {
-            return (int) $fromColumn;
-        }
+        if (is_numeric($fromColumn)) { return (int) $fromColumn; }
 
         $phoneKey = $this->normalizePhone($appointment->mobile ?? null);
         $emailKey = $this->normalizeEmail($notes['patient_email'] ?? null);
 
-        if ($phoneKey && isset($userLookup['phone'][$phoneKey])) {
-            return (int) $userLookup['phone'][$phoneKey];
-        }
-
-        if ($emailKey && isset($userLookup['email'][$emailKey])) {
-            return (int) $userLookup['email'][$emailKey];
-        }
+        if ($phoneKey && isset($userLookup['phone'][$phoneKey])) { return (int) $userLookup['phone'][$phoneKey]; }
+        if ($emailKey && isset($userLookup['email'][$emailKey])) { return (int) $userLookup['email'][$emailKey]; }
 
         if (empty($userLookup) && ($phoneKey || $emailKey)) {
             $userId = User::query()
@@ -757,7 +690,6 @@ class AppointmentSubmissionController extends Controller
                     return $phoneKey ? $q->orWhere('email', $emailKey) : $q->where('email', $emailKey);
                 })
                 ->value('id');
-
             return $userId ? (int) $userId : null;
         }
 
@@ -766,349 +698,179 @@ class AppointmentSubmissionController extends Controller
 
     private function buildUserLookup(Collection $appointments): array
     {
-        $phones = [];
-        $emails = [];
-
+        $phones = []; $emails = [];
         foreach ($appointments as $appointment) {
             $phone = $this->normalizePhone($appointment->mobile ?? null);
-            if ($phone) {
-                $phones[] = $phone;
-            }
-
+            if ($phone) { $phones[] = $phone; }
             $notes = $this->decodeNotes($appointment->notes);
             $email = $this->normalizeEmail($notes['patient_email'] ?? null);
-            if ($email) {
-                $emails[] = $email;
-            }
+            if ($email) { $emails[] = $email; }
         }
-
         $phones = array_values(array_unique(array_filter($phones)));
         $emails = array_values(array_unique(array_filter($emails)));
+        if (empty($phones) && empty($emails)) { return ['phone' => [], 'email' => []]; }
 
-        if (empty($phones) && empty($emails)) {
-            return ['phone' => [], 'email' => []];
-        }
-
-        $users = User::query()
-            ->select(['id', 'phone', 'email'])
-            ->where(function ($q) use ($phones, $emails) {
-                if ($phones) {
-                    $q->whereIn('phone', $phones);
-                }
-
-                if ($emails) {
-                    if ($phones) {
-                        $q->orWhereIn('email', $emails);
-                    } else {
-                        $q->whereIn('email', $emails);
-                    }
-                }
-            })
-            ->get();
+        $users  = User::query()->select(['id', 'phone', 'email'])->where(function ($q) use ($phones, $emails) {
+            if ($phones) { $q->whereIn('phone', $phones); }
+            if ($emails) { $phones ? $q->orWhereIn('email', $emails) : $q->whereIn('email', $emails); }
+        })->get();
 
         $lookup = ['phone' => [], 'email' => []];
-
         foreach ($users as $user) {
             $phone = $this->normalizePhone($user->phone ?? null);
-            if ($phone) {
-                $lookup['phone'][$phone] = $user->id;
-            }
-
+            if ($phone) { $lookup['phone'][$phone] = $user->id; }
             $email = $this->normalizeEmail($user->email ?? null);
-            if ($email) {
-                $lookup['email'][$email] = $user->id;
-            }
+            if ($email) { $lookup['email'][$email] = $user->id; }
         }
-
         return $lookup;
     }
 
     private function normalizePhone(?string $value): ?string
     {
-        if ($value === null) {
-            return null;
-        }
-
+        if ($value === null) { return null; }
         $digits = preg_replace('/\\D+/', '', $value);
-
         return $digits !== '' ? $digits : null;
     }
 
     private function normalizeEmail($value): ?string
     {
-        if (!is_string($value)) {
-            return null;
-        }
-
+        if (!is_string($value)) { return null; }
         $email = strtolower(trim($value));
-
         return $email !== '' ? $email : null;
     }
 
     private function fetchPetsForUser(int $userId): array
     {
         if (Schema::hasTable('pets')) {
-            $userColumn = Schema::hasColumn('pets', 'user_id')
-                ? 'user_id'
+            $userColumn = Schema::hasColumn('pets', 'user_id') ? 'user_id'
                 : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
-
             if ($userColumn) {
-                $petColumns = Schema::getColumnListing('pets');
-                $petColumns = array_values(array_filter(
-                    $petColumns,
-                    static fn (string $column) => $column !== 'pet_doc2_blob'
-                ));
-
-                $pets = DB::table('pets')
-                    ->where($userColumn, $userId)
-                    ->when(!empty($petColumns), fn ($query) => $query->select($petColumns))
-                    ->orderByDesc('id')
-                    ->get()
+                $petColumns = array_values(array_filter(Schema::getColumnListing('pets'), fn ($c) => $c !== 'pet_doc2_blob'));
+                $pets = DB::table('pets')->where($userColumn, $userId)
+                    ->when(!empty($petColumns), fn ($q) => $q->select($petColumns))
+                    ->orderByDesc('id')->get()
                     ->map(function ($pet) {
-                        foreach (['vaccine_reminder_status', 'dog_disease_payload'] as $jsonField) {
-                            if (property_exists($pet, $jsonField)) {
-                                $pet->{$jsonField} = $this->decodeJsonField($pet->{$jsonField});
-                            }
+                        foreach (['vaccine_reminder_status', 'dog_disease_payload'] as $f) {
+                            if (property_exists($pet, $f)) { $pet->{$f} = $this->decodeJsonField($pet->{$f}); }
                         }
-
                         $petId = property_exists($pet, 'id') && is_numeric($pet->id) ? (int) $pet->id : null;
                         $pet->pet_doc2_blob_url = $petId ? route('api.pets.pet-doc2-blob', ['pet' => $petId]) : null;
-
                         return $pet;
-                    })
-                    ->all();
-
-                if (!empty($pets)) {
-                    return ['source' => 'pets', 'pets' => $pets];
-                }
+                    })->all();
+                if (!empty($pets)) { return ['source' => 'pets', 'pets' => $pets]; }
             }
         }
 
         if (Schema::hasTable('user_pets')) {
-            $pets = DB::table('user_pets')
-                ->where('user_id', $userId)
-                ->orderByDesc('id')
-                ->get()
+            $pets = DB::table('user_pets')->where('user_id', $userId)->orderByDesc('id')->get()
                 ->map(function ($pet) {
-                    if (property_exists($pet, 'medical_history')) {
-                        $pet->medical_history = $this->decodeJsonField($pet->medical_history);
-                    }
-                    if (property_exists($pet, 'vaccination_log')) {
-                        $pet->vaccination_log = $this->decodeJsonField($pet->vaccination_log);
-                    }
+                    if (property_exists($pet, 'medical_history'))  { $pet->medical_history  = $this->decodeJsonField($pet->medical_history);  }
+                    if (property_exists($pet, 'vaccination_log'))  { $pet->vaccination_log   = $this->decodeJsonField($pet->vaccination_log);   }
                     return $pet;
-                })
-                ->all();
-
+                })->all();
             return ['source' => 'user_pets', 'pets' => $pets];
         }
 
         return ['source' => null, 'pets' => []];
     }
 
-    /**
-     * Fetch the pet linked directly to the appointment (appointments.pet_id) from the pets table.
-     */
     private function fetchAppointmentPet(Appointment $appointment): ?array
     {
-        if (!$appointment->pet_id || !Schema::hasTable('pets')) {
-            return null;
+        if (!$appointment->pet_id || !Schema::hasTable('pets')) { return null; }
+        $petColumns = array_values(array_filter(Schema::getColumnListing('pets'), fn ($c) => $c !== 'pet_doc2_blob'));
+        $pet = DB::table('pets')->where('id', $appointment->pet_id)
+            ->when(!empty($petColumns), fn ($q) => $q->select($petColumns))->first();
+        if (!$pet) { return null; }
+        foreach (['vaccine_reminder_status', 'dog_disease_payload'] as $f) {
+            if (property_exists($pet, $f)) { $pet->{$f} = $this->decodeJsonField($pet->{$f}); }
         }
-
-        $petColumns = Schema::getColumnListing('pets');
-        $petColumns = array_values(array_filter(
-            $petColumns,
-            static fn (string $column) => $column !== 'pet_doc2_blob'
-        ));
-
-        $pet = DB::table('pets')
-            ->where('id', $appointment->pet_id)
-            ->when(!empty($petColumns), fn ($query) => $query->select($petColumns))
-            ->first();
-
-        if (!$pet) {
-            return null;
-        }
-
-        // Normalize known JSON columns so consumers get structured data.
-        foreach (['vaccine_reminder_status', 'dog_disease_payload'] as $jsonField) {
-            if (property_exists($pet, $jsonField)) {
-                $pet->{$jsonField} = $this->decodeJsonField($pet->{$jsonField});
-            }
-        }
-
         if (property_exists($pet, 'id') && is_numeric($pet->id)) {
             $pet->pet_doc2_blob_url = route('api.pets.pet-doc2-blob', ['pet' => (int) $pet->id]);
         }
-
         return (array) $pet;
     }
 
     private function decodeJsonField($value)
     {
-        if (!is_string($value) || $value === '') {
-            return $value;
-        }
-
+        if (!is_string($value) || $value === '') { return $value; }
         $decoded = json_decode($value, true);
         return json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
     }
 
     private function sanitizeForJson($value)
     {
-        if (is_array($value)) {
-            foreach ($value as $key => $item) {
-                $value[$key] = $this->sanitizeForJson($item);
-            }
-
-            return $value;
-        }
-
-        if ($value instanceof \JsonSerializable) {
-            return $this->sanitizeForJson($value->jsonSerialize());
-        }
-
-        if ($value instanceof \Traversable) {
-            return $this->sanitizeForJson(iterator_to_array($value));
-        }
-
-        if (is_object($value)) {
-            return $this->sanitizeForJson((array) $value);
-        }
-
+        if (is_array($value)) { foreach ($value as $k => $v) { $value[$k] = $this->sanitizeForJson($v); } return $value; }
+        if ($value instanceof \JsonSerializable) { return $this->sanitizeForJson($value->jsonSerialize()); }
+        if ($value instanceof \Traversable)      { return $this->sanitizeForJson(iterator_to_array($value)); }
+        if (is_object($value))                   { return $this->sanitizeForJson((array) $value); }
         if (is_string($value)) {
-            if (function_exists('mb_check_encoding') && mb_check_encoding($value, 'UTF-8')) {
-                return $value;
-            }
-
+            if (function_exists('mb_check_encoding') && mb_check_encoding($value, 'UTF-8')) { return $value; }
             $normalized = function_exists('iconv') ? @iconv('UTF-8', 'UTF-8//IGNORE', $value) : false;
             return $normalized !== false ? $normalized : '';
         }
-
         return $value;
     }
 
     private function fetchPrescriptionsForPetAppointments(array $petIds, array $userIds, array $appointmentIds): array
     {
-        if (!Schema::hasTable('prescriptions')) {
-            return [];
-        }
-
-        $hasPetId = Schema::hasColumn('prescriptions', 'pet_id');
-        $hasUserId = Schema::hasColumn('prescriptions', 'user_id');
-        $hasVideoAppointmentId = Schema::hasColumn('prescriptions', 'video_appointment_id');
-
-        if (!$hasPetId && !$hasUserId && !$hasVideoAppointmentId) {
-            return [];
-        }
+        if (!Schema::hasTable('prescriptions')) { return []; }
+        $hasPetId               = Schema::hasColumn('prescriptions', 'pet_id');
+        $hasUserId              = Schema::hasColumn('prescriptions', 'user_id');
+        $hasVideoAppointmentId  = Schema::hasColumn('prescriptions', 'video_appointment_id');
+        if (!$hasPetId && !$hasUserId && !$hasVideoAppointmentId) { return []; }
 
         $query = DB::table('prescriptions');
         $query->where(function ($q) use ($hasPetId, $hasUserId, $hasVideoAppointmentId, $petIds, $userIds, $appointmentIds) {
-            $hasCondition = false;
-
-            if ($hasPetId && !empty($petIds)) {
-                $q->whereIn('pet_id', $petIds);
-                $hasCondition = true;
-            }
-
-            if ($hasUserId && !empty($userIds)) {
-                if ($hasCondition) {
-                    $q->orWhereIn('user_id', $userIds);
-                } else {
-                    $q->whereIn('user_id', $userIds);
-                }
-                $hasCondition = true;
-            }
-
-            if ($hasVideoAppointmentId && !empty($appointmentIds)) {
-                if ($hasCondition) {
-                    $q->orWhereIn('video_appointment_id', $appointmentIds);
-                } else {
-                    $q->whereIn('video_appointment_id', $appointmentIds);
-                }
-            }
+            $has = false;
+            if ($hasPetId && !empty($petIds))             { $q->whereIn('pet_id', $petIds); $has = true; }
+            if ($hasUserId && !empty($userIds))            { $has ? $q->orWhereIn('user_id', $userIds)           : $q->whereIn('user_id', $userIds);           $has = true; }
+            if ($hasVideoAppointmentId && !empty($appointmentIds)) { $has ? $q->orWhereIn('video_appointment_id', $appointmentIds) : $q->whereIn('video_appointment_id', $appointmentIds); }
         });
 
-        return $query
-            ->orderByDesc('id')
-            ->get()
-            ->map(function ($row) {
-                $payload = (array) $row;
-                if (array_key_exists('medications_json', $payload)) {
-                    $payload['medications_json'] = $this->decodeJsonField($payload['medications_json']);
-                }
-                return $payload;
-            })
-            ->values()
-            ->all();
+        return $query->orderByDesc('id')->get()->map(function ($row) {
+            $payload = (array) $row;
+            if (array_key_exists('medications_json', $payload)) {
+                $payload['medications_json'] = $this->decodeJsonField($payload['medications_json']);
+            }
+            return $payload;
+        })->values()->all();
     }
 
     private function appointmentDateTime(Appointment $appointment, string $timezone): ?Carbon
     {
         $date = trim((string) $appointment->appointment_date);
-        if ($date === '') {
-            return null;
-        }
-
-        $time = trim((string) $appointment->appointment_time);
-        if ($time === '') {
-            $time = '00:00:00';
-        }
-
+        if ($date === '') { return null; }
+        $time     = trim((string) $appointment->appointment_time);
+        if ($time === '') { $time = '00:00:00'; }
         $dateTime = $date . ' ' . $time;
-        $formats = [
-            'Y-m-d H:i:s',
-            'Y-m-d H:i',
-            'Y-m-d h:i A',
-            'Y-m-d h:i:s A',
-        ];
-
+        $formats  = ['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d h:i A', 'Y-m-d h:i:s A'];
         foreach ($formats as $format) {
-            try {
-                return Carbon::createFromFormat($format, $dateTime, $timezone);
-            } catch (\Throwable $e) {
-                continue;
-            }
+            try { return Carbon::createFromFormat($format, $dateTime, $timezone); } catch (\Throwable $e) { continue; }
         }
-
-        try {
-            return Carbon::parse($dateTime, $timezone);
-        } catch (\Throwable $e) {
-            return null;
-        }
+        try { return Carbon::parse($dateTime, $timezone); } catch (\Throwable $e) { return null; }
     }
 
-    /**
-     * @param  Collection<int, CallSession>  $sessions
-     */
+    /** @param Collection<int, CallSession> $sessions */
     private function formatVideoCalls(Collection $sessions): array
     {
-        return $sessions->map(function (CallSession $session) {
-            return $this->formatVideoCall($session);
-        })->all();
+        return $sessions->map(fn (CallSession $s) => $this->formatVideoCall($s))->all();
     }
 
     private function formatVideoCall(CallSession $session): array
     {
         $session->loadMissing('patient');
         $timestamp = $session->ended_at ?? $session->started_at ?? $session->created_at;
-
         return [
-            'id' => $session->id,
-            'patient' => [
-                'user_id' => $session->patient_id,
-                'name' => $session->patient?->name,
-                'phone' => $session->patient?->phone,
-                'email' => $session->patient?->email,
-            ],
-            'status' => $session->status,
+            'id'             => $session->id,
+            'patient'        => ['user_id' => $session->patient_id, 'name' => $session->patient?->name, 'phone' => $session->patient?->phone, 'email' => $session->patient?->email],
+            'status'         => $session->status,
             'payment_status' => $session->payment_status,
-            'amount' => $session->amount_paid,
-            'currency' => $session->currency ?? 'INR',
-            'started_at' => $session->started_at?->toDateTimeString(),
-            'ended_at' => $session->ended_at?->toDateTimeString(),
-            'created_at' => $session->created_at?->toDateTimeString(),
-            'timestamp' => $timestamp?->toDateTimeString(),
+            'amount'         => $session->amount_paid,
+            'currency'       => $session->currency ?? 'INR',
+            'started_at'     => $session->started_at?->toDateTimeString(),
+            'ended_at'       => $session->ended_at?->toDateTimeString(),
+            'created_at'     => $session->created_at?->toDateTimeString(),
+            'timestamp'      => $timestamp?->toDateTimeString(),
             'duration_seconds' => $session->duration_seconds,
         ];
     }
@@ -1117,76 +879,35 @@ class AppointmentSubmissionController extends Controller
     {
         foreach (['clinic_id', 'vet_registeration_id', 'vet_id'] as $key) {
             $parsed = $this->parsePositiveInt($request->input($key) ?? $request->query($key));
-            if ($parsed !== null) {
-                return $parsed;
-            }
+            if ($parsed !== null) { return $parsed; }
         }
 
-        $headerClinicId = $this->firstPositiveHeaderInt($request, [
-            'X-Clinic-Id',
-            'X-Vet-Id',
-            'X-Vet-Registeration-Id',
-            'X-Vet-Registerations-Temp-Id',
-        ]);
-        if ($headerClinicId !== null) {
-            return $headerClinicId;
-        }
+        $headerClinicId = $this->firstPositiveHeaderInt($request, ['X-Clinic-Id', 'X-Vet-Id', 'X-Vet-Registeration-Id', 'X-Vet-Registerations-Temp-Id']);
+        if ($headerClinicId !== null) { return $headerClinicId; }
 
-        $headerUserId = $this->firstPositiveHeaderInt($request, [
-            'X-User-Id',
-            'X-Acting-User',
-            'X-Session-User',
-        ]);
-        if (
-            $headerUserId !== null
-            && Schema::hasTable('vet_registerations_temp')
-            && DB::table('vet_registerations_temp')->where('id', $headerUserId)->exists()
-        ) {
+        $headerUserId = $this->firstPositiveHeaderInt($request, ['X-User-Id', 'X-Acting-User', 'X-Session-User']);
+        if ($headerUserId !== null && Schema::hasTable('vet_registerations_temp') && DB::table('vet_registerations_temp')->where('id', $headerUserId)->exists()) {
             return $headerUserId;
         }
 
-        $slug = trim((string) (
-            $request->input('vet_slug')
-            ?? $request->query('vet_slug')
-            ?? $request->input('clinic_slug')
-            ?? $request->query('clinic_slug')
-            ?? ''
-        ));
-        if (
-            $slug !== ''
-            && Schema::hasTable('vet_registerations_temp')
-            && Schema::hasColumn('vet_registerations_temp', 'slug')
-        ) {
-            $row = DB::table('vet_registerations_temp')
-                ->select('id')
-                ->whereRaw('LOWER(slug) = ?', [strtolower($slug)])
-                ->first();
-            if ($row) {
-                return (int) $row->id;
-            }
+        $slug = trim((string) ($request->input('vet_slug') ?? $request->query('vet_slug') ?? $request->input('clinic_slug') ?? $request->query('clinic_slug') ?? ''));
+        if ($slug !== '' && Schema::hasTable('vet_registerations_temp') && Schema::hasColumn('vet_registerations_temp', 'slug')) {
+            $row = DB::table('vet_registerations_temp')->select('id')->whereRaw('LOWER(slug) = ?', [strtolower($slug)])->first();
+            if ($row) { return (int) $row->id; }
         }
 
         $sessionClinicId = $this->parsePositiveInt(
-            session('clinic_id')
-                ?? session('vet_registerations_temp_id')
-                ?? session('vet_registeration_id')
-                ?? session('vet_id')
-                ?? data_get(session('user'), 'clinic_id')
-                ?? data_get(session('auth_full'), 'clinic_id')
-                ?? data_get(session('auth_full'), 'user.clinic_id')
-                ?? data_get(session('auth_full'), 'vet_registeration_id')
-                ?? data_get(session('auth_full'), 'vet_registerations_temp_id')
+            session('clinic_id') ?? session('vet_registerations_temp_id') ?? session('vet_registeration_id') ?? session('vet_id')
+            ?? data_get(session('user'), 'clinic_id') ?? data_get(session('auth_full'), 'clinic_id')
+            ?? data_get(session('auth_full'), 'user.clinic_id') ?? data_get(session('auth_full'), 'vet_registeration_id')
+            ?? data_get(session('auth_full'), 'vet_registerations_temp_id')
         );
-        if ($sessionClinicId !== null) {
-            return $sessionClinicId;
-        }
+        if ($sessionClinicId !== null) { return $sessionClinicId; }
 
         $doctorId = $this->resolveDoctorId($request);
         if ($doctorId !== null) {
             $clinicId = $this->lookupDoctorClinicId($doctorId);
-            if ($clinicId !== null) {
-                return $clinicId;
-            }
+            if ($clinicId !== null) { return $clinicId; }
         }
 
         return null;
@@ -1196,70 +917,36 @@ class AppointmentSubmissionController extends Controller
     {
         foreach (['doctor_id', 'doctorId'] as $key) {
             $parsed = $this->parsePositiveInt($request->input($key) ?? $request->query($key));
-            if ($parsed !== null) {
-                return $parsed;
-            }
+            if ($parsed !== null) { return $parsed; }
         }
-
         $headerDoctorId = $this->firstPositiveHeaderInt($request, ['X-Doctor-Id']);
-        if ($headerDoctorId !== null) {
-            return $headerDoctorId;
-        }
-
+        if ($headerDoctorId !== null) { return $headerDoctorId; }
         return $this->parsePositiveInt(
-            session('doctor_id')
-                ?? data_get(session('auth_full'), 'doctor_id')
-                ?? data_get(session('auth_full'), 'user.doctor_id')
-                ?? data_get(session('user'), 'doctor_id')
+            session('doctor_id') ?? data_get(session('auth_full'), 'doctor_id')
+            ?? data_get(session('auth_full'), 'user.doctor_id') ?? data_get(session('user'), 'doctor_id')
         );
     }
 
     private function lookupDoctorClinicId(?int $doctorId): ?int
     {
-        if (!$doctorId) {
-            return null;
-        }
-
-        $clinicId = Doctor::query()
-            ->where('id', $doctorId)
-            ->value('vet_registeration_id');
-
-        return $this->parsePositiveInt($clinicId);
+        if (!$doctorId) { return null; }
+        return $this->parsePositiveInt(Doctor::query()->where('id', $doctorId)->value('vet_registeration_id'));
     }
 
     private function firstPositiveHeaderInt(Request $request, array $headerNames): ?int
     {
         foreach ($headerNames as $headerName) {
             $parsed = $this->parsePositiveInt($request->header($headerName));
-            if ($parsed !== null) {
-                return $parsed;
-            }
+            if ($parsed !== null) { return $parsed; }
         }
-
         return null;
     }
 
     private function parsePositiveInt(mixed $value): ?int
     {
-        if (is_int($value)) {
-            return $value > 0 ? $value : null;
-        }
-
-        if (is_string($value)) {
-            $value = trim($value);
-            if ($value === '' || !preg_match('/^\d+$/', $value)) {
-                return null;
-            }
-
-            $parsed = (int) $value;
-            return $parsed > 0 ? $parsed : null;
-        }
-
-        if (is_numeric($value)) {
-            $parsed = (int) $value;
-            return $parsed > 0 ? $parsed : null;
-        }
-
+        if (is_int($value))    { return $value > 0 ? $value : null; }
+        if (is_string($value)) { $value = trim($value); if ($value === '' || !preg_match('/^\d+$/', $value)) { return null; } $parsed = (int) $value; return $parsed > 0 ? $parsed : null; }
+        if (is_numeric($value)){ $parsed = (int) $value; return $parsed > 0 ? $parsed : null; }
         return null;
     }
 }
