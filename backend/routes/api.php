@@ -381,6 +381,98 @@ Route::get('/doctors/active-slots', function (Request $request) {
     ]);
 });
 
+Route::post('/appointments/simple-create', function (Request $request) {
+    $validated = $request->validate([
+        'clinic_id'        => ['required', 'integer', 'exists:vet_registerations_temp,id'],
+        'user_id'          => ['required', 'integer', 'exists:users,id'],
+        'doctor_id'        => ['required', 'integer', 'exists:doctors,id'],
+        'appointment_date' => ['required', 'date_format:Y-m-d'],
+        'appointment_time' => ['required', 'string', 'max:50'],
+    ]);
+    
+    $clinic = VetRegisterationTemp::find((int) $validated['clinic_id']);
+    $user = User::find((int) $validated['user_id']);
+    $doctor = Doctor::find((int) $validated['doctor_id']);
+    
+    $notesPayload = [
+        'clinic_name'     => $clinic?->name,
+        'clinic_id'       => $clinic?->id,
+        'doctor_name'     => $doctor?->doctor_name ?? $doctor?->name ?? null,
+        'doctor_id'       => $doctor?->id,
+        'patient_user_id' => $user->id,
+        'patient_email'   => $user->email,
+    ];
+    
+    $petId = null;
+    $petName = null;
+    if (Schema::hasTable('pets')) {
+        $userColumn = Schema::hasColumn('pets', 'user_id') ? 'user_id'
+            : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+        if ($userColumn) {
+            $pet = DB::table('pets')->where($userColumn, $user->id)->first();
+            if ($pet) {
+                $petId = $pet->id;
+                $petName = $pet->name;
+            }
+        }
+    }
+    
+    $timeInput = trim((string) $validated['appointment_time']);
+    if (str_contains($timeInput, '-')) {
+        $parts = explode('-', $timeInput);
+        $timeInput = trim($parts[0]);
+    }
+    
+    if (preg_match('/^\d{2}:\d{2}:\d{2}$/', $timeInput)) {
+        $dbTime = $timeInput;
+    } elseif (preg_match('/^\d{2}:\d{2}$/', $timeInput)) {
+        $dbTime = $timeInput . ':00';
+    } else {
+        try {
+            $dbTime = \Illuminate\Support\Carbon::parse($timeInput)->format('H:i:s');
+        } catch (\Throwable $e) {
+            $dbTime = $timeInput;
+        }
+    }
+
+    $appointment = App\Models\Appointment::create([
+        'vet_registeration_id' => $clinic->id,
+        'doctor_id'            => $doctor->id,
+        'pet_id'               => $petId,
+        'name'                 => $user->name,
+        'mobile'               => $user->phone ?? 'N/A',
+        'pet_name'             => $petName,
+        'appointment_date'     => $validated['appointment_date'],
+        'appointment_time'     => $dbTime,
+        'status'               => 'confirmed',
+        'notes'                => json_encode($notesPayload),
+    ]);
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Appointment created successfully.',
+        'data' => [
+            'appointment_id' => $appointment->id,
+            'clinic' => [
+                'id' => $clinic->id,
+                'name' => $clinic->name,
+            ],
+            'doctor' => [
+                'id' => $doctor->id,
+                'name' => $doctor->doctor_name,
+            ],
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'phone' => $user->phone,
+            ],
+            'appointment_date' => $appointment->appointment_date,
+            'appointment_time' => $appointment->appointment_time,
+            'status' => $appointment->status,
+        ]
+    ], 201);
+});
+
 Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Request $request) {
     $fromDate = $request->query('from_date', '2026-05-10');
     
