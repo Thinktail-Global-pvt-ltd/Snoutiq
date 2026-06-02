@@ -372,6 +372,21 @@ Route::get('/clinics/onboarding-summary', function (Request $request) {
             'machinery_count' => (int) $machineryServices->count(),
             'profile_completion_percentage' => (int) ($profileCompletion['percentage'] ?? 0),
             'created_at' => $clinic->created_at ? $clinic->created_at->toIso8601String() : null,
+            'doctors' => $doctors->map(function ($doctor) {
+                return [
+                    'id' => (int) $doctor->id,
+                    'name' => $doctor->doctor_name ?? 'Unnamed Doctor',
+                    'email' => $doctor->doctor_email ?? null,
+                    'mobile' => $doctor->doctor_mobile ?? null,
+                    'license' => $doctor->doctor_license ?? null,
+                    'degree' => $doctor->degree ?? null,
+                    'years_of_experience' => $doctor->years_of_experience ?? null,
+                    'specialization' => $doctor->specialization_select_all_that_apply ?? null,
+                    'image_blob_url' => empty($doctor->doctor_image_blob)
+                        ? null
+                        : route('api.doctors.blob-image', ['doctor' => $doctor->id], true),
+                ];
+            })->values()->all(),
         ];
     });
     
