@@ -259,7 +259,7 @@ Route::get('/agora/appid', function () {
     ]);
 });
 
-Route::get('/clinics/onboarding-summary', function (Request $request) {
+Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Request $request) {
     $fromDate = $request->query('from_date', '2026-05-10');
     
     if ($fromDate !== 'all' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate)) {
