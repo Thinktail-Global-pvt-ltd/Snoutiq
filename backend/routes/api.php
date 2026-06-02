@@ -272,7 +272,14 @@ Route::get('/clinics/onboarding-summary', function (Request $request) {
     $clinicProfileCompletionService = app(App\Services\ClinicProfileCompletionService::class);
     
     $clinics = VetRegisterationTemp::query()
-        ->with('doctors')
+        ->whereHas('doctors', function ($query) {
+            $query->where('exported_from_excell', 1)
+                  ->orWhere('exported_from_excell', '1');
+        })
+        ->with(['doctors' => function ($query) {
+            $query->where('exported_from_excell', 1)
+                  ->orWhere('exported_from_excell', '1');
+        }])
         ->when($fromDate !== 'all', fn ($query) => $query->where('created_at', '>=', $fromDate.' 00:00:00'))
         ->orderByDesc('created_at')
         ->get();
