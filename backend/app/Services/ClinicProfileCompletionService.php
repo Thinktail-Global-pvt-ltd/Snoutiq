@@ -42,6 +42,14 @@ class ClinicProfileCompletionService
                 'label' => 'Clinic pincode',
                 'complete' => $this->filled(data_get($clinic, 'pincode')),
             ],
+            'clinic_day_fee' => [
+                'label' => 'Clinic day fee',
+                'complete' => $this->filled(data_get($clinic, 'clinic_day_fee')),
+            ],
+            'clinic_night_fee' => [
+                'label' => 'Clinic night fee',
+                'complete' => $this->filled(data_get($clinic, 'clinic_night_fee')),
+            ],
             'clinic_image' => [
                 'label' => 'Clinic image',
                 'complete' => $this->filled(data_get($clinic, 'clinic_image'))

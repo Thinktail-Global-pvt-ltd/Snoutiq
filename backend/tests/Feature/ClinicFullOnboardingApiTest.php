@@ -252,4 +252,150 @@ class ClinicFullOnboardingApiTest extends TestCase
         $this->assertEquals(400.0, $clinicData['clinic_day_fee']);
         $this->assertEquals(600.0, $clinicData['clinic_night_fee']);
     }
+
+    public function test_doctor_availability_update_can_update_clinic_fees(): void
+    {
+        // 1. Seed a clinic
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 100,
+            'name' => 'Excellent Vet Care',
+            'city' => 'New Delhi',
+            'pincode' => '110075',
+            'clinic_day_fee' => 400.00,
+            'clinic_night_fee' => 600.00,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 2. Seed an associated doctor
+        DB::table('doctors')->insert([
+            'id' => 200,
+            'vet_registeration_id' => 100,
+            'doctor_name' => 'Dr. Excellent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 3. Put to updateAvailability API
+        $response = $this->putJson('/api/doctors/200/availability', [
+            'clinic_day_fee' => 450.00,
+            'clinic_night_fee' => 750.00,
+            'availability' => [
+                [
+                    'service_type' => 'in_clinic',
+                    'day_of_week' => 1,
+                    'start_time' => '10:00',
+                    'end_time' => '18:00',
+                ]
+            ]
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+
+        // 4. Assert updated fees in DB
+        $this->assertDatabaseHas('vet_registerations_temp', [
+            'id' => 100,
+            'clinic_day_fee' => 450.00,
+            'clinic_night_fee' => 750.00,
+        ]);
+
+        // 5. Get availability via API and assert clinic fees
+        $getResp = $this->getJson('/api/doctors/200/availability');
+        $getResp->assertStatus(200);
+        $this->assertEquals(450.0, $getResp->json('clinic_day_fee'));
+        $this->assertEquals(750.0, $getResp->json('clinic_night_fee'));
+    }
+
+    public function test_clinic_availability_update_can_update_clinic_fees(): void
+    {
+        // 1. Seed a clinic
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 100,
+            'name' => 'Excellent Vet Care',
+            'city' => 'New Delhi',
+            'pincode' => '110075',
+            'clinic_day_fee' => 400.00,
+            'clinic_night_fee' => 600.00,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 2. Seed an associated doctor
+        DB::table('doctors')->insert([
+            'id' => 200,
+            'vet_registeration_id' => 100,
+            'doctor_name' => 'Dr. Excellent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 3. Put to updateClinicAvailability API
+        $response = $this->putJson('/api/clinics/100/doctor-availability', [
+            'clinic_day_fee' => 480.00,
+            'clinic_night_fee' => 780.00,
+            'availability' => [
+                [
+                    'service_type' => 'in_clinic',
+                    'day_of_week' => 2,
+                    'start_time' => '09:00',
+                    'end_time' => '19:00',
+                ]
+            ]
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+
+        // 4. Assert updated fees in DB
+        $this->assertDatabaseHas('vet_registerations_temp', [
+            'id' => 100,
+            'clinic_day_fee' => 480.00,
+            'clinic_night_fee' => 780.00,
+        ]);
+
+        // 5. Get clinic availability via API and assert clinic fees
+        $getResp = $this->getJson('/api/clinics/100/doctor-availability');
+        $getResp->assertStatus(200);
+        $this->assertEquals(480.0, $getResp->json('clinic_day_fee'));
+        $this->assertEquals(780.0, $getResp->json('clinic_night_fee'));
+    }
+
+    public function test_full_onboarding_payload_returns_profile_completion_with_clinic_fees(): void
+    {
+        // 1. Seed a clinic
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 313,
+            'name' => 'Excellent Vet Care',
+            'city' => 'New Delhi',
+            'pincode' => '110075',
+            'clinic_day_fee' => 450.00,
+            'clinic_night_fee' => null, // clinic_night_fee is missing
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 2. Call the GET /api/vet-registerations/313/full API
+        $response = $this->getJson('/api/vet-registerations/313/full');
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+
+        // 3. Assert profile completion structure contains our new checks
+        $checks = collect($response->json('data.profile_completion.checks'));
+        $dayFeeCheck = $checks->firstWhere('key', 'clinic_day_fee');
+        $nightFeeCheck = $checks->firstWhere('key', 'clinic_night_fee');
+
+        $this->assertNotNull($dayFeeCheck);
+        $this->assertTrue($dayFeeCheck['complete']);
+        $this->assertEquals('Clinic day fee', $dayFeeCheck['label']);
+
+        $this->assertNotNull($nightFeeCheck);
+        $this->assertFalse($nightFeeCheck['complete']);
+        $this->assertEquals('Clinic night fee', $nightFeeCheck['label']);
+
+        // Assert missing_fields contains clinic_night_fee
+        $missing = collect($response->json('data.profile_completion.missing_fields'));
+        $this->assertTrue($missing->contains('key', 'clinic_night_fee'));
+        $this->assertFalse($missing->contains('key', 'clinic_day_fee'));
+    }
 }
