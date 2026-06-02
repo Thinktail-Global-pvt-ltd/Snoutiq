@@ -530,6 +530,56 @@ Route::post('/create-appointment-in-clinic-without-payment', function (Request $
     ], 201);
 });
 
+Route::get('/appointments/pending-transactions', function (Request $request) {
+    $validated = $request->validate([
+        'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
+    ]);
+
+    $transactions = Transaction::query()
+        ->where('doctor_id', (int) $validated['doctor_id'])
+        ->where('status', 'pending')
+        ->whereIn('type', ['appointments', 'appointment'])
+        ->orderByDesc('created_at')
+        ->get();
+
+    $data = $transactions->map(function ($transaction) {
+        // Find associated appointment
+        $appointment = App\Models\Appointment::where('transaction_id', $transaction->id)->first();
+        
+        // Fallback to metadata
+        if (!$appointment && isset($transaction->metadata['appointment_id'])) {
+            $appointment = App\Models\Appointment::find((int) $transaction->metadata['appointment_id']);
+        }
+
+        return [
+            'transaction_id'        => $transaction->id,
+            'transaction_reference' => $transaction->reference,
+            'amount_paise'          => $transaction->amount_paise,
+            'status'                => $transaction->status,
+            'type'                  => $transaction->type,
+            'created_at'            => $transaction->created_at?->toIso8601String(),
+            'appointment'           => $appointment ? [
+                'id'               => $appointment->id,
+                'clinic_id'        => $appointment->vet_registeration_id,
+                'doctor_id'        => $appointment->doctor_id,
+                'pet_id'           => $appointment->pet_id,
+                'name'             => $appointment->name,
+                'mobile'             => $appointment->mobile,
+                'pet_name'         => $appointment->pet_name,
+                'appointment_date' => $appointment->appointment_date,
+                'appointment_time' => $appointment->appointment_time,
+                'status'           => $appointment->status,
+            ] : null,
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'count'   => $data->count(),
+        'data'    => $data,
+    ]);
+});
+
 Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Request $request) {
     $fromDate = $request->query('from_date', '2026-05-10');
     

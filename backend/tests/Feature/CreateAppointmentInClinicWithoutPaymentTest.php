@@ -200,4 +200,84 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
         $this->assertEquals('Fluffy', $metadata['pet_name']);
         $this->assertEquals(45050, $metadata['amount_paise']);
     }
+
+    public function test_gets_pending_transactions_for_doctor_correctly(): void
+    {
+        // Seed database
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 10,
+            'name' => 'Healing Paws Clinic',
+            'city' => 'Delhi',
+            'pincode' => '110001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 20,
+            'vet_registeration_id' => 10,
+            'doctor_name' => 'Dr. John Doe',
+            'doctor_email' => 'john.doe@example.com',
+            'doctor_mobile' => '9999988888',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 30,
+            'name' => 'Jane Pet Parent',
+            'email' => 'jane@example.com',
+            'phone' => '8888877777',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Create pending transaction via API
+        $responseCreate = $this->postJson('/api/create-appointment-in-clinic-without-payment', [
+            'clinic_id' => 10,
+            'user_id' => 30,
+            'doctor_id' => 20,
+            'appointment_date' => '2026-06-15',
+            'appointment_time' => '10:40:00',
+            'amount' => 450.50,
+        ]);
+        $responseCreate->assertStatus(201);
+        $createData = $responseCreate->json('data');
+
+        // Seed a completed transaction for the same doctor (should be filtered out)
+        DB::table('transactions')->insert([
+            'id' => 999,
+            'clinic_id' => 10,
+            'doctor_id' => 20,
+            'user_id' => 30,
+            'amount_paise' => 50000,
+            'status' => 'completed', // completed, not pending
+            'type' => 'appointments',
+            'reference' => 'completed_ref',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Call the GET API
+        $responseGet = $this->getJson('/api/appointments/pending-transactions?doctor_id=20');
+
+        $responseGet->assertStatus(200);
+        $responseGet->assertJsonPath('success', true);
+        $responseGet->assertJsonPath('count', 1);
+
+        $data = $responseGet->json('data');
+        $this->assertCount(1, $data);
+
+        $pendingTx = $data[0];
+        $this->assertEquals($createData['transaction_id'], $pendingTx['transaction_id']);
+        $this->assertEquals($createData['transaction_reference'], $pendingTx['transaction_reference']);
+        $this->assertEquals(45050, $pendingTx['amount_paise']);
+        $this->assertEquals('pending', $pendingTx['status']);
+        
+        $this->assertNotNull($pendingTx['appointment']);
+        $this->assertEquals($createData['appointment_id'], $pendingTx['appointment']['id']);
+        $this->assertEquals('Jane Pet Parent', $pendingTx['appointment']['name']);
+        $this->assertEquals('2026-06-15', $pendingTx['appointment']['appointment_date']);
+        $this->assertEquals('10:40:00', $pendingTx['appointment']['appointment_time']);
+    }
 }
