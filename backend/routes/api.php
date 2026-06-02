@@ -261,6 +261,7 @@ Route::get('/agora/appid', function () {
 
 Route::get('/doctors/active-slots', function (Request $request) {
     $doctorId = $request->query('doctor_id');
+    $dateParam = $request->query('date'); // Format: Y-m-d
     
     if (!$doctorId || !is_numeric($doctorId)) {
         return response()->json([
@@ -284,10 +285,29 @@ Route::get('/doctors/active-slots', function (Request $request) {
         ], 503);
     }
     
+    $timezone = 'Asia/Kolkata';
+    $now = \Illuminate\Support\Carbon::now($timezone);
+    
+    if ($dateParam) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateParam)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid date format. Use Y-m-d (e.g. 2026-06-02).'
+            ], 400);
+        }
+        $selectedDate = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $dateParam, $timezone);
+    } else {
+        $selectedDate = $now->copy();
+    }
+    
+    $selectedDayOfWeek = (int) $selectedDate->dayOfWeek; // 0 (Sunday) to 6 (Saturday)
+    $isToday = $selectedDate->format('Y-m-d') === $now->format('Y-m-d');
+    $currentTime = $now->format('H:i');
+    
     $availabilities = DB::table('doctor_availability')
         ->where('doctor_id', $doctor->id)
+        ->where('day_of_week', $selectedDayOfWeek)
         ->orderBy('service_type')
-        ->orderBy('day_of_week')
         ->orderBy('start_time')
         ->get();
         
@@ -306,9 +326,13 @@ Route::get('/doctors/active-slots', function (Request $request) {
         return sprintf('%02d:%02d', $h, $m);
     };
     
-    $data = $availabilities->map(function ($avail) use ($dayNames, $parseToMinutes, $formatTime) {
+    $data = $availabilities->map(function ($avail) use ($dayNames, $parseToMinutes, $formatTime, $isToday, $currentTime) {
         $startTime = substr($avail->start_time, 0, 5); // Format as hh:mm
         $endTime = substr($avail->end_time, 0, 5);     // Format as hh:mm
+        
+        if ($isToday && $endTime <= $currentTime) {
+            return null;
+        }
         
         $slots = [];
         $startMinutes = $parseToMinutes($startTime);
@@ -316,12 +340,23 @@ Route::get('/doctors/active-slots', function (Request $request) {
         
         if ($startMinutes < $endMinutes) {
             for ($m = $startMinutes; $m + 20 <= $endMinutes; $m += 20) {
+                $slotStart = $formatTime($m);
+                $slotEnd = $formatTime($m + 20);
+                
+                if ($isToday && $slotStart < $currentTime) {
+                    continue;
+                }
+                
                 $slots[] = [
-                    'start' => $formatTime($m),
-                    'end' => $formatTime($m + 20),
-                    'label' => $formatTime($m) . ' - ' . $formatTime($m + 20),
+                    'start' => $slotStart,
+                    'end' => $slotEnd,
+                    'label' => $slotStart . ' - ' . $slotEnd,
                 ];
             }
+        }
+        
+        if ($isToday && empty($slots)) {
+            return null;
         }
         
         return [
@@ -333,12 +368,15 @@ Route::get('/doctors/active-slots', function (Request $request) {
             'end_time' => $endTime,
             'slots' => $slots,
         ];
-    });
+    })->filter()->values();
     
     return response()->json([
         'success' => true,
         'doctor_id' => $doctor->id,
         'doctor_name' => $doctor->doctor_name,
+        'date' => $selectedDate->format('Y-m-d'),
+        'day_name' => $dayNames[$selectedDayOfWeek],
+        'is_today' => $isToday,
         'active_hours' => $data,
     ]);
 });
