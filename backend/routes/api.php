@@ -259,6 +259,90 @@ Route::get('/agora/appid', function () {
     ]);
 });
 
+Route::get('/doctors/active-slots', function (Request $request) {
+    $doctorId = $request->query('doctor_id');
+    
+    if (!$doctorId || !is_numeric($doctorId)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'doctor_id query parameter is required and must be numeric.'
+        ], 400);
+    }
+    
+    $doctor = Doctor::find((int) $doctorId);
+    if (!$doctor) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Doctor not found.'
+        ], 404);
+    }
+    
+    if (!Schema::hasTable('doctor_availability')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'doctor_availability table is not available.'
+        ], 503);
+    }
+    
+    $availabilities = DB::table('doctor_availability')
+        ->where('doctor_id', $doctor->id)
+        ->orderBy('service_type')
+        ->orderBy('day_of_week')
+        ->orderBy('start_time')
+        ->get();
+        
+    $dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    $parseToMinutes = function ($timeStr) {
+        $parts = explode(':', $timeStr);
+        $hours = isset($parts[0]) ? (int) $parts[0] : 0;
+        $minutes = isset($parts[1]) ? (int) $parts[1] : 0;
+        return ($hours * 60) + $minutes;
+    };
+    
+    $formatTime = function ($minutes) {
+        $h = intdiv($minutes, 60);
+        $m = $minutes % 60;
+        return sprintf('%02d:%02d', $h, $m);
+    };
+    
+    $data = $availabilities->map(function ($avail) use ($dayNames, $parseToMinutes, $formatTime) {
+        $startTime = substr($avail->start_time, 0, 5); // Format as hh:mm
+        $endTime = substr($avail->end_time, 0, 5);     // Format as hh:mm
+        
+        $slots = [];
+        $startMinutes = $parseToMinutes($startTime);
+        $endMinutes = $parseToMinutes($endTime);
+        
+        if ($startMinutes < $endMinutes) {
+            for ($m = $startMinutes; $m + 20 <= $endMinutes; $m += 20) {
+                $slots[] = [
+                    'start' => $formatTime($m),
+                    'end' => $formatTime($m + 20),
+                    'label' => $formatTime($m) . ' - ' . $formatTime($m + 20),
+                ];
+            }
+        }
+        
+        return [
+            'id' => $avail->id,
+            'service_type' => $avail->service_type ?? 'in_clinic',
+            'day_of_week' => (int) $avail->day_of_week,
+            'day_name' => $dayNames[(int) $avail->day_of_week] ?? 'Unknown',
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'slots' => $slots,
+        ];
+    });
+    
+    return response()->json([
+        'success' => true,
+        'doctor_id' => $doctor->id,
+        'doctor_name' => $doctor->doctor_name,
+        'active_hours' => $data,
+    ]);
+});
+
 Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Request $request) {
     $fromDate = $request->query('from_date', '2026-05-10');
     
