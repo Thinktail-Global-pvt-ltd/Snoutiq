@@ -363,29 +363,42 @@ Route::get('/clinics/onboarding-summary', function (Request $request) {
             $videoSchedules
         );
         
+        $clinic_image_url = !empty($clinic->clinic_image)
+            ? route('clinics.media.image', ['clinic' => $clinic->id], true)
+            : null;
+            
+        $clinic_video_url = !empty($clinic->clinic_video)
+            ? route('clinics.media.video', ['clinic' => $clinic->id], true)
+            : null;
+
         return [
             'id' => (int) $clinic->id,
             'name' => $clinic->name ?? 'Unnamed Clinic',
             'city' => $clinic->city ?? '—',
+            'clinic_image' => $clinic_image_url,
+            'clinic_image_url' => $clinic_image_url,
+            'clinic_video' => $clinic_video_url,
+            'clinic_video_url' => $clinic_video_url,
             'doctors_count' => (int) $doctors->count(),
             'services_count' => (int) $regularServices->count(),
             'machinery_count' => (int) $machineryServices->count(),
             'profile_completion_percentage' => (int) ($profileCompletion['percentage'] ?? 0),
             'created_at' => $clinic->created_at ? $clinic->created_at->toIso8601String() : null,
             'doctors' => $doctors->map(function ($doctor) {
-                return [
-                    'id' => (int) $doctor->id,
-                    'name' => $doctor->doctor_name ?? 'Unnamed Doctor',
-                    'email' => $doctor->doctor_email ?? null,
-                    'mobile' => $doctor->doctor_mobile ?? null,
-                    'license' => $doctor->doctor_license ?? null,
-                    'degree' => $doctor->degree ?? null,
-                    'years_of_experience' => $doctor->years_of_experience ?? null,
-                    'specialization' => $doctor->specialization_select_all_that_apply ?? null,
-                    'image_blob_url' => empty($doctor->doctor_image_blob)
-                        ? null
-                        : route('api.doctors.blob-image', ['doctor' => $doctor->id], true),
-                ];
+                $doctorData = $doctor->toArray();
+                
+                // Exclude raw binary blob data from the JSON output to avoid response bloating
+                unset($doctorData['doctor_image_blob']);
+                
+                $doctorBlobUrl = !empty($doctor->doctor_image_blob)
+                    ? route('api.doctors.blob-image', ['doctor' => $doctor->id], true)
+                    : null;
+                
+                $doctorData['doctor_blob'] = $doctorBlobUrl;
+                $doctorData['doctor_blob_url'] = $doctorBlobUrl;
+                $doctorData['doctor_image_blob_url'] = $doctorBlobUrl;
+                
+                return $doctorData;
             })->values()->all(),
         ];
     });
