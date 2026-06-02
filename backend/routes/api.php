@@ -394,6 +394,8 @@ Route::post('/create-appointment-in-clinic-without-payment', function (Request $
         'pet_id'           => $petValidation,
         'appointment_date' => ['required', 'date_format:Y-m-d'],
         'appointment_time' => ['required', 'string', 'max:50'],
+        'amount'           => ['nullable', 'numeric', 'min:0', 'max:1000000'],
+        'amount_paise'     => ['nullable', 'integer', 'min:0', 'max:100000000'],
     ]);
     
     $clinic = VetRegisterationTemp::find((int) $validated['clinic_id']);
@@ -465,13 +467,20 @@ Route::post('/create-appointment-in-clinic-without-payment', function (Request $
         'notes'                => json_encode($notesPayload),
     ]);
 
+    $amountPaise = 0;
+    if ($request->filled('amount_paise')) {
+        $amountPaise = (int) $validated['amount_paise'];
+    } elseif ($request->filled('amount')) {
+        $amountPaise = (int) round(((float) $validated['amount']) * 100);
+    }
+
     // Create a pending transaction row
     $transaction = Transaction::create([
         'clinic_id'    => $clinic->id,
         'doctor_id'    => $doctor->id,
         'user_id'      => $user->id,
         'pet_id'       => $petId,
-        'amount_paise' => 0,
+        'amount_paise' => $amountPaise,
         'status'       => 'pending',
         'type'         => 'appointments',
         'reference'    => 'inclinic_' . Str::random(16),
@@ -483,6 +492,7 @@ Route::post('/create-appointment-in-clinic-without-payment', function (Request $
             'pet_name'         => $petName,
             'appointment_date' => $appointment->appointment_date,
             'appointment_time' => $appointment->appointment_time,
+            'amount_paise'     => $amountPaise,
             'notes'            => $notesPayload,
         ],
     ]);
@@ -499,6 +509,7 @@ Route::post('/create-appointment-in-clinic-without-payment', function (Request $
             'appointment_id' => $appointment->id,
             'transaction_id' => $transaction->id,
             'transaction_reference' => $transaction->reference,
+            'amount_paise' => $transaction->amount_paise,
             'clinic' => [
                 'id' => $clinic->id,
                 'name' => $clinic->name,

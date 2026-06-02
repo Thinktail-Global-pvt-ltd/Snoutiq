@@ -147,6 +147,7 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
             'pet_id' => 40,
             'appointment_date' => '2026-06-15',
             'appointment_time' => '10:40:00',
+            'amount' => 450.50,
         ]);
 
         $response->assertStatus(201);
@@ -159,6 +160,7 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
         $this->assertNotNull($responseData['appointment_id']);
         $this->assertNotNull($responseData['transaction_id']);
         $this->assertNotNull($responseData['transaction_reference']);
+        $this->assertEquals(45050, $responseData['amount_paise']);
 
         // Assert Appointment was created in the database and linked to the correct transaction
         $this->assertDatabaseHas('appointments', [
@@ -175,13 +177,14 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
             'status' => 'confirmed',
         ]);
 
-        // Assert Transaction was created in the database with status pending
+        // Assert Transaction was created in the database with status pending and correct amount_paise
         $this->assertDatabaseHas('transactions', [
             'id' => $responseData['transaction_id'],
             'clinic_id' => 10,
             'doctor_id' => 20,
             'user_id' => 30,
             'pet_id' => 40,
+            'amount_paise' => 45050,
             'status' => 'pending',
             'type' => 'appointments',
             'reference' => $responseData['transaction_reference'],
@@ -195,5 +198,6 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
         $this->assertEquals('Dr. John Doe', $metadata['doctor_name']);
         $this->assertEquals('Jane Pet Parent', $metadata['user_name']);
         $this->assertEquals('Fluffy', $metadata['pet_name']);
+        $this->assertEquals(45050, $metadata['amount_paise']);
     }
 }
