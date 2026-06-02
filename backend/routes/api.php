@@ -381,7 +381,7 @@ Route::get('/doctors/active-slots', function (Request $request) {
     ]);
 });
 
-Route::post('/appointments/simple-create', function (Request $request) {
+Route::post('/create-appointment-in-clinic-without-payment', function (Request $request) {
     $petValidation = ['nullable', 'integer'];
     if (Schema::hasTable('pets')) {
         $petValidation[] = 'exists:pets,id';
@@ -464,12 +464,41 @@ Route::post('/appointments/simple-create', function (Request $request) {
         'status'               => 'confirmed',
         'notes'                => json_encode($notesPayload),
     ]);
+
+    // Create a pending transaction row
+    $transaction = Transaction::create([
+        'clinic_id'    => $clinic->id,
+        'doctor_id'    => $doctor->id,
+        'user_id'      => $user->id,
+        'pet_id'       => $petId,
+        'amount_paise' => 0,
+        'status'       => 'pending',
+        'type'         => 'appointments',
+        'reference'    => 'inclinic_' . Str::random(16),
+        'metadata'     => [
+            'appointment_id'   => $appointment->id,
+            'clinic_name'      => $clinic->name,
+            'doctor_name'      => $doctor->doctor_name ?? $doctor->name ?? null,
+            'user_name'        => $user->name,
+            'pet_name'         => $petName,
+            'appointment_date' => $appointment->appointment_date,
+            'appointment_time' => $appointment->appointment_time,
+            'notes'            => $notesPayload,
+        ],
+    ]);
+
+    // Link the transaction ID to the appointment
+    $appointment->update([
+        'transaction_id' => $transaction->id,
+    ]);
     
     return response()->json([
         'success' => true,
-        'message' => 'Appointment created successfully.',
+        'message' => 'Appointment created successfully without payment.',
         'data' => [
             'appointment_id' => $appointment->id,
+            'transaction_id' => $transaction->id,
+            'transaction_reference' => $transaction->reference,
             'clinic' => [
                 'id' => $clinic->id,
                 'name' => $clinic->name,

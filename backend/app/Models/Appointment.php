@@ -13,6 +13,7 @@ class Appointment extends Model
         'vet_registeration_id',
         'doctor_id',
         'pet_id',
+        'transaction_id',
         'name',
         'mobile',
         'pet_name',
@@ -40,5 +41,10 @@ class Appointment extends Model
     public function doctor()
     {
         return $this->belongsTo(Doctor::class, 'doctor_id');
+    }
+
+    public function transaction()
+    {
+        return $this->belongsTo(Transaction::class, 'transaction_id');
     }
 }
