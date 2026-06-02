@@ -280,4 +280,126 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
         $this->assertEquals('2026-06-15', $pendingTx['appointment']['appointment_date']);
         $this->assertEquals('10:40:00', $pendingTx['appointment']['appointment_time']);
     }
+
+    public function test_captures_appointment_payment_successfully(): void
+    {
+        // Seed database
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 10,
+            'name' => 'Healing Paws Clinic',
+            'city' => 'Delhi',
+            'pincode' => '110001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 20,
+            'vet_registeration_id' => 10,
+            'doctor_name' => 'Dr. John Doe',
+            'doctor_email' => 'john.doe@example.com',
+            'doctor_mobile' => '9999988888',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 30,
+            'name' => 'Jane Pet Parent',
+            'email' => 'jane@example.com',
+            'phone' => '8888877777',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Create pending transaction via API
+        $responseCreate = $this->postJson('/api/create-appointment-in-clinic-without-payment', [
+            'clinic_id' => 10,
+            'user_id' => 30,
+            'doctor_id' => 20,
+            'appointment_date' => '2026-06-15',
+            'appointment_time' => '10:40:00',
+            'amount' => 450.50,
+        ]);
+        $responseCreate->assertStatus(201);
+        $createData = $responseCreate->json('data');
+
+        // Capture payment via API
+        $responseCapture = $this->postJson('/api/appointments/capture-transaction', [
+            'appointment_id' => $createData['appointment_id'],
+            'transaction_id' => $createData['transaction_id'],
+        ]);
+
+        $responseCapture->assertStatus(200);
+        $responseCapture->assertJsonPath('success', true);
+        $responseCapture->assertJsonPath('data.status', 'captured');
+
+        // Assert status changed to captured in DB
+        $this->assertDatabaseHas('transactions', [
+            'id' => $createData['transaction_id'],
+            'status' => 'captured',
+        ]);
+    }
+
+    public function test_fails_to_capture_unlinked_appointment_payment(): void
+    {
+        // Seed database
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 10,
+            'name' => 'Healing Paws Clinic',
+            'city' => 'Delhi',
+            'pincode' => '110001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 20,
+            'vet_registeration_id' => 10,
+            'doctor_name' => 'Dr. John Doe',
+            'doctor_email' => 'john.doe@example.com',
+            'doctor_mobile' => '9999988888',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 30,
+            'name' => 'Jane Pet Parent',
+            'email' => 'jane@example.com',
+            'phone' => '8888877777',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Create appointment 1
+        $responseCreate1 = $this->postJson('/api/create-appointment-in-clinic-without-payment', [
+            'clinic_id' => 10,
+            'user_id' => 30,
+            'doctor_id' => 20,
+            'appointment_date' => '2026-06-15',
+            'appointment_time' => '10:40:00',
+        ]);
+        $createData1 = $responseCreate1->json('data');
+
+        // Create appointment 2
+        $responseCreate2 = $this->postJson('/api/create-appointment-in-clinic-without-payment', [
+            'clinic_id' => 10,
+            'user_id' => 30,
+            'doctor_id' => 20,
+            'appointment_date' => '2026-06-16',
+            'appointment_time' => '11:00:00',
+        ]);
+        $createData2 = $responseCreate2->json('data');
+
+        // Attempt to capture transaction of appointment 1 with appointment 2 (should fail)
+        $responseCapture = $this->postJson('/api/appointments/capture-transaction', [
+            'appointment_id' => $createData2['appointment_id'],
+            'transaction_id' => $createData1['transaction_id'],
+        ]);
+
+        $responseCapture->assertStatus(422);
+        $responseCapture->assertJsonPath('success', false);
+        $responseCapture->assertJsonPath('message', 'The provided transaction is not linked to this appointment.');
+    }
 }

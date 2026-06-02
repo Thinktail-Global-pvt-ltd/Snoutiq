@@ -580,6 +580,45 @@ Route::get('/appointments/pending-transactions', function (Request $request) {
     ]);
 });
 
+Route::post('/appointments/capture-transaction', function (Request $request) {
+    $validated = $request->validate([
+        'appointment_id' => ['required', 'integer', 'exists:appointments,id'],
+        'transaction_id' => ['required', 'integer', 'exists:transactions,id'],
+    ]);
+
+    $appointment = App\Models\Appointment::find((int) $validated['appointment_id']);
+    $transaction = Transaction::find((int) $validated['transaction_id']);
+
+    $isLinked = ($appointment->transaction_id == $transaction->id) ||
+                (isset($transaction->metadata['appointment_id']) && $transaction->metadata['appointment_id'] == $appointment->id);
+
+    if (!$isLinked) {
+        return response()->json([
+            'success' => false,
+            'message' => 'The provided transaction is not linked to this appointment.',
+        ], 422);
+    }
+
+    $transaction->status = 'captured';
+    
+    $metadata = $transaction->metadata ?? [];
+    $metadata['captured_at'] = now()->toIso8601String();
+    $transaction->metadata = $metadata;
+    
+    $transaction->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Transaction status updated to captured successfully.',
+        'data' => [
+            'appointment_id' => $appointment->id,
+            'transaction_id' => $transaction->id,
+            'status'         => $transaction->status,
+            'reference'      => $transaction->reference,
+        ]
+    ]);
+});
+
 Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Request $request) {
     $fromDate = $request->query('from_date', '2026-05-10');
     
