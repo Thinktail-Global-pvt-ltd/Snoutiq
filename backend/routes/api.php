@@ -382,10 +382,16 @@ Route::get('/doctors/active-slots', function (Request $request) {
 });
 
 Route::post('/appointments/simple-create', function (Request $request) {
+    $petValidation = ['nullable', 'integer'];
+    if (Schema::hasTable('pets')) {
+        $petValidation[] = 'exists:pets,id';
+    }
+
     $validated = $request->validate([
         'clinic_id'        => ['required', 'integer', 'exists:vet_registerations_temp,id'],
         'user_id'          => ['required', 'integer', 'exists:users,id'],
         'doctor_id'        => ['required', 'integer', 'exists:doctors,id'],
+        'pet_id'           => $petValidation,
         'appointment_date' => ['required', 'date_format:Y-m-d'],
         'appointment_time' => ['required', 'string', 'max:50'],
     ]);
@@ -403,16 +409,27 @@ Route::post('/appointments/simple-create', function (Request $request) {
         'patient_email'   => $user->email,
     ];
     
-    $petId = null;
+    $petId = isset($validated['pet_id']) ? (int) $validated['pet_id'] : null;
     $petName = null;
-    if (Schema::hasTable('pets')) {
-        $userColumn = Schema::hasColumn('pets', 'user_id') ? 'user_id'
-            : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
-        if ($userColumn) {
-            $pet = DB::table('pets')->where($userColumn, $user->id)->first();
+    
+    if ($petId) {
+        if (Schema::hasTable('pets')) {
+            $pet = DB::table('pets')->find($petId);
             if ($pet) {
-                $petId = $pet->id;
                 $petName = $pet->name;
+            }
+        }
+    } else {
+        // Fallback to user's first pet
+        if (Schema::hasTable('pets')) {
+            $userColumn = Schema::hasColumn('pets', 'user_id') ? 'user_id'
+                : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+            if ($userColumn) {
+                $pet = DB::table('pets')->where($userColumn, $user->id)->first();
+                if ($pet) {
+                    $petId = $pet->id;
+                    $petName = $pet->name;
+                }
             }
         }
     }
