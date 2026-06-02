@@ -158,6 +158,10 @@
                                                     <div class="fw-semibold">{{ $clinic->name ?? '—' }}</div>
                                                     <div class="small text-muted">{{ $clinic->mobile ?? 'No mobile' }} · {{ $clinic->email ?? 'No email' }}</div>
                                                     <div class="small text-muted">{{ $clinic->city ?? '—' }} {{ $clinic->pincode ? '· '.$clinic->pincode : '' }}</div>
+                                                    <div class="small text-muted mt-1">
+                                                        <strong>Day Fee:</strong> {{ $clinic->clinic_day_fee !== null ? '₹'.number_format((float) $clinic->clinic_day_fee, 2) : '—' }} · 
+                                                        <strong>Night Fee:</strong> {{ $clinic->clinic_night_fee !== null ? '₹'.number_format((float) $clinic->clinic_night_fee, 2) : '—' }}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
@@ -393,6 +397,16 @@
                                                                                 </div>
                                                                             </div>
                                                                         @endforeach
+                                                                        <div class="row g-2 mt-2 mb-2 pt-2 border-top">
+                                                                            <div class="col-6">
+                                                                                <label class="form-label small text-muted mb-1">Clinic Day Fee (₹)</label>
+                                                                                <input type="number" step="0.01" min="0" name="clinic_day_fee" value="{{ $clinic->clinic_day_fee }}" class="form-control form-control-sm" placeholder="e.g. 500">
+                                                                            </div>
+                                                                            <div class="col-6">
+                                                                                <label class="form-label small text-muted mb-1">Clinic Night Fee (₹)</label>
+                                                                                <input type="number" step="0.01" min="0" name="clinic_night_fee" value="{{ $clinic->clinic_night_fee }}" class="form-control form-control-sm" placeholder="e.g. 800">
+                                                                            </div>
+                                                                        </div>
                                                                         <div class="small text-muted mb-2">Blank start/end rows are ignored. Saving replaces this doctor's clinic hours.</div>
                                                                         <button type="submit" class="btn btn-sm btn-primary">Save clinic hours</button>
                                                                     </form>

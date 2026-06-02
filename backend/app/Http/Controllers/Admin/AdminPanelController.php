@@ -5146,6 +5146,8 @@ class AdminPanelController extends Controller
             'rows.*.day_of_week' => ['nullable', 'integer', 'min:0', 'max:6'],
             'rows.*.start_time' => ['nullable', 'date_format:H:i'],
             'rows.*.end_time' => ['nullable', 'date_format:H:i'],
+            'clinic_day_fee' => ['nullable', 'numeric', 'min:0'],
+            'clinic_night_fee' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         if (! Schema::hasTable('doctor_availability')) {
@@ -5154,7 +5156,20 @@ class AdminPanelController extends Controller
 
         $rows = $this->normalizeFullOnboardingHoursRows($validated['rows'] ?? [], true);
 
-        DB::transaction(function () use ($doctor, $rows): void {
+        DB::transaction(function () use ($doctor, $rows, $request): void {
+            if ($doctor->vet_registeration_id) {
+                $clinicUpdate = [];
+                if ($request->has('clinic_day_fee')) {
+                    $clinicUpdate['clinic_day_fee'] = $request->input('clinic_day_fee');
+                }
+                if ($request->has('clinic_night_fee')) {
+                    $clinicUpdate['clinic_night_fee'] = $request->input('clinic_night_fee');
+                }
+                if (!empty($clinicUpdate)) {
+                    DB::table('vet_registerations_temp')->where('id', $doctor->vet_registeration_id)->update($clinicUpdate);
+                }
+            }
+
             DB::table('doctor_availability')->where('doctor_id', (int) $doctor->id)->delete();
 
             if (! empty($rows)) {

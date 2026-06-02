@@ -24,15 +24,30 @@ class DoctorScheduleController extends Controller
             'availability.*.break_end' => 'nullable',
             'availability.*.avg_consultation_mins' => 'nullable|integer',
             'availability.*.max_bookings_per_hour' => 'nullable|integer',
+            'clinic_day_fee' => 'nullable|numeric|min:0',
+            'clinic_night_fee' => 'nullable|numeric|min:0',
         ]);
 
         // Ensure doctor exists
-        $exists = DB::table('doctors')->where('id', (int) $id)->exists();
-        if (!$exists) {
+        $doctor = DB::table('doctors')->where('id', (int) $id)->first();
+        if (!$doctor) {
             return response()->json(['success' => false, 'error' => 'Doctor not found'], 404);
         }
 
-        DB::transaction(function () use ($id, $payload) {
+        DB::transaction(function () use ($id, $doctor, $payload) {
+            if ($doctor->vet_registeration_id) {
+                $clinicUpdate = [];
+                if (array_key_exists('clinic_day_fee', $payload)) {
+                    $clinicUpdate['clinic_day_fee'] = $payload['clinic_day_fee'];
+                }
+                if (array_key_exists('clinic_night_fee', $payload)) {
+                    $clinicUpdate['clinic_night_fee'] = $payload['clinic_night_fee'];
+                }
+                if (!empty($clinicUpdate)) {
+                    DB::table('vet_registerations_temp')->where('id', $doctor->vet_registeration_id)->update($clinicUpdate);
+                }
+            }
+
             DB::table('doctor_availability')->where('doctor_id', (int) $id)->delete();
             foreach ($payload['availability'] as $a) {
                 DB::table('doctor_availability')->insert([
@@ -320,6 +335,8 @@ class DoctorScheduleController extends Controller
             'availability.*.break_end' => 'nullable',
             'availability.*.avg_consultation_mins' => 'nullable|integer',
             'availability.*.max_bookings_per_hour' => 'nullable|integer',
+            'clinic_day_fee' => 'nullable|numeric|min:0',
+            'clinic_night_fee' => 'nullable|numeric|min:0',
         ]);
 
         $doctorIds = DB::table('doctors')
@@ -335,7 +352,17 @@ class DoctorScheduleController extends Controller
             ], 404);
         }
 
-        DB::transaction(function () use ($doctorIds, $payload) {
+        DB::transaction(function () use ($clinicId, $doctorIds, $payload) {
+            $clinicUpdate = [];
+            if (array_key_exists('clinic_day_fee', $payload)) {
+                $clinicUpdate['clinic_day_fee'] = $payload['clinic_day_fee'];
+            }
+            if (array_key_exists('clinic_night_fee', $payload)) {
+                $clinicUpdate['clinic_night_fee'] = $payload['clinic_night_fee'];
+            }
+            if (!empty($clinicUpdate)) {
+                DB::table('vet_registerations_temp')->where('id', $clinicId)->update($clinicUpdate);
+            }
             $serviceTypes = collect($payload['availability'])
                 ->pluck('service_type')
                 ->filter()
