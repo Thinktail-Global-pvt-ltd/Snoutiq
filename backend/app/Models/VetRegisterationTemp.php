@@ -121,6 +121,8 @@ class VetRegisterationTemp extends Model
         'draft_expires_at',
         'claimed_at',
         'qr_code_path',
+        'clinic_day_fee',
+        'clinic_night_fee',
     ];
 
     protected $casts = [

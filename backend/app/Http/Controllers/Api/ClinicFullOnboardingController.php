@@ -340,6 +340,8 @@ class ClinicFullOnboardingController extends Controller
             'password' => ['nullable', 'string', 'min:6'],
             'hospital_profile' => ['nullable', 'string'],
             'clinic_profile' => ['nullable', 'string'],
+            'clinic_day_fee' => ['nullable', 'numeric', 'min:0'],
+            'clinic_night_fee' => ['nullable', 'numeric', 'min:0'],
             'clinic_image' => ['nullable'],
             'clinic_video' => ['nullable'],
 
@@ -676,6 +678,8 @@ class ClinicFullOnboardingController extends Controller
             'password',
             'hospital_profile',
             'clinic_profile',
+            'clinic_day_fee',
+            'clinic_night_fee',
         ])->toArray();
 
         $clinicData['password'] = $clinicData['password'] ?? '123456';
