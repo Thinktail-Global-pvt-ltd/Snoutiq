@@ -107,7 +107,7 @@ class DoctorScheduleController extends Controller
     public function getAvailability(Request $request, string $id)
     {
         $serviceType = $request->query('service_type'); // optional filter
-        $doctor = Doctor::select('id', 'doctors_price')->find((int) $id);
+        $doctor = Doctor::select('id', 'doctors_price', 'vet_registeration_id')->find((int) $id);
 
         $q = DB::table('doctor_availability')
             ->where('doctor_id', (int) $id)
@@ -121,10 +121,25 @@ class DoctorScheduleController extends Controller
 
         $rows = $q->get();
 
+        $clinicDayFee = null;
+        $clinicNightFee = null;
+        if ($doctor && $doctor->vet_registeration_id) {
+            $clinic = DB::table('vet_registerations_temp')
+                ->where('id', $doctor->vet_registeration_id)
+                ->select('clinic_day_fee', 'clinic_night_fee')
+                ->first();
+            if ($clinic) {
+                $clinicDayFee = $clinic->clinic_day_fee !== null ? (float) $clinic->clinic_day_fee : null;
+                $clinicNightFee = $clinic->clinic_night_fee !== null ? (float) $clinic->clinic_night_fee : null;
+            }
+        }
+
         return response()->json([
             'success' => true,
             'doctor_id' => (int) $id,
             'service_type' => $serviceType,
+            'clinic_day_fee' => $clinicDayFee,
+            'clinic_night_fee' => $clinicNightFee,
             'availability' => $rows,
             'doctor_price' => ($doctor && $doctor->doctors_price !== null)
                 ? (float) $doctor->doctors_price
@@ -304,9 +319,19 @@ class DoctorScheduleController extends Controller
             return strcmp((string) $a['start_time'], (string) $b['start_time']);
         });
 
+        $clinic = DB::table('vet_registerations_temp')
+            ->where('id', $clinicId)
+            ->select('clinic_day_fee', 'clinic_night_fee')
+            ->first();
+
+        $clinicDayFee = $clinic ? ($clinic->clinic_day_fee !== null ? (float) $clinic->clinic_day_fee : null) : null;
+        $clinicNightFee = $clinic ? ($clinic->clinic_night_fee !== null ? (float) $clinic->clinic_night_fee : null) : null;
+
         return response()->json([
             'success' => true,
             'clinic_id' => $clinicId,
+            'clinic_day_fee' => $clinicDayFee,
+            'clinic_night_fee' => $clinicNightFee,
             'service_type' => $effectiveServiceType,
             'availability' => $availability,
             'doctor_ids' => $doctorIds,
