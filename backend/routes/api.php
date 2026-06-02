@@ -259,6 +259,130 @@ Route::get('/agora/appid', function () {
     ]);
 });
 
+Route::get('/clinics/onboarding-summary', function (Request $request) {
+    $fromDate = $request->query('from_date', '2026-05-10');
+    
+    if ($fromDate !== 'all' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid from_date format. Use Y-m-d (e.g. 2026-05-10) or "all".'
+        ], 400);
+    }
+    
+    $clinicProfileCompletionService = app(App\Services\ClinicProfileCompletionService::class);
+    
+    $clinics = VetRegisterationTemp::query()
+        ->with('doctors')
+        ->when($fromDate !== 'all', fn ($query) => $query->where('created_at', '>=', $fromDate.' 00:00:00'))
+        ->orderByDesc('created_at')
+        ->get();
+        
+    $clinicIds = $clinics->pluck('id')->map(fn ($id) => (int) $id)->all();
+    $doctorIds = $clinics
+        ->flatMap(fn ($clinic) => $clinic->doctors->pluck('id'))
+        ->map(fn ($id) => (int) $id)
+        ->all();
+        
+    $servicesByClinic = empty($clinicIds)
+        ? collect()
+        : DB::table('groomer_services')
+            ->whereIn('user_id', $clinicIds)
+            ->get()
+            ->groupBy('user_id');
+            
+    $packagesByClinic = Schema::hasTable('clinic_specialized_packages') && !empty($clinicIds)
+        ? DB::table('clinic_specialized_packages')
+            ->whereIn('clinic_id', $clinicIds)
+            ->get()
+            ->groupBy('clinic_id')
+        : collect();
+        
+    $vetAtHomeByClinic = Schema::hasTable('vet_at_home_services') && !empty($clinicIds)
+        ? DB::table('vet_at_home_services')
+            ->whereIn('clinic_id', $clinicIds)
+            ->get()
+            ->groupBy('clinic_id')
+        : collect();
+        
+    $clinicAvailabilityByDoctor = Schema::hasTable('doctor_availability') && !empty($doctorIds)
+        ? DB::table('doctor_availability')
+            ->whereIn('doctor_id', $doctorIds)
+            ->get()
+            ->groupBy('doctor_id')
+        : collect();
+        
+    $videoAvailabilityByDoctor = Schema::hasTable('doctor_video_availability') && !empty($doctorIds)
+        ? DB::table('doctor_video_availability')
+            ->whereIn('doctor_id', $doctorIds)
+            ->where('is_active', 1)
+            ->get()
+            ->groupBy('doctor_id')
+        : collect();
+        
+    $summary = $clinics->map(function ($clinic) use (
+        $servicesByClinic,
+        $packagesByClinic,
+        $vetAtHomeByClinic,
+        $clinicAvailabilityByDoctor,
+        $videoAvailabilityByDoctor,
+        $clinicProfileCompletionService
+    ) {
+        $doctors = $clinic->doctors;
+        $doctorIds = $doctors->pluck('id')->map(fn ($id) => (int) $id);
+        
+        $clinicServices = $servicesByClinic->get($clinic->id, collect());
+        
+        $machineryServices = $clinicServices
+            ->filter(fn ($service) => strtolower((string) ($service->main_service ?? '')) === 'machinery');
+            
+        $regularServices = $clinicServices
+            ->reject(fn ($service) => strtolower((string) ($service->main_service ?? '')) === 'machinery');
+            
+        $clinicAvailability = $doctorIds
+            ->flatMap(fn (int $doctorId) => $clinicAvailabilityByDoctor->get($doctorId, collect()))
+            ->values();
+            
+        $videoAvailability = $doctorIds
+            ->flatMap(fn (int $doctorId) => $videoAvailabilityByDoctor->get($doctorId, collect()))
+            ->values();
+            
+        $videoSchedules = $doctorIds->map(function ($doctorId) use ($videoAvailabilityByDoctor) {
+            return [
+                'doctor_id' => $doctorId,
+                'availability' => $videoAvailabilityByDoctor->get($doctorId, collect())->values()
+            ];
+        });
+        
+        $profileCompletion = $clinicProfileCompletionService->calculate(
+            $clinic,
+            $doctors,
+            $clinicServices,
+            $packagesByClinic->get($clinic->id, collect()),
+            $vetAtHomeByClinic->get($clinic->id, collect()),
+            $clinicAvailability,
+            $videoSchedules
+        );
+        
+        return [
+            'id' => (int) $clinic->id,
+            'name' => $clinic->name ?? 'Unnamed Clinic',
+            'city' => $clinic->city ?? '—',
+            'doctors_count' => (int) $doctors->count(),
+            'services_count' => (int) $regularServices->count(),
+            'machinery_count' => (int) $machineryServices->count(),
+            'profile_completion_percentage' => (int) ($profileCompletion['percentage'] ?? 0),
+            'created_at' => $clinic->created_at ? $clinic->created_at->toIso8601String() : null,
+        ];
+    });
+    
+    return response()->json([
+        'success' => true,
+        'from_date' => $fromDate,
+        'count' => $summary->count(),
+        'data' => $summary,
+    ]);
+});
+
 Route::get('/device-tokens/issue', function (Request $request) {
     $data = $request->validate([
         'user_id' => ['required', 'integer'],
