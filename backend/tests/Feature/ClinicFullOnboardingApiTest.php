@@ -56,6 +56,7 @@ class ClinicFullOnboardingApiTest extends TestCase
             $table->string('doctor_email')->nullable();
             $table->string('doctor_mobile')->nullable();
             $table->string('doctor_license')->nullable();
+            $table->integer('exported_from_excell')->default(0);
             $table->timestamps();
         });
 
@@ -210,5 +211,45 @@ class ClinicFullOnboardingApiTest extends TestCase
             'clinic_day_fee' => 450.00,
             'clinic_night_fee' => 650.00,
         ]);
+    }
+
+    public function test_inclinic_lists_returns_clinic_fees(): void
+    {
+        // 1. Seed a clinic with day and night fees
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 100,
+            'name' => 'Excellent Vet Care',
+            'city' => 'New Delhi',
+            'pincode' => '110075',
+            'clinic_day_fee' => 400.00,
+            'clinic_night_fee' => 600.00,
+            'created_at' => '2026-06-01 12:00:00',
+            'updated_at' => '2026-06-01 12:00:00',
+        ]);
+
+        // 2. Seed an associated doctor with exported_from_excell = 1
+        DB::table('doctors')->insert([
+            'id' => 200,
+            'vet_registeration_id' => 100,
+            'doctor_name' => 'Dr. Excellent',
+            'exported_from_excell' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 3. Call the inclinic lists API
+        $response = $this->getJson('/api/inclinic-lists-new-after-10th-may-registerations?from_date=2026-05-10');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+
+        // Assert response contains custom fees
+        $data = $response->json('data');
+        $this->assertNotEmpty($data);
+
+        $clinicData = collect($data)->firstWhere('id', 100);
+        $this->assertNotNull($clinicData);
+        $this->assertEquals(400.0, $clinicData['clinic_day_fee']);
+        $this->assertEquals(600.0, $clinicData['clinic_night_fee']);
     }
 }

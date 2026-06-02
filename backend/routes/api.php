@@ -746,6 +746,8 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             'clinic_image_url' => $clinic_image_url,
             'clinic_video' => $clinic_video_url,
             'clinic_video_url' => $clinic_video_url,
+            'clinic_day_fee' => $clinic->clinic_day_fee !== null ? (float) $clinic->clinic_day_fee : null,
+            'clinic_night_fee' => $clinic->clinic_night_fee !== null ? (float) $clinic->clinic_night_fee : null,
             'doctors_count' => (int) $doctors->count(),
             'services_count' => (int) $regularServices->count(),
             'machinery_count' => (int) $machineryServices->count(),
