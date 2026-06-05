@@ -54,6 +54,8 @@ class Prescription extends Model
         'video_appointment_id',
         'in_clinic_appointment_id',
         'seen',
+        'vaccination_name',
+        'batch_number',
     ];
 
     protected $casts = [

@@ -739,6 +739,14 @@
               <option value="followup">Follow-up</option>
             </select>
           </div>
+          <div class="pv-field vaccination-field" style="display:none">
+            <label class="pv-label" for="vaccination-name">Vaccination Name</label>
+            <input type="text" id="vaccination-name" name="vaccination_name" class="pv-input" placeholder="e.g. DHPPiL">
+          </div>
+          <div class="pv-field vaccination-field" style="display:none">
+            <label class="pv-label" for="batch-number">Batch Number</label>
+            <input type="text" id="batch-number" name="batch_number" class="pv-input" placeholder="e.g. VAC123456">
+          </div>
           <div class="pv-field">
             <label class="pv-label" for="case-severity"><span class="pv-required">*</span> Case Severity</label>
             <select id="case-severity" name="case_severity" class="pv-input" data-role="case-severity">
@@ -1191,13 +1199,21 @@ window.PatientStore = (() => {
 
   function updateVisitCategoryUI(category) {
     const cat = normalizeVisitCategoryValue(category||els.visitCategory?.value||'');
-    if (!cat) { setCardVisible(els.clinicalCard,true); setCardVisible(els.diagnosisCard,true); setCardVisible(els.treatmentCard,true); setCardVisible(els.followupCard,true); return; }
+    if (!cat) {
+      setCardVisible(els.clinicalCard,true);
+      setCardVisible(els.diagnosisCard,true);
+      setCardVisible(els.treatmentCard,true);
+      setCardVisible(els.followupCard,true);
+      document.querySelectorAll('.vaccination-field').forEach(el => el.style.display = 'none');
+      return;
+    }
     const isVacc  = cat === 'vaccination';
     const isVideo = cat === 'video_consultation';
     setCardVisible(els.clinicalCard,  !isVacc && !isVideo);
     setCardVisible(els.diagnosisCard, !isVacc && !isVideo);
     setCardVisible(els.treatmentCard, !isVacc || isVideo);
     setCardVisible(els.followupCard,  true);
+    document.querySelectorAll('.vaccination-field').forEach(el => el.style.display = isVacc ? 'block' : 'none');
     renderFollowupContext();
   }
 
@@ -1646,6 +1662,8 @@ window.PatientStore = (() => {
     resetMedications(); toggleCriticalSections(); updateVisitCategoryUI(els.visitCategory?.value||'');
     const ri=document.getElementById('record-id'); if(ri) ri.value='';
     const rf=document.getElementById('record-file'); if(rf) rf.required=false;
+    const vn=document.getElementById('vaccination-name'); if(vn) vn.value='';
+    const bn=document.getElementById('batch-number'); if(bn) bn.value='';
   }
 
   function fillRecordFormFromRecord(rec) {
@@ -1666,6 +1684,8 @@ window.PatientStore = (() => {
     mv('doctor-treatment', rx.doctor_treatment??''); mv('treatment-plan',rx.treatment_plan??'');
     mv('home-care',        rx.home_care??''); mv('follow-up-date',rx.follow_up_date??''); mv('follow-up-type',rx.follow_up_type??'');
     mv('record-pet',       rx.pet_id??rec.pet_id??'');
+    mv('vaccination-name', rx.vaccination_name??'');
+    mv('batch-number',     rx.batch_number??'');
     updateVisitCategoryUI(els.visitCategory?.value||''); recomputeLastPostOp();
     medications = normalizeMedicationState(rx.medications_json||[]); renderMedicationCards(); syncMedicationPayload();
     if (!medications.length) addMedication();

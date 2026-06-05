@@ -511,6 +511,14 @@
               <option value="followup">Follow-up</option>
             </select>
           </div>
+          <div class="record-field vaccination-field" style="display:none">
+            <label class="record-label" for="vaccination-name">Vaccination Name</label>
+            <input type="text" id="vaccination-name" name="vaccination_name" class="record-input" placeholder="e.g. DHPPiL">
+          </div>
+          <div class="record-field vaccination-field" style="display:none">
+            <label class="record-label" for="batch-number">Batch Number</label>
+            <input type="text" id="batch-number" name="batch_number" class="record-input" placeholder="e.g. VAC123456">
+          </div>
           <div class="record-field">
             <label class="record-label" for="case-severity">Case Severity</label>
             <select id="case-severity" name="case_severity" class="record-input" data-role="case-severity">
@@ -694,6 +702,7 @@
     doctorSelect: document.getElementById('doctor-select'),
     recordPet: document.getElementById('record-pet'),
     caseSeverity: document.getElementById('case-severity'),
+    visitCategory: document.getElementById('visit-category'),
     criticalSections: Array.from(document.querySelectorAll('[data-critical]')),
     petModal: document.getElementById('pet-modal'),
     petForm: document.getElementById('pet-form'),
@@ -708,6 +717,12 @@
       section.style.display = 'block';
       section.classList.add('is-visible');
     });
+  }
+
+  function updateVisitCategoryUI(category) {
+    const cat = category || els.visitCategory?.value || '';
+    const isVacc = cat === 'vaccination';
+    document.querySelectorAll('.vaccination-field').forEach(el => el.style.display = isVacc ? 'block' : 'none');
   }
 
   function escapeHtml(value) {
@@ -1318,6 +1333,9 @@
     if (recordIdInput) recordIdInput.value = '';
     const recordFile = document.getElementById('record-file');
     if (recordFile) recordFile.required = true;
+    const vn = document.getElementById('vaccination-name'); if (vn) vn.value = '';
+    const bn = document.getElementById('batch-number'); if (bn) bn.value = '';
+    updateVisitCategoryUI('');
   }
 
   function resetPetForm() {
@@ -1363,7 +1381,10 @@
     mapValue('follow-up-type', prescription.follow_up_type ?? '');
     mapValue('follow-up-notes', prescription.follow_up_notes ?? '');
     mapValue('record-pet', prescription.pet_id ?? rec.pet_id ?? '');
+    mapValue('vaccination-name', prescription.vaccination_name ?? '');
+    mapValue('batch-number', prescription.batch_number ?? '');
     toggleCriticalSections(els.caseSeverity?.value || 'general');
+    updateVisitCategoryUI(prescription.visit_category);
   }
 
   function openUploadModal() {
@@ -1451,6 +1472,9 @@
     document.querySelectorAll('[data-role="close-pet-modal"]').forEach((btn) => btn.addEventListener('click', closePetModal));
     els.caseSeverity?.addEventListener('change', (event) => {
       toggleCriticalSections(event.target.value || 'general');
+    });
+    els.visitCategory?.addEventListener('change', (event) => {
+      updateVisitCategoryUI(event.target.value);
     });
 
     els.recordForm?.addEventListener('submit', async (event) => {

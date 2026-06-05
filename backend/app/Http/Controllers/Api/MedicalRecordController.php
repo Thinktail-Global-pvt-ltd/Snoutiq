@@ -198,6 +198,8 @@ class MedicalRecordController extends Controller
             'in_clinic_appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'in_clinic_appointtment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
+            'vaccination_name' => ['nullable', 'string', 'max:255'],
+            'batch_number' => ['nullable', 'string', 'max:255'],
         ]);
         $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
 
@@ -315,6 +317,8 @@ class MedicalRecordController extends Controller
             'video_appointment_id' => $validated['video_appointment_id'] ?? $prescription->video_appointment_id,
             'in_clinic_appointment_id' => $inClinicAppointmentId ?? $prescription->in_clinic_appointment_id,
             'medications_json' => $medsJson ?? $prescription->medications_json,
+            'vaccination_name' => $validated['vaccination_name'] ?? $prescription->vaccination_name,
+            'batch_number' => $validated['batch_number'] ?? $prescription->batch_number,
         ];
         if ($hasDoctorTreatmentColumn) {
             $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? $prescription->doctor_treatment;
@@ -324,6 +328,22 @@ class MedicalRecordController extends Controller
             $prescription->image_path = $recordFilePath;
         }
         $prescription->save();
+
+        $resolvedPetId = $petId ?? $prescription->pet_id;
+        $finalVisitCategory = $validated['visit_category'] ?? $prescription->visit_category;
+        $finalVaccineName = $validated['vaccination_name'] ?? $prescription->vaccination_name;
+        $finalBatchNumber = $validated['batch_number'] ?? $prescription->batch_number;
+
+        if ($resolvedPetId && $finalVisitCategory === 'vaccination' && !empty($finalVaccineName)) {
+            $this->updatePetVaccinationPayload(
+                (int) $resolvedPetId,
+                $finalVaccineName,
+                $finalBatchNumber,
+                (int) $record->id,
+                (int) $prescription->id
+            );
+        }
+
         $this->markVideoApointmentCompleted($validated['video_appointment_id'] ?? $prescription->video_appointment_id ?? null);
         $this->markCallSessionCompleted($callSessionInput);
 
@@ -391,6 +411,8 @@ class MedicalRecordController extends Controller
             'in_clinic_appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'in_clinic_appointtment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
+            'vaccination_name' => ['nullable', 'string', 'max:255'],
+            'batch_number' => ['nullable', 'string', 'max:255'],
         ]);
         $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
 
@@ -510,6 +532,8 @@ class MedicalRecordController extends Controller
             'in_clinic_appointment_id' => $inClinicAppointmentId,
             'medications_json' => $this->decodeMedicationsInput($request->input('medications_json'))
                 ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
+            'vaccination_name' => $validated['vaccination_name'] ?? null,
+            'batch_number' => $validated['batch_number'] ?? null,
         ];
         if ($hasDoctorTreatmentColumn) {
             $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? null;
@@ -523,6 +547,16 @@ class MedicalRecordController extends Controller
                 'success' => false,
                 'error' => 'Prescription could not be created',
             ], 500);
+        }
+
+        if ($petId && ($validated['visit_category'] ?? null) === 'vaccination' && !empty($validated['vaccination_name'])) {
+            $this->updatePetVaccinationPayload(
+                (int) $petId,
+                $validated['vaccination_name'],
+                $validated['batch_number'] ?? null,
+                (int) $record->id,
+                (int) $prescription->id
+            );
         }
 
         $this->markVideoApointmentCompleted($validated['video_appointment_id'] ?? $prescription->video_appointment_id ?? null);
@@ -1263,5 +1297,128 @@ PROMPT;
         }
 
         return url($path);
+    }
+
+    private function resolveStandardVaccineName(string $rawName): string
+    {
+        $rawName = trim($rawName);
+        if ($rawName === '') {
+            return '';
+        }
+
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? \App\Support\GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            return $rawName;
+        }
+
+        $model = \App\Support\GeminiConfig::chatModel() ?: \App\Support\GeminiConfig::defaultModel();
+        $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', $model);
+
+        $prompt = <<<PROMPT
+You are a veterinary assistant. Standardize the following user-entered pet vaccination name into a canonical name.
+Options include:
+- Rabies
+- DHPPi
+- Leptospirosis
+- FVRCP
+- FeLV
+- Canine Coronavirus
+- Deworming
+- DHPPiL
+
+Input vaccination text: "{$rawName}"
+
+Return ONLY the standardized vaccine name as a short string (e.g., "DHPPi" or "Rabies" or "DHPPiL"). Do not include any extra text, markdown formatting, or explanation.
+PROMPT;
+
+        try {
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'X-goog-api-key' => $apiKey,
+            ])->post($endpoint, [
+                'contents' => [[
+                    'role' => 'user',
+                    'parts' => [['text' => $prompt]],
+                ]],
+                'generationConfig' => [
+                    'temperature' => 0.1,
+                    'topP' => 0.8,
+                    'topK' => 32,
+                    'maxOutputTokens' => 50,
+                ],
+            ]);
+
+            $text = $response->json('candidates.0.content.parts.0.text');
+            if ($response->successful() && $text) {
+                $standardized = trim($text);
+                $standardized = preg_replace('/^```\s*|```$/', '', $standardized);
+                $standardized = trim($standardized);
+                if ($standardized !== '') {
+                    return $standardized;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Gemini vaccine standardization failed', ['error' => $e->getMessage()]);
+        }
+
+        return $rawName;
+    }
+
+    private function updatePetVaccinationPayload(int $petId, string $vaccineName, ?string $batchNumber, int $recordId, int $prescriptionId): void
+    {
+        if (!Schema::hasTable('pets') || !Schema::hasColumn('pets', 'dog_disease_payload')) {
+            return;
+        }
+
+        $pet = Pet::find($petId);
+        if (!$pet) {
+            return;
+        }
+
+        $resolvedName = $this->resolveStandardVaccineName($vaccineName);
+        if ($resolvedName === '') {
+            return;
+        }
+
+        $payload = $pet->dog_disease_payload;
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            $payload = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        // 1. Save to payload.vaccine
+        $payload['vaccine'] = $resolvedName;
+
+        // 2. Merge/update payload.vaccination
+        $vaccinations = $payload['vaccination'] ?? [];
+        if (!is_array($vaccinations)) {
+            $vaccinations = [];
+        }
+
+        $slugName = strtolower(trim(preg_replace('/[^a-z0-9]+/', '_', strtolower(trim($resolvedName))), '_'));
+        $date = now()->toDateString();
+        $key = "walkin|dog|{$slugName}|{$date}";
+
+        $vaccinations[$key] = [
+            'status' => 'done',
+            'date' => $date,
+            'last_date' => $date,
+            'next_due' => null,
+            'dose_number' => '1',
+            'vaccine_name' => $resolvedName,
+            'batch_no' => $batchNumber,
+            'source' => 'clinic_walkins',
+            'medical_record_id' => $recordId,
+            'prescription_id' => $prescriptionId,
+        ];
+
+        $payload['vaccination'] = $vaccinations;
+
+        // Save pet payload
+        $pet->dog_disease_payload = $payload;
+        $pet->save();
     }
 }
