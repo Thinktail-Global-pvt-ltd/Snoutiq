@@ -1399,22 +1399,28 @@ PROMPT;
         }
 
         $slugName = strtolower(trim(preg_replace('/[^a-z0-9]+/', '_', strtolower(trim($resolvedName))), '_'));
+        $slugName = trim($slugName, '_');
         $date = now()->toDateString();
-        $key = "walkin|dog|{$slugName}|{$date}";
 
-        $vaccinations[$key] = [
-            'status' => 'done',
+        $prescription = Prescription::find($prescriptionId);
+        $nextDue = null;
+        if ($prescription && $prescription->follow_up_date) {
+            $nextDue = is_string($prescription->follow_up_date)
+                ? substr($prescription->follow_up_date, 0, 10)
+                : $prescription->follow_up_date->toDateString();
+        }
+
+        $vaccineData = [
             'date' => $date,
-            'last_date' => $date,
-            'next_due' => null,
-            'dose_number' => '1',
-            'vaccine_name' => $resolvedName,
-            'batch_no' => $batchNumber,
-            'source' => 'clinic_walkins',
-            'medical_record_id' => $recordId,
-            'prescription_id' => $prescriptionId,
         ];
+        if ($nextDue) {
+            $vaccineData['next_due'] = $nextDue;
+        }
+        if ($batchNumber !== null && $batchNumber !== '') {
+            $vaccineData['batch_number'] = $batchNumber;
+        }
 
+        $vaccinations[$slugName] = $vaccineData;
         $payload['vaccination'] = $vaccinations;
 
         // Save pet payload
