@@ -1588,6 +1588,11 @@ window.PatientStore = (() => {
         const fp=[]; if(rx.follow_up_date) fp.push(`Date: ${escapeHtml(rx.follow_up_date)}`); if(rx.follow_up_type) fp.push(`Type: ${escapeHtml(rx.follow_up_type)}`);
         detailPairs.push({label:'Follow-up',value:fp.join(' | ')});
       }
+      if (rx.visit_category === 'vaccination') {
+        if (rx.vaccination_name) detailPairs.push({label:'Vaccine',      value:escapeHtml(rx.vaccination_name)});
+        if (rx.vaccination_date) detailPairs.push({label:'Vacc. date',   value:escapeHtml(rx.vaccination_date)});
+        if (rx.batch_number)     detailPairs.push({label:'Batch no.',    value:escapeHtml(rx.batch_number)});
+      }
       if (petLabel) detailPairs.unshift({label:'Pet',value:escapeHtml(petLabel)});
       const detailHtml  = detailPairs.length ? `<div class="pm-record-details">${detailPairs.map(p=>`<div class="pm-record-row"><div class="pm-record-label">${p.label}</div><div class="pm-record-value">${p.value}</div></div>`).join('')}</div>` : '';
       const tags = [rx.case_severity?`<span class="pm-tag-soft">${escapeHtml(rx.case_severity)}</span>`:'', rx.visit_category?`<span class="pm-tag-soft">${escapeHtml(rx.visit_category)}</span>`:''].filter(Boolean);

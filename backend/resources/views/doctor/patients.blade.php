@@ -1170,6 +1170,11 @@
         if (prescription.follow_up_notes) fuParts.push(`Notes: ${escapeHtml(prescription.follow_up_notes)}`);
         detailPairs.push({ label: 'Follow-up', value: fuParts.join(' • ') });
       }
+      if (prescription.visit_category === 'vaccination') {
+        if (prescription.vaccination_name) detailPairs.push({ label: 'Vaccine',    value: escapeHtml(prescription.vaccination_name) });
+        if (prescription.vaccination_date) detailPairs.push({ label: 'Vacc. date', value: escapeHtml(prescription.vaccination_date) });
+        if (prescription.batch_number)     detailPairs.push({ label: 'Batch no.',  value: escapeHtml(prescription.batch_number) });
+      }
       if (petLabel) {
         detailPairs.unshift({ label: 'Pet', value: escapeHtml(petLabel) });
       }
