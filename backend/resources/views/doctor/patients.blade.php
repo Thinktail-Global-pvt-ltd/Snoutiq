@@ -519,6 +519,10 @@
             <label class="record-label" for="batch-number">Batch Number</label>
             <input type="text" id="batch-number" name="batch_number" class="record-input" placeholder="e.g. VAC123456">
           </div>
+          <div class="record-field vaccination-field" style="display:none">
+            <label class="record-label" for="vaccination-date">Vaccination Date</label>
+            <input type="date" id="vaccination-date" name="vaccination_date" class="record-input">
+          </div>
           <div class="record-field">
             <label class="record-label" for="case-severity">Case Severity</label>
             <select id="case-severity" name="case_severity" class="record-input" data-role="case-severity">
@@ -1335,6 +1339,7 @@
     if (recordFile) recordFile.required = true;
     const vn = document.getElementById('vaccination-name'); if (vn) vn.value = '';
     const bn = document.getElementById('batch-number'); if (bn) bn.value = '';
+    const vd = document.getElementById('vaccination-date'); if (vd) vd.value = '';
     updateVisitCategoryUI('');
   }
 
@@ -1383,6 +1388,7 @@
     mapValue('record-pet', prescription.pet_id ?? rec.pet_id ?? '');
     mapValue('vaccination-name', prescription.vaccination_name ?? '');
     mapValue('batch-number', prescription.batch_number ?? '');
+    mapValue('vaccination-date', prescription.vaccination_date ?? '');
     toggleCriticalSections(els.caseSeverity?.value || 'general');
     updateVisitCategoryUI(prescription.visit_category);
   }

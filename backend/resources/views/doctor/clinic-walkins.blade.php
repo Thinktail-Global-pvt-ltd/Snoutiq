@@ -747,6 +747,10 @@
             <label class="pv-label" for="batch-number">Batch Number</label>
             <input type="text" id="batch-number" name="batch_number" class="pv-input" placeholder="e.g. VAC123456">
           </div>
+          <div class="pv-field vaccination-field" style="display:none">
+            <label class="pv-label" for="vaccination-date">Vaccination Date</label>
+            <input type="date" id="vaccination-date" name="vaccination_date" class="pv-input">
+          </div>
           <div class="pv-field">
             <label class="pv-label" for="case-severity"><span class="pv-required">*</span> Case Severity</label>
             <select id="case-severity" name="case_severity" class="pv-input" data-role="case-severity">
@@ -1664,6 +1668,7 @@ window.PatientStore = (() => {
     const rf=document.getElementById('record-file'); if(rf) rf.required=false;
     const vn=document.getElementById('vaccination-name'); if(vn) vn.value='';
     const bn=document.getElementById('batch-number'); if(bn) bn.value='';
+    const vd=document.getElementById('vaccination-date'); if(vd) vd.value='';
   }
 
   function fillRecordFormFromRecord(rec) {
@@ -1686,6 +1691,7 @@ window.PatientStore = (() => {
     mv('record-pet',       rx.pet_id??rec.pet_id??'');
     mv('vaccination-name', rx.vaccination_name??'');
     mv('batch-number',     rx.batch_number??'');
+    mv('vaccination-date', rx.vaccination_date??'');
     updateVisitCategoryUI(els.visitCategory?.value||''); recomputeLastPostOp();
     medications = normalizeMedicationState(rx.medications_json||[]); renderMedicationCards(); syncMedicationPayload();
     if (!medications.length) addMedication();

@@ -56,6 +56,7 @@ class Prescription extends Model
         'seen',
         'vaccination_name',
         'batch_number',
+        'vaccination_date',
     ];
 
     protected $casts = [

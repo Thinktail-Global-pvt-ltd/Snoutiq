@@ -200,6 +200,7 @@ class MedicalRecordController extends Controller
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
             'vaccination_name' => ['nullable', 'string', 'max:255'],
             'batch_number' => ['nullable', 'string', 'max:255'],
+            'vaccination_date' => ['nullable', 'date'],
         ]);
         $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
 
@@ -319,6 +320,7 @@ class MedicalRecordController extends Controller
             'medications_json' => $medsJson ?? $prescription->medications_json,
             'vaccination_name' => $validated['vaccination_name'] ?? $prescription->vaccination_name,
             'batch_number' => $validated['batch_number'] ?? $prescription->batch_number,
+            'vaccination_date' => $validated['vaccination_date'] ?? $prescription->vaccination_date,
         ];
         if ($hasDoctorTreatmentColumn) {
             $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? $prescription->doctor_treatment;
@@ -333,12 +335,14 @@ class MedicalRecordController extends Controller
         $finalVisitCategory = $validated['visit_category'] ?? $prescription->visit_category;
         $finalVaccineName = $validated['vaccination_name'] ?? $prescription->vaccination_name;
         $finalBatchNumber = $validated['batch_number'] ?? $prescription->batch_number;
+        $finalVaccinationDate = $validated['vaccination_date'] ?? $prescription->vaccination_date;
 
         if ($resolvedPetId && $finalVisitCategory === 'vaccination' && !empty($finalVaccineName)) {
             $this->updatePetVaccinationPayload(
                 (int) $resolvedPetId,
                 $finalVaccineName,
                 $finalBatchNumber,
+                $finalVaccinationDate,
                 (int) $record->id,
                 (int) $prescription->id
             );
@@ -413,6 +417,7 @@ class MedicalRecordController extends Controller
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
             'vaccination_name' => ['nullable', 'string', 'max:255'],
             'batch_number' => ['nullable', 'string', 'max:255'],
+            'vaccination_date' => ['nullable', 'date'],
         ]);
         $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
 
@@ -534,6 +539,7 @@ class MedicalRecordController extends Controller
                 ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
             'vaccination_name' => $validated['vaccination_name'] ?? null,
             'batch_number' => $validated['batch_number'] ?? null,
+            'vaccination_date' => $validated['vaccination_date'] ?? null,
         ];
         if ($hasDoctorTreatmentColumn) {
             $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? null;
@@ -554,6 +560,7 @@ class MedicalRecordController extends Controller
                 (int) $petId,
                 $validated['vaccination_name'],
                 $validated['batch_number'] ?? null,
+                $validated['vaccination_date'] ?? null,
                 (int) $record->id,
                 (int) $prescription->id
             );
@@ -1364,7 +1371,7 @@ PROMPT;
         return $rawName;
     }
 
-    private function updatePetVaccinationPayload(int $petId, string $vaccineName, ?string $batchNumber, int $recordId, int $prescriptionId): void
+    private function updatePetVaccinationPayload(int $petId, string $vaccineName, ?string $batchNumber, ?string $vaccinationDate, int $recordId, int $prescriptionId): void
     {
         if (!Schema::hasTable('pets') || !Schema::hasColumn('pets', 'dog_disease_payload')) {
             return;
@@ -1397,7 +1404,8 @@ PROMPT;
 
         $slugName = strtolower(preg_replace('/[^a-z0-9]+/', '_', strtolower(trim($resolvedName))));
         $slugName = trim($slugName, '_');
-        $date = now()->toDateString();
+        $date = ($vaccinationDate && strtotime($vaccinationDate)) ? substr($vaccinationDate, 0, 10) : now()->toDateString();
+        $vaccinationDate = $date;
 
         $prescription = Prescription::find($prescriptionId);
         $nextDue = null;
