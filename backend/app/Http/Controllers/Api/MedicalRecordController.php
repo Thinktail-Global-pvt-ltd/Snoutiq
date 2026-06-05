@@ -1389,16 +1389,13 @@ PROMPT;
             $payload = [];
         }
 
-        // 1. Save to payload.vaccine
-        $payload['vaccine'] = $resolvedName;
-
-        // 2. Merge/update payload.vaccination
+        // Merge/update payload.vaccination — override existing entry for this slug
         $vaccinations = $payload['vaccination'] ?? [];
         if (!is_array($vaccinations)) {
             $vaccinations = [];
         }
 
-        $slugName = strtolower(trim(preg_replace('/[^a-z0-9]+/', '_', strtolower(trim($resolvedName))), '_'));
+        $slugName = strtolower(preg_replace('/[^a-z0-9]+/', '_', strtolower(trim($resolvedName))));
         $slugName = trim($slugName, '_');
         $date = now()->toDateString();
 
@@ -1420,6 +1417,7 @@ PROMPT;
             $vaccineData['batch_number'] = $batchNumber;
         }
 
+        // Override any existing entry for this vaccine slug
         $vaccinations[$slugName] = $vaccineData;
         $payload['vaccination'] = $vaccinations;
 
