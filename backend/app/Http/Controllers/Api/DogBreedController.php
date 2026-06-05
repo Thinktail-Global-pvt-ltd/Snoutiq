@@ -11,6 +11,7 @@ class DogBreedController extends Controller
     private const ALL_BREEDS_URL = 'https://dog.ceo/api/breeds/list/all';
 
     private const MANUAL_DOG_BREEDS = [
+        'American Bully',
         'Rajapalayam',
         'Chippiparai',
         'Mudhol Hound',
