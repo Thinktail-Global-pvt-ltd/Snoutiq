@@ -31,6 +31,7 @@ use App\Http\Controllers\BlogController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\TagController;
+use App\Http\Controllers\Admin\UploadController;
 use App\Http\Controllers\SalesDraftClinicPageController;
 use App\Http\Controllers\Admin\LegacyQrRedirectAdminController;
 use App\Http\Controllers\LegacyQrRedirectController;
@@ -399,6 +400,7 @@ Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
     Route::get('/admin/posts/{post}/edit', [PostController::class, 'edit'])->name('admin.posts.edit');
     Route::match(['put', 'patch'], '/admin/posts/{post}', [PostController::class, 'update'])->name('admin.posts.update');
     Route::delete('/admin/posts/{post}', [PostController::class, 'destroy'])->name('admin.posts.destroy');
+    Route::post('/admin/upload', [UploadController::class, 'store'])->name('admin.upload.store');
 
     Route::get('/admin/categories', [CategoryController::class, 'index'])->name('admin.categories.index');
     Route::get('/admin/categories/create', [CategoryController::class, 'create'])->name('admin.categories.create');

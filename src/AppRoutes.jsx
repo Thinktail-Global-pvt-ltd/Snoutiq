@@ -76,7 +76,6 @@ const WhyWinterGroomingIsImportantForCats = lazy(() =>
   import("./blog/WhyWinterGroomingIsImportantForCats")
 );
 const DynamicBlogPost = lazy(() => import("./blog/DynamicBlogPost"));
-const AdminBlogManager = lazy(() => import("./pages/AdminBlogManager"));
 
 const DelhiPage = lazy(() => import("./pages/DelhiPage"));
 const GurugramPage = lazy(() => import("./pages/GurugramPage"));
@@ -387,8 +386,7 @@ export default function AppRoutes() {
         {/* ⚠ Must be AFTER all static /blog/* routes above */}
         <Route path="/blog/:slug" element={<DynamicBlogPost />} />
 
-        {/* Admin Blog Manager */}
-        <Route path="/admin/blog" element={<AdminBlogManager />} />
+
 
         <Route path="/delhi" element={<DelhiPage />} />
         <Route path="/gurugram" element={<GurugramPage />} />
