@@ -264,11 +264,10 @@ class PaymentController extends Controller
                 ];
             }, 3);
 
-            $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
-                doctorId: $context['doctor_id'] ?? null,
-                notes: $notes,
-                amountInInr: $amountInInr
-            );
+            $doctorOrderPushMeta = [
+                'sent' => false,
+                'reason' => 'deferred_to_verification',
+            ];
 
             $whatsAppMeta = null;
             $vetWhatsAppMeta = null;
@@ -493,11 +492,10 @@ class PaymentController extends Controller
         $videoApointment = $result['video_appointment'] ?? null;
         $couponCallSession = $result['call_session'] ?? null;
 
-        $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
-            doctorId: $couponContext['doctor_id'] ?? null,
-            notes: $couponNotes,
-            amountInInr: 0
-        );
+        $doctorOrderPushMeta = [
+            'sent' => false,
+            'reason' => 'deferred_to_verification',
+        ];
 
         $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
             context: $couponContext,
@@ -946,6 +944,7 @@ class PaymentController extends Controller
             $vetWhatsAppMeta = null;
             $prescriptionDocMeta = null;
             $vetPushMeta = null;
+            $doctorOrderPushMeta = null;
             try {
                 // Derive order type from notes or stored payment/transaction data
                 $orderType = $this->normalizeOrderType(
@@ -967,6 +966,14 @@ class PaymentController extends Controller
                     );
                     $whatsAppMeta = $videoConsultWhatsAppMeta['whatsapp'];
                     $vetWhatsAppMeta = $videoConsultWhatsAppMeta['vet_whatsapp'];
+                }
+
+                if ($this->isSuccessfulPaymentStatus($status)) {
+                    $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
+                        doctorId: $context['doctor_id'] ?? null,
+                        notes: $notes,
+                        amountInInr: $amountInInr
+                    );
                 }
 
                 $vetPushMeta = $this->notifyDoctorPaymentCaptured(
@@ -1002,6 +1009,7 @@ class PaymentController extends Controller
                 'vet_whatsapp' => $vetWhatsAppMeta,
                 'prescription_doc' => $prescriptionDocMeta,
                 'vet_push' => $vetPushMeta,
+                'doctor_push' => $doctorOrderPushMeta,
             ]);
 
         } catch (RazorpayError $e) {
@@ -1116,6 +1124,12 @@ class PaymentController extends Controller
             }
         }
 
+        $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
+            doctorId: $context['doctor_id'] ?? null,
+            notes: $metadataNotes,
+            amountInInr: 0
+        );
+
         return [
             'success' => true,
             'verified' => true,
@@ -1140,6 +1154,7 @@ class PaymentController extends Controller
                 'type' => $transaction->type,
                 'status' => $transaction->status,
             ],
+            'doctor_push' => $doctorOrderPushMeta,
             'message' => 'Coupon order detected. Razorpay verify bypassed.',
         ];
     }
