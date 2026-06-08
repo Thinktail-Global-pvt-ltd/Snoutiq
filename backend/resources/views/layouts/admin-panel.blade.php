@@ -129,6 +129,9 @@
             <a href="{{ route('admin.analytics.pages') }}" class="{{ request()->routeIs('admin.analytics.pages') ? 'active' : '' }}">Page Analytics</a>
             <a href="{{ route('admin.analytics.consultation-lifecycle') }}" class="{{ request()->routeIs('admin.analytics.consultation-lifecycle') ? 'active' : '' }}">Consultation Lifecycle Analytics</a>
             <a href="{{ route('admin.analytics.pincode-heatmap') }}" class="{{ request()->routeIs('admin.analytics.pincode-heatmap') ? 'active' : '' }}">Pincode Heatmap</a>
+            <a href="/admin/blog" class="{{ request()->is('admin/blog*') ? 'active' : '' }}" target="_blank" style="display:flex;align-items:center;gap:0.4rem;">
+                <i class="bi bi-pencil-square"></i> Blog Manager
+            </a>
         </nav>
         @hasSection('sidebar-secondary')
             <div class="mb-4">
