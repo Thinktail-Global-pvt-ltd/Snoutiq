@@ -927,6 +927,10 @@ class PetOverviewController extends Controller
             'a.updated_at',
         ];
 
+        if (Schema::hasColumn('appointments', 'transaction_id')) {
+            $select[] = 'a.transaction_id';
+        }
+
         if (Schema::hasTable('doctors')) {
             $query->leftJoin('doctors as d', 'd.id', '=', 'a.doctor_id');
             if (Schema::hasColumn('doctors', 'doctor_name')) {
@@ -943,16 +947,38 @@ class PetOverviewController extends Controller
             $select[] = 'v.name as clinic_name';
         }
 
-        $row = $query
+        $rows = $query
             ->select($select)
             ->orderByDesc('a.appointment_date')
             ->orderByDesc('a.appointment_time')
             ->orderByDesc('a.id')
-            ->first();
+            ->get();
 
-        if (!$row) {
+        $validRow = null;
+        foreach ($rows as $row) {
+            $hasTransactionId = property_exists($row, 'transaction_id') && $row->transaction_id !== null;
+            if ($hasTransactionId) {
+                $txnStatus = DB::table('transactions')->where('id', $row->transaction_id)->value('status');
+                if ($txnStatus !== null && strtolower(trim((string)$txnStatus)) === 'pending') {
+                    continue;
+                } else {
+                    $validRow = $row;
+                    break;
+                }
+            } else {
+                $decodedNotes = $this->decodeJsonMaybe($row->notes);
+                if (is_array($decodedNotes) && isset($decodedNotes['razorpay_order_id']) && $decodedNotes['razorpay_order_id'] !== null && trim((string)$decodedNotes['razorpay_order_id']) !== '') {
+                    $validRow = $row;
+                    break;
+                }
+            }
+        }
+
+        if (!$validRow) {
             return null;
         }
+
+        $row = $validRow;
 
         return [
             'id' => $row->id,
