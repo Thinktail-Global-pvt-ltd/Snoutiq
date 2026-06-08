@@ -1009,7 +1009,8 @@ class PetOverviewController extends Controller
 
         $query = DB::table('transactions as t')
             ->where('t.pet_id', $petId)
-            ->whereIn('t.type', ['excell_export_campaign', 'video_consult']);
+            ->whereIn('t.type', ['excell_export_campaign', 'video_consult'])
+            ->where('t.status', '!=', 'pending');
 
         $select = [
             't.id',
