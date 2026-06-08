@@ -137,120 +137,50 @@ const DynamicBlogPost = () => {
           </script>
         </Helmet>
 
-        <div className="font-sans text-gray-800 bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen mt-20">
-          <Header />
+      <Header />
+      <div className="min-h-screen bg-gray-50 py-8 px-4 mt-10">
+        <div className="max-w-4xl mx-auto">
+          {/* Blog Header */}
+          <header className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">
+              {post.title}
+            </h1>
+            {post.excerpt && (
+              <p className="text-gray-600 text-lg">
+                {post.excerpt}
+              </p>
+            )}
+            <div className="w-20 h-1 bg-blue-500 mx-auto mt-4"></div>
+          </header>
 
-          {/* Breadcrumb */}
-          <nav className="max-w-7xl mx-auto px-8 py-4 text-sm" aria-label="Breadcrumb">
-            <ol className="flex items-center space-x-2 flex-wrap">
-              <li>
-                <Link to="/" className="text-indigo-600 hover:underline">Home</Link>
-              </li>
-              <li className="text-gray-500">»</li>
-              <li>
-                <Link to="/blog" className="text-indigo-600 hover:underline">Blog</Link>
-              </li>
-              <li className="text-gray-500">»</li>
-              <li className="text-gray-700 truncate max-w-xs">{post.title}</li>
-            </ol>
-          </nav>
+          {/* Featured Image */}
+          {post.featured_image && (
+            <section className="mb-8">
+              <img
+                src={post.featured_image}
+                alt={post.title}
+                className="w-full h-auto rounded-lg shadow-sm"
+                onError={(e) => { e.target.style.display = "none"; }}
+              />
+            </section>
+          )}
 
-          <main className="max-w-4xl mx-auto px-8 py-8">
-            <article
-              className="bg-white rounded-xl shadow-lg overflow-hidden"
-              itemScope
-              itemType="http://schema.org/Article"
-            >
-              {/* Hero Header */}
-              <header className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white relative overflow-hidden py-16 px-8 text-center">
-                <div className="absolute text-9xl opacity-10 -top-10 -right-10 transform -rotate-12">🐾</div>
-                <div className="absolute text-7xl opacity-10 -bottom-10 -left-10 transform rotate-12">✍️</div>
-                <div className="relative z-10">
-                  {post.featured_image && (
-                    <div className="mb-6 flex justify-center">
-                      <img
-                        src={post.featured_image}
-                        alt={post.title}
-                        className="w-full max-h-64 object-cover rounded-xl shadow-xl"
-                        onError={(e) => { e.target.style.display = "none"; }}
-                      />
-                    </div>
-                  )}
-                  <h1
-                    className="text-3xl md:text-4xl lg:text-5xl font-black mb-6 drop-shadow-lg"
-                    itemProp="headline"
-                  >
-                    {post.title}
-                  </h1>
-                  {post.excerpt && (
-                    <p className="text-xl md:text-2xl opacity-95 font-light mb-4 leading-relaxed">
-                      {post.excerpt}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-center gap-4 text-sm opacity-80 flex-wrap">
-                    <span>By SnoutIQ</span>
-                    <span>·</span>
-                    <span>
-                      {new Date(post.created_at).toLocaleDateString("en-IN", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </div>
-                </div>
-              </header>
-
-              {/* Article Body — rich HTML from Quill editor */}
-              <section
-                className="px-6 md:px-10 py-10 prose prose-indigo max-w-none"
-                itemProp="articleBody"
-              >
-                {post.content ? (
-                  <div
-                    className="ql-editor-content"
-                    dangerouslySetInnerHTML={{ __html: post.content }}
-                  />
-                ) : (
-                  <p className="text-gray-500 italic text-center py-12">
-                    No content available for this post.
-                  </p>
-                )}
-              </section>
-
-              {/* CTA Box */}
-              <div className="mx-6 md:mx-10 mb-10">
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl p-8 text-center shadow-2xl">
-                  <h3 className="text-2xl md:text-3xl font-bold mb-4">
-                    Need Expert Pet Care Guidance?
-                  </h3>
-                  <p className="text-xl opacity-95 mb-6">
-                    Connect with licensed veterinarians online in 15 minutes.
-                  </p>
-                  <Link
-                    to="/"
-                    className="inline-block bg-white text-indigo-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors"
-                  >
-                    Visit SnoutIQ
-                  </Link>
-                </div>
-              </div>
-            </article>
-          </main>
-
-          {/* Back to Top */}
-          <button
-            onClick={scrollToTop}
-            className={`fixed bottom-8 right-8 bg-gradient-to-r from-indigo-600 to-purple-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 ${
-              showBackToTop ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
-            aria-label="Back to top"
-          >
-            <span className="text-2xl">↑</span>
-          </button>
-
-          <Footer />
+          {/* Article Content */}
+          <section className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            {post.content ? (
+              <div
+                className="ql-editor-content prose prose-indigo max-w-none"
+                dangerouslySetInnerHTML={{ __html: post.content }}
+              />
+            ) : (
+              <p className="text-gray-500 italic text-center py-12">
+                No content available for this post.
+              </p>
+            )}
+          </section>
         </div>
+      </div>
+      <Footer />
       </HelmetProvider>
 
       {/* Quill rendered content styles */}

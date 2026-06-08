@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Calendar,
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import {Header} from "../newflow/Navbar";
 import {Footer} from "../newflow/NewFooter";
+import axiosClient from "../axios";
 import img1 from '../assets/images/dog winter.png';
 import img2 from '../assets/images/pawproduction.png';
 import img3 from '../assets/images/tickfever.png';
@@ -498,23 +499,18 @@ function BlogCard({ post }) {
     >
       <div
         className="relative bg-gradient-to-br from-blue-50 to-cyan-50 aspect-[16/9] flex items-center justify-center overflow-hidden"
-        style={{
-          backgroundImage: `url(${post.image})`,   // ✅ fixed
+        style={post.image ? {
+          backgroundImage: `url(${post.image})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
-        }}
+        } : {}}
       >
-        <div className="absolute inset-0 bg-pattern opacity-5" />
-        {/* <div className="relative text-4xl transform group-hover:scale-110 transition-transform duration-300">
-          {post.trending ? "🚀" : "📝"}
-        </div> */}
-
-        {/* {post.trending && (
-          <div className="absolute top-4 left-4 flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-bold rounded-full shadow-lg">
-            <TrendingUp className="w-3 h-3" />
-            TRENDING
+        {!post.image && (
+          <div className="absolute inset-0 flex items-center justify-center text-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50">
+            <BookOpen className="w-12 h-12 opacity-60" />
           </div>
-        )} */}
+        )}
+        <div className="absolute inset-0 bg-pattern opacity-5" />
       </div>
 
       <div className="p-6 lg:p-8 flex flex-col flex-grow space-y-3">
@@ -724,6 +720,43 @@ function NewsletterSection() {
 export default function Blog() {
   const [activeCategory, setActiveCategory] = useState("All Posts");
   const [searchQuery, setSearchQuery] = useState("");
+  const [allPosts, setAllPosts] = useState(posts);
+
+  useEffect(() => {
+    axiosClient
+      .get("/blog-posts")
+      .then((res) => {
+        if (res.data?.success && Array.isArray(res.data?.data)) {
+          const mappedDynamic = res.data.data.map((p) => ({
+            image: p.featured_image || "",
+            title: p.title,
+            excerpt: p.excerpt || "",
+            author: "Snoutiq Editor",
+            date: new Date(p.created_at).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }),
+            readTime: "5 min read",
+            category: "Client Relations",
+            slug: p.slug,
+            created_at: p.created_at, // raw date for sorting
+          }));
+
+          const merged = [...mappedDynamic, ...posts];
+          
+          // Sort by date (descending)
+          merged.sort((a, b) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date).getTime();
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date).getTime();
+            return dateB - dateA;
+          });
+
+          setAllPosts(merged);
+        }
+      })
+      .catch((err) => console.error("Error fetching dynamic blogs:", err));
+  }, []);
 
   const handleSearchSubmit = () => {
     const section = document.getElementById("latest-articles");
@@ -747,7 +780,7 @@ export default function Blog() {
         /> */}
         {/* <FeaturedArticle /> */}
         <LatestArticles
-          posts={posts}
+          posts={allPosts}
           activeCategory={activeCategory}
           searchQuery={searchQuery}
         />
