@@ -642,6 +642,17 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             'message' => 'Invalid from_date format. Use Y-m-d (e.g. 2026-05-10) or "all".'
         ], 400);
     }
+
+    $userId = $request->query('user_id');
+    $userLat = null;
+    $userLng = null;
+    if ($userId) {
+        $user = DB::table('users')->select('latitude', 'longitude')->where('id', $userId)->first();
+        if ($user) {
+            $userLat = $user->latitude !== null ? (float) $user->latitude : null;
+            $userLng = $user->longitude !== null ? (float) $user->longitude : null;
+        }
+    }
     
     $clinicProfileCompletionService = app(App\Services\ClinicProfileCompletionService::class);
     
@@ -663,6 +674,14 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
         ->flatMap(fn ($clinic) => $clinic->doctors->pluck('id'))
         ->map(fn ($id) => (int) $id)
         ->all();
+        
+    $pincodes = $clinics->pluck('pincode')->filter()->unique()->all();
+    $geoPincodes = empty($pincodes)
+        ? collect()
+        : DB::table('geo_pincodes')
+            ->whereIn('pincode', $pincodes)
+            ->get()
+            ->keyBy('pincode');
         
     $servicesByClinic = empty($clinicIds)
         ? collect()
@@ -706,7 +725,10 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
         $vetAtHomeByClinic,
         $clinicAvailabilityByDoctor,
         $videoAvailabilityByDoctor,
-        $clinicProfileCompletionService
+        $clinicProfileCompletionService,
+        $userLat,
+        $userLng,
+        $geoPincodes
     ) {
         $doctors = $clinic->doctors;
         $doctorIds = $doctors->pluck('id')->map(fn ($id) => (int) $id);
@@ -752,10 +774,27 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             ? route('clinics.media.video', ['clinic' => $clinic->id], true)
             : null;
 
+        $distance = null;
+        $pincode = $clinic->pincode;
+        if ($pincode && $geo = $geoPincodes->get($pincode)) {
+            if ($userLat !== null && $userLng !== null && $geo->lat !== null && $geo->lon !== null) {
+                $lat1 = deg2rad($userLat);
+                $lon1 = deg2rad($userLng);
+                $lat2 = deg2rad((float) $geo->lat);
+                $lon2 = deg2rad((float) $geo->lon);
+                
+                $val = cos($lat1) * cos($lat2) * cos($lon2 - $lon1) + sin($lat1) * sin($lat2);
+                $val = min(1.0, max(-1.0, $val));
+                $distance = round(6371 * acos($val), 2);
+            }
+        }
+
         return [
             'id' => (int) $clinic->id,
             'name' => $clinic->name ?? 'Unnamed Clinic',
             'city' => $clinic->city ?? '—',
+            'pincode' => $clinic->pincode ?? null,
+            'distance_km' => $distance,
             'clinic_image' => $clinic_image_url,
             'clinic_image_url' => $clinic_image_url,
             'clinic_video' => $clinic_video_url,
@@ -767,7 +806,7 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             'machinery_count' => (int) $machineryServices->count(),
             'profile_completion_percentage' => (int) ($profileCompletion['percentage'] ?? 0),
             'created_at' => $clinic->created_at ? $clinic->created_at->toIso8601String() : null,
-            'doctors' => $doctors->map(function ($doctor) {
+            'doctors' => $doctors->map(function ($doctor) use ($distance) {
                 $doctorData = $doctor->toArray();
                 
                 // Exclude raw binary blob data from the JSON output to avoid response bloating
@@ -780,6 +819,7 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
                 $doctorData['doctor_blob'] = $doctorBlobUrl;
                 $doctorData['doctor_blob_url'] = $doctorBlobUrl;
                 $doctorData['doctor_image_blob_url'] = $doctorBlobUrl;
+                $doctorData['distance_km'] = $distance;
                 
                 return $doctorData;
             })->values()->all(),

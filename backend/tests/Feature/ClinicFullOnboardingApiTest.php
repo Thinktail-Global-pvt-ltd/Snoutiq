@@ -23,6 +23,7 @@ class ClinicFullOnboardingApiTest extends TestCase
         Schema::dropIfExists('vet_at_home_services');
         Schema::dropIfExists('device_tokens');
         Schema::dropIfExists('users');
+        Schema::dropIfExists('geo_pincodes');
 
         Schema::create('vet_registerations_temp', function (Blueprint $table) {
             $table->id();
@@ -149,6 +150,20 @@ class ClinicFullOnboardingApiTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('email')->nullable();
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('geo_pincodes', function (Blueprint $table) {
+            $table->id();
+            $table->string('pincode', 6)->index();
+            $table->string('label')->nullable();
+            $table->decimal('lat', 9, 6)->nullable();
+            $table->decimal('lon', 9, 6)->nullable();
+            $table->string('city')->nullable();
+            $table->string('state')->nullable();
+            $table->boolean('active')->default(true);
             $table->timestamps();
         });
     }
@@ -165,6 +180,7 @@ class ClinicFullOnboardingApiTest extends TestCase
         Schema::dropIfExists('vet_at_home_services');
         Schema::dropIfExists('device_tokens');
         Schema::dropIfExists('users');
+        Schema::dropIfExists('geo_pincodes');
 
         parent::tearDown();
     }
@@ -397,5 +413,71 @@ class ClinicFullOnboardingApiTest extends TestCase
         $missing = collect($response->json('data.profile_completion.missing_fields'));
         $this->assertTrue($missing->contains('key', 'clinic_night_fee'));
         $this->assertFalse($missing->contains('key', 'clinic_day_fee'));
+    }
+
+    public function test_inclinic_lists_returns_distance_using_user_lat_lng_and_pincode(): void
+    {
+        // 1. Seed user with coordinates (Delhi Connaught Place)
+        DB::table('users')->insert([
+            'id' => 500,
+            'name' => 'Test User',
+            'latitude' => 28.6304,
+            'longitude' => 77.2177,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 2. Seed geo_pincodes (Delhi Dwarka Pincode 110075)
+        DB::table('geo_pincodes')->insert([
+            'pincode' => '110075',
+            'lat' => 28.5921,
+            'lon' => 77.0460,
+            'city' => 'Delhi',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 3. Seed clinic with pincode 110075
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 300,
+            'name' => 'Dwarka Vet Clinic',
+            'city' => 'Delhi',
+            'pincode' => '110075',
+            'created_at' => '2026-06-01 12:00:00',
+            'updated_at' => '2026-06-01 12:00:00',
+        ]);
+
+        // 4. Seed doctor
+        DB::table('doctors')->insert([
+            'id' => 400,
+            'vet_registeration_id' => 300,
+            'doctor_name' => 'Dr. Dwarka',
+            'exported_from_excell' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 5. Call API with user_id
+        $response = $this->getJson('/api/inclinic-lists-new-after-10th-may-registerations?from_date=2026-05-10&user_id=500');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+
+        $data = $response->json('data');
+        $this->assertNotEmpty($data);
+
+        $clinicData = collect($data)->firstWhere('id', 300);
+        $this->assertNotNull($clinicData);
+
+        // Distance from 28.6304, 77.2177 to 28.5921, 77.0460 is approx 17.26 km. Let's assert it's between 17 and 18 km.
+        $this->assertNotNull($clinicData['distance_km']);
+        $this->assertGreaterThan(17.0, $clinicData['distance_km']);
+        $this->assertLessThan(18.0, $clinicData['distance_km']);
+
+        // Assert distance is also present in doctor object
+        $doctorData = collect($clinicData['doctors'])->firstWhere('id', 400);
+        $this->assertNotNull($doctorData);
+        $this->assertEquals($clinicData['distance_km'], $doctorData['distance_km']);
     }
 }
