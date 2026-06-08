@@ -492,6 +492,7 @@ function FeaturedArticle() {
 /* -------------------- BLOG CARD -------------------- */
 
 function BlogCard({ post }) {
+  const displayImage = post.image || img1;
   return (
     <Link
       to={`/blog/${post.slug}`}
@@ -499,17 +500,12 @@ function BlogCard({ post }) {
     >
       <div
         className="relative bg-gradient-to-br from-blue-50 to-cyan-50 aspect-[16/9] flex items-center justify-center overflow-hidden"
-        style={post.image ? {
-          backgroundImage: `url(${post.image})`,
+        style={{
+          backgroundImage: `url(${displayImage})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
-        } : {}}
+        }}
       >
-        {!post.image && (
-          <div className="absolute inset-0 flex items-center justify-center text-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50">
-            <BookOpen className="w-12 h-12 opacity-60" />
-          </div>
-        )}
         <div className="absolute inset-0 bg-pattern opacity-5" />
       </div>
 
