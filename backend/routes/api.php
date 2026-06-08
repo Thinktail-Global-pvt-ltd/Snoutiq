@@ -103,6 +103,20 @@ use App\Http\Controllers\Api\SnoutiqSymptomController;
 use App\Http\Controllers\Api\HomeVetBookingController;
 use App\Http\Middleware\EnsureAdminAuthenticated;
 use App\Services\PetDiseaseInferenceService;
+use App\Http\Controllers\Api\BlogPostController;
+
+// ─── Blog Posts (Public) ─────────────────────────────────────────────────────
+Route::get('/blog-posts', [BlogPostController::class, 'index'])->name('api.blog-posts.index');
+Route::get('/blog-posts/{slug}', [BlogPostController::class, 'show'])->name('api.blog-posts.show');
+
+// ─── Blog Posts (Admin Protected) ────────────────────────────────────────────
+Route::middleware(['web', EnsureAdminAuthenticated::class])->prefix('admin')->group(function () {
+    Route::get('/blog-posts', [BlogPostController::class, 'adminIndex'])->name('api.admin.blog-posts.index');
+    Route::get('/blog-posts/{id}', [BlogPostController::class, 'adminShow'])->whereNumber('id')->name('api.admin.blog-posts.show');
+    Route::post('/blog-posts', [BlogPostController::class, 'store'])->name('api.admin.blog-posts.store');
+    Route::put('/blog-posts/{id}', [BlogPostController::class, 'update'])->whereNumber('id')->name('api.admin.blog-posts.update');
+    Route::delete('/blog-posts/{id}', [BlogPostController::class, 'destroy'])->whereNumber('id')->name('api.admin.blog-posts.destroy');
+});
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
