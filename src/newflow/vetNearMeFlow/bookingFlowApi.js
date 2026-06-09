@@ -202,7 +202,7 @@ export async function createHomeServiceOrder({
   };
 }
 
-export async function createAppointmentOrder({ amount, userId, petId }) {
+export async function createAppointmentOrder({ amount, userId, petId, doctorId, clinicId }) {
   const normalizedAmount = Math.round(Number(amount) || 0);
 
   const response = await postBookingStep("/api/create-order", {
@@ -210,6 +210,8 @@ export async function createAppointmentOrder({ amount, userId, petId }) {
     order_type: "appointment",
     user_id: userId,
     pet_id: petId,
+    doctor_id: doctorId,
+    clinic_id: clinicId,
   });
 
   return {
@@ -267,6 +269,8 @@ export async function verifyHomeServicePayment({
 export async function verifyAppointmentPayment({
   userId,
   petId,
+  doctorId,
+  clinicId,
   razorpayOrderId,
   razorpayPaymentId,
   razorpaySignature,
@@ -278,6 +282,8 @@ export async function verifyAppointmentPayment({
     order_type: "appointment",
     user_id: userId,
     pet_id: petId,
+    doctor_id: doctorId,
+    clinic_id: clinicId,
   });
 
   return {

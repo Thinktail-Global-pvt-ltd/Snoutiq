@@ -264,43 +264,6 @@ class AppointmentSubmissionController extends Controller
             }
         }
 
-        if (!empty($validated['razorpay_payment_id'])) {
-            try {
-                $paymentController = app(\App\Http\Controllers\PaymentController::class);
-
-                $amountVal = $validated['amount'] ?? 0;
-                $amountInInr = (int) round($amountVal / 100);
-                if ($amountInInr <= 0 && $transaction) {
-                    $amountInInr = (int) round(($transaction->amount_paise ?? 0) / 100);
-                }
-
-                $ctx = [
-                    'clinic_id' => $clinic?->id,
-                    'doctor_id' => $doctor?->id,
-                    'user_id' => $user->id,
-                    'pet_id' => $validated['pet_id'] ?? null,
-                    'appointment_id' => $appointment->id,
-                ];
-
-                $notes = [
-                    'order_type' => 'appointments',
-                    'clinic_id' => $clinic?->id,
-                    'doctor_id' => $doctor?->id,
-                    'user_id' => $user->id,
-                    'pet_id' => $validated['pet_id'] ?? null,
-                ];
-
-                // Trigger WhatsApp alerts to parent and vet
-                $paymentController->sendAppointmentWhatsAppNotifications($ctx, $notes, $amountInInr);
-
-                // Trigger FCM push notifications to doctor
-                $paymentController->notifyDoctorOrderCreated($doctor?->id, $notes, $amountInInr);
-                $paymentController->notifyDoctorPaymentCaptured($ctx, $notes, $amountInInr, 'captured', 'appointments');
-
-            } catch (\Throwable $e) {
-                report($e);
-            }
-        }
 
         return $this->respondWithAppointment($appointment->fresh(), 201);
     }

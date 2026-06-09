@@ -176,6 +176,8 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
           amount: IN_CLINIC_PRICING.totalAmount,
           userId: preparedState.userId,
           petId: preparedState.petId,
+          doctorId: preparedState.doctorId,
+          clinicId: preparedState.clinicId,
         });
 
         if (!order.ok || !order.orderId || !order.key) {
@@ -213,6 +215,8 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
           pet_name: paymentState.petName,
           appointment_date: paymentState.date,
           appointment_time: paymentState.timeSlot,
+          doctor_id: String(paymentState.doctorId || ""),
+          clinic_id: String(paymentState.clinicId || ""),
         },
         theme: { color: "#1447e6" },
         modal: {
@@ -228,6 +232,8 @@ export default function InClinicPayment({ initialState, onBack, onPay }) {
             const verify = await verifyAppointmentPayment({
               userId: paymentState.userId,
               petId: paymentState.petId,
+              doctorId: paymentState.doctorId,
+              clinicId: paymentState.clinicId,
               razorpayOrderId: paymentResponse?.razorpay_order_id,
               razorpayPaymentId: paymentResponse?.razorpay_payment_id,
               razorpaySignature: paymentResponse?.razorpay_signature,
