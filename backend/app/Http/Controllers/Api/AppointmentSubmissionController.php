@@ -446,6 +446,7 @@ class AppointmentSubmissionController extends Controller
         $appointment->notes = json_encode($notesPayload);
         $appointment->save();
 
+        $whatsappStatus = null;
         if ($isRescheduled) {
             try {
                 $whatsApp = app(\App\Services\WhatsAppService::class);
@@ -488,14 +489,42 @@ class AppointmentSubmissionController extends Controller
                             'en',
                             'appointment_reschedule_alert'
                         );
+
+                        $whatsappStatus = [
+                            'sent' => true,
+                            'to' => $phoneNormalized,
+                            'template' => 'appointment_reschedule_1',
+                        ];
+                    } else {
+                        $whatsappStatus = [
+                            'sent' => false,
+                            'reason' => 'user_phone_missing',
+                        ];
                     }
+                } else {
+                    $whatsappStatus = [
+                        'sent' => false,
+                        'reason' => 'whatsapp_not_configured',
+                    ];
                 }
             } catch (\Throwable $e) {
                 \Log::error('WhatsApp reschedule notification failed', ['error' => $e->getMessage()]);
+                $whatsappStatus = [
+                    'sent' => false,
+                    'reason' => 'exception',
+                    'message' => $e->getMessage(),
+                ];
             }
         }
 
-        return $this->respondWithAppointment($appointment->fresh());
+        $response = $this->respondWithAppointment($appointment->fresh());
+        if ($isRescheduled) {
+            $responseData = $response->getData(true);
+            $responseData['whatsapp'] = $whatsappStatus;
+            $response->setData($responseData);
+        }
+
+        return $response;
     }
 
     public function listByDoctor(Doctor $doctor): JsonResponse
