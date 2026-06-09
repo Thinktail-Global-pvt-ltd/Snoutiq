@@ -2970,20 +2970,33 @@ Route::get('/users/last-vet-details', function (Request $request) {
         ->get()
         ->map(function (Doctor $doctor) {
             $item = $doctor->toArray();
-            $item['doctor_image_blob_url'] = empty($doctor->doctor_image_blob)
+            $imageUrl = empty($doctor->doctor_image_blob)
                 ? null
                 : route('api.doctors.blob-image', ['doctor' => $doctor->id]);
+
+            $item['doctor_image_blob'] = $imageUrl;
+            $item['doctor_image_blob_url'] = $imageUrl;
 
             return $item;
         })
         ->values();
+
+    $clinicData = $clinic->toArray();
+    $clinicData['clinic_image'] = empty($clinic->clinic_image)
+        ? null
+        : route('clinics.media.image', ['clinic' => $clinic->id]);
+    $clinicData['clinic_image_url'] = $clinicData['clinic_image'];
+    $clinicData['clinic_video'] = empty($clinic->clinic_video)
+        ? null
+        : route('clinics.media.video', ['clinic' => $clinic->id]);
+    $clinicData['clinic_video_url'] = $clinicData['clinic_video'];
 
     return response()->json([
         'success' => true,
         'data' => [
             'user_id' => $user->id,
             'last_vet_id' => $user->last_vet_id,
-            'clinic' => $clinic,
+            'clinic' => $clinicData,
             'doctors' => $doctors,
             'availability' => [
                 'source' => 'doctor_video_availability',

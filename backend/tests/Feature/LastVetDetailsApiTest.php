@@ -34,6 +34,8 @@ class LastVetDetailsApiTest extends TestCase
         DB::table('vet_registerations_temp')->insert([
             'id' => 10,
             'name' => 'Care Clinic',
+            'clinic_image' => 'dummy_image_data',
+            'clinic_video' => 'dummy_video_data',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -51,6 +53,7 @@ class LastVetDetailsApiTest extends TestCase
                 'id' => 101,
                 'vet_registeration_id' => 10,
                 'doctor_name' => 'Dr Available',
+                'doctor_image_blob' => 'dummy_doctor_blob',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -58,6 +61,7 @@ class LastVetDetailsApiTest extends TestCase
                 'id' => 102,
                 'vet_registeration_id' => 10,
                 'doctor_name' => 'Dr Later',
+                'doctor_image_blob' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -65,6 +69,7 @@ class LastVetDetailsApiTest extends TestCase
                 'id' => 103,
                 'vet_registeration_id' => 10,
                 'doctor_name' => 'Dr Break',
+                'doctor_image_blob' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -72,6 +77,7 @@ class LastVetDetailsApiTest extends TestCase
                 'id' => 104,
                 'vet_registeration_id' => 11,
                 'doctor_name' => 'Other Clinic Doctor',
+                'doctor_image_blob' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -135,7 +141,13 @@ class LastVetDetailsApiTest extends TestCase
             ->assertJsonCount(1, 'data.doctors')
             ->assertJsonPath('data.availability.source', 'doctor_video_availability')
             ->assertJsonPath('data.availability.day_of_week', 4)
-            ->assertJsonPath('data.availability.time', '11:15:00');
+            ->assertJsonPath('data.availability.time', '11:15:00')
+            ->assertJsonPath('data.clinic.clinic_image', route('clinics.media.image', ['clinic' => 10]))
+            ->assertJsonPath('data.clinic.clinic_image_url', route('clinics.media.image', ['clinic' => 10]))
+            ->assertJsonPath('data.clinic.clinic_video', route('clinics.media.video', ['clinic' => 10]))
+            ->assertJsonPath('data.clinic.clinic_video_url', route('clinics.media.video', ['clinic' => 10]))
+            ->assertJsonPath('data.doctors.0.doctor_image_blob', route('api.doctors.blob-image', ['doctor' => 101]))
+            ->assertJsonPath('data.doctors.0.doctor_image_blob_url', route('api.doctors.blob-image', ['doctor' => 101]));
     }
 
     private function resetSchema(): void
@@ -158,6 +170,8 @@ class LastVetDetailsApiTest extends TestCase
         Schema::create('vet_registerations_temp', function (Blueprint $table) {
             $table->unsignedBigInteger('id')->primary();
             $table->string('name')->nullable();
+            $table->binary('clinic_image')->nullable();
+            $table->binary('clinic_video')->nullable();
             $table->timestamps();
         });
 
@@ -165,6 +179,7 @@ class LastVetDetailsApiTest extends TestCase
             $table->unsignedBigInteger('id')->primary();
             $table->unsignedBigInteger('vet_registeration_id')->nullable();
             $table->string('doctor_name')->nullable();
+            $table->binary('doctor_image_blob')->nullable();
             $table->timestamps();
         });
 
