@@ -447,7 +447,15 @@ class AppointmentSubmissionController extends Controller
         $appointment->save();
 
         $whatsappStatus = null;
+        $fcmStatus = null;
         if ($isRescheduled) {
+            $userName = $appointment->name ?: 'Pet Parent';
+            $doctorName = $appointment->doctor?->doctor_name ?? 'Doctor';
+            $doctorNameSanitized = preg_replace('/^(dr\.\s*)+/i', '', trim($doctorName));
+            $rescheduledDate = $appointment->appointment_date;
+            $rescheduledTime = $appointment->appointment_time;
+
+            // Send WhatsApp
             try {
                 $whatsApp = app(\App\Services\WhatsAppService::class);
                 if ($whatsApp->isConfigured()) {
@@ -458,12 +466,6 @@ class AppointmentSubmissionController extends Controller
                             $phoneNormalized = '91' . $phoneNormalized;
                         }
 
-                        $userName = $appointment->name ?: 'Pet Parent';
-                        $doctorName = $appointment->doctor?->doctor_name ?? 'Doctor';
-                        $doctorNameSanitized = preg_replace('/^(dr\.\s*)+/i', '', trim($doctorName));
-                        $rescheduledDate = $appointment->appointment_date;
-                        $rescheduledTime = $appointment->appointment_time;
-                        
                         $changesDoneBy = 'Snoutiq Support';
                         if (auth()->check() && auth()->user()->name) {
                             $changesDoneBy = auth()->user()->name;
@@ -515,12 +517,93 @@ class AppointmentSubmissionController extends Controller
                     'message' => $e->getMessage(),
                 ];
             }
+
+            // Send FCM Push Notification to Patient
+            try {
+                $patientUserId = $this->resolvePatientUserId($appointment, $notesPayload);
+                if ($patientUserId) {
+                    $patientTokens = DB::table('device_tokens')
+                        ->where('user_id', $patientUserId)
+                        ->whereNotNull('token')
+                        ->pluck('token')
+                        ->filter()
+                        ->values()
+                        ->all();
+
+                    if (!empty($patientTokens)) {
+                        $fcmTitle = 'Appointment Rescheduled';
+                        $fcmBody = "Your upcoming appointment with Dr. {$doctorNameSanitized} has been rescheduled for {$rescheduledDate} at {$rescheduledTime}.";
+                        
+                        $fcmData = [
+                            'type' => 'test',
+                            'appointment_id' => (string) $appointment->id,
+                            'doctor_id' => (string) ($appointment->doctor_id ?? ''),
+                            'clinic_id' => (string) ($appointment->vet_registeration_id ?? ''),
+                            'start_time' => (string) ($rescheduledDate . ' ' . $rescheduledTime),
+                        ];
+
+                        $fcmService = app(\App\Services\Push\FcmService::class);
+                        $fcmSuccess = 0;
+                        $fcmFailed = 0;
+                        $fcmErrors = [];
+                        foreach ($patientTokens as $token) {
+                            try {
+                                $fcmService->sendToToken($token, $fcmTitle, $fcmBody, $fcmData);
+                                $fcmSuccess++;
+                            } catch (\Throwable $e) {
+                                $fcmFailed++;
+                                $fcmErrors[] = $e->getMessage();
+                            }
+                        }
+
+                        $fcmStatus = [
+                            'sent' => $fcmSuccess > 0,
+                            'success_count' => $fcmSuccess,
+                            'failure_count' => $fcmFailed,
+                            'errors' => $fcmErrors,
+                        ];
+                    } else {
+                        $fcmStatus = [
+                            'sent' => false,
+                            'reason' => 'no_device_tokens',
+                        ];
+                    }
+                } else {
+                    $fcmStatus = [
+                        'sent' => false,
+                        'reason' => 'patient_user_id_not_found',
+                    ];
+                }
+            } catch (\Throwable $e) {
+                \Log::error('FCM reschedule notification failed', ['error' => $e->getMessage()]);
+                $fcmStatus = [
+                    'sent' => false,
+                    'reason' => 'exception',
+                    'message' => $e->getMessage(),
+                ];
+            }
+        } else {
+            if (array_key_exists('date', $validated) || array_key_exists('time_slot', $validated)) {
+                $whatsappStatus = [
+                    'sent' => false,
+                    'reason' => 'skipped_no_change',
+                ];
+                $fcmStatus = [
+                    'sent' => false,
+                    'reason' => 'skipped_no_change',
+                ];
+            }
         }
 
         $response = $this->respondWithAppointment($appointment->fresh());
-        if ($isRescheduled) {
+        if ($whatsappStatus !== null || $fcmStatus !== null) {
             $responseData = $response->getData(true);
-            $responseData['whatsapp'] = $whatsappStatus;
+            if ($whatsappStatus !== null) {
+                $responseData['whatsapp'] = $whatsappStatus;
+            }
+            if ($fcmStatus !== null) {
+                $responseData['fcm'] = $fcmStatus;
+            }
             $response->setData($responseData);
         }
 

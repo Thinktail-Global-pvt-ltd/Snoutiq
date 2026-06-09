@@ -25,6 +25,7 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
         Schema::dropIfExists('users');
         Schema::dropIfExists('transactions');
         Schema::dropIfExists('pets');
+        Schema::dropIfExists('device_tokens');
 
         Schema::create('vet_registerations_temp', function (Blueprint $table) {
             $table->id();
@@ -93,6 +94,15 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
             $table->json('metadata')->nullable();
             $table->timestamps();
         });
+
+        Schema::create('device_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('token')->nullable();
+            $table->string('platform')->nullable();
+            $table->string('device_id')->nullable();
+            $table->timestamps();
+        });
     }
 
     protected function tearDown(): void
@@ -103,6 +113,7 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
         Schema::dropIfExists('users');
         Schema::dropIfExists('transactions');
         Schema::dropIfExists('pets');
+        Schema::dropIfExists('device_tokens');
 
         parent::tearDown();
     }
@@ -533,6 +544,23 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $userId = DB::table('users')->insertGetId([
+            'name' => 'Jane Pet Parent',
+            'phone' => '918888877777',
+            'email' => 'jane@example.com',
+            'password' => bcrypt('password'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('device_tokens')->insert([
+            'user_id' => $userId,
+            'token' => 'fcm-test-token-12345',
+            'platform' => 'android',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $appointmentId = DB::table('appointments')->insertGetId([
             'vet_registeration_id' => 10,
             'doctor_id' => 20,
@@ -542,6 +570,7 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
             'appointment_date' => '2026-06-15',
             'appointment_time' => '10:40:00',
             'status' => 'confirmed',
+            'notes' => json_encode(['patient_user_id' => $userId]),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -568,6 +597,25 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
 
         $this->app->instance(\App\Services\WhatsAppService::class, $whatsAppMock);
 
+        // Mock FcmService
+        $fcmMock = $this->createMock(\App\Services\Push\FcmService::class);
+        $fcmMock->expects($this->once())
+            ->method('sendToToken')
+            ->with(
+                $this->equalTo('fcm-test-token-12345'),
+                $this->equalTo('Appointment Rescheduled'),
+                $this->equalTo('Your upcoming appointment with Dr. John Doe has been rescheduled for 2026-06-16 at 11:00:00.'),
+                $this->callback(function ($data) use ($appointmentId) {
+                    return $data['type'] === 'test' &&
+                           $data['appointment_id'] === (string) $appointmentId &&
+                           $data['doctor_id'] === '20' &&
+                           $data['clinic_id'] === '10' &&
+                           $data['start_time'] === '2026-06-16 11:00:00';
+                })
+            );
+
+        $this->app->instance(\App\Services\Push\FcmService::class, $fcmMock);
+
         // Put request to reschedule
         $response = $this->putJson("/api/appointments/{$appointmentId}", [
             'date' => '2026-06-16',
@@ -576,5 +624,21 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('success', true);
+        $response->assertJsonStructure([
+            'success',
+            'data' => [
+                'appointment'
+            ],
+            'whatsapp' => [
+                'sent',
+                'to',
+                'template'
+            ],
+            'fcm' => [
+                'sent',
+                'success_count',
+                'failure_count'
+            ]
+        ]);
     }
 }
