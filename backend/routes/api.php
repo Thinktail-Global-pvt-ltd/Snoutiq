@@ -515,10 +515,46 @@ Route::post('/create-appointment-in-clinic-without-payment', function (Request $
     $appointment->update([
         'transaction_id' => $transaction->id,
     ]);
+
+    $whatsAppResult = null;
+    $doctorPush = null;
+    $vetPush = null;
+    $parentPush = null;
+
+    try {
+        $paymentController = app(\App\Http\Controllers\PaymentController::class);
+        $context = [
+            'clinic_id' => $clinic->id,
+            'doctor_id' => $doctor->id,
+            'user_id' => $user->id,
+            'pet_id' => $petId,
+            'appointment_id' => $appointment->id,
+            'call_identifier' => null,
+        ];
+        $notes = [
+            'order_type' => 'appointments',
+        ];
+        $amountInInr = (int) round($amountPaise / 100);
+
+        // Send WhatsApp notifications
+        $whatsAppResult = $paymentController->sendAppointmentWhatsAppNotifications($context, $notes, $amountInInr);
+
+        // Send FCM notifications
+        $doctorPush = $paymentController->notifyDoctorOrderCreated($doctor->id, $notes, $amountInInr);
+        $vetPush = $paymentController->notifyDoctorPaymentCaptured($context, $notes, $amountInInr, 'captured', 'appointments');
+        $parentPush = $paymentController->notifyPetParentOrderCreated($context, $notes, $amountInInr);
+    } catch (\Throwable $e) {
+        \Log::error('In-clinic appointment notifications failed', ['error' => $e->getMessage()]);
+    }
     
     return response()->json([
         'success' => true,
         'message' => 'Appointment created successfully without payment.',
+        'whatsapp' => $whatsAppResult['whatsapp'] ?? null,
+        'vet_whatsapp' => $whatsAppResult['vet_whatsapp'] ?? null,
+        'doctor_push' => $doctorPush,
+        'vet_push' => $vetPush,
+        'parent_push' => $parentPush,
         'data' => [
             'appointment_id' => $appointment->id,
             'transaction_id' => $transaction->id,

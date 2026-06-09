@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
@@ -12,6 +13,11 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Http::fake([
+            '*/api/push/test' => Http::response(['success' => true, 'sent' => true], 200),
+            '*/backend/api/push/test' => Http::response(['success' => true, 'sent' => true], 200),
+        ]);
 
         Schema::dropIfExists('appointments');
         Schema::dropIfExists('doctors');
