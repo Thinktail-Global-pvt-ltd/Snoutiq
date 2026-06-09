@@ -57,6 +57,8 @@ class ClinicFullOnboardingApiTest extends TestCase
             $table->string('doctor_email')->nullable();
             $table->string('doctor_mobile')->nullable();
             $table->string('doctor_license')->nullable();
+            $table->decimal('video_day_rate', 10, 2)->nullable();
+            $table->decimal('video_night_rate', 10, 2)->nullable();
             $table->integer('exported_from_excell')->default(0);
             $table->timestamps();
         });
@@ -228,6 +230,119 @@ class ClinicFullOnboardingApiTest extends TestCase
             'clinic_night_fee' => 650.00,
         ]);
     }
+
+    public function test_stores_availability_for_multiple_doctors(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1,
+            'name' => 'Default Admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/vet-registerations/store-full', [
+            'name' => 'Multi Doctor Center',
+            'email' => 'multi.doctor@example.com',
+            'mobile' => '9871198033',
+            'city' => 'Delhi Division',
+            'pincode' => '110075',
+            'clinic_day_fee' => 450.00,
+            'clinic_night_fee' => 650.00,
+            'doctors' => [
+                [
+                    'doctor_name' => 'Doctor One',
+                    'doctor_email' => 'one@example.com',
+                    'doctor_mobile' => '9999988881',
+                ],
+                [
+                    'doctor_name' => 'Doctor Two',
+                    'doctor_email' => 'two@example.com',
+                    'doctor_mobile' => '9999988882',
+                ],
+                [
+                    'doctor_name' => 'Doctor Three',
+                    'doctor_email' => 'three@example.com',
+                    'doctor_mobile' => '9999988883',
+                ],
+            ],
+            'clinic_availability' => [
+                [
+                    'service_type' => 'in_clinic',
+                    'day_of_week' => 1,
+                    'start_time' => '09:00',
+                    'end_time' => '18:00',
+                ],
+                [
+                    'service_type' => 'in_clinic',
+                    'day_of_week' => 2,
+                    'start_time' => '09:00',
+                    'end_time' => '18:00',
+                ]
+            ],
+            'video_schedule' => [
+                'day_rate' => 300.00,
+                'night_rate' => 500.00,
+                'availability' => [
+                    [
+                        'day_of_week' => 1,
+                        'start_time' => '10:00',
+                        'end_time' => '12:00',
+                    ],
+                    [
+                        'day_of_week' => 2,
+                        'start_time' => '14:00',
+                        'end_time' => '16:00',
+                    ]
+                ]
+            ],
+            'specialized_package' => [
+                'dog_vaccination_package_price' => 150.00,
+                'cat_vaccination_package_price' => 200.00,
+            ],
+            'vet_at_home_service' => [
+                'is_enabled' => true,
+                'service_hours' => '09:00-17:00',
+                'base_payout' => 1000.00,
+            ]
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('success', true);
+
+        // Get the doctors
+        $doctors = DB::table('doctors')->where('vet_registeration_id', $response->json('data.clinic.id'))->get();
+        $this->assertCount(3, $doctors);
+
+        foreach ($doctors as $doctor) {
+            // Check clinic availability
+            $avail = DB::table('doctor_availability')->where('doctor_id', $doctor->id)->get();
+            $this->assertCount(2, $avail, "Doctor {$doctor->doctor_name} should have 2 clinic availability rows");
+
+            // Check video schedule rates
+            $this->assertEquals(300.00, $doctor->video_day_rate);
+            $this->assertEquals(500.00, $doctor->video_night_rate);
+
+            // Check video schedule availability rows
+            $videoAvail = DB::table('doctor_video_availability')->where('doctor_id', $doctor->id)->get();
+            $this->assertCount(2, $videoAvail, "Doctor {$doctor->doctor_name} should have 2 video availability rows");
+
+            // Check specialized package
+            $this->assertDatabaseHas('clinic_specialized_packages', [
+                'doctor_id' => $doctor->id,
+                'dog_vaccination_package_price' => 150.00,
+                'cat_vaccination_package_price' => 200.00,
+            ]);
+
+            // Check vet at home service
+            $this->assertDatabaseHas('vet_at_home_services', [
+                'doctor_id' => $doctor->id,
+                'is_enabled' => true,
+                'service_hours' => '09:00-17:00',
+                'base_payout' => 1000.00,
+            ]);
+        }
+    }
+
 
     public function test_inclinic_lists_returns_clinic_fees(): void
     {

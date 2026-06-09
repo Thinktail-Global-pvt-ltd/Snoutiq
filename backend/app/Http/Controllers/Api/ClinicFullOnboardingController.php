@@ -940,34 +940,36 @@ class ClinicFullOnboardingController extends Controller
             return null;
         }
 
-        $doctorIndex = (int) ($package['doctor_index'] ?? 0);
-        $doctor = $doctors->get($doctorIndex);
-        if (! $doctor) {
-            throw ValidationException::withMessages([
-                'specialized_package.doctor_index' => ['The selected doctor index does not exist in doctors array.'],
+        $doctorIds = $doctors->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (empty($doctorIds)) {
+            return null;
+        }
+
+        $lastCreated = null;
+        foreach ($doctorIds as $doctorId) {
+            $lastCreated = ClinicSpecializedPackage::create([
+                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
+                'dog_vaccination_package_price' => $package['dog_vaccination_package_price'] ?? null,
+                'cat_vaccination_package_price' => $package['cat_vaccination_package_price'] ?? null,
+                'dog_neutering_price' => $package['dog_neutering_price'] ?? null,
+                'cat_neutering_price' => $package['cat_neutering_price'] ?? null,
+                'puppy_vaccination_package_price' => $package['puppy_vaccination_package_price'] ?? $package['dog_vaccination_male_package_price'] ?? $package['dog_vaccination_package_price'] ?? null,
+                'adult_dog_vaccination_package_price' => $package['adult_dog_vaccination_package_price'] ?? $package['dog_vaccination_female_package_price'] ?? $package['dog_vaccination_package_price'] ?? null,
+                'kitten_vaccination_package_price' => $package['kitten_vaccination_package_price'] ?? $package['cat_vaccination_male_package_price'] ?? $package['cat_vaccination_package_price'] ?? null,
+                'adult_cat_vaccination_package_price' => $package['adult_cat_vaccination_package_price'] ?? $package['cat_vaccination_female_package_price'] ?? $package['cat_vaccination_package_price'] ?? null,
+                'dog_vaccination_male_package_price' => $package['dog_vaccination_male_package_price'] ?? $package['dog_vaccination_package_price'] ?? null,
+                'dog_vaccination_female_package_price' => $package['dog_vaccination_female_package_price'] ?? $package['dog_vaccination_package_price'] ?? null,
+                'cat_vaccination_male_package_price' => $package['cat_vaccination_male_package_price'] ?? $package['cat_vaccination_package_price'] ?? null,
+                'cat_vaccination_female_package_price' => $package['cat_vaccination_female_package_price'] ?? $package['cat_vaccination_package_price'] ?? null,
+                'dog_neutering_male_price' => $package['dog_neutering_male_price'] ?? $package['dog_neutering_price'] ?? null,
+                'dog_neutering_female_price' => $package['dog_neutering_female_price'] ?? $package['dog_neutering_price'] ?? null,
+                'cat_neutering_male_price' => $package['cat_neutering_male_price'] ?? $package['cat_neutering_price'] ?? null,
+                'cat_neutering_female_price' => $package['cat_neutering_female_price'] ?? $package['cat_neutering_price'] ?? null,
             ]);
         }
 
-        return ClinicSpecializedPackage::create([
-            'clinic_id' => $clinicId,
-            'doctor_id' => $doctor->id,
-            'dog_vaccination_package_price' => $package['dog_vaccination_package_price'] ?? null,
-            'cat_vaccination_package_price' => $package['cat_vaccination_package_price'] ?? null,
-            'dog_neutering_price' => $package['dog_neutering_price'] ?? null,
-            'cat_neutering_price' => $package['cat_neutering_price'] ?? null,
-            'puppy_vaccination_package_price' => $package['puppy_vaccination_package_price'] ?? $package['dog_vaccination_male_package_price'] ?? $package['dog_vaccination_package_price'] ?? null,
-            'adult_dog_vaccination_package_price' => $package['adult_dog_vaccination_package_price'] ?? $package['dog_vaccination_female_package_price'] ?? $package['dog_vaccination_package_price'] ?? null,
-            'kitten_vaccination_package_price' => $package['kitten_vaccination_package_price'] ?? $package['cat_vaccination_male_package_price'] ?? $package['cat_vaccination_package_price'] ?? null,
-            'adult_cat_vaccination_package_price' => $package['adult_cat_vaccination_package_price'] ?? $package['cat_vaccination_female_package_price'] ?? $package['cat_vaccination_package_price'] ?? null,
-            'dog_vaccination_male_package_price' => $package['dog_vaccination_male_package_price'] ?? $package['dog_vaccination_package_price'] ?? null,
-            'dog_vaccination_female_package_price' => $package['dog_vaccination_female_package_price'] ?? $package['dog_vaccination_package_price'] ?? null,
-            'cat_vaccination_male_package_price' => $package['cat_vaccination_male_package_price'] ?? $package['cat_vaccination_package_price'] ?? null,
-            'cat_vaccination_female_package_price' => $package['cat_vaccination_female_package_price'] ?? $package['cat_vaccination_package_price'] ?? null,
-            'dog_neutering_male_price' => $package['dog_neutering_male_price'] ?? $package['dog_neutering_price'] ?? null,
-            'dog_neutering_female_price' => $package['dog_neutering_female_price'] ?? $package['dog_neutering_price'] ?? null,
-            'cat_neutering_male_price' => $package['cat_neutering_male_price'] ?? $package['cat_neutering_price'] ?? null,
-            'cat_neutering_female_price' => $package['cat_neutering_female_price'] ?? $package['cat_neutering_price'] ?? null,
-        ]);
+        return $lastCreated;
     }
 
     private function normalizeVaccinationPackageAliases(array $input): array
@@ -1072,25 +1074,25 @@ class ClinicFullOnboardingController extends Controller
             return null;
         }
 
-        $doctor = null;
-        if (array_key_exists('doctor_index', $serviceData)) {
-            $doctor = $doctors->get((int) $serviceData['doctor_index']);
-            if (! $doctor) {
-                throw ValidationException::withMessages([
-                    'vet_at_home_service.doctor_index' => ['The selected doctor index does not exist in doctors array.'],
-                ]);
-            }
+        $doctorIds = $doctors->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (empty($doctorIds)) {
+            return null;
         }
 
-        return VetAtHomeService::create([
-            'clinic_id' => $clinicId,
-            'doctor_id' => $doctor?->id,
-            'is_enabled' => (bool) ($serviceData['is_enabled'] ?? false),
-            'service_hours' => $serviceData['service_hours'] ?? null,
-            'response_time' => $serviceData['response_time'] ?? null,
-            'base_payout' => $serviceData['base_payout'] ?? null,
-            'protocol_label' => $serviceData['protocol_label'] ?? 'Doorstep Protocol',
-        ]);
+        $lastCreated = null;
+        foreach ($doctorIds as $doctorId) {
+            $lastCreated = VetAtHomeService::create([
+                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
+                'is_enabled' => (bool) ($serviceData['is_enabled'] ?? false),
+                'service_hours' => $serviceData['service_hours'] ?? null,
+                'response_time' => $serviceData['response_time'] ?? null,
+                'base_payout' => $serviceData['base_payout'] ?? null,
+                'protocol_label' => $serviceData['protocol_label'] ?? 'Doorstep Protocol',
+            ]);
+        }
+
+        return $lastCreated;
     }
 
     private function createVideoAvailability($doctors, ?array $videoSchedule): int
@@ -1100,12 +1102,9 @@ class ClinicFullOnboardingController extends Controller
             return 0;
         }
 
-        $doctorIndex = (int) ($videoSchedule['doctor_index'] ?? 0);
-        $doctor = $doctors->get($doctorIndex);
-        if (! $doctor) {
-            throw ValidationException::withMessages([
-                'video_schedule.doctor_index' => ['The selected doctor index does not exist in doctors array.'],
-            ]);
+        $doctorIds = $doctors->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (empty($doctorIds)) {
+            return 0;
         }
 
         $rateUpdates = [];
@@ -1119,24 +1118,26 @@ class ClinicFullOnboardingController extends Controller
             $rateUpdates['exported_from_excell'] = 1;
         }
         if (! empty($rateUpdates)) {
-            DB::table('doctors')->where('id', (int) $doctor->id)->update($rateUpdates);
+            DB::table('doctors')->whereIn('id', $doctorIds)->update($rateUpdates);
         }
 
         $insertRows = [];
-        foreach ($availabilityRows as $row) {
-            $insertRows[] = [
-                'doctor_id' => (int) $doctor->id,
-                'day_of_week' => $row['day_of_week'],
-                'start_time' => $row['start_time'],
-                'end_time' => $row['end_time'],
-                'break_start' => $row['break_start'] ?? null,
-                'break_end' => $row['break_end'] ?? null,
-                'avg_consultation_mins' => $row['avg_consultation_mins'] ?? 20,
-                'max_bookings_per_hour' => $row['max_bookings_per_hour'] ?? 3,
-                'is_active' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+        foreach ($doctorIds as $doctorId) {
+            foreach ($availabilityRows as $row) {
+                $insertRows[] = [
+                    'doctor_id' => $doctorId,
+                    'day_of_week' => $row['day_of_week'],
+                    'start_time' => $row['start_time'],
+                    'end_time' => $row['end_time'],
+                    'break_start' => $row['break_start'] ?? null,
+                    'break_end' => $row['break_end'] ?? null,
+                    'avg_consultation_mins' => $row['avg_consultation_mins'] ?? 20,
+                    'max_bookings_per_hour' => $row['max_bookings_per_hour'] ?? 3,
+                    'is_active' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
         }
 
         DB::table('doctor_video_availability')->insert($insertRows);
