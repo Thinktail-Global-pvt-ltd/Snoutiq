@@ -407,6 +407,13 @@ class AppointmentSubmissionController extends Controller
         if (array_key_exists('user_id', $validated)) {
             $user = User::findOrFail($validated['user_id']);
         }
+        $isRescheduled = false;
+        if (array_key_exists('date', $validated) && $appointment->appointment_date !== $validated['date']) {
+            $isRescheduled = true;
+        }
+        if (array_key_exists('time_slot', $validated) && $appointment->appointment_time !== $validated['time_slot']) {
+            $isRescheduled = true;
+        }
 
         if (array_key_exists('patient_name', $validated))  { $appointment->name       = $validated['patient_name'];  }
         if (array_key_exists('patient_phone', $validated)) { $appointment->mobile      = $validated['patient_phone']; }
@@ -438,6 +445,55 @@ class AppointmentSubmissionController extends Controller
 
         $appointment->notes = json_encode($notesPayload);
         $appointment->save();
+
+        if ($isRescheduled) {
+            try {
+                $whatsApp = app(\App\Services\WhatsAppService::class);
+                if ($whatsApp->isConfigured()) {
+                    $userPhone = $appointment->mobile;
+                    if ($userPhone) {
+                        $phoneNormalized = preg_replace('/\D/', '', $userPhone);
+                        if (!str_starts_with($phoneNormalized, '91') && strlen($phoneNormalized) === 10) {
+                            $phoneNormalized = '91' . $phoneNormalized;
+                        }
+
+                        $userName = $appointment->name ?: 'Pet Parent';
+                        $doctorName = $appointment->doctor?->doctor_name ?? 'Doctor';
+                        $doctorNameSanitized = preg_replace('/^(dr\.\s*)+/i', '', trim($doctorName));
+                        $rescheduledDate = $appointment->appointment_date;
+                        $rescheduledTime = $appointment->appointment_time;
+                        
+                        $changesDoneBy = 'Snoutiq Support';
+                        if (auth()->check() && auth()->user()->name) {
+                            $changesDoneBy = auth()->user()->name;
+                        }
+
+                        $components = [
+                            [
+                                'type' => 'body',
+                                'parameters' => [
+                                    ['type' => 'text', 'text' => $userName],
+                                    ['type' => 'text', 'text' => "Dr. {$doctorNameSanitized}"],
+                                    ['type' => 'text', 'text' => $rescheduledDate],
+                                    ['type' => 'text', 'text' => $rescheduledTime],
+                                    ['type' => 'text', 'text' => $changesDoneBy],
+                                ],
+                            ],
+                        ];
+
+                        $whatsApp->sendTemplate(
+                            $phoneNormalized,
+                            'appointment_reschedule_1',
+                            $components,
+                            'en',
+                            'appointment_reschedule_alert'
+                        );
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::error('WhatsApp reschedule notification failed', ['error' => $e->getMessage()]);
+            }
+        }
 
         return $this->respondWithAppointment($appointment->fresh());
     }

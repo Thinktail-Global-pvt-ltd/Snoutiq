@@ -510,4 +510,71 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
         $this->assertEquals('Dr. John Doe', $metadata['doctor_name']);
         $this->assertEquals('Healing Paws Clinic', $metadata['clinic_name']);
     }
+
+    public function test_appointment_rescheduling_triggers_whatsapp_notification(): void
+    {
+        // Seed data
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 10,
+            'name' => 'Healing Paws Clinic',
+            'city' => 'Delhi',
+            'pincode' => '110001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 20,
+            'vet_registeration_id' => 10,
+            'doctor_name' => 'Dr. John Doe',
+            'doctor_email' => 'john.doe@example.com',
+            'doctor_mobile' => '9999988888',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $appointmentId = DB::table('appointments')->insertGetId([
+            'vet_registeration_id' => 10,
+            'doctor_id' => 20,
+            'pet_id' => 40,
+            'name' => 'Jane Pet Parent',
+            'mobile' => '8888877777',
+            'appointment_date' => '2026-06-15',
+            'appointment_time' => '10:40:00',
+            'status' => 'confirmed',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Mock WhatsAppService
+        $whatsAppMock = $this->createMock(\App\Services\WhatsAppService::class);
+        $whatsAppMock->method('isConfigured')->willReturn(true);
+        
+        $whatsAppMock->expects($this->once())
+            ->method('sendTemplate')
+            ->with(
+                $this->equalTo('918888877777'),
+                $this->equalTo('appointment_reschedule_1'),
+                $this->callback(function ($components) {
+                    $params = $components[0]['parameters'];
+                    return $params[0]['text'] === 'Jane Pet Parent' &&
+                           $params[1]['text'] === 'Dr. John Doe' &&
+                           $params[2]['text'] === '2026-06-16' &&
+                           $params[3]['text'] === '11:00:00';
+                }),
+                $this->equalTo('en'),
+                $this->equalTo('appointment_reschedule_alert')
+            );
+
+        $this->app->instance(\App\Services\WhatsAppService::class, $whatsAppMock);
+
+        // Put request to reschedule
+        $response = $this->putJson("/api/appointments/{$appointmentId}", [
+            'date' => '2026-06-16',
+            'time_slot' => '11:00:00',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+    }
 }
