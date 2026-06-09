@@ -340,6 +340,12 @@ class ClinicFullOnboardingApiTest extends TestCase
                 'service_hours' => '09:00-17:00',
                 'base_payout' => 1000.00,
             ]);
+
+            // Check GET /api/video-schedule/doctors/{id}/availability includes clinic fees
+            $availResp = $this->getJson("/api/video-schedule/doctors/{$doctor->id}/availability");
+            $availResp->assertStatus(200);
+            $availResp->assertJsonPath('clinic_day_fee', 450);
+            $availResp->assertJsonPath('clinic_night_fee', 650);
         }
     }
 

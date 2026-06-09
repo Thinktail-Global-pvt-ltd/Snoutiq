@@ -157,8 +157,14 @@ class DoctorVideoScheduleController extends Controller
     public function getAvailability(Request $request, string $id)
     {
         $doctor = DB::table('doctors')
-            ->where('id', (int) $id)
-            ->select('video_day_rate', 'video_night_rate')
+            ->leftJoin('vet_registerations_temp', 'vet_registerations_temp.id', '=', 'doctors.vet_registeration_id')
+            ->where('doctors.id', (int) $id)
+            ->select(
+                'doctors.video_day_rate',
+                'doctors.video_night_rate',
+                'vet_registerations_temp.clinic_day_fee',
+                'vet_registerations_temp.clinic_night_fee'
+            )
             ->first();
 
         $rows = DB::table('doctor_video_availability')
@@ -174,6 +180,8 @@ class DoctorVideoScheduleController extends Controller
             'availability' => $rows,
             'day_rate' => $doctor?->video_day_rate === null ? null : (float) $doctor->video_day_rate,
             'night_rate' => $doctor?->video_night_rate === null ? null : (float) $doctor->video_night_rate,
+            'clinic_day_fee' => $doctor?->clinic_day_fee === null ? null : (float) $doctor->clinic_day_fee,
+            'clinic_night_fee' => $doctor?->clinic_night_fee === null ? null : (float) $doctor->clinic_night_fee,
         ]);
     }
 }
