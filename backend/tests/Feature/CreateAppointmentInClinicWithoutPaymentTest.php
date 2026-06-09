@@ -402,4 +402,106 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
         $responseCapture->assertJsonPath('success', false);
         $responseCapture->assertJsonPath('message', 'The provided transaction is not linked to this appointment.');
     }
+
+    public function test_appointment_submission_links_transaction_and_triggers_notifications(): void
+    {
+        // Seed database
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 10,
+            'name' => 'Healing Paws Clinic',
+            'city' => 'Delhi',
+            'pincode' => '110001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 20,
+            'vet_registeration_id' => 10,
+            'doctor_name' => 'Dr. John Doe',
+            'doctor_email' => 'john.doe@example.com',
+            'doctor_mobile' => '9999988888',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 30,
+            'name' => 'Jane Pet Parent',
+            'email' => 'jane@example.com',
+            'phone' => '8888877777',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 40,
+            'user_id' => 30,
+            'name' => 'Fluffy',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Create transaction in DB
+        DB::table('transactions')->insert([
+            'id' => 777,
+            'clinic_id' => null, // Will be linked
+            'doctor_id' => null, // Will be linked
+            'user_id' => null,   // Will be linked
+            'pet_id' => null,    // Will be linked
+            'amount_paise' => 45050,
+            'status' => 'captured',
+            'type' => 'appointments',
+            'reference' => 'pay_abc123',
+            'metadata' => json_encode([
+                'order_id' => 'order_xyz456',
+                'payment_id' => 'pay_abc123',
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Call Submit Appointment API with payment details
+        $response = $this->postJson('/api/appointments/submit', [
+            'clinic_id' => 10,
+            'doctor_id' => 20,
+            'user_id' => 30,
+            'pet_id' => 40,
+            'patient_name' => 'Jane Pet Parent',
+            'patient_phone' => '8888877777',
+            'patient_email' => 'jane@example.com',
+            'pet_name' => 'Fluffy',
+            'date' => '2026-06-15',
+            'time_slot' => '10:40:00',
+            'amount' => 45050,
+            'currency' => 'INR',
+            'razorpay_payment_id' => 'pay_abc123',
+            'razorpay_order_id' => 'order_xyz456',
+            'razorpay_signature' => 'signature123',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('success', true);
+
+        // Assert appointment has correct transaction_id
+        $this->assertDatabaseHas('appointments', [
+            'vet_registeration_id' => 10,
+            'doctor_id' => 20,
+            'pet_id' => 40,
+            'transaction_id' => 777,
+            'status' => 'confirmed',
+        ]);
+
+        // Assert transaction updated with clinic, doctor, user, pet, and appointment metadata
+        $transaction = DB::table('transactions')->where('id', 777)->first();
+        $this->assertEquals(10, $transaction->clinic_id);
+        $this->assertEquals(20, $transaction->doctor_id);
+        $this->assertEquals(30, $transaction->user_id);
+        $this->assertEquals(40, $transaction->pet_id);
+
+        $metadata = json_decode($transaction->metadata, true);
+        $this->assertNotNull($metadata['appointment_id']);
+        $this->assertEquals('Dr. John Doe', $metadata['doctor_name']);
+        $this->assertEquals('Healing Paws Clinic', $metadata['clinic_name']);
+    }
 }

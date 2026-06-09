@@ -666,7 +666,7 @@ class PaymentController extends Controller
         ];
     }
 
-    protected function notifyDoctorOrderCreated(?int $doctorId, array $notes, int $amountInInr): array
+    public function notifyDoctorOrderCreated(?int $doctorId, array $notes, int $amountInInr): array
     {
         if (! $doctorId) {
             return ['sent' => false, 'reason' => 'doctor_missing', 'doctor_id' => null];
@@ -2270,7 +2270,7 @@ class PaymentController extends Controller
         ];
     }
 
-    protected function sendAppointmentWhatsAppNotifications(array $context, array $notes, int $amountInInr): array
+    public function sendAppointmentWhatsAppNotifications(array $context, array $notes, int $amountInInr): array
     {
         if (! $this->whatsApp?->isConfigured()) {
             return [
@@ -2461,7 +2461,7 @@ class PaymentController extends Controller
     /**
      * Send a push notification to the doctor after successful payment.
      */
-    protected function notifyDoctorPaymentCaptured(
+    public function notifyDoctorPaymentCaptured(
         array $context,
         array $notes,
         int $amountInInr,

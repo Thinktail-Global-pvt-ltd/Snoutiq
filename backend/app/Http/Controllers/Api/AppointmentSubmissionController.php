@@ -208,6 +208,100 @@ class AppointmentSubmissionController extends Controller
 
         $appointment = Appointment::create($appointmentPayload);
 
+        // Try to link transaction and dispatch notifications if it's a paid appointment
+        $transaction = null;
+        if (!empty($validated['razorpay_payment_id'])) {
+            $transaction = DB::table('transactions')
+                ->where('reference', $validated['razorpay_payment_id'])
+                ->orWhere('metadata->payment_id', $validated['razorpay_payment_id'])
+                ->orderByDesc('id')
+                ->first();
+        }
+        if (!$transaction && !empty($validated['razorpay_order_id'])) {
+            $transaction = DB::table('transactions')
+                ->where('reference', $validated['razorpay_order_id'])
+                ->orWhere('metadata->order_id', $validated['razorpay_order_id'])
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        if ($transaction) {
+            $txUpdates = [];
+            if (empty($transaction->doctor_id) && $doctor) {
+                $txUpdates['doctor_id'] = $doctor->id;
+            }
+            if (empty($transaction->clinic_id) && $clinic) {
+                $txUpdates['clinic_id'] = $clinic->id;
+            }
+            if (empty($transaction->user_id) && $user) {
+                $txUpdates['user_id'] = $user->id;
+            }
+            if (empty($transaction->pet_id) && !empty($validated['pet_id'])) {
+                $txUpdates['pet_id'] = (int) $validated['pet_id'];
+            }
+
+            $metadata = json_decode($transaction->metadata ?? '{}', true);
+            if (is_array($metadata)) {
+                $metadata['appointment_id'] = $appointment->id;
+                if ($doctor) {
+                    $metadata['doctor_id'] = $doctor->id;
+                    $metadata['doctor_name'] = $doctor->doctor_name ?? $doctor->name;
+                }
+                if ($clinic) {
+                    $metadata['clinic_id'] = $clinic->id;
+                    $metadata['clinic_name'] = $clinic->name;
+                }
+                $txUpdates['metadata'] = json_encode($metadata);
+            }
+
+            if (!empty($txUpdates)) {
+                DB::table('transactions')->where('id', $transaction->id)->update($txUpdates);
+            }
+
+            if (Schema::hasColumn('appointments', 'transaction_id')) {
+                $appointment->transaction_id = $transaction->id;
+                $appointment->save();
+            }
+        }
+
+        if (!empty($validated['razorpay_payment_id'])) {
+            try {
+                $paymentController = app(\App\Http\Controllers\PaymentController::class);
+
+                $amountVal = $validated['amount'] ?? 0;
+                $amountInInr = (int) round($amountVal / 100);
+                if ($amountInInr <= 0 && $transaction) {
+                    $amountInInr = (int) round(($transaction->amount_paise ?? 0) / 100);
+                }
+
+                $ctx = [
+                    'clinic_id' => $clinic?->id,
+                    'doctor_id' => $doctor?->id,
+                    'user_id' => $user->id,
+                    'pet_id' => $validated['pet_id'] ?? null,
+                    'appointment_id' => $appointment->id,
+                ];
+
+                $notes = [
+                    'order_type' => 'appointments',
+                    'clinic_id' => $clinic?->id,
+                    'doctor_id' => $doctor?->id,
+                    'user_id' => $user->id,
+                    'pet_id' => $validated['pet_id'] ?? null,
+                ];
+
+                // Trigger WhatsApp alerts to parent and vet
+                $paymentController->sendAppointmentWhatsAppNotifications($ctx, $notes, $amountInInr);
+
+                // Trigger FCM push notifications to doctor
+                $paymentController->notifyDoctorOrderCreated($doctor?->id, $notes, $amountInInr);
+                $paymentController->notifyDoctorPaymentCaptured($ctx, $notes, $amountInInr, 'captured', 'appointments');
+
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         return $this->respondWithAppointment($appointment->fresh(), 201);
     }
 
