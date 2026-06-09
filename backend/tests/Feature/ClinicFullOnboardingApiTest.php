@@ -595,4 +595,36 @@ class ClinicFullOnboardingApiTest extends TestCase
         $this->assertNotNull($doctorData);
         $this->assertEquals($clinicData['distance_km'], $doctorData['distance_km']);
     }
+
+    public function test_skips_fcm_notification_when_test_parameter_is_one(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1,
+            'name' => 'Default Admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/vet-registerations/store-full', [
+            'name' => 'Test Skip Notification Clinic',
+            'email' => 'skip.notification@example.com',
+            'mobile' => '9871198033',
+            'city' => 'Delhi Division',
+            'pincode' => '110075',
+            'test' => 1,
+            'doctors' => [
+                [
+                    'doctor_name' => 'Dr. Test Skip',
+                    'doctor_email' => 'testskip@example.com',
+                    'doctor_mobile' => '9999988881',
+                ]
+            ]
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('data.pet_parent_notification.sent', false);
+        $response->assertJsonPath('data.pet_parent_notification.reason', 'Skipped notification because test parameter is set to 1.');
+    }
 }
+

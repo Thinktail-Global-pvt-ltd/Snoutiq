@@ -438,6 +438,7 @@ class ClinicFullOnboardingController extends Controller
             'dog_neutering_female_price' => ['nullable', 'numeric', 'min:0'],
             'cat_neutering_male_price' => ['nullable', 'numeric', 'min:0'],
             'cat_neutering_female_price' => ['nullable', 'numeric', 'min:0'],
+            'test' => ['nullable', 'integer'],
         ]);
 
         $result = DB::transaction(function () use ($request, $data) {
@@ -476,6 +477,16 @@ class ClinicFullOnboardingController extends Controller
 
     private function sendNewDoctorNotificationToPetParents(VetRegisterationTemp $clinic, $doctors): array
     {
+        if (request()->input('test') == 1) {
+            return [
+                'sent' => false,
+                'reason' => 'Skipped notification because test parameter is set to 1.',
+                'targeted' => 0,
+                'success' => 0,
+                'failure' => 0,
+            ];
+        }
+
         if (! Schema::hasTable('device_tokens') || ! Schema::hasTable('users')) {
             return [
                 'sent' => false,
