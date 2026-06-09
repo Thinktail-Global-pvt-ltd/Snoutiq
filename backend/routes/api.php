@@ -327,6 +327,18 @@ Route::get('/doctors/active-slots', function (Request $request) {
         
     $dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
+    // Fetch booked times for this doctor on the selected date to filter out already booked slots
+    $bookedTimes = [];
+    if (Schema::hasTable('appointments')) {
+        $bookedTimes = DB::table('appointments')
+            ->where('doctor_id', $doctor->id)
+            ->where('appointment_date', $selectedDate->format('Y-m-d'))
+            ->whereNotIn('status', ['cancelled', 'failed'])
+            ->pluck('appointment_time')
+            ->map(fn($t) => substr($t, 0, 5))
+            ->all();
+    }
+    
     $parseToMinutes = function ($timeStr) {
         $parts = explode(':', $timeStr);
         $hours = isset($parts[0]) ? (int) $parts[0] : 0;
@@ -340,7 +352,7 @@ Route::get('/doctors/active-slots', function (Request $request) {
         return sprintf('%02d:%02d', $h, $m);
     };
     
-    $data = $availabilities->map(function ($avail) use ($dayNames, $parseToMinutes, $formatTime, $isToday, $currentTime) {
+    $data = $availabilities->map(function ($avail) use ($dayNames, $parseToMinutes, $formatTime, $isToday, $currentTime, $bookedTimes) {
         $startTime = substr($avail->start_time, 0, 5); // Format as hh:mm
         $endTime = substr($avail->end_time, 0, 5);     // Format as hh:mm
         
@@ -358,6 +370,10 @@ Route::get('/doctors/active-slots', function (Request $request) {
                 $slotEnd = $formatTime($m + 20);
                 
                 if ($isToday && $slotStart < $currentTime) {
+                    continue;
+                }
+                
+                if (in_array($slotStart, $bookedTimes)) {
                     continue;
                 }
                 

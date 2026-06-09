@@ -641,4 +641,69 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
             ]
         ]);
     }
+
+    public function test_active_slots_excludes_already_booked_appointments(): void
+    {
+        // 1. Seed doctor
+        DB::table('doctors')->insert([
+            'id' => 20,
+            'doctor_name' => 'Dr. John Doe',
+            'doctor_email' => 'john.doe@example.com',
+            'doctor_mobile' => '9999988888',
+        ]);
+
+        // 2. Setup doctor availability in doctor_availability table
+        Schema::dropIfExists('doctor_availability');
+        Schema::create('doctor_availability', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('doctor_id');
+            $table->integer('day_of_week');
+            $table->time('start_time');
+            $table->time('end_time');
+            $table->string('service_type')->nullable();
+            $table->timestamps();
+        });
+
+        DB::table('doctor_availability')->insert([
+            'doctor_id' => 20,
+            'day_of_week' => 1, // Monday
+            'start_time' => '09:00:00',
+            'end_time' => '10:00:00',
+            'service_type' => 'in_clinic',
+        ]);
+
+        // 3. Seed an appointment booking for 09:20:00
+        DB::table('appointments')->insert([
+            'vet_registeration_id' => 10,
+            'doctor_id' => 20,
+            'pet_id' => 40,
+            'name' => 'Jane Pet Parent',
+            'mobile' => '8888877777',
+            'appointment_date' => '2026-06-15', // a future Monday
+            'appointment_time' => '09:20:00',
+            'status' => 'confirmed',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 4. Request active-slots API
+        $response = $this->getJson('/api/doctors/active-slots?doctor_id=20&date=2026-06-15');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        
+        $activeHours = $response->json('active_hours');
+        $this->assertCount(1, $activeHours);
+        
+        $slots = $activeHours[0]['slots'];
+        // Slots generated for 09:00-10:00: 09:00, 09:20, 09:40.
+        // But 09:20 is booked, so it should be hidden!
+        // So slots should contain 09:00 and 09:40 only.
+        $this->assertCount(2, $slots);
+        $this->assertEquals('09:00', $slots[0]['start']);
+        $this->assertEquals('09:40', $slots[1]['start']);
+
+        // Clean up
+        Schema::dropIfExists('doctor_availability');
+    }
 }
