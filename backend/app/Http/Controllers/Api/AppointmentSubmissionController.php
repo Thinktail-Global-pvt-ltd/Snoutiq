@@ -49,7 +49,7 @@ class AppointmentSubmissionController extends Controller
             'patient_email'        => ['nullable', 'email', 'max:191'],
             'pet_name'             => ['nullable', 'string', 'max:255'],
             'pet_id'               => $petValidation,
-            'appointment_type'     => ['sometimes', 'nullable', Rule::in(['neutering', 'deworming'])],
+            'appointment_type'     => ['sometimes', 'nullable', 'string', 'max:255'],
             // date and time_slot are now optional — if absent, only the user record is created
             'date'                 => ['nullable', 'date'],
             'time_slot'            => ['nullable', 'string', 'max:50'],
@@ -366,7 +366,7 @@ class AppointmentSubmissionController extends Controller
             'patient_phone'        => ['sometimes', 'nullable', 'string', 'max:20'],
             'pet_name'             => ['sometimes', 'nullable', 'string', 'max:255'],
             'pet_id'               => $petValidation,
-            'appointment_type'     => ['sometimes', 'nullable', Rule::in(['neutering', 'deworming'])],
+            'appointment_type'     => ['sometimes', 'nullable', 'string', 'max:255'],
             'date'                 => ['sometimes', 'required', 'date'],
             'time_slot'            => ['sometimes', 'required', 'string', 'max:50'],
             'status'               => ['sometimes', 'required', 'string', 'max:24'],
