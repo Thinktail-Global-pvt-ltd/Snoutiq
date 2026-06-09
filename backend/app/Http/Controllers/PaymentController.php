@@ -274,6 +274,7 @@ class PaymentController extends Controller
             $vetWhatsAppMeta = null;
             $prescriptionDocMeta = null;
             $vetPushMeta = null;
+            $parentPushMeta = null;
 
             if ($isAppointment) {
                 try {
@@ -283,6 +284,7 @@ class PaymentController extends Controller
 
                     $doctorOrderPushMeta = $this->notifyDoctorOrderCreated($context['doctor_id'] ?? null, $notes, $amountInInr);
                     $vetPushMeta = $this->notifyDoctorPaymentCaptured($context, $notes, $amountInInr, 'captured', 'appointments');
+                    $parentPushMeta = $this->notifyPetParentOrderCreated($context, $notes, $amountInInr);
                 } catch (\Throwable $e) {
                     report($e);
                 }
@@ -295,6 +297,7 @@ class PaymentController extends Controller
                 'order'    => $orderArr,
                 'order_id' => $orderArr['id'],
                 'doctor_push' => $doctorOrderPushMeta,
+                'parent_push' => $parentPushMeta,
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
                 'prescription_doc' => $prescriptionDocMeta,
@@ -2552,6 +2555,107 @@ class PaymentController extends Controller
             $sentCount = 0;
             foreach ($tokens as $token) {
                 $lastFailure = null;
+                foreach ($candidates as $endpoint) {
+                    $apiResponse = Http::acceptJson()
+                        ->asJson()
+                        ->timeout(8)
+                        ->post($endpoint, [
+                            'token' => (string) $token,
+                            'title' => $title,
+                            'body' => $body,
+                            'data' => $data,
+                        ]);
+
+                    $payload = $apiResponse->json();
+                    $pushMarkedSent = is_array($payload)
+                        && (($payload['sent'] ?? false) === true || ($payload['success'] ?? false) === true);
+
+                    if ($apiResponse->successful() && $pushMarkedSent) {
+                        $sentCount++;
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
+        }
+
+        return [
+            'sent' => $sentCount > 0,
+            'token_count' => count($tokens),
+            'sent_count' => $sentCount,
+        ];
+    }
+
+    /**
+     * Send a push notification to the pet parent (patient) when an appointment order is created.
+     */
+    public function notifyPetParentOrderCreated(array $context, array $notes, int $amountInInr): array
+    {
+        $userId = $context['user_id'] ?? null;
+        if (! $userId) {
+            return ['sent' => false, 'reason' => 'user_id_missing'];
+        }
+
+        $tokens = DeviceToken::query()
+            ->where('user_id', $userId)
+            ->pluck('token')
+            ->toArray();
+
+        $tokens = collect($tokens)
+            ->filter()
+            ->map(fn ($token) => trim(trim((string) $token), "\"'"))
+            ->filter(fn (string $token) => $token !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($tokens)) {
+            return ['sent' => false, 'reason' => 'token_missing'];
+        }
+
+        $doctorName = null;
+        if (! empty($context['doctor_id'])) {
+            $doctorName = Doctor::where('id', $context['doctor_id'])->value('doctor_name');
+        }
+
+        $petName = null;
+        if (! empty($context['pet_id'])) {
+            $petName = Pet::where('id', $context['pet_id'])->value('name');
+        }
+
+        $title = 'Appointment Booked';
+        $bodyParts = ['Your appointment booking has been confirmed'];
+        if ($petName) {
+            $bodyParts[] = "for {$petName}";
+        }
+        if ($doctorName) {
+            $doctorNameSanitized = preg_replace('/^(dr\.\s*)+/i', '', trim($doctorName));
+            $bodyParts[] = "with Dr. {$doctorNameSanitized}";
+        }
+        $body = implode(' ', $bodyParts) . '.';
+
+        $data = [
+            'type' => 'appointment_booked',
+            'order_type' => (string) ($notes['order_type'] ?? 'appointments'),
+            'doctor_id' => (string) ($context['doctor_id'] ?? ''),
+            'user_id' => (string) $userId,
+            'pet_id' => (string) ($context['pet_id'] ?? ''),
+            'amount_inr' => (string) $amountInInr,
+            'call_id' => (string) ($context['call_identifier'] ?? ''),
+            'deepLink' => '/patient-dashboard',
+        ];
+
+        try {
+            $baseUrl = rtrim((string) config('app.url'), '/');
+            $candidates = array_values(array_unique(array_filter([
+                $baseUrl !== '' ? $baseUrl . '/api/push/test' : null,
+                $baseUrl !== '' ? $baseUrl . '/backend/api/push/test' : null,
+            ])));
+
+            $sentCount = 0;
+            foreach ($tokens as $token) {
                 foreach ($candidates as $endpoint) {
                     $apiResponse = Http::acceptJson()
                         ->asJson()
