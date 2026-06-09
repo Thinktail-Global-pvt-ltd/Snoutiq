@@ -276,20 +276,6 @@ class PaymentController extends Controller
             $vetPushMeta = null;
             $parentPushMeta = null;
 
-            if ($isAppointment) {
-                try {
-                    $whatsAppMetaResult = $this->sendAppointmentWhatsAppNotifications($context, $notes, $amountInInr);
-                    $whatsAppMeta = $whatsAppMetaResult['whatsapp'] ?? null;
-                    $vetWhatsAppMeta = $whatsAppMetaResult['vet_whatsapp'] ?? null;
-
-                    $doctorOrderPushMeta = $this->notifyDoctorOrderCreated($context['doctor_id'] ?? null, $notes, $amountInInr);
-                    $vetPushMeta = $this->notifyDoctorPaymentCaptured($context, $notes, $amountInInr, 'captured', 'appointments');
-                    $parentPushMeta = $this->notifyPetParentOrderCreated($context, $notes, $amountInInr);
-                } catch (\Throwable $e) {
-                    report($e);
-                }
-            }
-
             return response()->json([
                 'success'  => true,
                 'key'      => $this->key,
@@ -975,6 +961,7 @@ class PaymentController extends Controller
             $prescriptionDocMeta = null;
             $vetPushMeta = null;
             $doctorOrderPushMeta = null;
+            $parentPushMeta = null;
             try {
                 // Derive order type from notes or stored payment/transaction data
                 $orderType = $this->normalizeOrderType(
@@ -986,29 +973,38 @@ class PaymentController extends Controller
                 );
 
                 $isAppointment = in_array($orderType, ['appointment', 'appointments'], true);
-                if (
-                    !$isAppointment
-                    && $this->isVideoConsultTransactionType($orderType)
-                    && strtolower(trim((string) $status)) === 'captured'
-                ) {
-                    $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
-                        context: $context,
-                        notes: $notes,
-                        amountInInr: $amountInInr
-                    );
-                    $whatsAppMeta = $videoConsultWhatsAppMeta['whatsapp'];
-                    $vetWhatsAppMeta = $videoConsultWhatsAppMeta['vet_whatsapp'];
-                }
+                if ($isAppointment) {
+                    if ($this->isSuccessfulPaymentStatus($status)) {
+                        $whatsAppMetaResult = $this->sendAppointmentWhatsAppNotifications($context, $notes, $amountInInr);
+                        $whatsAppMeta = $whatsAppMetaResult['whatsapp'] ?? null;
+                        $vetWhatsAppMeta = $whatsAppMetaResult['vet_whatsapp'] ?? null;
 
-                if (!$isAppointment && $this->isSuccessfulPaymentStatus($status)) {
-                    $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
-                        doctorId: $context['doctor_id'] ?? null,
-                        notes: $notes,
-                        amountInInr: $amountInInr
-                    );
-                }
+                        $doctorOrderPushMeta = $this->notifyDoctorOrderCreated($context['doctor_id'] ?? null, $notes, $amountInInr);
+                        $vetPushMeta = $this->notifyDoctorPaymentCaptured($context, $notes, $amountInInr, $status, $orderType);
+                        $parentPushMeta = $this->notifyPetParentOrderCreated($context, $notes, $amountInInr);
+                    }
+                } else {
+                    if (
+                        $this->isVideoConsultTransactionType($orderType)
+                        && strtolower(trim((string) $status)) === 'captured'
+                    ) {
+                        $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
+                            context: $context,
+                            notes: $notes,
+                            amountInInr: $amountInInr
+                        );
+                        $whatsAppMeta = $videoConsultWhatsAppMeta['whatsapp'];
+                        $vetWhatsAppMeta = $videoConsultWhatsAppMeta['vet_whatsapp'];
+                    }
 
-                if (!$isAppointment) {
+                    if ($this->isSuccessfulPaymentStatus($status)) {
+                        $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
+                            doctorId: $context['doctor_id'] ?? null,
+                            notes: $notes,
+                            amountInInr: $amountInInr
+                        );
+                    }
+
                     $vetPushMeta = $this->notifyDoctorPaymentCaptured(
                         context: $context,
                         notes: $notes,
@@ -1044,6 +1040,7 @@ class PaymentController extends Controller
                 'prescription_doc' => $prescriptionDocMeta,
                 'vet_push' => $vetPushMeta,
                 'doctor_push' => $doctorOrderPushMeta,
+                'parent_push' => $parentPushMeta,
             ]);
 
         } catch (RazorpayError $e) {
