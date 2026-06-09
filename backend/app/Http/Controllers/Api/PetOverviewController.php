@@ -958,13 +958,8 @@ class PetOverviewController extends Controller
         foreach ($rows as $row) {
             $hasTransactionId = property_exists($row, 'transaction_id') && $row->transaction_id !== null;
             if ($hasTransactionId) {
-                $txnStatus = DB::table('transactions')->where('id', $row->transaction_id)->value('status');
-                if ($txnStatus !== null && strtolower(trim((string)$txnStatus)) === 'pending') {
-                    continue;
-                } else {
-                    $validRow = $row;
-                    break;
-                }
+                $validRow = $row;
+                break;
             } else {
                 $decodedNotes = $this->decodeJsonMaybe($row->notes);
                 if (is_array($decodedNotes) && isset($decodedNotes['razorpay_order_id']) && $decodedNotes['razorpay_order_id'] !== null && trim((string)$decodedNotes['razorpay_order_id']) !== '') {
