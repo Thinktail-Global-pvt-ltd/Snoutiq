@@ -562,7 +562,7 @@ class CreateAppointmentInClinicWithoutPaymentTest extends TestCase
                            $params[2]['text'] === '2026-06-16' &&
                            $params[3]['text'] === '11:00:00';
                 }),
-                $this->equalTo('en'),
+                $this->equalTo('en_US'),
                 $this->equalTo('appointment_reschedule_alert')
             );
 

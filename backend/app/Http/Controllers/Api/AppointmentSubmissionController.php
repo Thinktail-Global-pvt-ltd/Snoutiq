@@ -486,7 +486,7 @@ class AppointmentSubmissionController extends Controller
                             $phoneNormalized,
                             'appointment_reschedule_1',
                             $components,
-                            'en',
+                            'en_US',
                             'appointment_reschedule_alert'
                         );
 
