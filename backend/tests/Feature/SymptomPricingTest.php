@@ -24,7 +24,7 @@ class SymptomPricingTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_symptom_check_returns_default_pricing_for_no_user_context(): void
+    public function test_symptom_check_returns_cards_without_price(): void
     {
         // Unconscious triggers the emergency red flag, bypassing Gemini call
         $response = $this->postJson('/api/symptom-check', [
@@ -35,86 +35,33 @@ class SymptomPricingTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('routing', 'emergency')
-            ->assertJsonPath('ui.service_cards.0.price', '₹999') // Vet at Home default
-            ->assertJsonPath('ui.service_cards.1.price', '₹350'); // Confirmed Clinic Booking default
+            ->assertJsonPath('routing', 'emergency');
+
+        $cards = $response->json('ui.service_cards');
+        $this->assertNotEmpty($cards);
+        foreach ($cards as $card) {
+            $this->assertArrayNotHasKey('price', $card);
+            $this->assertArrayNotHasKey('orig_price', $card);
+        }
     }
 
-    public function test_symptom_check_returns_dynamic_pricing_for_user_with_last_vet_id(): void
+    public function test_legacy_chat_send_returns_cards_without_price(): void
     {
-        // Setup Clinic with fee
-        DB::table('vet_registerations_temp')->insert([
-            'id' => 20,
-            'name' => 'Happy Pets Clinic',
-            'clinic_day_fee' => 600.00,
-            'clinic_night_fee' => 800.00,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Setup Doctor with rate under the clinic
-        DB::table('doctors')->insert([
-            'id' => 201,
-            'vet_registeration_id' => 20,
-            'doctor_name' => 'Dr. Smith',
-            'video_day_rate' => 750.00,
-            'video_night_rate' => 900.00,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Setup User linked to the clinic
-        DB::table('users')->insert([
-            'id' => 5001,
-            'name' => 'John Doe',
-            'last_vet_id' => 20,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Setup Pet
-        DB::table('pets')->insert([
-            'id' => 6001,
-            'user_id' => 5001,
-            'name' => 'Max',
-            'species' => 'dog',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Call symptom check for this user (not breathing triggers emergency red-flag bypass)
-        $response = $this->postJson('/api/symptom-check', [
-            'user_id' => 5001,
-            'pet_id' => 6001,
-            'message' => 'My dog is not breathing',
-            'pet_name' => 'Max',
-            'species' => 'dog',
-        ]);
-
-        $response->assertOk()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('routing', 'emergency')
-            // For emergency, it returns Vet at Home (fixed 999) and Confirmed Clinic Booking (dynamic: clinic_day_fee = 600)
-            ->assertJsonPath('ui.service_cards.1.price', '₹600');
-
-        // Let's check non-emergency/mild routing (default) to verify video call rate
-        // We'll call /api/chat/send legacy/compat endpoint where we mock/greeting to trigger default routing
-        // Wait, greeting 'hello' triggers softReset and default routing or default card output
-        // Let's call /api/chat/send
         $responseCompat = $this->postJson('/api/chat/send', [
-            'user_id' => 5001,
-            'pet_id' => 6001,
             'question' => 'hello',
             'pet_name' => 'Max',
             'species' => 'dog',
         ]);
 
         $responseCompat->assertOk()
-            ->assertJsonPath('success', true)
-            // default view is video_consult + vet_at_home
-            // Video consultation price should be dynamic: video_day_rate = 750
-            ->assertJsonPath('ui.service_cards.0.price', '₹750')
-            ->assertJsonPath('ui.service_cards.0.orig_price', null); // orig_price is null for dynamic rate
+            ->assertJsonPath('success', true);
+
+        $cards = $responseCompat->json('ui.service_cards');
+        $this->assertNotEmpty($cards);
+        foreach ($cards as $card) {
+            $this->assertArrayNotHasKey('price', $card);
+            $this->assertArrayNotHasKey('orig_price', $card);
+        }
     }
 
     private function resetSchema(): void
