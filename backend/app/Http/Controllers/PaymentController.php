@@ -672,13 +672,24 @@ class PaymentController extends Controller
             return ['sent' => false, 'reason' => 'doctor_missing', 'doctor_id' => null];
         }
 
-        $latestToken = DeviceToken::query()
-            ->where('user_id', $doctorId)
-            ->where('meta->owner_model', Doctor::class)
-            ->whereNotNull('token')
-            ->where('token', '!=', '')
-            ->orderByRaw('COALESCE(last_seen_at, updated_at, created_at) DESC')
-            ->value('token');
+        $latestToken = null;
+
+        if (Schema::hasTable('doctor_fcm_tokens')) {
+            $latestToken = DB::table('doctor_fcm_tokens')
+                ->where('doctor_id', $doctorId)
+                ->orderByDesc('id')
+                ->value('token');
+        }
+
+        if (! $latestToken) {
+            $latestToken = DeviceToken::query()
+                ->where('user_id', $doctorId)
+                ->where('meta->owner_model', Doctor::class)
+                ->whereNotNull('token')
+                ->where('token', '!=', '')
+                ->orderByRaw('COALESCE(last_seen_at, updated_at, created_at) DESC')
+                ->value('token');
+        }
 
         if (! $latestToken) {
             $latestToken = DeviceToken::query()
@@ -955,17 +966,28 @@ class PaymentController extends Controller
                     ?? ($record->raw_response['notes']['type'] ?? null)
                 );
 
+                $isAppointment = in_array($orderType, ['appointment', 'appointments'], true);
                 if (
-                    $this->isVideoConsultTransactionType($orderType)
+                    ($this->isVideoConsultTransactionType($orderType) || $isAppointment)
                     && strtolower(trim((string) $status)) === 'captured'
                 ) {
-                    $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
-                        context: $context,
-                        notes: $notes,
-                        amountInInr: $amountInInr
-                    );
-                    $whatsAppMeta = $videoConsultWhatsAppMeta['whatsapp'];
-                    $vetWhatsAppMeta = $videoConsultWhatsAppMeta['vet_whatsapp'];
+                    if ($isAppointment) {
+                        $appointmentWhatsAppMeta = $this->sendAppointmentWhatsAppNotifications(
+                            context: $context,
+                            notes: $notes,
+                            amountInInr: $amountInInr
+                        );
+                        $whatsAppMeta = $appointmentWhatsAppMeta['whatsapp'];
+                        $vetWhatsAppMeta = $appointmentWhatsAppMeta['vet_whatsapp'];
+                    } else {
+                        $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
+                            context: $context,
+                            notes: $notes,
+                            amountInInr: $amountInInr
+                        );
+                        $whatsAppMeta = $videoConsultWhatsAppMeta['whatsapp'];
+                        $vetWhatsAppMeta = $videoConsultWhatsAppMeta['vet_whatsapp'];
+                    }
                 }
 
                 if ($this->isSuccessfulPaymentStatus($status)) {
@@ -1452,17 +1474,32 @@ class PaymentController extends Controller
                 return Transaction::create($payload);
             }, 3);
 
-            $this->updateHomeServiceBookingPaymentState(
-                bookingId: $context['home_service_booking_id'] ?? null,
-                updates: [
-                    'payment_status' => $this->isSuccessfulPaymentStatus($transactionStatus) ? 'paid' : $transactionStatus,
-                    'payment_provider' => 'razorpay',
-                    'payment_reference' => $payment->razorpay_payment_id ?? $payment->razorpay_order_id,
-                    'amount_paid' => is_numeric($amount) ? ((int) $amount) / 100 : null,
-                    'amount_payable' => is_numeric($amount) ? ((int) $amount) / 100 : null,
-                    'mark_step3_complete' => $this->isSuccessfulPaymentStatus($transactionStatus),
-                ]
-            );
+            $isAppointment = in_array($transactionType, ['appointment', 'appointments'], true);
+            if ($isAppointment) {
+                $this->updateAppointmentPaymentState(
+                    appointmentId: $context['appointment_id'] ?? $context['home_service_booking_id'] ?? null,
+                    orderId: $payment->razorpay_order_id,
+                    updates: [
+                        'payment_status' => $this->isSuccessfulPaymentStatus($transactionStatus) ? 'paid' : $transactionStatus,
+                        'transaction_id' => $transaction->id,
+                        'razorpay_payment_id' => $payment->razorpay_payment_id,
+                        'razorpay_signature' => $payment->razorpay_signature,
+                        'razorpay_order_id' => $payment->razorpay_order_id,
+                    ]
+                );
+            } else {
+                $this->updateHomeServiceBookingPaymentState(
+                    bookingId: $context['home_service_booking_id'] ?? null,
+                    updates: [
+                        'payment_status' => $this->isSuccessfulPaymentStatus($transactionStatus) ? 'paid' : $transactionStatus,
+                        'payment_provider' => 'razorpay',
+                        'payment_reference' => $payment->razorpay_payment_id ?? $payment->razorpay_order_id,
+                        'amount_paid' => is_numeric($amount) ? ((int) $amount) / 100 : null,
+                        'amount_payable' => is_numeric($amount) ? ((int) $amount) / 100 : null,
+                        'mark_step3_complete' => $this->isSuccessfulPaymentStatus($transactionStatus),
+                    ]
+                );
+            }
 
             return $transaction;
         } catch (\Throwable $e) {
@@ -2233,6 +2270,138 @@ class PaymentController extends Controller
         ];
     }
 
+    protected function sendAppointmentWhatsAppNotifications(array $context, array $notes, int $amountInInr): array
+    {
+        if (! $this->whatsApp?->isConfigured()) {
+            return [
+                'whatsapp' => null,
+                'vet_whatsapp' => null,
+            ];
+        }
+
+        try {
+            $user = $context['user_id'] ? User::find($context['user_id']) : null;
+            if (! $user || empty($user->phone)) {
+                return [
+                    'whatsapp' => null,
+                    'vet_whatsapp' => null,
+                ];
+            }
+
+            $doctorId = $context['doctor_id'] ?? null;
+            $doctor = $doctorId ? Doctor::find($doctorId) : null;
+            $doctorName = $this->sanitizeDoctorNameForWhatsApp($doctor?->doctor_name) ?: 'Doctor';
+
+            $clinicId = $context['clinic_id'] ?? null;
+            if (! $clinicId && $doctor) {
+                $clinicId = $doctor->vet_registeration_id;
+            }
+            $clinicName = null;
+            if ($clinicId) {
+                $clinicName = DB::table('vet_registerations_temp')->where('id', $clinicId)->value('name');
+            }
+            $clinicName = $clinicName ?: 'Clinic';
+
+            $petName = null;
+            $petType = 'pet';
+            if ($context['pet_id']) {
+                $pet = Pet::find($context['pet_id']);
+                if ($pet) {
+                    $petName = $pet->name;
+                    $petType = $pet->pet_type ?: $pet->type ?: 'pet';
+                }
+            }
+            $petName = $petName ?: 'your pet';
+
+            $amount = (string) $amountInInr;
+            $responseTime = (string) ($notes['response_time_minutes'] ?? 15);
+
+            // Send to Parent: cf_payment_confirmed_parent
+            $parentPhone = $this->normalizePhone($user->phone);
+            $templateParent = config('services.whatsapp.templates.cf_payment_confirmed_parent', 'cf_payment_confirmed_parent');
+            $languageParent = config('services.whatsapp.templates.cf_payment_confirmed_parent_language', 'en');
+
+            $componentsParent = [
+                [
+                    'type' => 'body',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $doctorName],
+                        ['type' => 'text', 'text' => $user->name ?: 'Pet Parent'],
+                        ['type' => 'text', 'text' => $amount],
+                        ['type' => 'text', 'text' => $responseTime],
+                    ],
+                ],
+            ];
+
+            $this->whatsApp->sendTemplate(
+                $parentPhone,
+                $templateParent,
+                $componentsParent,
+                $languageParent,
+                'cf_payment_confirmed_parent_alert'
+            );
+
+            // Send to Vet (Doctor/Clinic): cf_payment_confirmed_vet
+            $vetPhone = null;
+            if ($doctor) {
+                $vetPhone = $doctor->doctor_mobile ?? $doctor->doctor_phone ?? $doctor->phone ?? null;
+            }
+            if (!$vetPhone && $clinicId) {
+                $vetPhone = DB::table('vet_registerations_temp')->where('id', $clinicId)->value('mobile');
+            }
+
+            $vetWhatsAppResponse = null;
+            if ($vetPhone) {
+                $vetPhoneNormalized = $this->normalizePhone($vetPhone);
+                $templateVet = config('services.whatsapp.templates.cf_payment_confirmed_vet', 'cf_payment_confirmed_vet');
+                $languageVet = config('services.whatsapp.templates.cf_payment_confirmed_vet_language', 'en');
+
+                $componentsVet = [
+                    [
+                        'type' => 'body',
+                        'parameters' => [
+                            ['type' => 'text', 'text' => $amount],
+                            ['type' => 'text', 'text' => $user->name ?: 'Pet Parent'],
+                            ['type' => 'text', 'text' => $this->normalizePhone($user->phone) ?: ''],
+                        ],
+                    ],
+                ];
+
+                $this->whatsApp->sendTemplate(
+                    $vetPhoneNormalized,
+                    $templateVet,
+                    $componentsVet,
+                    $languageVet,
+                    'cf_payment_confirmed_vet_alert'
+                );
+
+                $vetWhatsAppResponse = [
+                    'sent' => true,
+                    'to' => $vetPhone,
+                    'template' => $templateVet,
+                    'language' => $languageVet,
+                ];
+            }
+
+            return [
+                'whatsapp' => [
+                    'sent' => true,
+                    'to' => $user->phone,
+                    'template' => $templateParent,
+                    'language' => $languageParent,
+                ],
+                'vet_whatsapp' => $vetWhatsAppResponse,
+            ];
+
+        } catch (\Throwable $e) {
+            report($e);
+            return [
+                'whatsapp' => ['sent' => false, 'reason' => $e->getMessage()],
+                'vet_whatsapp' => ['sent' => false, 'reason' => $e->getMessage()],
+            ];
+        }
+    }
+
     protected function buildVetTemplateComponents(
         string $template,
         string $doctorName,
@@ -2311,6 +2480,17 @@ class PaymentController extends Controller
         $tokens = DeviceToken::query()
             ->where('user_id', $doctorId)
             ->pluck('token')
+            ->toArray();
+
+        if (Schema::hasTable('doctor_fcm_tokens')) {
+            $doctorSpecificTokens = DB::table('doctor_fcm_tokens')
+                ->where('doctor_id', $doctorId)
+                ->pluck('token')
+                ->toArray();
+            $tokens = array_merge($tokens, $doctorSpecificTokens);
+        }
+
+        $tokens = collect($tokens)
             ->filter()
             ->map(fn ($token) => trim(trim((string) $token), "\"'"))
             ->filter(fn (string $token) => $token !== '')
@@ -2386,6 +2566,7 @@ class PaymentController extends Controller
             'user_id' => $this->toNullableInt($this->firstFilled($request, ['user_id', 'userId', 'patient_id', 'patientId'], $notes)),
             'pet_id' => $this->toNullableInt($this->firstFilled($request, ['pet_id', 'petId'], $notes)),
             'home_service_booking_id' => $this->toNullableInt($this->firstFilled($request, ['home_service_booking_id', 'homeServiceBookingId', 'booking_id', 'bookingId'], $notes)),
+            'appointment_id' => $this->toNullableInt($this->firstFilled($request, ['appointment_id', 'appointmentId', 'booking_id', 'bookingId'], $notes)),
         ];
 
         if (! $context['user_id'] && $request->user()) {
@@ -2655,6 +2836,65 @@ class PaymentController extends Controller
             }
 
             $booking->save();
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function updateAppointmentPaymentState(?int $appointmentId, ?string $orderId, array $updates): void
+    {
+        if (!Schema::hasTable('appointments')) {
+            return;
+        }
+
+        try {
+            $appointment = null;
+            if ($appointmentId) {
+                $appointment = DB::table('appointments')->where('id', $appointmentId)->first();
+            }
+            if (!$appointment && $orderId !== null && trim($orderId) !== '') {
+                $appointment = DB::table('appointments')
+                    ->where('notes', 'like', '%' . $orderId . '%')
+                    ->first();
+            }
+
+            if (!$appointment) {
+                return;
+            }
+
+            $dbUpdates = [];
+
+            $paymentStatus = trim((string) ($updates['payment_status'] ?? ''));
+            if ($paymentStatus !== '') {
+                if (in_array(strtolower($paymentStatus), ['paid', 'captured', 'success'], true)) {
+                    $dbUpdates['status'] = 'confirmed';
+                }
+            }
+
+            if (array_key_exists('transaction_id', $updates) && $updates['transaction_id'] !== null) {
+                if (Schema::hasColumn('appointments', 'transaction_id')) {
+                    $dbUpdates['transaction_id'] = $updates['transaction_id'];
+                }
+            }
+
+            $decodedNotes = $this->decodeJsonMaybe($appointment->notes);
+            if (is_array($decodedNotes)) {
+                if (array_key_exists('razorpay_payment_id', $updates)) {
+                    $decodedNotes['razorpay_payment_id'] = $updates['razorpay_payment_id'];
+                }
+                if (array_key_exists('razorpay_signature', $updates)) {
+                    $decodedNotes['razorpay_signature'] = $updates['razorpay_signature'];
+                }
+                if (array_key_exists('razorpay_order_id', $updates) && $updates['razorpay_order_id'] !== null) {
+                    $decodedNotes['razorpay_order_id'] = $updates['razorpay_order_id'];
+                }
+                $dbUpdates['notes'] = json_encode($decodedNotes);
+            }
+
+            if (!empty($dbUpdates)) {
+                $dbUpdates['updated_at'] = now();
+                DB::table('appointments')->where('id', $appointment->id)->update($dbUpdates);
+            }
         } catch (\Throwable $e) {
             report($e);
         }
