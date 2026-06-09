@@ -2543,15 +2543,45 @@ class PaymentController extends Controller
         ];
 
         try {
-            $this->fcm->sendMulticast($tokens, $title, $body, $data);
+            $baseUrl = rtrim((string) config('app.url'), '/');
+            $candidates = array_values(array_unique(array_filter([
+                $baseUrl !== '' ? $baseUrl . '/api/push/test' : null,
+                $baseUrl !== '' ? $baseUrl . '/backend/api/push/test' : null,
+            ])));
+
+            $sentCount = 0;
+            foreach ($tokens as $token) {
+                $lastFailure = null;
+                foreach ($candidates as $endpoint) {
+                    $apiResponse = Http::acceptJson()
+                        ->asJson()
+                        ->timeout(8)
+                        ->post($endpoint, [
+                            'token' => (string) $token,
+                            'title' => $title,
+                            'body' => $body,
+                            'data' => $data,
+                        ]);
+
+                    $payload = $apiResponse->json();
+                    $pushMarkedSent = is_array($payload)
+                        && (($payload['sent'] ?? false) === true || ($payload['success'] ?? false) === true);
+
+                    if ($apiResponse->successful() && $pushMarkedSent) {
+                        $sentCount++;
+                        break;
+                    }
+                }
+            }
         } catch (\Throwable $e) {
             report($e);
             return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
         }
 
         return [
-            'sent' => true,
+            'sent' => $sentCount > 0,
             'token_count' => count($tokens),
+            'sent_count' => $sentCount,
         ];
     }
 
