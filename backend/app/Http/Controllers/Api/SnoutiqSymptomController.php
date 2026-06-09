@@ -3135,7 +3135,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         bool $redFlagBypass
     ): array {
         $pet = $state['pet'] ?? [];
-        $ui = $this->buildUiPayload($routing, $score, $pet, $response);
+        $ui = $this->buildUiPayload($routing, $score, $pet, $response, $state['user_id'] ?? null);
         $view = (string) ($ui['view'] ?? $routing);
 
         return [
@@ -3162,7 +3162,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         ];
     }
 
-    private function buildUiPayload(string $routing, int $score, array $pet, array $response): array
+    private function buildUiPayload(string $routing, int $score, array $pet, array $response, ?int $userId = null): array
     {
         $healthScore = $this->healthScorePercent($routing, $score);
         $view = $this->uiViewFromHealthScore($healthScore, $routing);
@@ -3187,7 +3187,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
                     'whatsapp_text' => $this->shareWhatsappText($petName, $healthScore, $healthMeta['label']),
                 ],
             ],
-            'service_cards' => $this->serviceCards($view),
+            'service_cards' => $this->serviceCards($view, $userId),
         ];
     }
 
@@ -3326,14 +3326,58 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         };
     }
 
-    private function serviceCards(string $view): array
+    private function serviceCards(string $view, ?int $userId = null): array
     {
+        $videoPrice = '₹499';
+        $videoOrigPrice = '₹599';
+        $clinicPrice = '₹350';
+
+        if ($userId && Schema::hasTable('users') && Schema::hasColumn('users', 'last_vet_id')) {
+            $userRow = DB::table('users')->select('last_vet_id')->where('id', $userId)->first();
+            if ($userRow && !empty($userRow->last_vet_id)) {
+                $lastVetId = $userRow->last_vet_id;
+
+                if (Schema::hasTable('vet_registerations_temp') && Schema::hasColumn('vet_registerations_temp', 'clinic_day_fee')) {
+                    $clinicRow = DB::table('vet_registerations_temp')
+                        ->select('clinic_day_fee')
+                        ->where('id', $lastVetId)
+                        ->first();
+                    if ($clinicRow && $clinicRow->clinic_day_fee !== null) {
+                        $clinicPrice = '₹' . (int) $clinicRow->clinic_day_fee;
+                    }
+                }
+
+                if (Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'video_day_rate')) {
+                    $doctorRow = DB::table('doctors')
+                        ->select('video_day_rate')
+                        ->where('vet_registeration_id', $lastVetId)
+                        ->whereNotNull('video_day_rate')
+                        ->orderByDesc('id')
+                        ->first();
+                    if ($doctorRow) {
+                        $videoPrice = '₹' . (int) $doctorRow->video_day_rate;
+                        $videoOrigPrice = null;
+                    } else {
+                        $doctorRow = DB::table('doctors')
+                            ->select('video_day_rate')
+                            ->where('vet_registeration_id', $lastVetId)
+                            ->orderByDesc('id')
+                            ->first();
+                        if ($doctorRow && $doctorRow->video_day_rate !== null) {
+                            $videoPrice = '₹' . (int) $doctorRow->video_day_rate;
+                            $videoOrigPrice = null;
+                        }
+                    }
+                }
+            }
+        }
+
         $video = [
             'badge' => 'Most popular',
             'badge_variant' => '',
             'title' => 'Video Consultation',
-            'price' => '₹499',
-            'orig_price' => '₹599',
+            'price' => $videoPrice,
+            'orig_price' => $videoOrigPrice,
             'guarantee' => "Connect in 15 mins or it's free",
             'bullets' => ['Experienced vets only', 'Connect in 15 mins', 'Money-back guarantee'],
             'theme' => 'video',
@@ -3364,7 +3408,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'badge' => 'Confirmed slot',
             'badge_variant' => 'cb',
             'title' => 'Confirmed Clinic Booking',
-            'price' => '₹350',
+            'price' => $clinicPrice,
             'orig_price' => null,
             'guarantee' => 'Guaranteed appointment, skip the wait',
             'bullets' => ['No queue - appointment confirmed instantly', 'Nearest available vet'],
