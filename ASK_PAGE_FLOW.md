@@ -73,10 +73,8 @@ Inside `AskPage.jsx`, the page keeps:
 The page also persists some state locally:
 
 - `snoutiq-ask-state-v1`
-  Stores:
-  - `species`
-  - `sessionId`
-  - `entries`
+  Stores in-progress chat state while the page is open, but `/ask` now starts
+  fresh on mount and does not restore the previous conversation into the UI
 - `snoutiq-ask-daily-usage-v1`
   Stores:
   - current date
@@ -93,15 +91,10 @@ Important:
 
 When `/ask` opens:
 
-1. `AskPage` reads local storage
-2. If previous state exists:
-   - restores `species`
-   - restores `sessionId`
-   - restores `entries`
+1. `AskPage` restores the saved pet parent profile and any in-progress intake draft
+2. It does not restore the previous `sessionId` or old chat entries
 3. It reads local daily usage count
-4. It renders:
-   - idle screen if no chat entries exist
-   - existing conversation if restored
+4. It renders a fresh idle screen for a new symptom check
 
 ### 2. Session restore fallback
 
@@ -115,7 +108,8 @@ then frontend calls:
 
 - `GET /api/symptom-session/{session_id}`
 
-This is a recovery path so that a saved session can still rebuild a minimal chat timeline.
+This is only a recovery path for an active in-memory session. `/ask` no longer
+rehydrates an old conversation from storage on page entry.
 
 ### 3. First message
 
