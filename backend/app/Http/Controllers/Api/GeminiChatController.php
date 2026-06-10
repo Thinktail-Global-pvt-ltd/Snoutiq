@@ -2180,7 +2180,10 @@ PROMPT;
 
         [$base64, $mimeType, $fileName, $fileSize, $contents] = $this->resolveSummaryDocumentPayload($request, 'document', 10240);
 
-        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? GeminiConfig::apiKey()));
+        // Resolve API key exactly like SnoutiqSymptomController (env first, then config/fallback)
+        $apiKey = env('GEMINI_API_KEY') ?: config('services.gemini.api_key') ?: GeminiConfig::apiKey();
+        $apiKey = trim((string) $apiKey);
+
         if ($apiKey === '') {
             return response()->json([
                 'success' => false,
@@ -2273,7 +2276,9 @@ PROMPT;
             ], 502);
         }
 
+        // Try the configured model (like gemini-2.0-flash from env) first, then fallbacks
         $models = array_values(array_unique(array_filter([
+            env('GEMINI_MODEL', 'gemini-2.0-flash'),
             'gemini-2.5-flash',
             GeminiConfig::chatModel(),
             config('services.gemini.chat_model'),
@@ -2298,6 +2303,7 @@ PROMPT;
                     urlencode($apiKey)
                 );
 
+                // Simple generationConfig matching geminiCallWithImage (no responseMimeType / topP / topK limits)
                 $payload = json_encode([
                     'contents' => [[
                         'role' => 'user',
@@ -2307,25 +2313,19 @@ PROMPT;
                         ],
                     ]],
                     'generationConfig' => [
-                        'temperature' => 0.1,
-                        'topP' => 0.8,
-                        'topK' => 32,
                         'maxOutputTokens' => 1800,
-                        'responseMimeType' => 'application/json',
+                        'temperature' => 0.2,
                     ],
                 ], JSON_UNESCAPED_SLASHES);
 
+                // Simple curl parameters identical to curlPost
                 $ch = curl_init($url);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_POST           => true,
-                    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
                     CURLOPT_POSTFIELDS     => $payload,
-                    CURLOPT_TIMEOUT        => 50,
-                    CURLOPT_CONNECTTIMEOUT => 15,
-                    CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-                    CURLOPT_SSL_VERIFYPEER => true,
-                    CURLOPT_SSL_VERIFYHOST => 2,
+                    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                    CURLOPT_TIMEOUT        => 45,
                 ]);
 
                 $resp = curl_exec($ch);
@@ -2335,7 +2335,7 @@ PROMPT;
 
                 if ($err || $resp === false) {
                     $errors[] = "Model {$model} attempt {$attempt} cURL error: {$err}";
-                    break; // break retry loop, try next model
+                    break;
                 }
 
                 $lastResp = $resp;
@@ -2358,8 +2358,21 @@ PROMPT;
                             'data' => $decoded,
                         ]);
                     } else {
+                        // Extract JSON from balanced brackets if it has markdown formatting / extra text
+                        $startPos = strpos($text, '{');
+                        $endPos = strrpos($text, '}');
+                        if ($startPos !== false && $endPos !== false && $endPos > $startPos) {
+                            $extractedJson = substr($text, $startPos, $endPos - $startPos + 1);
+                            $decodedExtracted = json_decode($extractedJson, true);
+                            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedExtracted)) {
+                                return response()->json([
+                                    'success' => true,
+                                    'data' => $decodedExtracted,
+                                ]);
+                            }
+                        }
                         $errors[] = "Model {$model} attempt {$attempt} JSON decode error: " . json_last_error_msg();
-                        break; // break retry loop, try next model
+                        break;
                     }
                 } elseif ($httpCode === 429) {
                     $errors[] = "Model {$model} attempt {$attempt} rate limited (HTTP 429)";
@@ -2368,7 +2381,7 @@ PROMPT;
                     }
                 } else {
                     $errors[] = "Model {$model} attempt {$attempt} failed with HTTP {$httpCode}";
-                    break; // break retry loop, try next model
+                    break;
                 }
             }
         }
