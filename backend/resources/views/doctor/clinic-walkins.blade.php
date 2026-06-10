@@ -1838,14 +1838,12 @@ window.PatientStore = (() => {
       fd.append('document', file);
 
       try {
-        const response = await fetch(`${API_BASE}/medical-records/parse-vaccination-certificate`, {
+        const res = await request(`${API_BASE}/medical-records/parse-vaccination-certificate`, {
           method: 'POST',
-          headers: Auth.headers(),
           body: fd
         });
 
-        const res = await response.json();
-        if (response.ok && res.success && res.data) {
+        if (res && res.success && res.data) {
           if (jsonTextarea) {
             jsonTextarea.value = JSON.stringify(res.data, null, 2);
           }
@@ -1859,7 +1857,7 @@ window.PatientStore = (() => {
             showConfirmButton: false
           });
         } else {
-          throw new Error(res.error || 'Failed to parse certificate.');
+          throw new Error(res?.error || 'Failed to parse certificate.');
         }
       } catch (err) {
         if (statusIcon) statusIcon.textContent = '❌';
