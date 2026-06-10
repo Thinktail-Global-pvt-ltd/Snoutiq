@@ -201,6 +201,8 @@ class MedicalRecordController extends Controller
             'vaccination_name' => ['nullable', 'string', 'max:255'],
             'batch_number' => ['nullable', 'string', 'max:255'],
             'vaccination_date' => ['nullable', 'date'],
+            'deworming' => ['nullable', 'string', 'max:50'],
+            'last_deworming_date' => ['nullable', 'date'],
         ]);
         $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
 
@@ -321,6 +323,8 @@ class MedicalRecordController extends Controller
             'vaccination_name' => $validated['vaccination_name'] ?? $prescription->vaccination_name,
             'batch_number' => $validated['batch_number'] ?? $prescription->batch_number,
             'vaccination_date' => $validated['vaccination_date'] ?? $prescription->vaccination_date,
+            'deworming' => $validated['deworming'] ?? $prescription->deworming,
+            'last_deworming_date' => (($validated['deworming'] ?? $prescription->deworming) === 'yes') ? ($validated['last_deworming_date'] ?? $prescription->last_deworming_date) : null,
         ];
         if ($hasDoctorTreatmentColumn) {
             $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? $prescription->doctor_treatment;
@@ -345,6 +349,14 @@ class MedicalRecordController extends Controller
                 $finalVaccinationDate,
                 (int) $record->id,
                 (int) $prescription->id
+            );
+        }
+
+        if ($resolvedPetId && $finalVisitCategory === 'deworming') {
+            $this->updatePetDewormingPayload(
+                (int) $resolvedPetId,
+                $validated['deworming'] ?? $prescription->deworming ?? 'no',
+                (($validated['deworming'] ?? $prescription->deworming) === 'yes') ? ($validated['last_deworming_date'] ?? $prescription->last_deworming_date) : null
             );
         }
 
@@ -418,6 +430,8 @@ class MedicalRecordController extends Controller
             'vaccination_name' => ['nullable', 'string', 'max:255'],
             'batch_number' => ['nullable', 'string', 'max:255'],
             'vaccination_date' => ['nullable', 'date'],
+            'deworming' => ['nullable', 'string', 'max:50'],
+            'last_deworming_date' => ['nullable', 'date'],
         ]);
         $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
 
@@ -540,6 +554,8 @@ class MedicalRecordController extends Controller
             'vaccination_name' => $validated['vaccination_name'] ?? null,
             'batch_number' => $validated['batch_number'] ?? null,
             'vaccination_date' => $validated['vaccination_date'] ?? null,
+            'deworming' => $validated['deworming'] ?? null,
+            'last_deworming_date' => (($validated['deworming'] ?? null) === 'yes') ? ($validated['last_deworming_date'] ?? null) : null,
         ];
         if ($hasDoctorTreatmentColumn) {
             $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? null;
@@ -563,6 +579,14 @@ class MedicalRecordController extends Controller
                 $validated['vaccination_date'] ?? null,
                 (int) $record->id,
                 (int) $prescription->id
+            );
+        }
+
+        if ($petId && ($validated['visit_category'] ?? null) === 'deworming') {
+            $this->updatePetDewormingPayload(
+                (int) $petId,
+                $validated['deworming'] ?? 'no',
+                (($validated['deworming'] ?? null) === 'yes') ? ($validated['last_deworming_date'] ?? null) : null
             );
         }
 
@@ -1432,5 +1456,87 @@ PROMPT;
         // Save pet payload
         $pet->dog_disease_payload = $payload;
         $pet->save();
+    }
+
+    private function updatePetDewormingPayload(int $petId, string $dewormingStatus, ?string $lastDewormingDate): void
+    {
+        if (!Schema::hasTable('pets')) {
+            return;
+        }
+
+        $pet = Pet::find($petId);
+        if (!$pet) {
+            return;
+        }
+
+        $dewormingYesNo = (strtolower(trim($dewormingStatus)) === 'yes') ? 1 : 0;
+        
+        $updates = [];
+        if (Schema::hasColumn('pets', 'deworming_yes_no')) {
+            $updates['deworming_yes_no'] = $dewormingYesNo;
+        }
+
+        if ($dewormingYesNo) {
+            if ($lastDewormingDate) {
+                $carbonDate = null;
+                try {
+                    $carbonDate = \Carbon\Carbon::parse($lastDewormingDate);
+                } catch (\Throwable $e) {
+                }
+
+                if ($carbonDate) {
+                    $formattedDate = $carbonDate->toDateString();
+                    if (Schema::hasColumn('pets', 'last_deworming_date')) {
+                        $updates['last_deworming_date'] = $formattedDate;
+                    }
+
+                    $petDob = $pet->pet_dob ?? $pet->dob ?? null;
+                    if ($petDob) {
+                        try {
+                            $dob = \Carbon\Carbon::parse($petDob)->startOfDay();
+                            $today = \Carbon\Carbon::today();
+                            $ageInMonths = max(0, $dob->diffInMonths($today, false));
+                            $isUnderSixMonths = $ageInMonths < 6;
+                            $status = $isUnderSixMonths ? 'every_15_days' : 'every_3_months';
+                            
+                            $baseDate = $carbonDate->copy()->startOfDay();
+                            $nextDate = $baseDate->copy();
+                            if ($isUnderSixMonths) {
+                                do {
+                                    $nextDate->addDays(15);
+                                } while ($nextDate->lte($today));
+                            } else {
+                                do {
+                                    $nextDate->addMonthsNoOverflow(3);
+                                } while ($nextDate->lte($today));
+                            }
+
+                            if (Schema::hasColumn('pets', 'deworming_status')) {
+                                $updates['deworming_status'] = $status;
+                            }
+                            if (Schema::hasColumn('pets', 'next_deworming_date')) {
+                                $updates['next_deworming_date'] = $nextDate->toDateString();
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to calculate next deworming date: ' . $e->getMessage());
+                        }
+                    }
+                }
+            }
+        } else {
+            if (Schema::hasColumn('pets', 'last_deworming_date')) {
+                $updates['last_deworming_date'] = null;
+            }
+            if (Schema::hasColumn('pets', 'deworming_status')) {
+                $updates['deworming_status'] = null;
+            }
+            if (Schema::hasColumn('pets', 'next_deworming_date')) {
+                $updates['next_deworming_date'] = null;
+            }
+        }
+
+        if (!empty($updates)) {
+            $pet->update($updates);
+        }
     }
 }

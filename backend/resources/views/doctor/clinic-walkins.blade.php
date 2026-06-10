@@ -737,6 +737,7 @@
               <option value="consultation">Consultation</option>
               <option value="video_consultation">Video Consultation</option>
               <option value="followup">Follow-up</option>
+              <option value="deworming">Deworming</option>
             </select>
           </div>
           <div class="pv-field vaccination-field" style="display:none">
@@ -750,6 +751,17 @@
           <div class="pv-field vaccination-field" style="display:none">
             <label class="pv-label" for="vaccination-date">Vaccination Date</label>
             <input type="date" id="vaccination-date" name="vaccination_date" class="pv-input">
+          </div>
+          <div class="pv-field deworming-field" style="display:none">
+            <label class="pv-label" for="deworming-status"><span class="pv-required">*</span> Deworming</label>
+            <select id="deworming-status" name="deworming" class="pv-input">
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+          <div class="pv-field deworming-field deworming-date-container" style="display:none">
+            <label class="pv-label" for="last-deworming-date"><span class="pv-required">*</span> Last Deworming Date</label>
+            <input type="date" id="last-deworming-date" name="last_deworming_date" class="pv-input">
           </div>
           <div class="pv-field">
             <label class="pv-label" for="case-severity"><span class="pv-required">*</span> Case Severity</label>
@@ -1201,6 +1213,26 @@ window.PatientStore = (() => {
     return raw;
   }
 
+  function updateDewormingDateUI() {
+    const isDeworm = (els.visitCategory?.value === 'deworming');
+    const dewormingStatus = document.getElementById('deworming-status');
+    const dewormingDateContainer = document.querySelector('.deworming-date-container');
+    const lastDewormingDateInput = document.getElementById('last-deworming-date');
+
+    if (isDeworm && dewormingStatus?.value === 'yes') {
+      if (dewormingDateContainer) dewormingDateContainer.style.display = 'block';
+      if (lastDewormingDateInput) lastDewormingDateInput.setAttribute('required', 'required');
+    } else {
+      if (dewormingDateContainer) dewormingDateContainer.style.display = 'none';
+      if (lastDewormingDateInput) {
+        lastDewormingDateInput.removeAttribute('required');
+        if (!isDeworm || dewormingStatus?.value !== 'yes') {
+          lastDewormingDateInput.value = '';
+        }
+      }
+    }
+  }
+
   function updateVisitCategoryUI(category) {
     const cat = normalizeVisitCategoryValue(category||els.visitCategory?.value||'');
     if (!cat) {
@@ -1209,15 +1241,22 @@ window.PatientStore = (() => {
       setCardVisible(els.treatmentCard,true);
       setCardVisible(els.followupCard,true);
       document.querySelectorAll('.vaccination-field').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.deworming-field').forEach(el => el.style.display = 'none');
       return;
     }
-    const isVacc  = cat === 'vaccination';
-    const isVideo = cat === 'video_consultation';
-    setCardVisible(els.clinicalCard,  !isVacc && !isVideo);
-    setCardVisible(els.diagnosisCard, !isVacc && !isVideo);
-    setCardVisible(els.treatmentCard, !isVacc || isVideo);
-    setCardVisible(els.followupCard,  true);
+    const isVacc   = cat === 'vaccination';
+    const isVideo  = cat === 'video_consultation';
+    const isDeworm = cat === 'deworming';
+
+    setCardVisible(els.clinicalCard,  !isVacc && !isVideo && !isDeworm);
+    setCardVisible(els.diagnosisCard, !isVacc && !isVideo && !isDeworm);
+    setCardVisible(els.treatmentCard, (!isVacc || isVideo) && !isDeworm);
+    setCardVisible(els.followupCard,  !isDeworm);
+
     document.querySelectorAll('.vaccination-field').forEach(el => el.style.display = isVacc ? 'block' : 'none');
+    document.querySelectorAll('.deworming-field').forEach(el => el.style.display = isDeworm ? 'block' : 'none');
+
+    updateDewormingDateUI();
     renderFollowupContext();
   }
 
@@ -1674,6 +1713,8 @@ window.PatientStore = (() => {
     const vn=document.getElementById('vaccination-name'); if(vn) vn.value='';
     const bn=document.getElementById('batch-number'); if(bn) bn.value='';
     const vd=document.getElementById('vaccination-date'); if(vd) vd.value='';
+    const ds=document.getElementById('deworming-status'); if(ds) ds.value='no';
+    const ld=document.getElementById('last-deworming-date'); if(ld) ld.value='';
   }
 
   function fillRecordFormFromRecord(rec) {
@@ -1697,6 +1738,8 @@ window.PatientStore = (() => {
     mv('vaccination-name', rx.vaccination_name??'');
     mv('batch-number',     rx.batch_number??'');
     mv('vaccination-date', rx.vaccination_date??'');
+    mv('deworming-status',  rx.deworming??'no');
+    mv('last-deworming-date', rx.last_deworming_date??'');
     updateVisitCategoryUI(els.visitCategory?.value||''); recomputeLastPostOp();
     medications = normalizeMedicationState(rx.medications_json||[]); renderMedicationCards(); syncMedicationPayload();
     if (!medications.length) addMedication();
@@ -1751,6 +1794,7 @@ window.PatientStore = (() => {
     els.caseSeverity?.addEventListener('change', () => toggleCriticalSections());
     els.addMedicineBtn?.addEventListener('click', () => addMedication());
     els.visitCategory?.addEventListener('change', e => updateVisitCategoryUI(e.target.value));
+    document.getElementById('deworming-status')?.addEventListener('change', () => updateDewormingDateUI());
     els.recordPet?.addEventListener('change', () => { recomputeLastPostOp(); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); });
     els.recordNotes?.addEventListener('input', () => {
       const auto = String(els.recordNotes.dataset.autofillSymptom??'').trim();
@@ -1762,6 +1806,14 @@ window.PatientStore = (() => {
       if (!CLINIC_ID) { Swal.fire({icon:'error',title:'Clinic missing',text:'Clinic ID not detected. Reload dashboard.'}); return; }
       const patientId = els.modalUserInput.value;
       if (!patientId) { Swal.fire({icon:'error',title:'Patient missing',text:'Select a patient before uploading.'}); return; }
+      if (els.visitCategory?.value === 'deworming') {
+        const dStatus = document.getElementById('deworming-status')?.value;
+        const dDate = document.getElementById('last-deworming-date')?.value;
+        if (dStatus === 'yes' && !dDate) {
+          Swal.fire({icon:'warning',title:'Missing Date',text:'Please enter the last deworming date.'});
+          return;
+        }
+      }
       syncMedicationPayload();
       const fd = new FormData(els.recordForm);
       fd.append('clinic_id', CLINIC_ID);
