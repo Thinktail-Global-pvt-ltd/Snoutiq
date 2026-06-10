@@ -1627,9 +1627,6 @@ PROMPT;
             ], 500);
         }
 
-        $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
-        $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s', $model, $apiKey);
-
         $prompt = <<<PROMPT
 You are an expert veterinary AI assistant. Your task is to analyze the uploaded pet vaccination certificate image/document and convert its contents into a structured JSON object.
 
@@ -1662,8 +1659,9 @@ Return ONLY a valid JSON object matching this structure:
 Do not return any other text, explanations, or markdown blocks. Only return the raw JSON object.
 PROMPT;
 
-        try {
-            if (app()->runningUnitTests()) {
+        if (app()->runningUnitTests()) {
+            try {
+                $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s', urlencode($apiKey));
                 $response = Http::withHeaders([
                     'Content-Type' => 'application/json',
                 ])->post($endpoint, [
@@ -1684,53 +1682,102 @@ PROMPT;
 
                 $text = $response->json('candidates.0.content.parts.0.text');
                 $httpCode = $response->status();
-                $resp = $response->body();
-            } else {
-                $payload = json_encode([
-                    'contents' => [[
-                        'role' => 'user',
-                        'parts' => [
-                            ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
-                            ['text' => $prompt],
-                        ],
-                    ]],
-                    'generationConfig' => [
-                        'temperature' => 0.1,
-                        'topP' => 0.8,
-                        'topK' => 32,
-                        'maxOutputTokens' => 1800,
-                        'responseMimeType' => 'application/json',
-                    ],
-                ], JSON_UNESCAPED_SLASHES);
-
-                $ch = curl_init($endpoint);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST           => true,
-                    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS     => $payload,
-                    CURLOPT_TIMEOUT        => 50,
-                    CURLOPT_CONNECTTIMEOUT => 15,
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => 0,
-                ]);
-
-                $resp = curl_exec($ch);
-                $err = curl_error($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                if ($err || $resp === false) {
-                    Log::warning('Gemini cURL call failed in parseVaccinationCertificate', ['error' => $err]);
-                    return response()->json([
-                        'success' => false,
-                        'error' => 'cURL error: ' . $err,
-                    ], 502);
-                }
-
-                $decodedResponse = json_decode($resp, true);
-                $text = $decodedResponse['candidates'][0]['content']['parts'][0]['text'] ?? null;
+                $respBody = $response->body();
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'HTTP facade error: ' . $e->getMessage(),
+                ], 502);
             }
+
+            if ($httpCode === 200 && $text) {
+                $text = trim($text);
+                $decoded = json_decode($text, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => $decoded,
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to parse JSON from Gemini response.',
+                'raw' => $text ?? null,
+                'debug' => [
+                    'http_code' => $httpCode ?? 502,
+                    'response' => isset($respBody) ? (json_decode($respBody, true) ?? $respBody) : null
+                ]
+            ], 502);
+        }
+
+        $models = array_values(array_unique(array_filter([
+            'gemini-2.5-flash',
+            \App\Support\GeminiConfig::chatModel(),
+            config('services.gemini.chat_model'),
+            config('services.gemini.model'),
+            \App\Support\GeminiConfig::defaultModel(),
+        ])));
+
+        $errors = [];
+        $lastResp = null;
+        $lastHttpCode = null;
+        $lastText = null;
+
+        foreach ($models as $model) {
+            $url = sprintf(
+                'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+                $model,
+                urlencode($apiKey)
+            );
+
+            $payload = json_encode([
+                'contents' => [[
+                    'role' => 'user',
+                    'parts' => [
+                        ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
+                        ['text' => $prompt],
+                    ],
+                ]],
+                'generationConfig' => [
+                    'temperature' => 0.1,
+                    'topP' => 0.8,
+                    'topK' => 32,
+                    'maxOutputTokens' => 1800,
+                    'responseMimeType' => 'application/json',
+                ],
+            ], JSON_UNESCAPED_SLASHES);
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                CURLOPT_POSTFIELDS     => $payload,
+                CURLOPT_TIMEOUT        => 50,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+            ]);
+
+            $resp = curl_exec($ch);
+            $err = curl_error($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($err || $resp === false) {
+                $errors[] = "Model {$model} cURL error: {$err}";
+                continue;
+            }
+
+            $lastResp = $resp;
+            $lastHttpCode = $httpCode;
+
+            $decodedResponse = json_decode($resp, true);
+            $text = $decodedResponse['candidates'][0]['content']['parts'][0]['text'] ?? null;
+            $lastText = $text;
 
             if ($httpCode === 200 && $text) {
                 $text = trim($text);
@@ -1745,32 +1792,23 @@ PROMPT;
                         'data' => $decoded,
                     ]);
                 } else {
-                    Log::warning('Gemini response was not valid JSON', ['raw' => $text, 'json_error' => json_last_error_msg()]);
+                    $errors[] = "Model {$model} JSON decode error: " . json_last_error_msg();
                 }
             } else {
-                Log::warning('Gemini API call failed or returned empty text', [
-                    'status' => $httpCode,
-                    'body' => $resp
-                ]);
+                $errors[] = "Model {$model} API failed with HTTP {$httpCode}";
             }
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to parse JSON from Gemini response.',
-                'raw' => $text ?? null,
-                'debug' => [
-                    'http_code' => $httpCode,
-                    'response' => json_decode($resp, true) ?? $resp
-                ]
-            ], 502);
-
-        } catch (\Throwable $e) {
-            Log::error('Gemini vaccination certificate parsing failed', ['error' => $e->getMessage()]);
-            return response()->json([
-                'success' => false,
-                'error' => 'An error occurred while calling the Gemini API: ' . $e->getMessage(),
-            ], 500);
         }
+
+        return response()->json([
+            'success' => false,
+            'error' => 'Failed to parse JSON from Gemini response.',
+            'raw' => $lastText ?? null,
+            'errors' => $errors,
+            'debug' => [
+                'http_code' => $lastHttpCode,
+                'response' => $lastResp ? (json_decode($lastResp, true) ?? $lastResp) : null
+            ]
+        ], 502);
     }
 
     private function mergeVaccinationCertificatePayload(int $petId, string $jsonString): void
