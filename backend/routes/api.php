@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 // use App
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
+use App\Http\Controllers\Api\AiSearchController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\RoleLoginController;
 use App\Http\Controllers\Api\ChatController;
@@ -3626,6 +3627,9 @@ Route::post('/chat/unified', [GeminiChatController::class, 'unifiedProcess']);
 Route::get('/chat/unified/status', [GeminiChatController::class, 'unifiedStatus']);
 Route::post('/chat/unified/reset', [GeminiChatController::class, 'unifiedReset']);
 
+// Gemini AI Search endpoint
+Route::match(['get', 'post'], '/ai/search', [AiSearchController::class, 'search']);
+
 Route::prefix('groomer')->group(function () {
               // list
   //  Route::post('/service', [GroomerServiceController::class, 'store']);          // create
@@ -3827,7 +3831,7 @@ Route::get('/doctor/pending-prescription', [\App\Http\Controllers\Api\DoctorPend
 Route::get('/users/{user}/medical-records', [MedicalRecordController::class, 'index']);
 Route::get('/medical-records/user/{user}', [MedicalRecordController::class, 'userRecords']);
 Route::post('/medical-records', [MedicalRecordController::class, 'store']);
-Route::post('/medical-records/parse-vaccination-certificate', [MedicalRecordController::class, 'parseVaccinationCertificate']);
+Route::post('/medical-records/parse-vaccination-certificate', [GeminiChatController::class, 'parseVaccinationCertificate']);
 Route::match(['put','patch'], '/medical-records/{record}', [MedicalRecordController::class, 'update']);
 Route::get('/medical-records/slug/{slug}', [MedicalRecordController::class, 'indexBySlug']);
 Route::get('/affected-systems', [\App\Http\Controllers\Api\AffectedSystemController::class, 'index']);

@@ -17,17 +17,17 @@ final class GeminiConfig
 
     public static function apiKey(): string
     {
-        return self::API_KEY;
+        return config('services.gemini.api_key') ?: env('GEMINI_API_KEY') ?: self::API_KEY;
     }
 
     public static function defaultModel(): string
     {
-        return self::DEFAULT_MODEL;
+        return config('services.gemini.model') ?: env('GEMINI_MODEL') ?: self::DEFAULT_MODEL;
     }
 
     public static function chatModel(): string
     {
-        return self::DEFAULT_CHAT_MODEL;
+        return config('services.gemini.chat_model') ?: env('GEMINI_CHAT_MODEL') ?: self::DEFAULT_CHAT_MODEL;
     }
 
     public static function summaryModels(): array
