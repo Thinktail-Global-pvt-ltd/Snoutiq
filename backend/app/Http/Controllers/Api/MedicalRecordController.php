@@ -1758,6 +1758,10 @@ PROMPT;
                 'success' => false,
                 'error' => 'Failed to parse JSON from Gemini response.',
                 'raw' => $text ?? null,
+                'debug' => [
+                    'http_code' => $httpCode,
+                    'response' => json_decode($resp, true) ?? $resp
+                ]
             ], 502);
 
         } catch (\Throwable $e) {
