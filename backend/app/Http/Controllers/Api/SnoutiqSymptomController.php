@@ -530,6 +530,9 @@ class SnoutiqSymptomController extends Controller
         if (!is_array($rawBody)) {
             return $response;
         }
+        if (!($rawBody['success'] ?? false)) {
+            return $response;
+        }
 
         $routing = (string) ($rawBody['routing'] ?? 'video_consult');
         $score = (int) ($rawBody['score'] ?? 0);
