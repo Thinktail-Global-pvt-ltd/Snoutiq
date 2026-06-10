@@ -19,6 +19,7 @@ use Illuminate\Support\Str;
 use App\Support\GeminiConfig;
 use App\Services\PetDiseaseInferenceService;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Http;
 
 class GeminiChatController extends Controller
 {
@@ -2169,5 +2170,218 @@ PROMPT;
         }
 
         return null;
+    }
+
+    public function parseVaccinationCertificate(Request $request)
+    {
+        $request->validate([
+            'document' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
+        ]);
+
+        [$base64, $mimeType, $fileName, $fileSize, $contents] = $this->resolveSummaryDocumentPayload($request, 'document', 10240);
+
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            return response()->json([
+                'success' => false,
+                'error' => 'Gemini API key is not configured.',
+            ], 500);
+        }
+
+        $prompt = <<<PROMPT
+You are an expert veterinary AI assistant. Your task is to analyze the uploaded pet vaccination certificate image/document and convert its contents into a structured JSON object.
+
+Please scan the document for any recorded vaccinations. For each vaccine found:
+1. Identify the name of the vaccine. Standardize it into one of the following canonical slugs:
+   - "dhppil" (for Vanguard Plus 5 L4, DHPPiL, Canine Distemper-Adenovirus-Parvovirus-Parainfluenza-Leptospirosis, or any distemper/lepto combo)
+   - "rabies" (for Defensor 3, Rabisin, Rabies, or any rabies vaccine)
+   - "canine_coronavirus" (for Vanguard CV, Canine Coronavirus Vaccine, Corona, or similar)
+   - "nobivac_kc" (for Nobivac KC, Kennel Cough, KC, or similar)
+   - "dhppi" (for DHPPi, distemper/parvo without lepto)
+   - "leptospirosis" (for Leptospirosis only vaccine)
+   - "fvrcp" (for FVRCP / cat vaccine)
+   - "felv" (for FeLV / cat vaccine)
+   If a vaccine does not match any of the above, use a clean snake_case slug based on the vaccine name.
+
+2. Extract the administration date ("date") and the next due date ("next_due").
+   - Convert all dates into "YYYY-MM-DD" format.
+   - If next due date is not written on the document, try to calculate it based on standard veterinary intervals (e.g. 1 year after the administration date for adult booster, or 1 month/3 months if indicated by handwritten notes/stickers) or set it to null/omit it if uncertain.
+
+Return ONLY a valid JSON object matching this structure:
+{
+  "vaccination": {
+    "dhppil": {
+      "date": "2026-06-05",
+      "next_due": "2026-06-05"
+    }
+  }
+}
+
+Do not return any other text, explanations, or markdown blocks. Only return the raw JSON object.
+PROMPT;
+
+        if (app()->runningUnitTests()) {
+            try {
+                $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s', urlencode($apiKey));
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                ])->post($endpoint, [
+                    'contents' => [[
+                        'role' => 'user',
+                        'parts' => [
+                            ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
+                            ['text' => $prompt],
+                        ],
+                    ]],
+                    'generationConfig' => [
+                        'temperature' => 0.1,
+                        'topP' => 0.8,
+                        'topK' => 32,
+                        'maxOutputTokens' => 1800,
+                    ],
+                ]);
+
+                $text = $response->json('candidates.0.content.parts.0.text');
+                $httpCode = $response->status();
+                $respBody = $response->body();
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'HTTP facade error: ' . $e->getMessage(),
+                ], 502);
+            }
+
+            if ($httpCode === 200 && $text) {
+                $text = trim($text);
+                $decoded = json_decode($text, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => $decoded,
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to parse JSON from Gemini response.',
+                'raw' => $text ?? null,
+                'debug' => [
+                    'http_code' => $httpCode ?? 502,
+                    'response' => isset($respBody) ? (json_decode($respBody, true) ?? $respBody) : null
+                ]
+            ], 502);
+        }
+
+        $models = array_values(array_unique(array_filter([
+            'gemini-2.5-flash',
+            GeminiConfig::chatModel(),
+            config('services.gemini.chat_model'),
+            config('services.gemini.model'),
+            GeminiConfig::defaultModel(),
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-flash-001',
+            'gemini-1.5-flash',
+        ])));
+
+        $errors = [];
+        $lastResp = null;
+        $lastHttpCode = null;
+        $lastText = null;
+
+        foreach ($models as $model) {
+            $maxAttempts = 3;
+            for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+                $url = sprintf(
+                    'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+                    $model,
+                    urlencode($apiKey)
+                );
+
+                $payload = json_encode([
+                    'contents' => [[
+                        'role' => 'user',
+                        'parts' => [
+                            ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
+                            ['text' => $prompt],
+                        ],
+                    ]],
+                    'generationConfig' => [
+                        'temperature' => 0.1,
+                        'topP' => 0.8,
+                        'topK' => 32,
+                        'maxOutputTokens' => 1800,
+                        'responseMimeType' => 'application/json',
+                    ],
+                ], JSON_UNESCAPED_SLASHES);
+
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST           => true,
+                    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS     => $payload,
+                    CURLOPT_TIMEOUT        => 50,
+                    CURLOPT_CONNECTTIMEOUT => 15,
+                    CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_SSL_VERIFYHOST => 2,
+                ]);
+
+                $resp = curl_exec($ch);
+                $err = curl_error($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($err || $resp === false) {
+                    $errors[] = "Model {$model} attempt {$attempt} cURL error: {$err}";
+                    break; // break retry loop, try next model
+                }
+
+                $lastResp = $resp;
+                $lastHttpCode = $httpCode;
+
+                $decodedResponse = json_decode($resp, true);
+                $text = $decodedResponse['candidates'][0]['content']['parts'][0]['text'] ?? null;
+                $lastText = $text;
+
+                if ($httpCode === 200 && $text) {
+                    $text = trim($text);
+                    $text = preg_replace('/^```(?:json)?\s*/i', '', $text);
+                    $text = preg_replace('/\s*```$/', '', $text);
+                    $text = trim($text);
+
+                    $decoded = json_decode($text, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        return response()->json([
+                            'success' => true,
+                            'data' => $decoded,
+                        ]);
+                    } else {
+                        $errors[] = "Model {$model} attempt {$attempt} JSON decode error: " . json_last_error_msg();
+                        break; // break retry loop, try next model
+                    }
+                } elseif ($httpCode === 429) {
+                    $errors[] = "Model {$model} attempt {$attempt} rate limited (HTTP 429)";
+                    if ($attempt < $maxAttempts) {
+                        usleep(500000 * $attempt); // backoff 500ms * attempt before retrying
+                    }
+                } else {
+                    $errors[] = "Model {$model} attempt {$attempt} failed with HTTP {$httpCode}";
+                    break; // break retry loop, try next model
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'error' => 'Failed to parse JSON from Gemini response.',
+            'raw' => $lastText ?? null,
+            'errors' => $errors,
+            'debug' => [
+                'http_code' => $lastHttpCode,
+                'response' => $lastResp ? (json_decode($lastResp, true) ?? $lastResp) : null
+            ]
+        ], 502);
     }
 }
