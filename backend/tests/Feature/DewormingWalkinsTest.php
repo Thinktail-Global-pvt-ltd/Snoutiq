@@ -360,4 +360,114 @@ class DewormingWalkinsTest extends TestCase
         $this->assertEquals('every_3_months', $pet->deworming_status);
         $this->assertDateEquals('2026-09-02', $pet->next_deworming_date);
     }
+
+    public function test_parse_vaccination_certificate_success(): void
+    {
+        \Illuminate\Support\Facades\Http::fake([
+            'https://generativelanguage.googleapis.com/*' => \Illuminate\Support\Facades\Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => '{"vaccination":{"dhppil":{"date":"2026-06-05","next_due":"2026-06-05"}}}'
+                        ]]
+                    ]
+                ]]
+            ], 200)
+        ]);
+
+        $file = \Illuminate\Http\UploadedFile::fake()->image('cert.png');
+
+        $response = $this->postJson('/api/medical-records/parse-vaccination-certificate', [
+            'document' => $file,
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'vaccination' => [
+                        'dhppil' => [
+                            'date' => '2026-06-05',
+                            'next_due' => '2026-06-05',
+                        ]
+                    ]
+                ]
+            ]);
+    }
+
+    public function test_store_medical_record_with_vaccination_certificate_json(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1479,
+            'name' => 'Pet Parent',
+            'last_vet_id' => 22,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 22,
+            'name' => 'Vet Clinic',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 40,
+            'vet_registeration_id' => 22,
+            'doctor_name' => 'Dr. Rao',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1357,
+            'user_id' => 1479,
+            'name' => 'Bruno',
+            'pet_dob' => '2025-01-01',
+            'dog_disease_payload' => json_encode([
+                'vaccination' => [
+                    'rabies' => [
+                        'date' => '2025-05-10',
+                        'next_due' => '2026-05-10',
+                    ]
+                ]
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/medical-records', [
+            'user_id' => 1479,
+            'doctor_id' => 40,
+            'clinic_id' => 22,
+            'pet_id' => 1357,
+            'visit_category' => 'vaccination',
+            'notes' => 'Vaccination cert upload test',
+            'vaccination_certificate_json' => json_encode([
+                'vaccination' => [
+                    'dhppil' => [
+                        'date' => '2026-06-05',
+                        'next_due' => '2026-06-05',
+                    ]
+                ]
+            ]),
+        ]);
+
+        $response->assertStatus(201);
+
+        $pet = Pet::find(1357);
+        $this->assertNotNull($pet);
+        $payload = is_string($pet->dog_disease_payload) ? json_decode($pet->dog_disease_payload, true) : $pet->dog_disease_payload;
+        
+        $this->assertArrayHasKey('vaccination', $payload);
+        $this->assertArrayHasKey('rabies', $payload['vaccination']);
+        $this->assertArrayHasKey('dhppil', $payload['vaccination']);
+        
+        $this->assertEquals('2026-06-05', $payload['vaccination']['dhppil']['date']);
+        $this->assertEquals('2026-06-05', $payload['vaccination']['dhppil']['next_due']);
+        
+        $this->assertEquals('2025-05-10', $payload['vaccination']['rabies']['date']);
+        $this->assertEquals('2026-05-10', $payload['vaccination']['rabies']['next_due']);
+    }
 }

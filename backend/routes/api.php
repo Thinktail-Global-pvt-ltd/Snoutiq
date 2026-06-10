@@ -3827,6 +3827,7 @@ Route::get('/doctor/pending-prescription', [\App\Http\Controllers\Api\DoctorPend
 Route::get('/users/{user}/medical-records', [MedicalRecordController::class, 'index']);
 Route::get('/medical-records/user/{user}', [MedicalRecordController::class, 'userRecords']);
 Route::post('/medical-records', [MedicalRecordController::class, 'store']);
+Route::post('/medical-records/parse-vaccination-certificate', [MedicalRecordController::class, 'parseVaccinationCertificate']);
 Route::match(['put','patch'], '/medical-records/{record}', [MedicalRecordController::class, 'update']);
 Route::get('/medical-records/slug/{slug}', [MedicalRecordController::class, 'indexBySlug']);
 Route::get('/affected-systems', [\App\Http\Controllers\Api\AffectedSystemController::class, 'index']);

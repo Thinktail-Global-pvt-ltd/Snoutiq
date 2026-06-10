@@ -752,6 +752,19 @@
             <label class="pv-label" for="vaccination-date">Vaccination Date</label>
             <input type="date" id="vaccination-date" name="vaccination_date" class="pv-input">
           </div>
+          <div class="pv-field vaccination-field" style="display:none">
+            <label class="pv-label">Vaccination Certificate</label>
+            <label class="pv-upload" for="vaccination-certificate-file" style="margin-top:2px;">
+              <span id="vaccination-certificate-status-icon">📎</span> <span id="vaccination-certificate-status-text">Upload certificate (Gemini Auto-Parse)</span>
+            </label>
+            <input id="vaccination-certificate-file" type="file" class="pv-input" accept="image/*,application/pdf" style="display:none">
+            <div class="pv-helper">PDF, JPG, PNG up to 10 MB.</div>
+          </div>
+          <div class="pv-field vaccination-field" style="display:none; grid-column: 1 / -1; margin-top: 10px;">
+            <label class="pv-label" for="vaccination-certificate-json">Parsed Certificate Data</label>
+            <textarea id="vaccination-certificate-json" name="vaccination_certificate_json" class="pv-input pv-textarea" placeholder="Parsed JSON data will appear here..." style="font-family: monospace; font-size: 13px;"></textarea>
+            <div class="pv-helper">Verify/edit the parsed JSON before saving. Format: {"vaccination":{"dhppil":{"date":"YYYY-MM-DD","next_due":"YYYY-MM-DD"}}}</div>
+          </div>
           <div class="pv-field deworming-field" style="display:none">
             <label class="pv-label" for="deworming-status"><span class="pv-required">*</span> Deworming</label>
             <select id="deworming-status" name="deworming" class="pv-input">
@@ -1715,10 +1728,18 @@ window.PatientStore = (() => {
     const vd=document.getElementById('vaccination-date'); if(vd) vd.value='';
     const ds=document.getElementById('deworming-status'); if(ds) ds.value='no';
     const ld=document.getElementById('last-deworming-date'); if(ld) ld.value='';
+    const vcf=document.getElementById('vaccination-certificate-file'); if(vcf) vcf.value='';
+    const vcj=document.getElementById('vaccination-certificate-json'); if(vcj) vcj.value='';
+    const vct=document.getElementById('vaccination-certificate-status-text'); if(vct) vct.textContent='Upload certificate (Gemini Auto-Parse)';
+    const vci=document.getElementById('vaccination-certificate-status-icon'); if(vci) vci.textContent='📎';
   }
 
   function fillRecordFormFromRecord(rec) {
     if (!rec) return;
+    const vcf=document.getElementById('vaccination-certificate-file'); if(vcf) vcf.value='';
+    const vcj=document.getElementById('vaccination-certificate-json'); if(vcj) vcj.value='';
+    const vct=document.getElementById('vaccination-certificate-status-text'); if(vct) vct.textContent='Upload certificate (Gemini Auto-Parse)';
+    const vci=document.getElementById('vaccination-certificate-status-icon'); if(vci) vci.textContent='📎';
     const rx = rec.prescription||{};
     state.editingRecordId = rec.id;
     const ri=document.getElementById('record-id'); if(ri) ri.value=rec.id;
@@ -1799,6 +1820,56 @@ window.PatientStore = (() => {
     els.recordNotes?.addEventListener('input', () => {
       const auto = String(els.recordNotes.dataset.autofillSymptom??'').trim();
       if (auto && String(els.recordNotes.value??'').trim()!==auto) delete els.recordNotes.dataset.autofillSymptom;
+    });
+
+    const certInput = document.getElementById('vaccination-certificate-file');
+    certInput?.addEventListener('change', async ev => {
+      const file = ev.target?.files?.[0];
+      if (!file) return;
+
+      const statusIcon = document.getElementById('vaccination-certificate-status-icon');
+      const statusText = document.getElementById('vaccination-certificate-status-text');
+      const jsonTextarea = document.getElementById('vaccination-certificate-json');
+
+      if (statusIcon) statusIcon.textContent = '⏳';
+      if (statusText) statusText.textContent = 'Analyzing with Gemini 2.5 Flash...';
+
+      const fd = new FormData();
+      fd.append('document', file);
+
+      try {
+        const response = await fetch(`${API_BASE}/medical-records/parse-vaccination-certificate`, {
+          method: 'POST',
+          headers: Auth.headers(),
+          body: fd
+        });
+
+        const res = await response.json();
+        if (response.ok && res.success && res.data) {
+          if (jsonTextarea) {
+            jsonTextarea.value = JSON.stringify(res.data, null, 2);
+          }
+          if (statusIcon) statusIcon.textContent = '✅';
+          if (statusText) statusText.textContent = 'Parsed successfully!';
+          Swal.fire({
+            icon: 'success',
+            title: 'Certificate Parsed',
+            text: 'Vaccination details extracted successfully. Please verify the JSON below.',
+            timer: 2000,
+            showConfirmButton: false
+          });
+        } else {
+          throw new Error(res.error || 'Failed to parse certificate.');
+        }
+      } catch (err) {
+        if (statusIcon) statusIcon.textContent = '❌';
+        if (statusText) statusText.textContent = 'Upload failed. Try again.';
+        Swal.fire({
+          icon: 'error',
+          title: 'Parsing Failed',
+          text: err.message || 'Could not parse vaccination certificate.'
+        });
+      }
     });
 
     els.recordForm?.addEventListener('submit', async ev => {

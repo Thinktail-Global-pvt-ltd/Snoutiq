@@ -201,6 +201,7 @@ class MedicalRecordController extends Controller
             'vaccination_name' => ['nullable', 'string', 'max:255'],
             'batch_number' => ['nullable', 'string', 'max:255'],
             'vaccination_date' => ['nullable', 'date'],
+            'vaccination_certificate_json' => ['nullable', 'string'],
             'deworming' => ['nullable', 'string', 'max:50'],
             'last_deworming_date' => ['nullable', 'date'],
         ]);
@@ -374,15 +375,20 @@ class MedicalRecordController extends Controller
         $finalBatchNumber = $validated['batch_number'] ?? $prescription->batch_number;
         $finalVaccinationDate = $validated['vaccination_date'] ?? $prescription->vaccination_date;
 
-        if ($resolvedPetId && $finalVisitCategory === 'vaccination' && !empty($finalVaccineName)) {
-            $this->updatePetVaccinationPayload(
-                (int) $resolvedPetId,
-                $finalVaccineName,
-                $finalBatchNumber,
-                $finalVaccinationDate,
-                (int) $record->id,
-                (int) $prescription->id
-            );
+        if ($resolvedPetId && $finalVisitCategory === 'vaccination') {
+            if (!empty($validated['vaccination_certificate_json'])) {
+                $this->mergeVaccinationCertificatePayload((int) $resolvedPetId, $validated['vaccination_certificate_json']);
+            }
+            if (!empty($finalVaccineName)) {
+                $this->updatePetVaccinationPayload(
+                    (int) $resolvedPetId,
+                    $finalVaccineName,
+                    $finalBatchNumber,
+                    $finalVaccinationDate,
+                    (int) $record->id,
+                    (int) $prescription->id
+                );
+            }
         }
 
         $this->markVideoApointmentCompleted($validated['video_appointment_id'] ?? $prescription->video_appointment_id ?? null);
@@ -455,6 +461,7 @@ class MedicalRecordController extends Controller
             'vaccination_name' => ['nullable', 'string', 'max:255'],
             'batch_number' => ['nullable', 'string', 'max:255'],
             'vaccination_date' => ['nullable', 'date'],
+            'vaccination_certificate_json' => ['nullable', 'string'],
             'deworming' => ['nullable', 'string', 'max:50'],
             'last_deworming_date' => ['nullable', 'date'],
         ]);
@@ -628,15 +635,20 @@ class MedicalRecordController extends Controller
             ], 500);
         }
 
-        if ($petId && ($validated['visit_category'] ?? null) === 'vaccination' && !empty($validated['vaccination_name'])) {
-            $this->updatePetVaccinationPayload(
-                (int) $petId,
-                $validated['vaccination_name'],
-                $validated['batch_number'] ?? null,
-                $validated['vaccination_date'] ?? null,
-                (int) $record->id,
-                (int) $prescription->id
-            );
+        if ($petId && ($validated['visit_category'] ?? null) === 'vaccination') {
+            if (!empty($validated['vaccination_certificate_json'])) {
+                $this->mergeVaccinationCertificatePayload((int) $petId, $validated['vaccination_certificate_json']);
+            }
+            if (!empty($validated['vaccination_name'])) {
+                $this->updatePetVaccinationPayload(
+                    (int) $petId,
+                    $validated['vaccination_name'],
+                    $validated['batch_number'] ?? null,
+                    $validated['vaccination_date'] ?? null,
+                    (int) $record->id,
+                    (int) $prescription->id
+                );
+            }
         }
 
         $this->markVideoApointmentCompleted($validated['video_appointment_id'] ?? $prescription->video_appointment_id ?? null);
@@ -1587,5 +1599,171 @@ PROMPT;
         if (!empty($updates)) {
             $pet->update($updates);
         }
+    }
+
+    public function parseVaccinationCertificate(Request $request)
+    {
+        $request->validate([
+            'document' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
+        ]);
+
+        $file = $request->file('document');
+        if (!$file || !$file->isValid()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid file uploaded.',
+            ], 422);
+        }
+
+        $contents = file_get_contents($file->getRealPath());
+        $base64 = base64_encode($contents);
+        $mimeType = $file->getClientMimeType() ?: $file->getMimeType() ?: 'application/octet-stream';
+
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? \App\Support\GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            return response()->json([
+                'success' => false,
+                'error' => 'Gemini API key is not configured.',
+            ], 500);
+        }
+
+        $model = 'gemini-2.5-flash';
+        $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s', $model, $apiKey);
+
+        $prompt = <<<PROMPT
+You are an expert veterinary AI assistant. Your task is to analyze the uploaded pet vaccination certificate image/document and convert its contents into a structured JSON object.
+
+Please scan the document for any recorded vaccinations. For each vaccine found:
+1. Identify the name of the vaccine. Standardize it into one of the following canonical slugs:
+   - "dhppil" (for Vanguard Plus 5 L4, DHPPiL, Canine Distemper-Adenovirus-Parvovirus-Parainfluenza-Leptospirosis, or any distemper/lepto combo)
+   - "rabies" (for Defensor 3, Rabisin, Rabies, or any rabies vaccine)
+   - "canine_coronavirus" (for Vanguard CV, Canine Coronavirus Vaccine, Corona, or similar)
+   - "nobivac_kc" (for Nobivac KC, Kennel Cough, KC, or similar)
+   - "dhppi" (for DHPPi, distemper/parvo without lepto)
+   - "leptospirosis" (for Leptospirosis only vaccine)
+   - "fvrcp" (for FVRCP / cat vaccine)
+   - "felv" (for FeLV / cat vaccine)
+   If a vaccine does not match any of the above, use a clean snake_case slug based on the vaccine name.
+
+2. Extract the administration date ("date") and the next due date ("next_due").
+   - Convert all dates into "YYYY-MM-DD" format.
+   - If next due date is not written on the document, try to calculate it based on standard veterinary intervals (e.g. 1 year after the administration date for adult booster, or 1 month/3 months if indicated by handwritten notes/stickers) or set it to null/omit it if uncertain.
+
+Return ONLY a valid JSON object matching this structure:
+{
+  "vaccination": {
+    "dhppil": {
+      "date": "2026-06-05",
+      "next_due": "2026-06-05"
+    }
+  }
+}
+
+Do not return any other text, explanations, or markdown blocks. Only return the raw JSON object.
+PROMPT;
+
+        try {
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+            ])->post($endpoint, [
+                'contents' => [[
+                    'role' => 'user',
+                    'parts' => [
+                        ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
+                        ['text' => $prompt],
+                    ],
+                ]],
+                'generationConfig' => [
+                    'temperature' => 0.1,
+                    'topP' => 0.8,
+                    'topK' => 32,
+                    'maxOutputTokens' => 1800,
+                ],
+            ]);
+
+            $text = $response->json('candidates.0.content.parts.0.text');
+            if ($response->successful() && $text) {
+                $text = trim($text);
+                $text = preg_replace('/^```(?:json)?\s*/i', '', $text);
+                $text = preg_replace('/\s*```$/', '', $text);
+                $text = trim($text);
+
+                $decoded = json_decode($text, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => $decoded,
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to parse JSON from Gemini response.',
+                'raw' => $text ?? null,
+            ], 502);
+
+        } catch (\Throwable $e) {
+            Log::error('Gemini vaccination certificate parsing failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'error' => 'An error occurred while calling the Gemini API: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function mergeVaccinationCertificatePayload(int $petId, string $jsonString): void
+    {
+        $decoded = json_decode($jsonString, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded) || !isset($decoded['vaccination']) || !is_array($decoded['vaccination'])) {
+            Log::warning('Invalid vaccination certificate JSON string skipped', ['json' => $jsonString]);
+            return;
+        }
+
+        $pet = Pet::find($petId);
+        if (!$pet) {
+            return;
+        }
+
+        $payload = $pet->dog_disease_payload;
+        if (is_string($payload)) {
+            $payloadDecoded = json_decode($payload, true);
+            $payload = is_array($payloadDecoded) ? $payloadDecoded : [];
+        }
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $vaccinations = $payload['vaccination'] ?? [];
+        if (!is_array($vaccinations)) {
+            $vaccinations = [];
+        }
+
+        foreach ($decoded['vaccination'] as $rawSlug => $data) {
+            if (!is_array($data)) {
+                continue;
+            }
+            $slugName = strtolower(preg_replace('/[^a-z0-9]+/', '_', strtolower(trim($rawSlug))));
+            $slugName = trim($slugName, '_');
+            if ($slugName === '') {
+                continue;
+            }
+
+            $date = ($data['date'] ?? null) ? substr($data['date'], 0, 10) : now()->toDateString();
+            $nextDue = ($data['next_due'] ?? null) ? substr($data['next_due'], 0, 10) : null;
+
+            $vaccineData = [
+                'date' => $date,
+            ];
+            if ($nextDue) {
+                $vaccineData['next_due'] = $nextDue;
+            }
+
+            $vaccinations[$slugName] = $vaccineData;
+        }
+
+        $payload['vaccination'] = $vaccinations;
+        $pet->dog_disease_payload = $payload;
+        $pet->save();
     }
 }
