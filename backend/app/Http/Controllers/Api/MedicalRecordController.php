@@ -1694,7 +1694,14 @@ PROMPT;
                         'success' => true,
                         'data' => $decoded,
                     ]);
+                } else {
+                    Log::warning('Gemini response was not valid JSON', ['raw' => $text, 'json_error' => json_last_error_msg()]);
                 }
+            } else {
+                Log::warning('Gemini API call failed or returned empty text', [
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
             }
 
             return response()->json([
