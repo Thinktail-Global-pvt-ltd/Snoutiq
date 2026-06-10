@@ -57,6 +57,10 @@ class Prescription extends Model
         'vaccination_name',
         'batch_number',
         'vaccination_date',
+        'deworming',
+        'last_deworming_date',
+        'deworming_status',
+        'next_deworming_date',
     ];
 
     protected $casts = [
@@ -72,6 +76,7 @@ class Prescription extends Model
         'is_chronic' => 'boolean',
         'medications_json' => 'array',
         'seen' => 'boolean',
+        'next_deworming_date' => 'date',
     ];
 
     public function doctor(): BelongsTo

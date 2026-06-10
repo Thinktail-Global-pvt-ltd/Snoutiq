@@ -105,6 +105,8 @@ class DewormingWalkinsTest extends TestCase
             $table->json('medications_json')->nullable();
             $table->string('deworming', 50)->nullable();
             $table->date('last_deworming_date')->nullable();
+            $table->string('deworming_status', 50)->nullable();
+            $table->date('next_deworming_date')->nullable();
             
             // Other fields to prevent QueryException during fill/create/update
             $table->float('temperature')->nullable();
@@ -202,6 +204,8 @@ class DewormingWalkinsTest extends TestCase
         $this->assertNotNull($prescription);
         $this->assertEquals('no', $prescription->deworming);
         $this->assertNull($prescription->last_deworming_date);
+        $this->assertNull($prescription->deworming_status);
+        $this->assertNull($prescription->next_deworming_date);
 
         $pet = Pet::find(1357);
         $this->assertNotNull($pet);
@@ -263,6 +267,8 @@ class DewormingWalkinsTest extends TestCase
         $this->assertNotNull($prescription);
         $this->assertEquals('yes', $prescription->deworming);
         $this->assertDateEquals('2026-06-01', $prescription->last_deworming_date);
+        $this->assertEquals('every_3_months', $prescription->deworming_status);
+        $this->assertDateEquals('2026-09-01', $prescription->next_deworming_date);
 
         $pet = Pet::find(1357);
         $this->assertNotNull($pet);
@@ -344,6 +350,8 @@ class DewormingWalkinsTest extends TestCase
         $this->assertNotNull($prescription);
         $this->assertEquals('yes', $prescription->deworming);
         $this->assertDateEquals('2026-06-02', $prescription->last_deworming_date);
+        $this->assertEquals('every_3_months', $prescription->deworming_status);
+        $this->assertDateEquals('2026-09-02', $prescription->next_deworming_date);
 
         $pet = Pet::find(1357);
         $this->assertNotNull($pet);

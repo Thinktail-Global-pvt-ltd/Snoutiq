@@ -282,6 +282,39 @@ class MedicalRecordController extends Controller
             $validated['system_affected_id'] ?? null,
             $validated['system_affected'] ?? null
         );
+        $resolvedPetId = $petId ?? $prescription->pet_id;
+        $finalVisitCategory = $validated['visit_category'] ?? $prescription->visit_category;
+
+        $dewormingStatus = null;
+        $nextDewormingDate = null;
+        $dewormVal = $validated['deworming'] ?? $prescription->deworming;
+        $lastDewormDate = ($dewormVal === 'yes') ? ($validated['last_deworming_date'] ?? $prescription->last_deworming_date) : null;
+
+        if ($resolvedPetId && $finalVisitCategory === 'deworming') {
+            if ($dewormVal === 'yes') {
+                try {
+                    $subRequest = new \Illuminate\Http\Request([
+                        'pet_id' => (int) $resolvedPetId,
+                        'last_deworming_date' => $lastDewormDate,
+                        'deworming_yes_no' => 1
+                    ]);
+                    $subResponse = app(\App\Http\Controllers\Api\PetOverviewController::class)->updateDewormingVaccination($subRequest);
+                    $responseData = json_decode($subResponse->getContent(), true);
+                    if (isset($responseData['success']) && $responseData['success'] && isset($responseData['data'])) {
+                        $dewormingStatus = $responseData['data']['deworming_status'] ?? null;
+                        $nextDewormingDate = $responseData['data']['next_deworming_date'] ?? null;
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed internal deworming call: ' . $e->getMessage());
+                }
+            } else {
+                $this->updatePetDewormingPayload(
+                    (int) $resolvedPetId,
+                    'no',
+                    null
+                );
+            }
+        }
 
         $prescriptionPayload = [
             'medical_record_id' => $record->id,
@@ -323,8 +356,10 @@ class MedicalRecordController extends Controller
             'vaccination_name' => $validated['vaccination_name'] ?? $prescription->vaccination_name,
             'batch_number' => $validated['batch_number'] ?? $prescription->batch_number,
             'vaccination_date' => $validated['vaccination_date'] ?? $prescription->vaccination_date,
-            'deworming' => $validated['deworming'] ?? $prescription->deworming,
-            'last_deworming_date' => (($validated['deworming'] ?? $prescription->deworming) === 'yes') ? ($validated['last_deworming_date'] ?? $prescription->last_deworming_date) : null,
+            'deworming' => $dewormVal,
+            'last_deworming_date' => $lastDewormDate,
+            'deworming_status' => $dewormingStatus,
+            'next_deworming_date' => $nextDewormingDate,
         ];
         if ($hasDoctorTreatmentColumn) {
             $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? $prescription->doctor_treatment;
@@ -335,8 +370,6 @@ class MedicalRecordController extends Controller
         }
         $prescription->save();
 
-        $resolvedPetId = $petId ?? $prescription->pet_id;
-        $finalVisitCategory = $validated['visit_category'] ?? $prescription->visit_category;
         $finalVaccineName = $validated['vaccination_name'] ?? $prescription->vaccination_name;
         $finalBatchNumber = $validated['batch_number'] ?? $prescription->batch_number;
         $finalVaccinationDate = $validated['vaccination_date'] ?? $prescription->vaccination_date;
@@ -349,14 +382,6 @@ class MedicalRecordController extends Controller
                 $finalVaccinationDate,
                 (int) $record->id,
                 (int) $prescription->id
-            );
-        }
-
-        if ($resolvedPetId && $finalVisitCategory === 'deworming') {
-            $this->updatePetDewormingPayload(
-                (int) $resolvedPetId,
-                $validated['deworming'] ?? $prescription->deworming ?? 'no',
-                (($validated['deworming'] ?? $prescription->deworming) === 'yes') ? ($validated['last_deworming_date'] ?? $prescription->last_deworming_date) : null
             );
         }
 
@@ -511,6 +536,36 @@ class MedicalRecordController extends Controller
             'mime_type' => $filePayload['mime'] ?? null,
             'notes' => $validated['notes'] ?? null,
         ]);
+        $dewormingStatus = null;
+        $nextDewormingDate = null;
+        $dewormVal = $validated['deworming'] ?? null;
+        $lastDewormDate = ($dewormVal === 'yes') ? ($validated['last_deworming_date'] ?? null) : null;
+
+        if ($petId && ($validated['visit_category'] ?? null) === 'deworming') {
+            if ($dewormVal === 'yes') {
+                try {
+                    $subRequest = new \Illuminate\Http\Request([
+                        'pet_id' => (int) $petId,
+                        'last_deworming_date' => $lastDewormDate,
+                        'deworming_yes_no' => 1
+                    ]);
+                    $subResponse = app(\App\Http\Controllers\Api\PetOverviewController::class)->updateDewormingVaccination($subRequest);
+                    $responseData = json_decode($subResponse->getContent(), true);
+                    if (isset($responseData['success']) && $responseData['success'] && isset($responseData['data'])) {
+                        $dewormingStatus = $responseData['data']['deworming_status'] ?? null;
+                        $nextDewormingDate = $responseData['data']['next_deworming_date'] ?? null;
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed internal deworming call: ' . $e->getMessage());
+                }
+            } else {
+                $this->updatePetDewormingPayload(
+                    (int) $petId,
+                    'no',
+                    null
+                );
+            }
+        }
 
         // Persist consultation detail into prescriptions for downstream use
         $prescriptionPayload = [
@@ -554,8 +609,10 @@ class MedicalRecordController extends Controller
             'vaccination_name' => $validated['vaccination_name'] ?? null,
             'batch_number' => $validated['batch_number'] ?? null,
             'vaccination_date' => $validated['vaccination_date'] ?? null,
-            'deworming' => $validated['deworming'] ?? null,
-            'last_deworming_date' => (($validated['deworming'] ?? null) === 'yes') ? ($validated['last_deworming_date'] ?? null) : null,
+            'deworming' => $dewormVal,
+            'last_deworming_date' => $lastDewormDate,
+            'deworming_status' => $dewormingStatus,
+            'next_deworming_date' => $nextDewormingDate,
         ];
         if ($hasDoctorTreatmentColumn) {
             $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? null;
@@ -579,14 +636,6 @@ class MedicalRecordController extends Controller
                 $validated['vaccination_date'] ?? null,
                 (int) $record->id,
                 (int) $prescription->id
-            );
-        }
-
-        if ($petId && ($validated['visit_category'] ?? null) === 'deworming') {
-            $this->updatePetDewormingPayload(
-                (int) $petId,
-                $validated['deworming'] ?? 'no',
-                (($validated['deworming'] ?? null) === 'yes') ? ($validated['last_deworming_date'] ?? null) : null
             );
         }
 
