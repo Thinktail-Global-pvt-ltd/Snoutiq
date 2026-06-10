@@ -1619,7 +1619,7 @@ PROMPT;
         $base64 = base64_encode($contents);
         $mimeType = $file->getClientMimeType() ?: $file->getMimeType() ?: 'application/octet-stream';
 
-        $apiKey = trim((string) (env('GEMINI_API_KEY') ?? \App\Support\GeminiConfig::apiKey()));
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? \App\Support\GeminiConfig::apiKey()));
         if ($apiKey === '') {
             return response()->json([
                 'success' => false,
