@@ -530,14 +530,17 @@ class DewormingWalkinsTest extends TestCase
                         [
                             'date' => '2025-04-10', // duplicate, should be ignored
                             'next_due' => '2025-05-10',
+                            'batch_no' => 'B-DUP',
                         ],
                         [
                             'date' => '2026-06-05', // newer, should be sorted last
                             'next_due' => '2027-06-05',
+                            'batch_no' => 'B-NEW',
                         ],
                         [
                             'date' => '2024-03-08', // older, should be sorted first
                             'next_due' => '2024-04-08',
+                            'batch_no' => 'B-OLD',
                         ]
                     ]
                 ]
@@ -557,14 +560,17 @@ class DewormingWalkinsTest extends TestCase
         $doses = $payload['vaccination']['dhppil'];
         $this->assertCount(3, $doses);
 
-        // Assert chronological order
+        // Assert chronological order and batch numbers
         $this->assertEquals('2024-03-08', $doses[0]['date']);
         $this->assertEquals('2024-04-08', $doses[0]['next_due']);
+        $this->assertEquals('B-OLD', $doses[0]['batch_no']);
 
         $this->assertEquals('2025-04-10', $doses[1]['date']);
         $this->assertEquals('2025-05-10', $doses[1]['next_due']);
+        $this->assertEquals('B-DUP', $doses[1]['batch_no']);
 
         $this->assertEquals('2026-06-05', $doses[2]['date']);
         $this->assertEquals('2027-06-05', $doses[2]['next_due']);
+        $this->assertEquals('B-NEW', $doses[2]['batch_no']);
     }
 }

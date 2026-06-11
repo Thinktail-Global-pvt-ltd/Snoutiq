@@ -1675,17 +1675,19 @@ PROMPT;
             // Merge, deduplicate, and sort
             $allDoses = array_merge($existingDoses, $incomingDoses);
             $uniqueDoses = [];
-            $seenKeys = [];
 
             foreach ($allDoses as $dose) {
                 $date = ($dose['date'] ?? null) ? substr($dose['date'], 0, 10) : now()->toDateString();
                 $nextDue = ($dose['next_due'] ?? null) ? substr($dose['next_due'], 0, 10) : null;
+                $batchNo = $dose['batch_no'] ?? $dose['batch_number'] ?? null;
 
                 $doseKey = $date . '|' . ($nextDue ?? '');
-                if (isset($seenKeys[$doseKey])) {
+                if (isset($uniqueDoses[$doseKey])) {
+                    if (empty($uniqueDoses[$doseKey]['batch_no']) && !empty($batchNo)) {
+                        $uniqueDoses[$doseKey]['batch_no'] = $batchNo;
+                    }
                     continue;
                 }
-                $seenKeys[$doseKey] = true;
 
                 $doseData = [
                     'date' => $date,
@@ -1693,8 +1695,13 @@ PROMPT;
                 if ($nextDue) {
                     $doseData['next_due'] = $nextDue;
                 }
-                $uniqueDoses[] = $doseData;
+                if ($batchNo) {
+                    $doseData['batch_no'] = $batchNo;
+                }
+                $uniqueDoses[$doseKey] = $doseData;
             }
+
+            $uniqueDoses = array_values($uniqueDoses);
 
             usort($uniqueDoses, function ($a, $b) {
                 return strcmp($a['date'], $b['date']);

@@ -740,18 +740,7 @@
               <option value="deworming">Deworming</option>
             </select>
           </div>
-          <div class="pv-field vaccination-field" style="display:none">
-            <label class="pv-label" for="vaccination-name">Vaccination Name</label>
-            <input type="text" id="vaccination-name" name="vaccination_name" class="pv-input" placeholder="e.g. DHPPiL">
-          </div>
-          <div class="pv-field vaccination-field" style="display:none">
-            <label class="pv-label" for="batch-number">Batch Number</label>
-            <input type="text" id="batch-number" name="batch_number" class="pv-input" placeholder="e.g. VAC123456">
-          </div>
-          <div class="pv-field vaccination-field" style="display:none">
-            <label class="pv-label" for="vaccination-date">Vaccination Date</label>
-            <input type="date" id="vaccination-date" name="vaccination_date" class="pv-input">
-          </div>
+
           <div class="pv-field vaccination-field" style="display:none">
             <label class="pv-label">Vaccination Certificate</label>
             <label class="pv-upload" for="vaccination-certificate-file" style="margin-top:2px;">
@@ -1842,6 +1831,7 @@ window.PatientStore = (() => {
       const nameInput = row.querySelector('.vaccine-name');
       const dateInput = row.querySelector('.vaccine-date');
       const nextDueInput = row.querySelector('.vaccine-next-due');
+      const batchNoInput = row.querySelector('.vaccine-batch-no');
 
       let name = nameInput.value.trim();
       if (!name) return;
@@ -1851,6 +1841,7 @@ window.PatientStore = (() => {
 
       const dateVal = dateInput.value;
       const nextDueVal = nextDueInput.value;
+      const batchNoVal = batchNoInput ? batchNoInput.value.trim() : '';
 
       const vaccineData = {
         date: dateVal || new Date().toISOString().split('T')[0]
@@ -1858,6 +1849,9 @@ window.PatientStore = (() => {
 
       if (nextDueVal) {
         vaccineData.next_due = nextDueVal;
+      }
+      if (batchNoVal) {
+        vaccineData.batch_no = batchNoVal;
       }
 
       if (!result.vaccination[standardizedSlug]) {
@@ -1869,7 +1863,7 @@ window.PatientStore = (() => {
     jsonTextarea.value = rows.length > 0 ? JSON.stringify(result, null, 2) : '';
   }
 
-  function renderVaccineRow(slug = '', date = '', nextDue = '') {
+  function renderVaccineRow(slug = '', date = '', nextDue = '', batchNo = '') {
     const listContainer = document.getElementById('vaccination-editor-list');
     const emptyState = document.getElementById('vaccination-editor-empty');
     if (!listContainer) return;
@@ -1878,7 +1872,7 @@ window.PatientStore = (() => {
 
     const row = document.createElement('div');
     row.className = 'vaccine-row';
-    row.style.cssText = 'display:grid; grid-template-columns:1.5fr 1.2fr 1.2fr auto; gap:12px; align-items:flex-end; background:#fff; padding:14px; border:1.5px solid #cbd5e1; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.02); margin-bottom:10px;';
+    row.style.cssText = 'display:grid; grid-template-columns:1.2fr 1fr 1fr 1fr auto; gap:12px; align-items:flex-end; background:#fff; padding:14px; border:1.5px solid #cbd5e1; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.02); margin-bottom:10px;';
 
     let displayName = slug;
     const lowerSlug = slug.toLowerCase();
@@ -1904,6 +1898,10 @@ window.PatientStore = (() => {
         <label class="pv-label" style="font-size:12px; font-weight:700; color:#475569;">Next Due Date</label>
         <input type="date" class="vaccine-next-due pv-input" value="${nextDue}" style="border:1.5px solid #000; border-radius:10px; padding:8px 10px; font-size:13px; width:100%; height:auto;">
       </div>
+      <div class="pv-field" style="margin:0;">
+        <label class="pv-label" style="font-size:12px; font-weight:700; color:#475569;">Batch Number</label>
+        <input type="text" class="vaccine-batch-no pv-input" value="${batchNo}" placeholder="e.g. VAC123" style="border:1.5px solid #000; border-radius:10px; padding:8px 10px; font-size:13px; width:100%; height:auto;">
+      </div>
       <button type="button" class="vaccine-delete-btn" style="border:none; background:none; cursor:pointer; font-size:18px; padding:8px; color:#ef4444; border-radius:10px; transition:background 0.12s; height:38px; width:38px; display:flex; align-items:center; justify-content:center; margin-bottom:2px;" title="Delete vaccine entry">
         🗑️
       </button>
@@ -1912,11 +1910,13 @@ window.PatientStore = (() => {
     const nameInput = row.querySelector('.vaccine-name');
     const dateInput = row.querySelector('.vaccine-date');
     const nextDueInput = row.querySelector('.vaccine-next-due');
+    const batchNoInput = row.querySelector('.vaccine-batch-no');
     const deleteBtn = row.querySelector('.vaccine-delete-btn');
 
     nameInput.addEventListener('input', serializeVaccineList);
     dateInput.addEventListener('change', serializeVaccineList);
     nextDueInput.addEventListener('change', serializeVaccineList);
+    batchNoInput.addEventListener('input', serializeVaccineList);
 
     deleteBtn.addEventListener('click', () => {
       row.remove();
@@ -1959,10 +1959,10 @@ window.PatientStore = (() => {
         const item = vaccinations[slug];
         if (Array.isArray(item)) {
           item.forEach(subItem => {
-            renderVaccineRow(slug, subItem?.date || '', subItem?.next_due || '');
+            renderVaccineRow(slug, subItem?.date || '', subItem?.next_due || '', subItem?.batch_no || subItem?.batch_number || '');
           });
         } else if (item && typeof item === 'object') {
-          renderVaccineRow(slug, item.date || '', item.next_due || '');
+          renderVaccineRow(slug, item.date || '', item.next_due || '', item.batch_no || item.batch_number || '');
         }
       });
     }
