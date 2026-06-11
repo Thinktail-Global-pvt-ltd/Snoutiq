@@ -746,7 +746,7 @@
             <label class="pv-upload" for="vaccination-certificate-file" style="margin-top:2px;">
               <span id="vaccination-certificate-status-icon">📎</span> <span id="vaccination-certificate-status-text">Upload certificate (Gemini Auto-Parse)</span>
             </label>
-            <input id="vaccination-certificate-file" type="file" class="pv-input" accept="image/*,application/pdf" style="display:none">
+            <input id="vaccination-certificate-file" name="vaccination_certificate_file" type="file" class="pv-input" accept="image/*,application/pdf" style="display:none">
             <div class="pv-helper">PDF, JPG, PNG up to 10 MB.</div>
           </div>
           <div class="pv-field vaccination-field" style="display:none; grid-column: 1 / -1; margin-top: 10px;">
@@ -2083,6 +2083,10 @@ window.PatientStore = (() => {
       }
       syncMedicationPayload();
       const fd = new FormData(els.recordForm);
+      const vcf = fd.get('vaccination_certificate_file');
+      if (!(vcf instanceof File) || !vcf.size) {
+        fd.delete('vaccination_certificate_file');
+      }
       fd.append('clinic_id', CLINIC_ID);
       if (!fd.get('doctor_id')) fd.delete('doctor_id');
       if (!fd.get('pet_id'))    fd.delete('pet_id');

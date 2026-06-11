@@ -663,4 +663,79 @@ class DewormingWalkinsTest extends TestCase
         $noDocResponse = $this->get('/api/vaccination-records/pets/8888/image');
         $noDocResponse->assertStatus(404);
     }
+
+    public function test_store_medical_record_with_vaccination_certificate_file(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1479,
+            'name' => 'Pet Parent',
+            'last_vet_id' => 22,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 22,
+            'name' => 'Vet Clinic',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 40,
+            'vet_registeration_id' => 22,
+            'doctor_name' => 'Dr. Rao',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1357,
+            'user_id' => 1479,
+            'name' => 'Bruno',
+            'pet_dob' => '2025-01-01',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $file = \Illuminate\Http\UploadedFile::fake()->image('my_vaccine_cert.png');
+
+        // Post request to save medical record with vaccination certificate file
+        $response = $this->postJson('/api/medical-records', [
+            'user_id' => 1479,
+            'doctor_id' => 40,
+            'clinic_id' => 22,
+            'pet_id' => 1357,
+            'visit_category' => 'vaccination',
+            'notes' => 'Vaccination cert file upload test',
+            'vaccination_certificate_file' => $file,
+            'vaccination_certificate_json' => json_encode([
+                'vaccination' => [
+                    'dhppil' => [
+                        'date' => '2026-06-05',
+                        'next_due' => '2026-06-05',
+                    ]
+                ]
+            ]),
+        ]);
+
+        $response->assertStatus(201);
+
+        // Verify the file was saved in the pet_vaccination_documents table
+        $this->assertDatabaseHas('pet_vaccination_documents', [
+            'pet_id' => 1357,
+            'document_mime' => 'image/png',
+            'document_name' => 'my_vaccine_cert.png',
+        ]);
+
+        $doc = DB::table('pet_vaccination_documents')->where('pet_id', 1357)->first();
+        $this->assertNotNull($doc->document_blob);
+
+        // Check retrieval endpoint returns the file successfully
+        $retrieveResponse = $this->get('/api/vaccination-records/pets/1357/image');
+        $retrieveResponse->assertStatus(200);
+        $retrieveResponse->assertHeader('Content-Type', 'image/png');
+        $retrieveResponse->assertHeader('Content-Disposition', 'inline; filename="my_vaccine_cert.png"');
+        $this->assertEquals($doc->document_blob, $retrieveResponse->getContent());
+    }
 }

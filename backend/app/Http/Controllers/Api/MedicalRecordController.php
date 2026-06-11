@@ -198,6 +198,7 @@ class MedicalRecordController extends Controller
             'in_clinic_appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'in_clinic_appointtment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
+            'vaccination_certificate_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
             'vaccination_name' => ['nullable', 'string', 'max:255'],
             'batch_number' => ['nullable', 'string', 'max:255'],
             'vaccination_date' => ['nullable', 'date'],
@@ -376,6 +377,9 @@ class MedicalRecordController extends Controller
         $finalVaccinationDate = $validated['vaccination_date'] ?? $prescription->vaccination_date;
 
         if ($resolvedPetId && $finalVisitCategory === 'vaccination') {
+            if ($request->hasFile('vaccination_certificate_file')) {
+                $this->saveVaccinationCertificateDocument((int) $resolvedPetId, $request->file('vaccination_certificate_file'));
+            }
             if (!empty($validated['vaccination_certificate_json'])) {
                 $this->mergeVaccinationCertificatePayload((int) $resolvedPetId, $validated['vaccination_certificate_json']);
             }
@@ -458,6 +462,7 @@ class MedicalRecordController extends Controller
             'in_clinic_appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'in_clinic_appointtment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
+            'vaccination_certificate_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
             'vaccination_name' => ['nullable', 'string', 'max:255'],
             'batch_number' => ['nullable', 'string', 'max:255'],
             'vaccination_date' => ['nullable', 'date'],
@@ -636,6 +641,9 @@ class MedicalRecordController extends Controller
         }
 
         if ($petId && ($validated['visit_category'] ?? null) === 'vaccination') {
+            if ($request->hasFile('vaccination_certificate_file')) {
+                $this->saveVaccinationCertificateDocument((int) $petId, $request->file('vaccination_certificate_file'));
+            }
             if (!empty($validated['vaccination_certificate_json'])) {
                 $this->mergeVaccinationCertificatePayload((int) $petId, $validated['vaccination_certificate_json']);
             }
@@ -1681,5 +1689,34 @@ PROMPT;
         ];
         $pet->dog_disease_payload = $payload;
         $pet->save();
+    }
+
+    private function saveVaccinationCertificateDocument(int $petId, $file): void
+    {
+        if ($file && $file->isValid()) {
+            try {
+                $blob = $file->get();
+                $mime = $file->getClientMimeType() ?: ($file->getMimeType() ?: 'application/octet-stream');
+                $name = $file->getClientOriginalName();
+                $size = $file->getSize();
+
+                DB::table('pet_vaccination_documents')->updateOrInsert(
+                    ['pet_id' => $petId],
+                    [
+                        'document_blob' => $blob,
+                        'document_mime' => $mime,
+                        'document_name' => $name,
+                        'document_size' => $size,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::error('Failed to save vaccination certificate blob to database', [
+                    'pet_id' => $petId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
     }
 }
