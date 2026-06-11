@@ -1616,36 +1616,7 @@ PROMPT;
             return;
         }
 
-        $payload = $pet->dog_disease_payload;
-        if (is_string($payload)) {
-            $payloadDecoded = json_decode($payload, true);
-            $payload = is_array($payloadDecoded) ? $payloadDecoded : [];
-        }
-        if (!is_array($payload)) {
-            $payload = [];
-        }
-
-        $vaccinations = $payload['vaccination'] ?? [];
-        if (!is_array($vaccinations)) {
-            $vaccinations = [];
-        }
-
-        // Normalize all existing vaccinations to arrays of doses to ensure clean DB state
-        foreach ($vaccinations as $slug => $record) {
-            if (is_array($record)) {
-                if (isset($record['date']) || isset($record['next_due'])) {
-                    $vaccinations[$slug] = [$record];
-                } else {
-                    $normalizedDoses = [];
-                    foreach ($record as $dose) {
-                        if (is_array($dose)) {
-                            $normalizedDoses[] = $dose;
-                        }
-                    }
-                    $vaccinations[$slug] = $normalizedDoses;
-                }
-            }
-        }
+        $vaccinations = [];
 
         foreach ($decoded['vaccination'] as $rawSlug => $data) {
             if (!is_array($data)) {
@@ -1669,14 +1640,9 @@ PROMPT;
                 }
             }
 
-            // Since $vaccinations[$slugName] is already normalized to an array, we can just fetch it
-            $existingDoses = $vaccinations[$slugName] ?? [];
-
-            // Merge, deduplicate, and sort
-            $allDoses = array_merge($existingDoses, $incomingDoses);
             $uniqueDoses = [];
 
-            foreach ($allDoses as $dose) {
+            foreach ($incomingDoses as $dose) {
                 $date = ($dose['date'] ?? null) ? substr($dose['date'], 0, 10) : now()->toDateString();
                 $nextDue = ($dose['next_due'] ?? null) ? substr($dose['next_due'], 0, 10) : null;
                 $batchNo = $dose['batch_no'] ?? $dose['batch_number'] ?? null;
@@ -1710,7 +1676,9 @@ PROMPT;
             $vaccinations[$slugName] = $uniqueDoses;
         }
 
-        $payload['vaccination'] = $vaccinations;
+        $payload = [
+            'vaccination' => $vaccinations,
+        ];
         $pet->dog_disease_payload = $payload;
         $pet->save();
     }

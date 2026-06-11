@@ -157,9 +157,12 @@ class PetVaccinationRecordController extends Controller
             $recordId = $this->storeAnalysisRecord($data, $analysis, $fileName);
         }
 
+        // pets.dog_disease_payload is only updated when the form is submitted, not during document analysis
+        /*
         if (! empty($data['update_pet_payload']) && ! empty($data['pet_id']) && Schema::hasTable('pets')) {
             $this->mergeAnalysisIntoPetPayload((int) $data['pet_id'], (int) ($data['user_id'] ?? 0), $analysis);
         }
+        */
 
         return response()->json([
             'success' => true,

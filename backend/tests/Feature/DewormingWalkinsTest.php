@@ -472,14 +472,11 @@ class DewormingWalkinsTest extends TestCase
         $payload = is_string($pet->dog_disease_payload) ? json_decode($pet->dog_disease_payload, true) : $pet->dog_disease_payload;
         
         $this->assertArrayHasKey('vaccination', $payload);
-        $this->assertArrayHasKey('rabies', $payload['vaccination']);
+        $this->assertArrayNotHasKey('rabies', $payload['vaccination']);
         $this->assertArrayHasKey('dhppil', $payload['vaccination']);
         
         $this->assertEquals('2026-06-05', $payload['vaccination']['dhppil'][0]['date']);
         $this->assertEquals('2026-06-05', $payload['vaccination']['dhppil'][0]['next_due']);
-        
-        $this->assertEquals('2025-05-10', $payload['vaccination']['rabies'][0]['date']);
-        $this->assertEquals('2026-05-10', $payload['vaccination']['rabies'][0]['next_due']);
     }
 
     public function test_store_medical_record_with_multiple_doses_vaccination_certificate_json(): void
