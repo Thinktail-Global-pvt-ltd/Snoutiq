@@ -276,6 +276,9 @@ class ClinicsController extends Controller
             ->joinSub($patientIds, 'pids', function ($join) {
                 $join->on('pids.user_id', '=', 'u.id');
             })
+            ->when(Schema::hasColumn('users', 'deleted_at'), function ($query) {
+                $query->whereNull('u.deleted_at');
+            })
             ->leftJoinSub($transactionStats, 'tx', function ($join) {
                 $join->on('tx.user_id', '=', 'u.id');
             })
