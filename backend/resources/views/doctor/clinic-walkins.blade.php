@@ -770,14 +770,6 @@
                 No parsed vaccine data yet. Upload a certificate above to auto-populate, or click "+ Add Vaccine" below.
               </div>
               
-              <!-- Header for the grid of vaccines -->
-              <div id="vaccination-editor-header" style="display:none; grid-template-columns:1.2fr 1fr 1fr auto; gap:10px; margin-bottom:8px; padding:0 10px; font-size:11px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.05em;">
-                <div>Vaccine Name</div>
-                <div>Administered Date</div>
-                <div>Next Due Date</div>
-                <div></div>
-              </div>
-              
               <!-- Vaccines list container -->
               <div id="vaccination-editor-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;"></div>
               
@@ -1828,12 +1820,9 @@ window.PatientStore = (() => {
   function closePetModal() { els.petModal?.classList.remove('is-visible'); if (els.petPatient) els.petPatient.textContent='Patient | -'; if (els.petForm) els.petForm.reset(); }
 
   // --- VACCINE CERTIFICATE EDITOR MODULE ---
-  const STANDARD_VACCINES = ['dhppil', 'rabies', 'canine_coronavirus', 'nobivac_kc', 'dhppi', 'leptospirosis', 'fvrcp', 'felv'];
-
   function serializeVaccineList() {
     const listContainer = document.getElementById('vaccination-editor-list');
     const jsonTextarea = document.getElementById('vaccination-certificate-json');
-    const header = document.getElementById('vaccination-editor-header');
     if (!listContainer || !jsonTextarea) return;
 
     const result = {
@@ -1842,24 +1831,15 @@ window.PatientStore = (() => {
 
     const rows = listContainer.querySelectorAll('.vaccine-row');
 
-    if (header) {
-      header.style.display = rows.length > 0 ? 'grid' : 'none';
-    }
-
     rows.forEach(row => {
-      const select = row.querySelector('.vaccine-select');
-      const customInput = row.querySelector('.vaccine-custom-input');
+      const nameInput = row.querySelector('.vaccine-name');
       const dateInput = row.querySelector('.vaccine-date');
       const nextDueInput = row.querySelector('.vaccine-next-due');
 
-      let slug = select.value;
-      if (slug === 'custom') {
-        slug = customInput.value.trim();
-      }
+      let name = nameInput.value.trim();
+      if (!name) return;
 
-      if (!slug) return;
-
-      let standardizedSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      let standardizedSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
       if (!standardizedSlug) return;
 
       const dateVal = dateInput.value;
@@ -1880,63 +1860,49 @@ window.PatientStore = (() => {
   function renderVaccineRow(slug = '', date = '', nextDue = '') {
     const listContainer = document.getElementById('vaccination-editor-list');
     const emptyState = document.getElementById('vaccination-editor-empty');
-    const header = document.getElementById('vaccination-editor-header');
     if (!listContainer) return;
 
     if (emptyState) emptyState.style.display = 'none';
-    if (header) header.style.display = 'grid';
 
     const row = document.createElement('div');
     row.className = 'vaccine-row';
-    row.style.cssText = 'display:grid; grid-template-columns:1.2fr 1fr 1fr auto; gap:10px; align-items:center; background:#fff; padding:10px; border:1.5px solid #cbd5e1; border-radius:10px;';
+    row.style.cssText = 'display:grid; grid-template-columns:1.5fr 1.2fr 1.2fr auto; gap:12px; align-items:flex-end; background:#fff; padding:14px; border:1.5px solid #cbd5e1; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.02); margin-bottom:10px;';
 
-    const isStandard = STANDARD_VACCINES.includes(slug.toLowerCase());
-    const matchedSlug = isStandard ? slug.toLowerCase() : (slug ? 'custom' : 'dhppil');
+    let displayName = slug;
+    const lowerSlug = slug.toLowerCase();
+    if (lowerSlug === 'dhppil') displayName = 'DHPPiL';
+    else if (lowerSlug === 'rabies') displayName = 'Rabies';
+    else if (lowerSlug === 'canine_coronavirus') displayName = 'Canine Coronavirus';
+    else if (lowerSlug === 'nobivac_kc') displayName = 'Nobivac KC';
+    else if (lowerSlug === 'dhppi') displayName = 'DHPPi';
+    else if (lowerSlug === 'leptospirosis') displayName = 'Leptospirosis';
+    else if (lowerSlug === 'fvrcp') displayName = 'FVRCP';
+    else if (lowerSlug === 'felv') displayName = 'FeLV';
 
     row.innerHTML = `
-      <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
-        <select class="vaccine-select pv-input" style="padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; font-weight:600; width:100%; height:auto;">
-          <option value="dhppil" ${matchedSlug === 'dhppil' ? 'selected' : ''}>DHPPiL</option>
-          <option value="rabies" ${matchedSlug === 'rabies' ? 'selected' : ''}>Rabies</option>
-          <option value="canine_coronavirus" ${matchedSlug === 'canine_coronavirus' ? 'selected' : ''}>Canine Coronavirus</option>
-          <option value="nobivac_kc" ${matchedSlug === 'nobivac_kc' ? 'selected' : ''}>Nobivac KC</option>
-          <option value="dhppi" ${matchedSlug === 'dhppi' ? 'selected' : ''}>DHPPi</option>
-          <option value="leptospirosis" ${matchedSlug === 'leptospirosis' ? 'selected' : ''}>Leptospirosis</option>
-          <option value="fvrcp" ${matchedSlug === 'fvrcp' ? 'selected' : ''}>FVRCP (Cat)</option>
-          <option value="felv" ${matchedSlug === 'felv' ? 'selected' : ''}>FeLV (Cat)</option>
-          <option value="custom" ${matchedSlug === 'custom' ? 'selected' : ''}>Custom Vaccine...</option>
-        </select>
-        <input type="text" class="vaccine-custom-input pv-input" value="${!isStandard ? slug : ''}" placeholder="Type vaccine name..." style="display:${!isStandard && slug ? 'block' : 'none'}; padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; margin-top:4px; width:100%; height:auto;">
+      <div class="pv-field" style="margin:0;">
+        <label class="pv-label" style="font-size:12px; font-weight:700; color:#475569;">Vaccination Name</label>
+        <input type="text" class="vaccine-name pv-input" value="${displayName}" placeholder="e.g. DHPPiL" style="border:1.5px solid #000; border-radius:10px; padding:8px 10px; font-size:13px; width:100%; height:auto;">
       </div>
-      <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
-        <input type="date" class="vaccine-date pv-input" value="${date}" style="padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; width:100%; height:auto;">
+      <div class="pv-field" style="margin:0;">
+        <label class="pv-label" style="font-size:12px; font-weight:700; color:#475569;">Date Administered</label>
+        <input type="date" class="vaccine-date pv-input" value="${date}" style="border:1.5px solid #000; border-radius:10px; padding:8px 10px; font-size:13px; width:100%; height:auto;">
       </div>
-      <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
-        <input type="date" class="vaccine-next-due pv-input" value="${nextDue}" style="padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; width:100%; height:auto;">
+      <div class="pv-field" style="margin:0;">
+        <label class="pv-label" style="font-size:12px; font-weight:700; color:#475569;">Next Due Date</label>
+        <input type="date" class="vaccine-next-due pv-input" value="${nextDue}" style="border:1.5px solid #000; border-radius:10px; padding:8px 10px; font-size:13px; width:100%; height:auto;">
       </div>
-      <button type="button" class="vaccine-delete-btn" style="border:none; background:none; cursor:pointer; font-size:16px; padding:4px 8px; color:#ef4444; border-radius:6px; transition:background 0.12s;">
+      <button type="button" class="vaccine-delete-btn" style="border:none; background:none; cursor:pointer; font-size:18px; padding:8px; color:#ef4444; border-radius:10px; transition:background 0.12s; height:38px; width:38px; display:flex; align-items:center; justify-content:center; margin-bottom:2px;" title="Delete vaccine entry">
         🗑️
       </button>
     `;
 
-    const select = row.querySelector('.vaccine-select');
-    const customInput = row.querySelector('.vaccine-custom-input');
+    const nameInput = row.querySelector('.vaccine-name');
     const dateInput = row.querySelector('.vaccine-date');
     const nextDueInput = row.querySelector('.vaccine-next-due');
     const deleteBtn = row.querySelector('.vaccine-delete-btn');
 
-    select.addEventListener('change', () => {
-      if (select.value === 'custom') {
-        customInput.style.display = 'block';
-        customInput.focus();
-      } else {
-        customInput.style.display = 'none';
-        customInput.value = '';
-      }
-      serializeVaccineList();
-    });
-
-    customInput.addEventListener('input', serializeVaccineList);
+    nameInput.addEventListener('input', serializeVaccineList);
     dateInput.addEventListener('change', serializeVaccineList);
     nextDueInput.addEventListener('change', serializeVaccineList);
 
@@ -1944,7 +1910,6 @@ window.PatientStore = (() => {
       row.remove();
       if (listContainer.children.length === 0) {
         if (emptyState) emptyState.style.display = 'block';
-        if (header) header.style.display = 'none';
       }
       serializeVaccineList();
     });
@@ -1958,7 +1923,6 @@ window.PatientStore = (() => {
   function loadVaccineList(data) {
     const listContainer = document.getElementById('vaccination-editor-list');
     const emptyState = document.getElementById('vaccination-editor-empty');
-    const header = document.getElementById('vaccination-editor-header');
     if (!listContainer) return;
 
     listContainer.innerHTML = '';
@@ -1977,10 +1941,8 @@ window.PatientStore = (() => {
 
     if (keys.length === 0) {
       if (emptyState) emptyState.style.display = 'block';
-      if (header) header.style.display = 'none';
     } else {
       if (emptyState) emptyState.style.display = 'none';
-      if (header) header.style.display = 'grid';
       keys.forEach(slug => {
         const item = vaccinations[slug];
         if (Array.isArray(item)) {
