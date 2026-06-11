@@ -2372,7 +2372,7 @@ PROMPT;
                             }
                         }
                         $errors[] = "Model {$model} attempt {$attempt} JSON decode error: " . json_last_error_msg() . " | Raw response: " . $text;
-                        break;
+                        break 2;
                     }
                 } elseif ($httpCode === 429) {
                     $errors[] = "Model {$model} attempt {$attempt} rate limited (HTTP 429)";
