@@ -213,20 +213,34 @@ class SendPetVaccinationUpcomingReminders extends Command
                 continue;
             }
 
-            $nextDue = $this->parseDate($details['next_due'] ?? null);
-            if (! $nextDue) {
-                continue;
+            // Normalize details to a sequential array of doses
+            $doses = [];
+            if (isset($details['date']) || isset($details['next_due'])) {
+                $doses[] = $details;
+            } else {
+                foreach ($details as $dose) {
+                    if (is_array($dose)) {
+                        $doses[] = $dose;
+                    }
+                }
             }
 
-            $dueDate = $nextDue->copy()->startOfDay();
-            if ($dueDate->lt($todayStart) || $dueDate->gt($weekEnd)) {
-                continue;
-            }
+            foreach ($doses as $dose) {
+                $nextDue = $this->parseDate($dose['next_due'] ?? null);
+                if (! $nextDue) {
+                    continue;
+                }
 
-            $upcoming[] = [
-                'vaccine' => $this->normalizeVaccineName($vaccineKey),
-                'due_date' => $dueDate->toDateString(),
-            ];
+                $dueDate = $nextDue->copy()->startOfDay();
+                if ($dueDate->lt($todayStart) || $dueDate->gt($weekEnd)) {
+                    continue;
+                }
+
+                $upcoming[] = [
+                    'vaccine' => $this->normalizeVaccineName($vaccineKey),
+                    'due_date' => $dueDate->toDateString(),
+                ];
+            }
         }
 
         usort($upcoming, function (array $a, array $b): int {

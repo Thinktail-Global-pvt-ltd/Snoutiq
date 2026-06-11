@@ -1601,215 +1601,7 @@ PROMPT;
         }
     }
 
-    public function parseVaccinationCertificate(Request $request)
-    {
-        $request->validate([
-            'document' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
-        ]);
 
-        $file = $request->file('document');
-        if (!$file || !$file->isValid()) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Invalid file uploaded.',
-            ], 422);
-        }
-
-        $contents = file_get_contents($file->getRealPath());
-        $base64 = base64_encode($contents);
-        $mimeType = $file->getClientMimeType() ?: $file->getMimeType() ?: 'application/octet-stream';
-
-        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? \App\Support\GeminiConfig::apiKey()));
-        if ($apiKey === '') {
-            return response()->json([
-                'success' => false,
-                'error' => 'Gemini API key is not configured.',
-            ], 500);
-        }
-
-        $prompt = <<<PROMPT
-You are an expert veterinary AI assistant. Your task is to analyze the uploaded pet vaccination certificate image/document and convert its contents into a structured JSON object.
-
-Please scan the document for any recorded vaccinations. For each vaccine found:
-1. Identify the name of the vaccine. Standardize it into one of the following canonical slugs:
-   - "dhppil" (for Vanguard Plus 5 L4, DHPPiL, Canine Distemper-Adenovirus-Parvovirus-Parainfluenza-Leptospirosis, or any distemper/lepto combo)
-   - "rabies" (for Defensor 3, Rabisin, Rabies, or any rabies vaccine)
-   - "canine_coronavirus" (for Vanguard CV, Canine Coronavirus Vaccine, Corona, or similar)
-   - "nobivac_kc" (for Nobivac KC, Kennel Cough, KC, or similar)
-   - "dhppi" (for DHPPi, distemper/parvo without lepto)
-   - "leptospirosis" (for Leptospirosis only vaccine)
-   - "fvrcp" (for FVRCP / cat vaccine)
-   - "felv" (for FeLV / cat vaccine)
-   If a vaccine does not match any of the above, use a clean snake_case slug based on the vaccine name.
-
-2. Extract the administration date ("date") and the next due date ("next_due").
-   - Convert all dates into "YYYY-MM-DD" format.
-   - If next due date is not written on the document, try to calculate it based on standard veterinary intervals (e.g. 1 year after the administration date for adult booster, or 1 month/3 months if indicated by handwritten notes/stickers) or set it to null/omit it if uncertain.
-
-Return ONLY a valid JSON object matching this structure:
-{
-  "vaccination": {
-    "dhppil": {
-      "date": "2026-06-05",
-      "next_due": "2026-06-05"
-    }
-  }
-}
-
-Do not return any other text, explanations, or markdown blocks. Only return the raw JSON object.
-PROMPT;
-
-        if (app()->runningUnitTests()) {
-            try {
-                $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s', urlencode($apiKey));
-                $response = Http::withHeaders([
-                    'Content-Type' => 'application/json',
-                ])->post($endpoint, [
-                    'contents' => [[
-                        'role' => 'user',
-                        'parts' => [
-                            ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
-                            ['text' => $prompt],
-                        ],
-                    ]],
-                    'generationConfig' => [
-                        'temperature' => 0.1,
-                        'topP' => 0.8,
-                        'topK' => 32,
-                        'maxOutputTokens' => 1800,
-                    ],
-                ]);
-
-                $text = $response->json('candidates.0.content.parts.0.text');
-                $httpCode = $response->status();
-                $respBody = $response->body();
-            } catch (\Throwable $e) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'HTTP facade error: ' . $e->getMessage(),
-                ], 502);
-            }
-
-            if ($httpCode === 200 && $text) {
-                $text = trim($text);
-                $decoded = json_decode($text, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    return response()->json([
-                        'success' => true,
-                        'data' => $decoded,
-                    ]);
-                }
-            }
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to parse JSON from Gemini response.',
-                'raw' => $text ?? null,
-                'debug' => [
-                    'http_code' => $httpCode ?? 502,
-                    'response' => isset($respBody) ? (json_decode($respBody, true) ?? $respBody) : null
-                ]
-            ], 502);
-        }
-
-        $models = array_values(array_unique(array_filter([
-            'gemini-2.5-flash',
-            \App\Support\GeminiConfig::chatModel(),
-            config('services.gemini.chat_model'),
-            config('services.gemini.model'),
-            \App\Support\GeminiConfig::defaultModel(),
-        ])));
-
-        $errors = [];
-        $lastResp = null;
-        $lastHttpCode = null;
-        $lastText = null;
-
-        foreach ($models as $model) {
-            $url = sprintf(
-                'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
-                $model,
-                urlencode($apiKey)
-            );
-
-            $payload = json_encode([
-                'contents' => [[
-                    'role' => 'user',
-                    'parts' => [
-                        ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64]],
-                        ['text' => $prompt],
-                    ],
-                ]],
-                'generationConfig' => [
-                    'temperature' => 0.1,
-                    'topP' => 0.8,
-                    'topK' => 32,
-                    'maxOutputTokens' => 1800,
-                    'responseMimeType' => 'application/json',
-                ],
-            ], JSON_UNESCAPED_SLASHES);
-
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST           => true,
-                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-                CURLOPT_POSTFIELDS     => $payload,
-                CURLOPT_TIMEOUT        => 50,
-                CURLOPT_CONNECTTIMEOUT => 15,
-                CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-                CURLOPT_SSL_VERIFYPEER => true,
-                CURLOPT_SSL_VERIFYHOST => 2,
-            ]);
-
-            $resp = curl_exec($ch);
-            $err = curl_error($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($err || $resp === false) {
-                $errors[] = "Model {$model} cURL error: {$err}";
-                continue;
-            }
-
-            $lastResp = $resp;
-            $lastHttpCode = $httpCode;
-
-            $decodedResponse = json_decode($resp, true);
-            $text = $decodedResponse['candidates'][0]['content']['parts'][0]['text'] ?? null;
-            $lastText = $text;
-
-            if ($httpCode === 200 && $text) {
-                $text = trim($text);
-                $text = preg_replace('/^```(?:json)?\s*/i', '', $text);
-                $text = preg_replace('/\s*```$/', '', $text);
-                $text = trim($text);
-
-                $decoded = json_decode($text, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    return response()->json([
-                        'success' => true,
-                        'data' => $decoded,
-                    ]);
-                } else {
-                    $errors[] = "Model {$model} JSON decode error: " . json_last_error_msg();
-                }
-            } else {
-                $errors[] = "Model {$model} API failed with HTTP {$httpCode}";
-            }
-        }
-
-        return response()->json([
-            'success' => false,
-            'error' => 'Failed to parse JSON from Gemini response.',
-            'raw' => $lastText ?? null,
-            'errors' => $errors,
-            'debug' => [
-                'http_code' => $lastHttpCode,
-                'response' => $lastResp ? (json_decode($lastResp, true) ?? $lastResp) : null
-            ]
-        ], 502);
-    }
 
     private function mergeVaccinationCertificatePayload(int $petId, string $jsonString): void
     {
@@ -1838,6 +1630,23 @@ PROMPT;
             $vaccinations = [];
         }
 
+        // Normalize all existing vaccinations to arrays of doses to ensure clean DB state
+        foreach ($vaccinations as $slug => $record) {
+            if (is_array($record)) {
+                if (isset($record['date']) || isset($record['next_due'])) {
+                    $vaccinations[$slug] = [$record];
+                } else {
+                    $normalizedDoses = [];
+                    foreach ($record as $dose) {
+                        if (is_array($dose)) {
+                            $normalizedDoses[] = $dose;
+                        }
+                    }
+                    $vaccinations[$slug] = $normalizedDoses;
+                }
+            }
+        }
+
         foreach ($decoded['vaccination'] as $rawSlug => $data) {
             if (!is_array($data)) {
                 continue;
@@ -1848,17 +1657,50 @@ PROMPT;
                 continue;
             }
 
-            $date = ($data['date'] ?? null) ? substr($data['date'], 0, 10) : now()->toDateString();
-            $nextDue = ($data['next_due'] ?? null) ? substr($data['next_due'], 0, 10) : null;
-
-            $vaccineData = [
-                'date' => $date,
-            ];
-            if ($nextDue) {
-                $vaccineData['next_due'] = $nextDue;
+            // Normalize incoming doses to a sequential array of doses
+            $incomingDoses = [];
+            if (isset($data['date']) || isset($data['next_due'])) {
+                $incomingDoses[] = $data;
+            } else {
+                foreach ($data as $dose) {
+                    if (is_array($dose)) {
+                        $incomingDoses[] = $dose;
+                    }
+                }
             }
 
-            $vaccinations[$slugName] = $vaccineData;
+            // Since $vaccinations[$slugName] is already normalized to an array, we can just fetch it
+            $existingDoses = $vaccinations[$slugName] ?? [];
+
+            // Merge, deduplicate, and sort
+            $allDoses = array_merge($existingDoses, $incomingDoses);
+            $uniqueDoses = [];
+            $seenKeys = [];
+
+            foreach ($allDoses as $dose) {
+                $date = ($dose['date'] ?? null) ? substr($dose['date'], 0, 10) : now()->toDateString();
+                $nextDue = ($dose['next_due'] ?? null) ? substr($dose['next_due'], 0, 10) : null;
+
+                $doseKey = $date . '|' . ($nextDue ?? '');
+                if (isset($seenKeys[$doseKey])) {
+                    continue;
+                }
+                $seenKeys[$doseKey] = true;
+
+                $doseData = [
+                    'date' => $date,
+                ];
+                if ($nextDue) {
+                    $doseData['next_due'] = $nextDue;
+                }
+                $uniqueDoses[] = $doseData;
+            }
+
+            usort($uniqueDoses, function ($a, $b) {
+                return strcmp($a['date'], $b['date']);
+            });
+
+            $vaccinations[$slugName] = $uniqueDoses;
         }
 
         $payload['vaccination'] = $vaccinations;

@@ -589,45 +589,61 @@ class PetConsultTimelineController extends Controller
         $index = 0;
 
         foreach ($vaccinationNode as $key => $entry) {
-            $record = is_array($entry) ? $entry : ['value' => $entry];
-            $vaccineName = $this->resolveVaccinationName($key, $record, $index);
+            $doses = [];
+            if (is_array($entry)) {
+                if (isset($entry['date']) || isset($entry['next_due']) || isset($entry['date_given']) || isset($entry['last_date'])) {
+                    $doses[] = $entry;
+                } else {
+                    foreach ($entry as $dose) {
+                        if (is_array($dose)) {
+                            $doses[] = $dose;
+                        }
+                    }
+                }
+            } else {
+                $doses[] = ['value' => $entry];
+            }
 
-            $lastDate = $this->normalizeDateString(
-                $record['last_date']
-                    ?? $record['lastDate']
-                    ?? $record['date']
-                    ?? $record['date_given']
-                    ?? null
-            );
-            $nextDue = $this->normalizeDateString(
-                $record['next_due']
-                    ?? $record['nextDue']
-                    ?? $record['next_due_date']
-                    ?? $record['due_date']
-                    ?? null
-            );
+            foreach ($doses as $record) {
+                $vaccineName = $this->resolveVaccinationName($key, $record, $index);
 
-            $eventAt = $this->normalizeDateToIso8601($lastDate)
-                ?? $this->normalizeDateToIso8601($nextDue)
-                ?? optional($pet->updated_at)->toIso8601String()
-                ?? optional($pet->created_at)->toIso8601String();
+                $lastDate = $this->normalizeDateString(
+                    $record['last_date']
+                        ?? $record['lastDate']
+                        ?? $record['date']
+                        ?? $record['date_given']
+                        ?? null
+                );
+                $nextDue = $this->normalizeDateString(
+                    $record['next_due']
+                        ?? $record['nextDue']
+                        ?? $record['next_due_date']
+                        ?? $record['due_date']
+                        ?? null
+                );
 
-            $items[] = [
-                'source' => 'vaccination',
-                'event_type' => 'vaccination',
-                'record_id' => sprintf('pet-%d-vaccination-%d', (int) $pet->id, $index + 1),
-                'event_at' => $eventAt,
-                'created_at' => $eventAt,
-                'record' => [
-                    'pet_id' => (int) $pet->id,
-                    'vaccine_name' => $vaccineName,
-                    'status' => $record['status'] ?? null,
-                    'last_date' => $lastDate,
-                    'next_due' => $nextDue,
-                    'raw' => $record,
-                ],
-            ];
-            $index++;
+                $eventAt = $this->normalizeDateToIso8601($lastDate)
+                    ?? $this->normalizeDateToIso8601($nextDue)
+                    ?? optional($pet->updated_at)->toIso8601String()
+                    ?? optional($pet->created_at)->toIso8601String();
+
+                $items[] = [
+                    'source' => 'vaccination',
+                    'event_type' => 'vaccination',
+                    'record_id' => sprintf('pet-%d-vaccination-%d', (int) $pet->id, $index + 1),
+                    'event_at' => $eventAt,
+                    'created_at' => $eventAt,
+                    'record' => [
+                        'pet_id' => (int) $pet->id,
+                        'vaccine_name' => $vaccineName,
+                        'status' => $record['status'] ?? null,
+                        'last_date' => $lastDate,
+                        'next_due' => $nextDue,
+                        'raw' => $record,
+                    ],
+                ];
+                $index++;
+            }
         }
 
         return collect($items)->sortByDesc(function (array $item) {
@@ -1000,44 +1016,60 @@ class PetConsultTimelineController extends Controller
 
         if (is_array($vaccinationNode)) {
             foreach ($vaccinationNode as $key => $entry) {
-                $record = is_array($entry) ? $entry : ['value' => $entry];
-                $lastDate = $this->normalizeDateString(
-                    $record['last_date']
-                        ?? $record['lastDate']
-                        ?? $record['date']
-                        ?? $record['date_given']
-                        ?? null
-                );
+                $doses = [];
+                if (is_array($entry)) {
+                    if (isset($entry['date']) || isset($entry['next_due']) || isset($entry['date_given']) || isset($entry['last_date'])) {
+                        $doses[] = $entry;
+                    } else {
+                        foreach ($entry as $dose) {
+                            if (is_array($dose)) {
+                                $doses[] = $dose;
+                            }
+                        }
+                    }
+                } else {
+                    $doses[] = ['value' => $entry];
+                }
 
-                if (!$lastDate) {
+                foreach ($doses as $record) {
+                    $lastDate = $this->normalizeDateString(
+                        $record['last_date']
+                            ?? $record['lastDate']
+                            ?? $record['date']
+                            ?? $record['date_given']
+                            ?? null
+                    );
+
+                    if (!$lastDate) {
+                        $index++;
+                        continue;
+                    }
+
+                    try {
+                        $timestamp = Carbon::parse($lastDate)->getTimestamp();
+                    } catch (\Throwable $e) {
+                        $timestamp = null;
+                    }
+
+                    if ($timestamp === null) {
+                        $index++;
+                        continue;
+                    }
+
+                    if ($latestTimestamp === null || $timestamp > $latestTimestamp) {
+                        $latestTimestamp = $timestamp;
+                        $latest = [
+                            'name' => $this->resolveVaccinationName($key, $record, $index),
+                            'date' => $lastDate,
+                            'doctor' => $record['doctor']
+                                ?? $record['doctor_name']
+                                ?? $record['vet']
+                                ?? $record['administered_by']
+                                ?? null,
+                        ];
+                    }
                     $index++;
-                    continue;
                 }
-
-                try {
-                    $timestamp = Carbon::parse($lastDate)->getTimestamp();
-                } catch (\Throwable $e) {
-                    $timestamp = null;
-                }
-
-                if ($timestamp === null) {
-                    $index++;
-                    continue;
-                }
-
-                if ($latestTimestamp === null || $timestamp > $latestTimestamp) {
-                    $latestTimestamp = $timestamp;
-                    $latest = [
-                        'name' => $this->resolveVaccinationName($key, $record, $index),
-                        'date' => $lastDate,
-                        'doctor' => $record['doctor']
-                            ?? $record['doctor_name']
-                            ?? $record['vet']
-                            ?? $record['administered_by']
-                            ?? null,
-                    ];
-                }
-                $index++;
             }
         }
 

@@ -464,10 +464,107 @@ class DewormingWalkinsTest extends TestCase
         $this->assertArrayHasKey('rabies', $payload['vaccination']);
         $this->assertArrayHasKey('dhppil', $payload['vaccination']);
         
-        $this->assertEquals('2026-06-05', $payload['vaccination']['dhppil']['date']);
-        $this->assertEquals('2026-06-05', $payload['vaccination']['dhppil']['next_due']);
+        $this->assertEquals('2026-06-05', $payload['vaccination']['dhppil'][0]['date']);
+        $this->assertEquals('2026-06-05', $payload['vaccination']['dhppil'][0]['next_due']);
         
-        $this->assertEquals('2025-05-10', $payload['vaccination']['rabies']['date']);
-        $this->assertEquals('2026-05-10', $payload['vaccination']['rabies']['next_due']);
+        $this->assertEquals('2025-05-10', $payload['vaccination']['rabies'][0]['date']);
+        $this->assertEquals('2026-05-10', $payload['vaccination']['rabies'][0]['next_due']);
+    }
+
+    public function test_store_medical_record_with_multiple_doses_vaccination_certificate_json(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1479,
+            'name' => 'Pet Parent',
+            'last_vet_id' => 22,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 22,
+            'name' => 'Vet Clinic',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 40,
+            'vet_registeration_id' => 22,
+            'doctor_name' => 'Dr. Rao',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Start with an existing multi-dose array for dhppil (with one dose)
+        DB::table('pets')->insert([
+            'id' => 1357,
+            'user_id' => 1479,
+            'name' => 'Bruno',
+            'pet_dob' => '2025-01-01',
+            'dog_disease_payload' => json_encode([
+                'vaccination' => [
+                    'dhppil' => [
+                        [
+                            'date' => '2025-04-10',
+                            'next_due' => '2025-05-10',
+                        ]
+                    ]
+                ]
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Post multiple doses for dhppil (one duplicate, one newer, one older)
+        $response = $this->postJson('/api/medical-records', [
+            'user_id' => 1479,
+            'doctor_id' => 40,
+            'clinic_id' => 22,
+            'pet_id' => 1357,
+            'visit_category' => 'vaccination',
+            'notes' => 'Vaccination cert upload test',
+            'vaccination_certificate_json' => json_encode([
+                'vaccination' => [
+                    'dhppil' => [
+                        [
+                            'date' => '2025-04-10', // duplicate, should be ignored
+                            'next_due' => '2025-05-10',
+                        ],
+                        [
+                            'date' => '2026-06-05', // newer, should be sorted last
+                            'next_due' => '2027-06-05',
+                        ],
+                        [
+                            'date' => '2024-03-08', // older, should be sorted first
+                            'next_due' => '2024-04-08',
+                        ]
+                    ]
+                ]
+            ]),
+        ]);
+
+        $response->assertStatus(201);
+
+        $pet = Pet::find(1357);
+        $this->assertNotNull($pet);
+        $payload = is_string($pet->dog_disease_payload) ? json_decode($pet->dog_disease_payload, true) : $pet->dog_disease_payload;
+        
+        $this->assertArrayHasKey('vaccination', $payload);
+        $this->assertArrayHasKey('dhppil', $payload['vaccination']);
+        
+        // Assert that there are exactly 3 doses (duplicate is deduplicated)
+        $doses = $payload['vaccination']['dhppil'];
+        $this->assertCount(3, $doses);
+
+        // Assert chronological order
+        $this->assertEquals('2024-03-08', $doses[0]['date']);
+        $this->assertEquals('2024-04-08', $doses[0]['next_due']);
+
+        $this->assertEquals('2025-04-10', $doses[1]['date']);
+        $this->assertEquals('2025-05-10', $doses[1]['next_due']);
+
+        $this->assertEquals('2026-06-05', $doses[2]['date']);
+        $this->assertEquals('2027-06-05', $doses[2]['next_due']);
     }
 }

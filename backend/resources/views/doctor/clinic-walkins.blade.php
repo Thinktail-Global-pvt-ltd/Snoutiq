@@ -770,6 +770,13 @@
                 No parsed vaccine data yet. Upload a certificate above to auto-populate, or click "+ Add Vaccine" below.
               </div>
               
+              <!-- Loader showing while analyzing -->
+              <div id="vaccination-editor-loading" style="display:none; text-align:center; padding:30px 0; border:2px dashed #2563eb; border-radius:10px; background:#eff6ff;">
+                <div style="width: 32px; height: 32px; border: 3px solid #bfdbfe; border-top: 3px solid #2563eb; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite;"></div>
+                <div style="margin-top:12px; font-weight:700; font-size:14px; color:#1e40af;">Analyzing certificate with Gemini 2.5 Flash...</div>
+                <div style="font-size:12px; color:#60a5fa; margin-top:4px;">Please wait while we extract the vaccination details</div>
+              </div>
+              
               <!-- Vaccines list container -->
               <div id="vaccination-editor-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;"></div>
               
@@ -1845,13 +1852,18 @@ window.PatientStore = (() => {
       const dateVal = dateInput.value;
       const nextDueVal = nextDueInput.value;
 
-      result.vaccination[standardizedSlug] = {
+      const vaccineData = {
         date: dateVal || new Date().toISOString().split('T')[0]
       };
 
       if (nextDueVal) {
-        result.vaccination[standardizedSlug].next_due = nextDueVal;
+        vaccineData.next_due = nextDueVal;
       }
+
+      if (!result.vaccination[standardizedSlug]) {
+        result.vaccination[standardizedSlug] = [];
+      }
+      result.vaccination[standardizedSlug].push(vaccineData);
     });
 
     jsonTextarea.value = rows.length > 0 ? JSON.stringify(result, null, 2) : '';
@@ -2002,6 +2014,16 @@ window.PatientStore = (() => {
       if (statusIcon) statusIcon.textContent = '⏳';
       if (statusText) statusText.textContent = 'Analyzing with Gemini 2.5 Flash...';
 
+      const emptyState = document.getElementById('vaccination-editor-empty');
+      const loadingState = document.getElementById('vaccination-editor-loading');
+      const listContainer = document.getElementById('vaccination-editor-list');
+      const addBtn = document.getElementById('vaccination-editor-add-btn');
+
+      if (emptyState) emptyState.style.display = 'none';
+      if (listContainer) listContainer.style.display = 'none';
+      if (loadingState) loadingState.style.display = 'block';
+      if (addBtn) addBtn.disabled = true;
+
       const fd = new FormData();
       fd.append('document', file);
 
@@ -2036,6 +2058,13 @@ window.PatientStore = (() => {
           title: 'Parsing Failed',
           text: err.message || 'Could not parse vaccination certificate.'
         });
+      } finally {
+        if (loadingState) loadingState.style.display = 'none';
+        if (listContainer) listContainer.style.display = 'flex';
+        if (addBtn) addBtn.disabled = false;
+        if (listContainer && listContainer.children.length === 0) {
+          if (emptyState) emptyState.style.display = 'block';
+        }
       }
     });
 
