@@ -28,6 +28,7 @@ class DewormingWalkinsTest extends TestCase
 
     private function resetSchema(): void
     {
+        Schema::dropIfExists('pet_vaccination_documents');
         Schema::dropIfExists('prescriptions');
         Schema::dropIfExists('medical_records');
         Schema::dropIfExists('pets');
@@ -75,6 +76,16 @@ class DewormingWalkinsTest extends TestCase
             $table->string('deworming_status', 50)->nullable();
             $table->date('next_deworming_date')->nullable();
             $table->json('dog_disease_payload')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('pet_vaccination_documents', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('pet_id')->unique();
+            $table->binary('document_blob')->nullable();
+            $table->string('document_mime', 120)->nullable();
+            $table->string('document_name')->nullable();
+            $table->unsignedInteger('document_size')->nullable();
             $table->timestamps();
         });
 
@@ -572,5 +583,87 @@ class DewormingWalkinsTest extends TestCase
         $this->assertEquals('2026-06-05', $doses[2]['date']);
         $this->assertEquals('2027-06-05', $doses[2]['next_due']);
         $this->assertEquals('B-NEW', $doses[2]['batch_no']);
+    }
+
+    public function test_upload_and_retrieve_vaccination_image_blob(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1479,
+            'name' => 'Pet Parent',
+            'last_vet_id' => 22,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 22,
+            'name' => 'Vet Clinic',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 40,
+            'vet_registeration_id' => 22,
+            'doctor_name' => 'Dr. Rao',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1357,
+            'user_id' => 1479,
+            'name' => 'Bruno',
+            'pet_dob' => '2025-01-01',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $file = \Illuminate\Http\UploadedFile::fake()->image('vaccination_cert.png');
+
+        // Post request to upload the vaccination document and save its image blob
+        $response = $this->postJson('/api/vaccination-records/analyze-document', [
+            'pet_id' => 1357,
+            'user_id' => 1479,
+            'document' => $file,
+            'save_vaccination_image' => true,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.document.vaccination_image_blob_saved', true);
+
+        // Verify it was saved in the pet_vaccination_documents table and NOT pets table
+        $this->assertDatabaseHas('pet_vaccination_documents', [
+            'pet_id' => 1357,
+            'document_mime' => 'image/png',
+            'document_name' => 'vaccination_cert.png',
+        ]);
+
+        // Get the binary blob from the DB and make sure it has the same size
+        $doc = DB::table('pet_vaccination_documents')->where('pet_id', 1357)->first();
+        $this->assertNotNull($doc);
+        $this->assertNotNull($doc->document_blob);
+
+        // Check retrieval endpoint
+        $retrieveResponse = $this->get('/api/vaccination-records/pets/1357/image');
+        $retrieveResponse->assertStatus(200);
+        $retrieveResponse->assertHeader('Content-Type', 'image/png');
+        $retrieveResponse->assertHeader('Content-Disposition', 'inline; filename="vaccination_cert.png"');
+        $this->assertEquals($doc->document_blob, $retrieveResponse->getContent());
+
+        // Check retrieval endpoint for non-existing pet
+        $nonExistingResponse = $this->get('/api/vaccination-records/pets/99999/image');
+        $nonExistingResponse->assertStatus(404);
+
+        // Check retrieval endpoint for pet without document
+        DB::table('pets')->insert([
+            'id' => 8888,
+            'user_id' => 1479,
+            'name' => 'NoDocPet',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $noDocResponse = $this->get('/api/vaccination-records/pets/8888/image');
+        $noDocResponse->assertStatus(404);
     }
 }

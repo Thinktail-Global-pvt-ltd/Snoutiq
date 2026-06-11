@@ -81,4 +81,9 @@ class Pet extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    public function vaccinationDocument(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(PetVaccinationDocument::class, 'pet_id');
+    }
 }

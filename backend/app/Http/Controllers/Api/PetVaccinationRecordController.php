@@ -190,23 +190,30 @@ class PetVaccinationRecordController extends Controller
             ], 500);
         }
 
-        $row = DB::table('pets')
-            ->where('id', $pet)
-            ->first([
-                'id',
-                'vaccination_image_blob',
-                'vaccination_image_mime',
-                'vaccination_image_name',
-            ]);
-
-        if (! $row) {
+        $petExists = DB::table('pets')->where('id', $pet)->exists();
+        if (! $petExists) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pet not found.',
             ], 404);
         }
 
-        $blob = $row->vaccination_image_blob;
+        $row = DB::table('pet_vaccination_documents')
+            ->where('pet_id', $pet)
+            ->first([
+                'document_blob',
+                'document_mime',
+                'document_name',
+            ]);
+
+        if (! $row) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vaccination image blob not found for this pet.',
+            ], 404);
+        }
+
+        $blob = $row->document_blob;
         if ($blob === null || $blob === '') {
             return response()->json([
                 'success' => false,
@@ -214,8 +221,8 @@ class PetVaccinationRecordController extends Controller
             ], 404);
         }
 
-        $mime = $row->vaccination_image_mime ?: 'application/octet-stream';
-        $fileName = $row->vaccination_image_name ?: ('pet-' . $row->id . '-vaccination-image');
+        $mime = $row->document_mime ?: 'application/octet-stream';
+        $fileName = $row->document_name ?: ('pet-' . $pet . '-vaccination-image');
 
         return response($blob, 200, [
             'Content-Type' => $mime,
@@ -639,26 +646,38 @@ PROMPT;
             return false;
         }
 
-        DB::table('pets')->where('id', $petId)->update([
-            'vaccination_image_blob' => $blob,
-            'vaccination_image_mime' => $mimeType ?: 'application/octet-stream',
-            'vaccination_image_name' => $fileName,
-            'vaccination_image_size' => $fileSize,
-            'vaccination_image_uploaded_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $exists = DB::table('pet_vaccination_documents')->where('pet_id', $petId)->exists();
+        if ($exists) {
+            DB::table('pet_vaccination_documents')->where('pet_id', $petId)->update([
+                'document_blob' => $blob,
+                'document_mime' => $mimeType ?: 'application/octet-stream',
+                'document_name' => $fileName,
+                'document_size' => $fileSize,
+                'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('pet_vaccination_documents')->insert([
+                'pet_id' => $petId,
+                'document_blob' => $blob,
+                'document_mime' => $mimeType ?: 'application/octet-stream',
+                'document_name' => $fileName,
+                'document_size' => $fileSize,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         return true;
     }
 
     private function vaccinationImageBlobColumnsReady(): bool
     {
-        return Schema::hasTable('pets')
-            && Schema::hasColumn('pets', 'vaccination_image_blob')
-            && Schema::hasColumn('pets', 'vaccination_image_mime')
-            && Schema::hasColumn('pets', 'vaccination_image_name')
-            && Schema::hasColumn('pets', 'vaccination_image_size')
-            && Schema::hasColumn('pets', 'vaccination_image_uploaded_at');
+        return Schema::hasTable('pet_vaccination_documents')
+            && Schema::hasColumn('pet_vaccination_documents', 'pet_id')
+            && Schema::hasColumn('pet_vaccination_documents', 'document_blob')
+            && Schema::hasColumn('pet_vaccination_documents', 'document_mime')
+            && Schema::hasColumn('pet_vaccination_documents', 'document_name')
+            && Schema::hasColumn('pet_vaccination_documents', 'document_size');
     }
 
     private function storeAnalysisRecord(array $data, array $analysis, ?string $fileName): int
