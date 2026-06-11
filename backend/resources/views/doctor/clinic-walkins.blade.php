@@ -761,9 +761,34 @@
             <div class="pv-helper">PDF, JPG, PNG up to 10 MB.</div>
           </div>
           <div class="pv-field vaccination-field" style="display:none; grid-column: 1 / -1; margin-top: 10px;">
-            <label class="pv-label" for="vaccination-certificate-json">Parsed Certificate Data</label>
-            <textarea id="vaccination-certificate-json" name="vaccination_certificate_json" class="pv-input pv-textarea" placeholder="Parsed JSON data will appear here..." style="font-family: monospace; font-size: 13px;"></textarea>
-            <div class="pv-helper">Verify/edit the parsed JSON before saving. Format: {"vaccination":{"dhppil":{"date":"YYYY-MM-DD","next_due":"YYYY-MM-DD"}}}</div>
+            <label class="pv-label" style="font-weight: 700; margin-bottom: 4px;">Parsed Certificate Data</label>
+            <textarea id="vaccination-certificate-json" name="vaccination_certificate_json" style="display:none;"></textarea>
+            
+            <div id="vaccination-editor-container" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:16px; margin-top:4px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+              <!-- Empty state text when no vaccines are parsed -->
+              <div id="vaccination-editor-empty" style="color:#64748b; font-size:13px; text-align:center; padding:20px 0; border:2px dashed #cbd5e1; border-radius:10px; background:#fff;">
+                No parsed vaccine data yet. Upload a certificate above to auto-populate, or click "+ Add Vaccine" below.
+              </div>
+              
+              <!-- Header for the grid of vaccines -->
+              <div id="vaccination-editor-header" style="display:none; grid-template-columns:1.2fr 1fr 1fr auto; gap:10px; margin-bottom:8px; padding:0 10px; font-size:11px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.05em;">
+                <div>Vaccine Name</div>
+                <div>Administered Date</div>
+                <div>Next Due Date</div>
+                <div></div>
+              </div>
+              
+              <!-- Vaccines list container -->
+              <div id="vaccination-editor-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;"></div>
+              
+              <!-- Add vaccine button -->
+              <div style="display:flex; justify-content:flex-end;">
+                <button type="button" id="vaccination-editor-add-btn" class="pv-btn pv-btn-ghost" style="padding:6px 12px; font-size:12px; display:inline-flex; align-items:center; gap:6px; font-weight:700; border:1.5px solid #cbd5e1; border-radius:8px; height:auto;">
+                  ➕ Add Vaccine
+                </button>
+              </div>
+            </div>
+            <div class="pv-helper">Verify and edit the extracted vaccinations above. They will be saved to the pet's vaccination record automatically.</div>
           </div>
           <div class="pv-field deworming-field" style="display:none">
             <label class="pv-label" for="deworming-status"><span class="pv-required">*</span> Deworming</label>
@@ -1732,6 +1757,7 @@ window.PatientStore = (() => {
     const vcj=document.getElementById('vaccination-certificate-json'); if(vcj) vcj.value='';
     const vct=document.getElementById('vaccination-certificate-status-text'); if(vct) vct.textContent='Upload certificate (Gemini Auto-Parse)';
     const vci=document.getElementById('vaccination-certificate-status-icon'); if(vci) vci.textContent='📎';
+    if (typeof loadVaccineList === 'function') loadVaccineList(null);
   }
 
   function fillRecordFormFromRecord(rec) {
@@ -1740,6 +1766,7 @@ window.PatientStore = (() => {
     const vcj=document.getElementById('vaccination-certificate-json'); if(vcj) vcj.value='';
     const vct=document.getElementById('vaccination-certificate-status-text'); if(vct) vct.textContent='Upload certificate (Gemini Auto-Parse)';
     const vci=document.getElementById('vaccination-certificate-status-icon'); if(vci) vci.textContent='📎';
+    if (typeof loadVaccineList === 'function') loadVaccineList(null);
     const rx = rec.prescription||{};
     state.editingRecordId = rec.id;
     const ri=document.getElementById('record-id'); if(ri) ri.value=rec.id;
@@ -1800,6 +1827,185 @@ window.PatientStore = (() => {
   }
   function closePetModal() { els.petModal?.classList.remove('is-visible'); if (els.petPatient) els.petPatient.textContent='Patient | -'; if (els.petForm) els.petForm.reset(); }
 
+  // --- VACCINE CERTIFICATE EDITOR MODULE ---
+  const STANDARD_VACCINES = ['dhppil', 'rabies', 'canine_coronavirus', 'nobivac_kc', 'dhppi', 'leptospirosis', 'fvrcp', 'felv'];
+
+  function serializeVaccineList() {
+    const listContainer = document.getElementById('vaccination-editor-list');
+    const jsonTextarea = document.getElementById('vaccination-certificate-json');
+    const header = document.getElementById('vaccination-editor-header');
+    if (!listContainer || !jsonTextarea) return;
+
+    const result = {
+      vaccination: {}
+    };
+
+    const rows = listContainer.querySelectorAll('.vaccine-row');
+
+    if (header) {
+      header.style.display = rows.length > 0 ? 'grid' : 'none';
+    }
+
+    rows.forEach(row => {
+      const select = row.querySelector('.vaccine-select');
+      const customInput = row.querySelector('.vaccine-custom-input');
+      const dateInput = row.querySelector('.vaccine-date');
+      const nextDueInput = row.querySelector('.vaccine-next-due');
+
+      let slug = select.value;
+      if (slug === 'custom') {
+        slug = customInput.value.trim();
+      }
+
+      if (!slug) return;
+
+      let standardizedSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (!standardizedSlug) return;
+
+      const dateVal = dateInput.value;
+      const nextDueVal = nextDueInput.value;
+
+      result.vaccination[standardizedSlug] = {
+        date: dateVal || new Date().toISOString().split('T')[0]
+      };
+
+      if (nextDueVal) {
+        result.vaccination[standardizedSlug].next_due = nextDueVal;
+      }
+    });
+
+    jsonTextarea.value = rows.length > 0 ? JSON.stringify(result, null, 2) : '';
+  }
+
+  function renderVaccineRow(slug = '', date = '', nextDue = '') {
+    const listContainer = document.getElementById('vaccination-editor-list');
+    const emptyState = document.getElementById('vaccination-editor-empty');
+    const header = document.getElementById('vaccination-editor-header');
+    if (!listContainer) return;
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (header) header.style.display = 'grid';
+
+    const row = document.createElement('div');
+    row.className = 'vaccine-row';
+    row.style.cssText = 'display:grid; grid-template-columns:1.2fr 1fr 1fr auto; gap:10px; align-items:center; background:#fff; padding:10px; border:1.5px solid #cbd5e1; border-radius:10px;';
+
+    const isStandard = STANDARD_VACCINES.includes(slug.toLowerCase());
+    const matchedSlug = isStandard ? slug.toLowerCase() : (slug ? 'custom' : 'dhppil');
+
+    row.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+        <select class="vaccine-select pv-input" style="padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; font-weight:600; width:100%; height:auto;">
+          <option value="dhppil" ${matchedSlug === 'dhppil' ? 'selected' : ''}>DHPPiL</option>
+          <option value="rabies" ${matchedSlug === 'rabies' ? 'selected' : ''}>Rabies</option>
+          <option value="canine_coronavirus" ${matchedSlug === 'canine_coronavirus' ? 'selected' : ''}>Canine Coronavirus</option>
+          <option value="nobivac_kc" ${matchedSlug === 'nobivac_kc' ? 'selected' : ''}>Nobivac KC</option>
+          <option value="dhppi" ${matchedSlug === 'dhppi' ? 'selected' : ''}>DHPPi</option>
+          <option value="leptospirosis" ${matchedSlug === 'leptospirosis' ? 'selected' : ''}>Leptospirosis</option>
+          <option value="fvrcp" ${matchedSlug === 'fvrcp' ? 'selected' : ''}>FVRCP (Cat)</option>
+          <option value="felv" ${matchedSlug === 'felv' ? 'selected' : ''}>FeLV (Cat)</option>
+          <option value="custom" ${matchedSlug === 'custom' ? 'selected' : ''}>Custom Vaccine...</option>
+        </select>
+        <input type="text" class="vaccine-custom-input pv-input" value="${!isStandard ? slug : ''}" placeholder="Type vaccine name..." style="display:${!isStandard && slug ? 'block' : 'none'}; padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; margin-top:4px; width:100%; height:auto;">
+      </div>
+      <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+        <input type="date" class="vaccine-date pv-input" value="${date}" style="padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; width:100%; height:auto;">
+      </div>
+      <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+        <input type="date" class="vaccine-next-due pv-input" value="${nextDue}" style="padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; width:100%; height:auto;">
+      </div>
+      <button type="button" class="vaccine-delete-btn" style="border:none; background:none; cursor:pointer; font-size:16px; padding:4px 8px; color:#ef4444; border-radius:6px; transition:background 0.12s;">
+        🗑️
+      </button>
+    `;
+
+    const select = row.querySelector('.vaccine-select');
+    const customInput = row.querySelector('.vaccine-custom-input');
+    const dateInput = row.querySelector('.vaccine-date');
+    const nextDueInput = row.querySelector('.vaccine-next-due');
+    const deleteBtn = row.querySelector('.vaccine-delete-btn');
+
+    select.addEventListener('change', () => {
+      if (select.value === 'custom') {
+        customInput.style.display = 'block';
+        customInput.focus();
+      } else {
+        customInput.style.display = 'none';
+        customInput.value = '';
+      }
+      serializeVaccineList();
+    });
+
+    customInput.addEventListener('input', serializeVaccineList);
+    dateInput.addEventListener('change', serializeVaccineList);
+    nextDueInput.addEventListener('change', serializeVaccineList);
+
+    deleteBtn.addEventListener('click', () => {
+      row.remove();
+      if (listContainer.children.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        if (header) header.style.display = 'none';
+      }
+      serializeVaccineList();
+    });
+
+    deleteBtn.addEventListener('mouseenter', () => deleteBtn.style.background = '#fee2e2');
+    deleteBtn.addEventListener('mouseleave', () => deleteBtn.style.background = 'none');
+
+    listContainer.appendChild(row);
+  }
+
+  function loadVaccineList(data) {
+    const listContainer = document.getElementById('vaccination-editor-list');
+    const emptyState = document.getElementById('vaccination-editor-empty');
+    const header = document.getElementById('vaccination-editor-header');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+
+    let parsedData = null;
+    if (typeof data === 'string') {
+      try {
+        parsedData = JSON.parse(data);
+      } catch (_) {}
+    } else if (data && typeof data === 'object') {
+      parsedData = data;
+    }
+
+    const vaccinations = parsedData?.vaccination || {};
+    const keys = Object.keys(vaccinations);
+
+    if (keys.length === 0) {
+      if (emptyState) emptyState.style.display = 'block';
+      if (header) header.style.display = 'none';
+    } else {
+      if (emptyState) emptyState.style.display = 'none';
+      if (header) header.style.display = 'grid';
+      keys.forEach(slug => {
+        const item = vaccinations[slug];
+        if (Array.isArray(item)) {
+          item.forEach(subItem => {
+            renderVaccineRow(slug, subItem?.date || '', subItem?.next_due || '');
+          });
+        } else if (item && typeof item === 'object') {
+          renderVaccineRow(slug, item.date || '', item.next_due || '');
+        }
+      });
+    }
+
+    serializeVaccineList();
+  }
+
+  function initVaccineEditor() {
+    const addBtn = document.getElementById('vaccination-editor-add-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        renderVaccineRow('', '', '');
+        serializeVaccineList();
+      });
+    }
+  }
+
   function wireEvents() {
     els.search?.addEventListener('input', e => { state.search=e.target.value||''; renderPatientList(); });
     els.sort?.addEventListener('change', e => { state.sort=e.target.value; renderPatientList(); });
@@ -1847,12 +2053,13 @@ window.PatientStore = (() => {
           if (jsonTextarea) {
             jsonTextarea.value = JSON.stringify(res.data, null, 2);
           }
+          loadVaccineList(res.data);
           if (statusIcon) statusIcon.textContent = '✅';
           if (statusText) statusText.textContent = 'Parsed successfully!';
           Swal.fire({
             icon: 'success',
             title: 'Certificate Parsed',
-            text: 'Vaccination details extracted successfully. Please verify the JSON below.',
+            text: 'Vaccination details extracted successfully. Please verify the data below.',
             timer: 2000,
             showConfirmButton: false
           });
@@ -1923,6 +2130,8 @@ window.PatientStore = (() => {
         selectPatient(patientId);
       } catch (error) { Swal.fire({icon:'error',title:'Could not add pet',text:error.message||'Request failed'}); }
     });
+
+    initVaccineEditor();
   }
 
   // Subscribe to PatientStore — keeps walk-in list in sync
