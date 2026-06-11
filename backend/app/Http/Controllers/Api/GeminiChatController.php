@@ -1153,14 +1153,21 @@ PROMPT;
             urlencode($apiKey)
         );
 
+        $genConfig = [
+            'maxOutputTokens' => 450,
+        ];
+        if (str_contains($model, 'gemini-2.5') || str_contains($model, 'gemini-2.0')) {
+            $genConfig['thinkingConfig'] = [
+                'thinkingBudget' => 0,
+            ];
+        }
+
         $payload = json_encode([
             'contents' => [[
                 'role'  => 'user',
                 'parts' => [['text' => $prompt]],
             ]],
-            'generationConfig' => [
-                'maxOutputTokens' => 450,
-            ],
+            'generationConfig' => $genConfig,
         ], JSON_UNESCAPED_SLASHES);
 
         $ch = curl_init($url);
@@ -1385,7 +1392,7 @@ PROMPT;
                 'temperature' => 0.2,
                 'topP' => 0.8,
                 'topK' => 32,
-                'maxOutputTokens' => 1800,
+                'maxOutputTokens' => 8192,
             ],
         ], JSON_UNESCAPED_SLASHES);
 
@@ -2240,7 +2247,10 @@ PROMPT;
                         'temperature' => 0.1,
                         'topP' => 0.8,
                         'topK' => 32,
-                        'maxOutputTokens' => 1800,
+                        'maxOutputTokens' => 8192,
+                        'thinkingConfig' => [
+                            'thinkingBudget' => 0,
+                        ],
                     ],
                 ]);
 
@@ -2303,6 +2313,17 @@ PROMPT;
                     urlencode($apiKey)
                 );
 
+                $genConfig = [
+                    'maxOutputTokens' => 8192,
+                    'temperature' => 0.2,
+                ];
+
+                if (str_contains($model, 'gemini-2.5') || str_contains($model, 'gemini-2.0')) {
+                    $genConfig['thinkingConfig'] = [
+                        'thinkingBudget' => 0,
+                    ];
+                }
+
                 // Simple generationConfig matching geminiCallWithImage (no responseMimeType / topP / topK limits)
                 $payload = json_encode([
                     'contents' => [[
@@ -2312,10 +2333,7 @@ PROMPT;
                             ['text' => $prompt],
                         ],
                     ]],
-                    'generationConfig' => [
-                        'maxOutputTokens' => 1800,
-                        'temperature' => 0.2,
-                    ],
+                    'generationConfig' => $genConfig,
                 ], JSON_UNESCAPED_SLASHES);
 
                 // Simple curl parameters identical to curlPost

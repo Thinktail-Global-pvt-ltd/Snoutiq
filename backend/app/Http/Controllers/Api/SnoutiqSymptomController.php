@@ -2269,12 +2269,19 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $prompt = mb_substr($prompt, 0, self::MAX_PROMPT_CHARS);
         }
 
-        $url  = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
+        $genConfig = ['maxOutputTokens' => $maxTokens, 'temperature' => 0.2];
+        if (str_contains($this->model, 'gemini-2.5') || str_contains($this->model, 'gemini-2.0')) {
+            $genConfig['thinkingConfig'] = [
+                'thinkingBudget' => 0,
+            ];
+        }
+
         $body = json_encode([
             'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-            'generationConfig' => ['maxOutputTokens' => $maxTokens, 'temperature' => 0.2],
+            'generationConfig' => $genConfig,
         ]);
 
+        $url  = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
         return $this->curlPost($url, $body);
     }
 
@@ -2289,7 +2296,13 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             $imageB64 = $m[1];
         }
 
-        $url  = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
+        $genConfig = ['maxOutputTokens' => $maxTokens, 'temperature' => 0.2];
+        if (str_contains($this->model, 'gemini-2.5') || str_contains($this->model, 'gemini-2.0')) {
+            $genConfig['thinkingConfig'] = [
+                'thinkingBudget' => 0,
+            ];
+        }
+
         $body = json_encode([
             'contents' => [[
                 'role'  => 'user',
@@ -2298,9 +2311,10 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
                     ['text'        => $prompt],
                 ],
             ]],
-            'generationConfig' => ['maxOutputTokens' => $maxTokens, 'temperature' => 0.2],
+            'generationConfig' => $genConfig,
         ]);
 
+        $url  = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
         return $this->curlPost($url, $body);
     }
 
