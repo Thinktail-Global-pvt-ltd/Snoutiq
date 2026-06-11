@@ -2371,7 +2371,7 @@ PROMPT;
                                 ]);
                             }
                         }
-                        $errors[] = "Model {$model} attempt {$attempt} JSON decode error: " . json_last_error_msg();
+                        $errors[] = "Model {$model} attempt {$attempt} JSON decode error: " . json_last_error_msg() . " | Raw response: " . $text;
                         break;
                     }
                 } elseif ($httpCode === 429) {
