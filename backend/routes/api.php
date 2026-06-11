@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 // use App
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AiSearchController;
+use App\Http\Controllers\Api\RawGeminiController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\RoleLoginController;
 use App\Http\Controllers\Api\ChatController;
@@ -3629,6 +3630,9 @@ Route::post('/chat/unified/reset', [GeminiChatController::class, 'unifiedReset']
 
 // Gemini AI Search endpoint
 Route::match(['get', 'post'], '/ai/search', [AiSearchController::class, 'search']);
+
+// Gemini Raw AI Search endpoint (hardcoded developer key)
+Route::match(['get', 'post'], '/ai/raw-search', [RawGeminiController::class, 'rawSearch']);
 
 Route::prefix('groomer')->group(function () {
               // list
