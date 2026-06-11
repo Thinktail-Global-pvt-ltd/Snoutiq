@@ -80,7 +80,7 @@ return [
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
-        'chat_model' => env('GEMINI_CHAT_MODEL', 'gemini-2.0-flash'),
+        'chat_model' => env('GEMINI_CHAT_MODEL', 'gemini-2.5-flash'),
     ],
 
     'agora' => [

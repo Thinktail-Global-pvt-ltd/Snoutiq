@@ -2276,9 +2276,9 @@ PROMPT;
             ], 502);
         }
 
-        // Try the configured model (like gemini-2.0-flash from env) first, then fallbacks
+        // Try the configured model (like gemini-2.5-flash from env) first, then fallbacks
         $models = array_values(array_unique(array_filter([
-            env('GEMINI_MODEL', 'gemini-2.0-flash'),
+            env('GEMINI_MODEL', 'gemini-2.5-flash'),
             'gemini-2.5-flash',
             GeminiConfig::chatModel(),
             config('services.gemini.chat_model'),

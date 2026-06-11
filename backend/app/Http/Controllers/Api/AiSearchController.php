@@ -36,10 +36,10 @@ class AiSearchController extends Controller
             ], 503);
         }
 
-        // Use requested model or fall back to default chat model (e.g. gemini-2.0-flash)
+        // Use requested model or fall back to default chat model (e.g. gemini-2.5-flash)
         $model = $request->input('model', GeminiConfig::chatModel());
         if (empty($model)) {
-            $model = 'gemini-2.0-flash';
+            $model = 'gemini-2.5-flash';
         }
 
         // 3. Construct API URL
