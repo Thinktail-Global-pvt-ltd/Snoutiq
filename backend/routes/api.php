@@ -2968,9 +2968,8 @@ Route::get('/users/last-vet-details', function (Request $request) {
 
     $doctors = Doctor::query()
         ->where('vet_registeration_id', $clinic->id)
-        ->whereIn('id', $availableDoctorIds->all())
         ->get()
-        ->map(function (Doctor $doctor) {
+        ->map(function (Doctor $doctor) use ($availableDoctorIds) {
             $item = $doctor->toArray();
             $imageUrl = empty($doctor->doctor_image_blob)
                 ? null
@@ -2978,6 +2977,7 @@ Route::get('/users/last-vet-details', function (Request $request) {
 
             $item['doctor_image_blob'] = $imageUrl;
             $item['doctor_image_blob_url'] = $imageUrl;
+            $item['is_available'] = $availableDoctorIds->contains((int) $doctor->id);
 
             return $item;
         })

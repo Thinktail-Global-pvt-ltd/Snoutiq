@@ -27,7 +27,7 @@ class LastVetDetailsApiTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_last_vet_details_returns_only_currently_available_doctors(): void
+    public function test_last_vet_details_returns_all_doctors_with_availability_status(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 4, 23, 11, 15, 0, 'Asia/Kolkata'));
 
@@ -136,9 +136,16 @@ class LastVetDetailsApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.user_id', 1404)
             ->assertJsonPath('data.last_vet_id', 10)
+            ->assertJsonCount(3, 'data.doctors')
             ->assertJsonPath('data.doctors.0.id', 101)
             ->assertJsonPath('data.doctors.0.doctor_name', 'Dr Available')
-            ->assertJsonCount(1, 'data.doctors')
+            ->assertJsonPath('data.doctors.0.is_available', true)
+            ->assertJsonPath('data.doctors.1.id', 102)
+            ->assertJsonPath('data.doctors.1.doctor_name', 'Dr Later')
+            ->assertJsonPath('data.doctors.1.is_available', false)
+            ->assertJsonPath('data.doctors.2.id', 103)
+            ->assertJsonPath('data.doctors.2.doctor_name', 'Dr Break')
+            ->assertJsonPath('data.doctors.2.is_available', false)
             ->assertJsonPath('data.availability.source', 'doctor_video_availability')
             ->assertJsonPath('data.availability.day_of_week', 4)
             ->assertJsonPath('data.availability.time', '11:15:00')
