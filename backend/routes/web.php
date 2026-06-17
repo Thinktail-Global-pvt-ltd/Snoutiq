@@ -329,6 +329,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/full-onboarding/{clinic}/media', [AdminPanelController::class, 'updateFullOnboardingClinicMedia'])->name('admin.full-onboarding.media.update');
         Route::delete('/full-onboarding/{clinic}/media/{field}', [AdminPanelController::class, 'deleteFullOnboardingClinicMedia'])->name('admin.full-onboarding.media.delete');
         Route::delete('/full-onboarding/{clinic}', [AdminPanelController::class, 'deleteFullOnboardingEntry'])->name('admin.full-onboarding.delete');
+        Route::post('/full-onboarding/{clinic}/doctors', [AdminPanelController::class, 'storeFullOnboardingDoctor'])->name('admin.full-onboarding.doctors.store');
         Route::put('/full-onboarding/doctors/{doctor}/clinic-hours', [AdminPanelController::class, 'updateFullOnboardingDoctorClinicHours'])->name('admin.full-onboarding.doctors.clinic-hours.update');
         Route::delete('/full-onboarding/doctors/{doctor}/clinic-hours', [AdminPanelController::class, 'clearFullOnboardingDoctorClinicHours'])->name('admin.full-onboarding.doctors.clinic-hours.clear');
         Route::put('/full-onboarding/doctors/{doctor}/video-hours', [AdminPanelController::class, 'updateFullOnboardingDoctorVideoHours'])->name('admin.full-onboarding.doctors.video-hours.update');

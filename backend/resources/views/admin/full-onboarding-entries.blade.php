@@ -285,7 +285,17 @@
                                                         <span class="text-muted small">No vet-at-home settings.</span>
                                                     @endforelse
                                                 </div>
-                                            </div>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
+                                            <h5 class="h6 mb-0 text-uppercase text-muted fw-semibold" style="letter-spacing: 0.05em;">Doctors</h5>
+                                            <button type="button" class="btn btn-sm text-white px-3 py-1.5 rounded-3 shadow-sm border-0" 
+                                                    style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); font-weight: 500; transition: all 0.2s ease;"
+                                                    onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(124, 58, 237, 0.25)';"
+                                                    onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
+                                                    data-bs-toggle="modal" data-bs-target="#addDoctorModal{{ $clinic->id }}">
+                                                <i class="bi bi-plus-lg me-1"></i> Add Doctor
+                                            </button>
                                         </div>
 
                                         <div class="table-responsive mb-3">
@@ -596,6 +606,93 @@
                                                         <i class="bi bi-trash"></i> Delete
                                                     </button>
                                                 </form>
+                                            </div>
+                                        </div>
+
+                                        <!-- Add Doctor Modal -->
+                                        <div class="modal fade" id="addDoctorModal{{ $clinic->id }}" tabindex="-1" aria-labelledby="addDoctorModalLabel{{ $clinic->id }}" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                                                    <div class="modal-header border-bottom-0 pb-0" style="padding: 1.5rem 1.5rem 0.5rem 1.5rem;">
+                                                        <h5 class="modal-title fw-bold" id="addDoctorModalLabel{{ $clinic->id }}" style="color: #1e293b;">
+                                                            Add Doctor to <span style="color: #6366f1;">{{ $clinic->name }}</span>
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <form method="POST" action="{{ route('admin.full-onboarding.doctors.store', ['clinic' => $clinic->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}">
+                                                        @csrf
+                                                        <div class="modal-body" style="padding: 1rem 1.5rem 1.5rem 1.5rem;">
+                                                            <div class="mb-3">
+                                                                <label class="form-label small fw-semibold text-muted mb-1">Doctor Name <span class="text-danger">*</span></label>
+                                                                <div class="input-group">
+                                                                    <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-person"></i></span>
+                                                                    <input type="text" name="doctor_name" class="form-control bg-light border-start-0" placeholder="Dr. Jane Doe" required style="font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                                                                </div>
+                                                            </div>
+                                                            <div class="row g-2 mb-3">
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label small fw-semibold text-muted mb-1">Email Address</label>
+                                                                    <div class="input-group">
+                                                                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-envelope"></i></span>
+                                                                        <input type="email" name="doctor_email" class="form-control bg-light border-start-0" placeholder="doctor@example.com" style="font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label small fw-semibold text-muted mb-1">Mobile Number</label>
+                                                                    <div class="input-group">
+                                                                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-telephone"></i></span>
+                                                                        <input type="text" name="doctor_mobile" class="form-control bg-light border-start-0" placeholder="10-digit number" style="font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row g-2 mb-3">
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label small fw-semibold text-muted mb-1">Degree</label>
+                                                                    <div class="input-group">
+                                                                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-mortarboard"></i></span>
+                                                                        <input type="text" name="degree" class="form-control bg-light border-start-0" placeholder="e.g. BVSc & AH" style="font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label small fw-semibold text-muted mb-1">Experience (Years)</label>
+                                                                    <div class="input-group">
+                                                                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-briefcase"></i></span>
+                                                                        <input type="number" name="years_of_experience" class="form-control bg-light border-start-0" min="0" placeholder="e.g. 5" style="font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row g-2 mb-3">
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label small fw-semibold text-muted mb-1">License Number</label>
+                                                                    <div class="input-group">
+                                                                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-card-text"></i></span>
+                                                                        <input type="text" name="doctor_license" class="form-control bg-light border-start-0" placeholder="e.g. VCI-1234" style="font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label small fw-semibold text-muted mb-1">Consultation Fee (₹)</label>
+                                                                    <div class="input-group">
+                                                                        <span class="input-group-text bg-light border-end-0 text-muted">₹</span>
+                                                                        <input type="number" step="0.01" name="doctors_price" class="form-control bg-light border-start-0" placeholder="e.g. 500" style="font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label small fw-semibold text-muted mb-1">Specialization</label>
+                                                                <div class="input-group">
+                                                                    <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-clipboard-pulse"></i></span>
+                                                                    <input type="text" name="specialization_select_all_that_apply" class="form-control bg-light border-start-0" placeholder="e.g. Surgery, Dermatology (comma separated)" style="font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer border-top-0 pt-0" style="padding: 0 1.5rem 1.5rem 1.5rem;">
+                                                            <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: 8px;">Cancel</button>
+                                                            <button type="submit" class="btn text-white" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 8px; border: 0; font-weight: 500;">
+                                                                Add Doctor
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

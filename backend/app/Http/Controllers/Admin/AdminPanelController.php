@@ -5097,6 +5097,39 @@ class AdminPanelController extends Controller
             ->with('status', 'Full onboarding entry deleted.');
     }
 
+    public function storeFullOnboardingDoctor(Request $request, VetRegisterationTemp $clinic): RedirectResponse
+    {
+        $validated = $request->validate([
+            'doctor_name' => ['required', 'string', 'max:255'],
+            'doctor_email' => ['nullable', 'email', 'max:255'],
+            'doctor_mobile' => ['nullable', 'string', 'max:15'],
+            'doctor_license' => ['nullable', 'string', 'max:255'],
+            'degree' => ['nullable', 'string', 'max:255'],
+            'years_of_experience' => ['nullable', 'integer', 'min:0', 'max:80'],
+            'specialization_select_all_that_apply' => ['nullable', 'string', 'max:500'],
+            'doctors_price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $doctorData = [
+            'vet_registeration_id' => $clinic->id,
+            'doctor_name' => $validated['doctor_name'],
+            'doctor_email' => $validated['doctor_email'] ?? null,
+            'doctor_mobile' => $validated['doctor_mobile'] ?? null,
+            'doctor_license' => $validated['doctor_license'] ?? null,
+            'degree' => $validated['degree'] ?? null,
+            'years_of_experience' => $validated['years_of_experience'] ?? null,
+            'specialization_select_all_that_apply' => $validated['specialization_select_all_that_apply'] ?? null,
+            'doctors_price' => $validated['doctors_price'] ?? null,
+            'staff_role' => 'vet',
+            'toggle_availability' => 1,
+            'doctor_status' => 'approved',
+        ];
+
+        Doctor::create($doctorData);
+
+        return $this->redirectFullOnboardingWithStatus($request, 'Doctor '.$validated['doctor_name'].' added successfully.');
+    }
+
     public function updateFullOnboardingClinicMedia(Request $request, VetRegisterationTemp $clinic): RedirectResponse
     {
         $request->validate([
