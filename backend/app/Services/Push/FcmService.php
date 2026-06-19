@@ -363,55 +363,52 @@ class FcmService
      * @param array<string,string> $data
      * @return array<string,mixed>
      */
-    private function buildPayloadArray(string $token, ?string $title, ?string $body, array $data): array
-    {
-        $deliveryMode = $this->resolveDeliveryMode($data);
-        $dataOnly = $deliveryMode === self::DELIVERY_MODE_DATA_ONLY;
-        $notificationOnly = $deliveryMode === self::DELIVERY_MODE_NOTIFICATION_ONLY;
-        $isIncomingCall = $this->isIncomingCallPayload($data);
+  private function buildPayloadArray(string $token, ?string $title, ?string $body, array $data): array
+{
+    $deliveryMode = $this->resolveDeliveryMode($data);
+    $dataOnly = $deliveryMode === self::DELIVERY_MODE_DATA_ONLY;
+    $notificationOnly = $deliveryMode === self::DELIVERY_MODE_NOTIFICATION_ONLY;
+    $isIncomingCall = $this->isIncomingCallPayload($data);
 
-        $payload = [
-            'token' => $token,
-            'android' => [
-                'priority' => 'high',
-            ],
+    $payload = [
+        'token' => $token,
+        'android' => ['priority' => 'high'],
+    ];
+
+    if (!$notificationOnly) {
+        $payload['data'] = $data;
+    } else {
+        $payload['data'] = $this->buildNotificationOnlyData($data);
+    }
+
+    if ($isIncomingCall) {
+        $payload['android']['ttl'] = '30s';
+    } elseif ($dataOnly) {
+        $payload['android']['ttl'] = '90s';
+    }
+
+    if ($dataOnly || $isIncomingCall) {
+        $payload['apns'] = [
+            'headers' => ['apns-priority' => '10'],
+        ];
+    }
+
+    // ✅ Sirf yeh ek block — no duplicate
+    if (!$dataOnly && $title !== null && trim($title) !== '') {
+        $payload['notification'] = [
+            'title' => $title,
+            'body' => $body ?? '',
         ];
 
-        if (!$notificationOnly) {
-            $payload['data'] = $data;
-        } else {
-            $payload['data'] = $this->buildNotificationOnlyData($data);
-        }
-
-        if ($isIncomingCall) {
-            $payload['android']['ttl'] = '30s';
-        } elseif ($dataOnly) {
-            $payload['android']['ttl'] = '90s';
-        }
-
-        if ($isIncomingCall && !$dataOnly) {
+        if (!$isIncomingCall) {
             $payload['android']['notification'] = [
-                'channel_id' => 'incoming_calls_v6',
+                'channel_id' => 'general_notifications_v1',
             ];
         }
-
-        if ($dataOnly || $isIncomingCall) {
-            $payload['apns'] = [
-                'headers' => [
-                    'apns-priority' => '10',
-                ],
-            ];
-        }
-
-        if (!$dataOnly && $title !== null && trim($title) !== '') {
-            $payload['notification'] = [
-                'title' => $title,
-                'body' => $body ?? '',
-            ];
-        }
-
-        return $payload;
     }
+
+    return $payload;
+}
 
     /**
      * @param array<string,mixed> $payload
