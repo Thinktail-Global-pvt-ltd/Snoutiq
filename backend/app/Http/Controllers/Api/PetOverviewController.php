@@ -340,6 +340,74 @@ class PetOverviewController extends Controller
     }
 
     /**
+     * GET /api/pets/neutering-payload
+     * Input: pet_id (query)
+     * Output: neutering details
+     */
+    public function neuteringPayload(Request $request)
+    {
+        $rawPetId = $request->query('pet_id', $request->input('pet_id'));
+        $petId = is_numeric($rawPetId) ? (int) $rawPetId : 0;
+
+        if ($petId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_id is required',
+            ], 422);
+        }
+
+        if (!Schema::hasTable('pets')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets table is missing',
+            ], 500);
+        }
+
+        $columns = ['id'];
+        $hasIsNueteredColumn = Schema::hasColumn('pets', 'is_nuetered');
+        $hasIsNeuteredColumn = Schema::hasColumn('pets', 'is_neutered');
+
+        if ($hasIsNueteredColumn) {
+            $columns[] = 'is_nuetered';
+        }
+        if ($hasIsNeuteredColumn) {
+            $columns[] = 'is_neutered';
+        }
+
+        if (!$hasIsNueteredColumn && !$hasIsNeuteredColumn) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Neither is_nuetered nor is_neutered column exists on pets table',
+            ], 500);
+        }
+
+        $pet = DB::table('pets')
+            ->select($columns)
+            ->where('id', $petId)
+            ->first();
+
+        if (!$pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found',
+            ], 404);
+        }
+
+        $isNeuteredRaw = property_exists($pet, 'is_nuetered')
+            ? $pet->is_nuetered
+            : (property_exists($pet, 'is_neutered') ? $pet->is_neutered : null);
+
+        $isNeutered = $this->normalizeYesNoFlag($isNeuteredRaw);
+
+        return response()->json([
+            'success' => true,
+            'pet_id' => $petId,
+            'is_neutered' => $isNeutered,
+            'is_nuetered' => $isNeutered,
+        ]);
+    }
+
+    /**
      * POST /api/pets/deworming-vaccination
      * Input: pet_id, deworming_yes_no, last_deworming_date, vaccination_json (or vaccinations_json / vaccination)
      * Saves: deworming_yes_no, last_deworming_date, next_deworming_date, dog_disease_payload.vaccination
