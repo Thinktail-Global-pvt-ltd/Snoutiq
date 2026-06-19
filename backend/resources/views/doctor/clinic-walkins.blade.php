@@ -1444,6 +1444,29 @@ window.PatientStore = (() => {
     }
   }
 
+  function autofillDewormingFromSelectedPet() {
+    const pet = getSelectedPet();
+    const isDeworm = (els.visitCategory?.value === 'deworming');
+    if (!isDeworm) return;
+
+    const dewormingStatus = document.getElementById('deworming-status');
+    const lastDewormingDateInput = document.getElementById('last-deworming-date');
+
+    if (pet && dewormingStatus) {
+      const hasDewormed = pet.deworming_yes_no === true || pet.deworming_yes_no === 1 || pet.deworming_yes_no === '1' || String(pet.deworming_yes_no).toLowerCase() === 'yes';
+      dewormingStatus.value = hasDewormed ? 'yes' : 'no';
+
+      if (lastDewormingDateInput) {
+        lastDewormingDateInput.value = pet.last_deworming_date || '';
+      }
+      updateDewormingDateUI();
+    } else {
+      if (dewormingStatus) dewormingStatus.value = 'no';
+      if (lastDewormingDateInput) lastDewormingDateInput.value = '';
+      updateDewormingDateUI();
+    }
+  }
+
   function applyFilters(list) {
     let f = list.slice();
     if (state.search) {
@@ -1794,6 +1817,7 @@ window.PatientStore = (() => {
     mv('last-deworming-date', rx.last_deworming_date??'');
     updateVisitCategoryUI(els.visitCategory?.value||''); recomputeLastPostOp();
     autofillVaccinationFromSelectedPet();
+    autofillDewormingFromSelectedPet();
     medications = normalizeMedicationState(rx.medications_json||[]); renderMedicationCards(); syncMedicationPayload();
     if (!medications.length) addMedication();
     toggleCriticalSections(); updateVisitCategoryUI(els.visitCategory?.value||'');
@@ -1814,6 +1838,7 @@ window.PatientStore = (() => {
     if (!medications.length) addMedication();
     renderPetSelect(patient); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); recomputeLastPostOp();
     autofillVaccinationFromSelectedPet();
+    autofillDewormingFromSelectedPet();
     if (els.doctorSelect && DEFAULT_DOCTOR_ID) els.doctorSelect.value=DEFAULT_DOCTOR_ID;
     els.modal.classList.add('is-visible');
   }
@@ -2030,9 +2055,9 @@ window.PatientStore = (() => {
     document.querySelectorAll('[data-role="close-pet-modal"]').forEach(btn => btn.addEventListener('click', closePetModal));
     els.caseSeverity?.addEventListener('change', () => toggleCriticalSections());
     els.addMedicineBtn?.addEventListener('click', () => addMedication());
-    els.visitCategory?.addEventListener('change', e => { updateVisitCategoryUI(e.target.value); autofillVaccinationFromSelectedPet(); });
+    els.visitCategory?.addEventListener('change', e => { updateVisitCategoryUI(e.target.value); autofillVaccinationFromSelectedPet(); autofillDewormingFromSelectedPet(); });
     document.getElementById('deworming-status')?.addEventListener('change', () => updateDewormingDateUI());
-    els.recordPet?.addEventListener('change', () => { recomputeLastPostOp(); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); autofillVaccinationFromSelectedPet(); });
+    els.recordPet?.addEventListener('change', () => { recomputeLastPostOp(); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); autofillVaccinationFromSelectedPet(); autofillDewormingFromSelectedPet(); });
     els.recordNotes?.addEventListener('input', () => {
       const auto = String(els.recordNotes.dataset.autofillSymptom??'').trim();
       if (auto && String(els.recordNotes.value??'').trim()!==auto) delete els.recordNotes.dataset.autofillSymptom;
