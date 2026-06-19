@@ -383,6 +383,12 @@
                                                                     <form method="POST" action="{{ route('admin.full-onboarding.doctors.clinic-hours.update', ['doctor' => $doctor->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" class="border rounded p-2 bg-white">
                                                                         @csrf
                                                                         @method('PUT')
+                                                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                                            <span class="small fw-semibold text-muted">Clinic Hours</span>
+                                                                            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 0.72rem; line-height: 1.5; border-radius: 4px;" onclick="set24Hours(this)">
+                                                                                <i class="bi bi-clock-history me-1"></i> Set 24/7 Hours
+                                                                            </button>
+                                                                        </div>
                                                                         @foreach($clinicHourEditRows as $index => $row)
                                                                             <div class="row g-1 align-items-center mb-1">
                                                                                 <div class="col-4">
@@ -445,6 +451,12 @@
                                                                     <form method="POST" action="{{ route('admin.full-onboarding.doctors.video-hours.update', ['doctor' => $doctor->id, 'date_filter' => $dateFilter, 'from_date' => $fromDate]) }}" class="border rounded p-2 bg-white">
                                                                         @csrf
                                                                         @method('PUT')
+                                                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                                            <span class="small fw-semibold text-muted">Video Hours</span>
+                                                                            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 0.72rem; line-height: 1.5; border-radius: 4px;" onclick="set24Hours(this)">
+                                                                                <i class="bi bi-clock-history me-1"></i> Set 24/7 Hours
+                                                                            </button>
+                                                                        </div>
                                                                         @foreach($videoHourEditRows as $index => $row)
                                                                             <div class="row g-1 align-items-center mb-1">
                                                                                 <div class="col-4">
@@ -706,3 +718,30 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+function set24Hours(btn) {
+    const form = btn.closest('form');
+    if (!form) return;
+    
+    // Set all start_time inputs to '00:00' and end_time inputs to '23:59'
+    const startInputs = form.querySelectorAll('input[type="time"][name*="start_time"]');
+    const endInputs = form.querySelectorAll('input[type="time"][name*="end_time"]');
+    
+    startInputs.forEach(input => {
+        input.value = '00:00';
+    });
+    endInputs.forEach(input => {
+        input.value = '23:59';
+    });
+    
+    // If it's the clinic hours form, set the service_type selects to 'in_clinic'
+    const serviceSelects = form.querySelectorAll('select[name*="service_type"]');
+    serviceSelects.forEach(select => {
+        select.value = 'in_clinic';
+    });
+}
+</script>
+@endpush
+

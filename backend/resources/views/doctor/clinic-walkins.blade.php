@@ -1428,6 +1428,22 @@ window.PatientStore = (() => {
     els.recordNotes.value = symptom; els.recordNotes.dataset.autofillSymptom = symptom;
   }
 
+  function autofillVaccinationFromSelectedPet() {
+    const pet = getSelectedPet();
+    const isVacc = (els.visitCategory?.value === 'vaccination');
+    if (!isVacc) return;
+
+    if (pet && (pet.vaccination || pet.vaccination_details)) {
+      if (typeof loadVaccineList === 'function') {
+        loadVaccineList({ vaccination: pet.vaccination || pet.vaccination_details });
+      }
+    } else {
+      if (typeof loadVaccineList === 'function') {
+        loadVaccineList(null);
+      }
+    }
+  }
+
   function applyFilters(list) {
     let f = list.slice();
     if (state.search) {
@@ -1777,6 +1793,7 @@ window.PatientStore = (() => {
     mv('deworming-status',  rx.deworming??'no');
     mv('last-deworming-date', rx.last_deworming_date??'');
     updateVisitCategoryUI(els.visitCategory?.value||''); recomputeLastPostOp();
+    autofillVaccinationFromSelectedPet();
     medications = normalizeMedicationState(rx.medications_json||[]); renderMedicationCards(); syncMedicationPayload();
     if (!medications.length) addMedication();
     toggleCriticalSections(); updateVisitCategoryUI(els.visitCategory?.value||'');
@@ -1796,6 +1813,7 @@ window.PatientStore = (() => {
     if (forceFollowup && els.visitCategory) { els.visitCategory.value='followup'; updateVisitCategoryUI('followup'); }
     if (!medications.length) addMedication();
     renderPetSelect(patient); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); recomputeLastPostOp();
+    autofillVaccinationFromSelectedPet();
     if (els.doctorSelect && DEFAULT_DOCTOR_ID) els.doctorSelect.value=DEFAULT_DOCTOR_ID;
     els.modal.classList.add('is-visible');
   }
@@ -1868,6 +1886,22 @@ window.PatientStore = (() => {
     const emptyState = document.getElementById('vaccination-editor-empty');
     if (!listContainer) return;
 
+    // Check for duplicates (same standardized slug and date)
+    const incomingSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const rows = listContainer.querySelectorAll('.vaccine-row');
+    let isDuplicate = false;
+    rows.forEach(row => {
+      const nameInput = row.querySelector('.vaccine-name');
+      const dateInput = row.querySelector('.vaccine-date');
+      const rowSlug = nameInput ? nameInput.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') : '';
+      const dateVal = dateInput ? dateInput.value : '';
+      if (rowSlug === incomingSlug && dateVal === date) {
+        isDuplicate = true;
+      }
+    });
+
+    if (isDuplicate) return;
+
     if (emptyState) emptyState.style.display = 'none';
 
     const row = document.createElement('div');
@@ -1932,12 +1966,14 @@ window.PatientStore = (() => {
     listContainer.appendChild(row);
   }
 
-  function loadVaccineList(data) {
+  function loadVaccineList(data, append = false) {
     const listContainer = document.getElementById('vaccination-editor-list');
     const emptyState = document.getElementById('vaccination-editor-empty');
     if (!listContainer) return;
 
-    listContainer.innerHTML = '';
+    if (!append) {
+      listContainer.innerHTML = '';
+    }
 
     let parsedData = null;
     if (typeof data === 'string') {
@@ -1951,7 +1987,7 @@ window.PatientStore = (() => {
     const vaccinations = parsedData?.vaccination || {};
     const keys = Object.keys(vaccinations);
 
-    if (keys.length === 0) {
+    if (keys.length === 0 && !append) {
       if (emptyState) emptyState.style.display = 'block';
     } else {
       if (emptyState) emptyState.style.display = 'none';
@@ -1994,9 +2030,9 @@ window.PatientStore = (() => {
     document.querySelectorAll('[data-role="close-pet-modal"]').forEach(btn => btn.addEventListener('click', closePetModal));
     els.caseSeverity?.addEventListener('change', () => toggleCriticalSections());
     els.addMedicineBtn?.addEventListener('click', () => addMedication());
-    els.visitCategory?.addEventListener('change', e => updateVisitCategoryUI(e.target.value));
+    els.visitCategory?.addEventListener('change', e => { updateVisitCategoryUI(e.target.value); autofillVaccinationFromSelectedPet(); });
     document.getElementById('deworming-status')?.addEventListener('change', () => updateDewormingDateUI());
-    els.recordPet?.addEventListener('change', () => { recomputeLastPostOp(); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); });
+    els.recordPet?.addEventListener('change', () => { recomputeLastPostOp(); autofillVisitNotesFromSelectedPet({onlyWhenEmpty:true}); autofillVaccinationFromSelectedPet(); });
     els.recordNotes?.addEventListener('input', () => {
       const auto = String(els.recordNotes.dataset.autofillSymptom??'').trim();
       if (auto && String(els.recordNotes.value??'').trim()!==auto) delete els.recordNotes.dataset.autofillSymptom;
@@ -2037,7 +2073,7 @@ window.PatientStore = (() => {
           if (jsonTextarea) {
             jsonTextarea.value = JSON.stringify(res.data, null, 2);
           }
-          loadVaccineList(res.data);
+          loadVaccineList(res.data, true);
           if (statusIcon) statusIcon.textContent = '✅';
           if (statusText) statusText.textContent = 'Parsed successfully!';
           Swal.fire({
