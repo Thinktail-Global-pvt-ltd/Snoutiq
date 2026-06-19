@@ -273,6 +273,73 @@ class PetOverviewController extends Controller
     }
 
     /**
+     * GET /api/pets/deworming-payload
+     * Input: pet_id (query)
+     * Output: deworming details
+     */
+    public function dewormingPayload(Request $request)
+    {
+        $rawPetId = $request->query('pet_id', $request->input('pet_id'));
+        $petId = is_numeric($rawPetId) ? (int) $rawPetId : 0;
+
+        if ($petId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_id is required',
+            ], 422);
+        }
+
+        if (!Schema::hasTable('pets')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pets table is missing',
+            ], 500);
+        }
+
+        $columns = ['id'];
+        if (Schema::hasColumn('pets', 'deworming_yes_no')) {
+            $columns[] = 'deworming_yes_no';
+        }
+        if (Schema::hasColumn('pets', 'last_deworming_date')) {
+            $columns[] = 'last_deworming_date';
+        }
+        if (Schema::hasColumn('pets', 'deworming_status')) {
+            $columns[] = 'deworming_status';
+        }
+        if (Schema::hasColumn('pets', 'next_deworming_date')) {
+            $columns[] = 'next_deworming_date';
+        }
+
+        $pet = DB::table('pets')
+            ->select($columns)
+            ->where('id', $petId)
+            ->first();
+
+        if (!$pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found',
+            ], 404);
+        }
+
+        $dewormingYesNo = property_exists($pet, 'deworming_yes_no')
+            ? $this->normalizeYesNoFlag($pet->deworming_yes_no)
+            : null;
+        $lastDewormingDate = property_exists($pet, 'last_deworming_date') ? $pet->last_deworming_date : null;
+        $dewormingStatus = property_exists($pet, 'deworming_status') ? $pet->deworming_status : null;
+        $nextDewormingDate = property_exists($pet, 'next_deworming_date') ? $pet->next_deworming_date : null;
+
+        return response()->json([
+            'success' => true,
+            'pet_id' => $petId,
+            'deworming_yes_no' => $dewormingYesNo,
+            'last_deworming_date' => $lastDewormingDate,
+            'deworming_status' => $dewormingStatus,
+            'next_deworming_date' => $nextDewormingDate,
+        ]);
+    }
+
+    /**
      * POST /api/pets/deworming-vaccination
      * Input: pet_id, deworming_yes_no, last_deworming_date, vaccination_json (or vaccinations_json / vaccination)
      * Saves: deworming_yes_no, last_deworming_date, next_deworming_date, dog_disease_payload.vaccination
