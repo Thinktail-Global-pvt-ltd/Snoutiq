@@ -4334,7 +4334,7 @@ class AdminPanelController extends Controller
 
         $clickedCount = $notifications->filter(fn (array $row): bool => ($row['clicked'] ?? null) === true)->count();
 
-        return response()->json([
+        $responseData = $this->sanitizeUtf8Strings([
             'status' => 'success',
             'lead' => [
                 'id' => $userId,
@@ -4348,6 +4348,13 @@ class AdminPanelController extends Controller
                 'details_loaded' => true,
             ],
         ]);
+
+        return response()->json(
+            $responseData,
+            200,
+            [],
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+        );
     }
 
     public function sendLeadManagementAiMarketingPush(Request $request, User $user): JsonResponse
@@ -4514,12 +4521,41 @@ class AdminPanelController extends Controller
             ],
         ];
 
-        return response()->json([
+        $responseData = $this->sanitizeUtf8Strings([
             'status' => 'success',
             'user_id' => $userId,
             'name' => (string) ($user->name ?? 'Unnamed user'),
             'sections' => array_values(array_filter($sections)),
         ]);
+
+        return response()->json(
+            $responseData,
+            200,
+            [],
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+        );
+    }
+
+    private function sanitizeUtf8Strings($data)
+    {
+        if (is_string($data)) {
+            if (!mb_check_encoding($data, 'UTF-8')) {
+                if (function_exists('mb_scrub')) {
+                    return mb_scrub($data, 'UTF-8');
+                }
+                return mb_convert_encoding($data, 'UTF-8', 'UTF-8');
+            }
+            return $data;
+        }
+        if (is_array($data)) {
+            $clean = [];
+            foreach ($data as $key => $value) {
+                $cleanKey = is_string($key) ? $this->sanitizeUtf8Strings($key) : $key;
+                $clean[$cleanKey] = $this->sanitizeUtf8Strings($value);
+            }
+            return $clean;
+        }
+        return $data;
     }
 
     private function formatLeadProfileVisibleAttributes($model, array $exclude = []): array
@@ -4533,6 +4569,9 @@ class AdminPanelController extends Controller
 
         foreach ($model->getAttributes() as $key => $value) {
             if (isset($excluded[$key])) {
+                continue;
+            }
+            if (preg_match('/(?:blob|binary|bytes)/i', (string) $key)) {
                 continue;
             }
             if ($value === null) {
@@ -4550,14 +4589,21 @@ class AdminPanelController extends Controller
                 continue;
             }
             if (is_array($value) || is_object($value)) {
-                $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $result[$key] = $json !== false ? $json : (string) $value;
+                $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+                $result[$key] = $json !== false ? $this->sanitizeUtf8Strings($json) : $this->sanitizeUtf8Strings((string) $value);
                 continue;
             }
             if (is_resource($value)) {
                 $contents = stream_get_contents($value);
-                $result[$key] = is_string($contents) ? $contents : '';
+                $result[$key] = is_string($contents) ? (mb_check_encoding($contents, 'UTF-8') ? $contents : '') : '';
                 continue;
+            }
+
+            if (is_string($value)) {
+                if (str_contains($value, "\0") || preg_match('/^\xFF\xD8|^\x89PNG|^\x47\x49\x46/s', $value)) {
+                    continue;
+                }
+                $value = $this->sanitizeUtf8Strings($value);
             }
 
             $result[$key] = (string) $value;

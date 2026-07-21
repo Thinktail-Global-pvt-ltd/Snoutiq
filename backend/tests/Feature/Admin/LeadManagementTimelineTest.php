@@ -17,12 +17,23 @@ class LeadManagementTimelineTest extends TestCase
     {
         parent::setUp();
 
+        Schema::dropIfExists('pets');
         Schema::dropIfExists('prescriptions');
         Schema::dropIfExists('notifications');
         Schema::dropIfExists('fcm_notifications');
         Schema::dropIfExists('transactions');
         Schema::dropIfExists('doctors');
         Schema::dropIfExists('users');
+
+        Schema::create('pets', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->string('name')->nullable();
+            $table->binary('pet_doc2_blob_new')->nullable();
+            $table->binary('pet_doc2_blob')->nullable();
+            $table->string('reported_symptom')->nullable();
+            $table->timestamps();
+        });
 
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
@@ -195,5 +206,42 @@ class LeadManagementTimelineTest extends TestCase
         $response->assertDontSee('Next action saved from CRM panel.', false);
         $response->assertSee('Prescription added', false);
         $response->assertSee((string) $notification->id);
+    }
+
+    public function test_lead_management_full_profile_handles_binary_blobs_and_malformed_utf8_safely(): void
+    {
+        $user = User::query()->create([
+            'name' => "Malformed \xB1\xFE Name",
+            'email' => 'binaryuser@example.com',
+            'phone' => '916262883732',
+            'password' => 'secret',
+        ]);
+
+        // Insert binary blob data and invalid utf8 bytes into pet table
+        DB::table('pets')->insert([
+            'user_id' => $user->id,
+            'name' => "Ruby \x80\xFF",
+            'pet_doc2_blob_new' => "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01",
+            'pet_doc2_blob' => "\x89PNG\x0D\x0A\x1A\x0A\x00\x00\x00\x0DIHDR",
+            'reported_symptom' => "Fever \xE2\x28\xA1",
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withSession([
+            'is_admin' => true,
+            'admin_email' => (string) config('admin.email', 'admin@snoutiq.com'),
+            'role' => 'admin',
+        ])->get(route('admin.lead-management.users.full-profile', ['user' => $user->id]));
+
+        $response->assertOk();
+        $response->assertJson([
+            'status' => 'success',
+            'user_id' => $user->id,
+        ]);
+        
+        $jsonContent = $response->getContent();
+        $this->assertNotFalse($jsonContent);
+        $this->assertStringNotContainsString('Malformed UTF-8', $jsonContent);
     }
 }
