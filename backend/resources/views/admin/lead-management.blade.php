@@ -1637,6 +1637,42 @@
             border-right: 0;
         }
     }
+
+    .crm-service-copy-box {
+        margin-top: 1.2rem;
+        padding: 0.8rem;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px dashed rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .crm-service-copy-box:hover {
+        background: rgba(255, 255, 255, 0.035);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+    .crm-copy-btn {
+        margin-top: 0.6rem;
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        background: #6366f1;
+        color: #ffffff;
+        font-weight: 500;
+        font-size: 0.85rem;
+        border: none;
+        padding: 0.45rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.15s ease, transform 0.1s ease;
+    }
+    .crm-copy-btn:hover {
+        background: #4f46e5;
+    }
+    .crm-copy-btn:active {
+        transform: scale(0.98);
+    }
 </style>
 @endpush
 
@@ -1913,6 +1949,7 @@
                         'pet_name' => trim((string) ($row['pet_name'] ?? '')),
                         'doctor_id' => is_numeric($row['doctor_id'] ?? null) ? (int) $row['doctor_id'] : null,
                         'doctor_name' => trim((string) ($row['doctor_name'] ?? '')),
+                        'doctor_mobile' => trim((string) ($row['doctor_mobile'] ?? '')),
                         'clinic_id' => is_numeric($row['clinic_id'] ?? null) ? (int) $row['clinic_id'] : null,
                         'clinic_name' => trim((string) ($row['clinic_name'] ?? '')),
                         'can_reassign_doctor' => is_numeric($row['id'] ?? null) && (int) ($row['id'] ?? 0) > 0,
@@ -2004,6 +2041,8 @@
                     ? (int) $leadUser['conversion_transaction_doctor_id']
                     : null,
                 'conversion_transaction_doctor_name' => (string) ($leadUser['conversion_transaction_doctor_name'] ?? ''),
+                'conversion_transaction_doctor_mobile' => (string) ($leadUser['conversion_transaction_doctor_mobile'] ?? ''),
+                'pets_details' => is_array($leadUser['pets_details'] ?? null) ? $leadUser['pets_details'] : [],
                 'conversion_transaction_clinic_id' => is_numeric($leadUser['conversion_transaction_clinic_id'] ?? null)
                     ? (int) $leadUser['conversion_transaction_clinic_id']
                     : null,
@@ -2698,6 +2737,44 @@
     let activeDetailTab = 'profile';
     let searchSubmitTimer = null;
 
+    function generateAppointmentCopyText(lead, svc) {
+        const ownerName = lead.name || 'N/A';
+        const ownerPhone = lead.phone || 'N/A';
+        const ownerCity = lead.city || 'N/A';
+
+        const petDetails = Array.isArray(lead.pets_details) ? lead.pets_details : [];
+        let petInfoStr = 'N/A';
+        let symptomStr = 'N/A';
+
+        if (petDetails.length > 0) {
+            petInfoStr = petDetails.map(p => {
+                const parts = [];
+                if (p.name) parts.push(`*Name:* ${p.name}`);
+                if (p.pet_type) parts.push(`*Type:* ${p.pet_type}`);
+                if (p.breed) parts.push(`*Breed:* ${p.breed}`);
+                return parts.join(', ');
+            }).join(' | ');
+
+            const symptoms = petDetails.map(p => p.reported_symptom).filter(Boolean);
+            if (symptoms.length > 0) {
+                symptomStr = symptoms.join(', ');
+            }
+        }
+
+        const docName = svc.transactionDoctorName || 'Unassigned';
+        const docPhone = svc.transactionDoctorMobile || 'N/A';
+        const clinicName = svc.transactionClinicName || 'Unassigned';
+
+        return `*Snoutiq Appointment Details* 🐾\n\n` +
+               `👤 *Owner:* ${ownerName} (${ownerPhone})\n` +
+               `📍 *City:* ${ownerCity}\n` +
+               `🐶 *Pet Details:* ${petInfoStr}\n` +
+               `⚠️ *Reported Symptom:* ${symptomStr}\n` +
+               `🩺 *Doctor:* ${docName} (${docPhone})\n` +
+               `🏥 *Clinic:* ${clinicName}\n` +
+               `📅 *Date:* ${svc.tags && svc.tags[2] ? svc.tags[2] : 'N/A'}`;
+    }
+
     function escapeHtml(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -3282,6 +3359,7 @@
                 transactionId: Number(lead.conversion_transaction_id || 0),
                 transactionDoctorId: Number(lead.conversion_transaction_doctor_id || 0) || null,
                 transactionDoctorName: String(lead.conversion_transaction_doctor_name || ''),
+                transactionDoctorMobile: String(lead.conversion_transaction_doctor_mobile || ''),
                 transactionClinicId: Number(lead.conversion_transaction_clinic_id || 0) || null,
                 transactionClinicName: String(lead.conversion_transaction_clinic_name || ''),
                 canReassignDoctor: Boolean(lead.conversion_transaction_doctor_reassignable),
@@ -3319,6 +3397,7 @@
                 transactionId,
                 transactionDoctorId: Number(txn.doctor_id || 0) || null,
                 transactionDoctorName: String(txn.doctor_name || ''),
+                transactionDoctorMobile: String(txn.doctor_mobile || ''),
                 transactionClinicId: Number(txn.clinic_id || 0) || null,
                 transactionClinicName: String(txn.clinic_name || ''),
                 canReassignDoctor: Boolean(txn.can_reassign_doctor),
@@ -3696,10 +3775,29 @@
                                         <span>Current doctor</span>
                                         <strong>${escapeHtml(svc.transactionDoctorName || 'Unassigned')}</strong>
                                     </div>
+                                    ${svc.transactionDoctorMobile ? `
+                                        <div class="crm-service-assignment-row">
+                                            <span>Doctor mobile</span>
+                                            <strong><a href="tel:${escapeHtml(svc.transactionDoctorMobile)}" style="color: #6366f1; text-decoration: underline; font-weight: 600;">${escapeHtml(svc.transactionDoctorMobile)}</a></strong>
+                                        </div>
+                                    ` : ''}
                                     <div class="crm-service-assignment-row">
                                         <span>Current clinic</span>
                                         <strong>${escapeHtml(svc.transactionClinicName || (svc.transactionClinicId ? `ID ${svc.transactionClinicId}` : 'Unassigned'))}</strong>
                                     </div>
+                                </div>
+                                <div class="crm-service-copy-box">
+                                    <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #8a8d93; margin-bottom: 0.5rem; font-weight: 600;">
+                                        Appointment Copy Message
+                                    </div>
+                                    <pre style="white-space: pre-wrap; font-family: inherit; font-size: 0.85rem; margin: 0; padding: 0.6rem; background: rgba(0, 0, 0, 0.25); border-radius: 4px; color: #e2e8f0; line-height: 1.45; border: 1px solid rgba(255, 255, 255, 0.05);">${escapeHtml(generateAppointmentCopyText(lead, svc))}</pre>
+                                    <button 
+                                        type="button" 
+                                        class="crm-copy-btn"
+                                        data-copy-appointment-text
+                                    >
+                                        <i class="bi bi-clipboard"></i> Copy Message to Clipboard
+                                    </button>
                                 </div>
                                 ${svc.canReassignDoctor ? `
                                     <div class="crm-service-assignment-form">
@@ -3875,6 +3973,26 @@
                 }
 
                 await updateTransactionDoctor(transactionId, doctorId, button);
+            });
+        });
+
+        detailWrapEl.querySelectorAll('[data-copy-appointment-text]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const preEl = button.previousElementSibling;
+                if (!preEl) return;
+                const text = preEl.textContent || '';
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('Message copied to clipboard!');
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<i class="bi bi-check-lg"></i> Copied!';
+                    button.style.background = '#10b981';
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                        button.style.background = '#6366f1';
+                    }, 2000);
+                }).catch(() => {
+                    showToast('Failed to copy to clipboard.');
+                });
             });
         });
     }
@@ -4221,6 +4339,7 @@
                     : {};
                 lead.conversion_transaction_doctor_id = Number(transaction.doctor_id || doctorId);
                 lead.conversion_transaction_doctor_name = String(transaction.doctor_name || '');
+                lead.conversion_transaction_doctor_mobile = String(transaction.doctor_mobile || '');
                 lead.conversion_transaction_clinic_id = transaction.clinic_id ? Number(transaction.clinic_id) : null;
                 lead.conversion_transaction_clinic_name = String(transaction.clinic_name || '');
             }
@@ -4235,6 +4354,7 @@
                         ...txn,
                         doctor_id: Number(data.transaction?.doctor_id || doctorId),
                         doctor_name: String(data.transaction?.doctor_name || ''),
+                        doctor_mobile: String(data.transaction?.doctor_mobile || ''),
                         clinic_id: data.transaction?.clinic_id ? Number(data.transaction.clinic_id) : null,
                         clinic_name: String(data.transaction?.clinic_name || ''),
                     };

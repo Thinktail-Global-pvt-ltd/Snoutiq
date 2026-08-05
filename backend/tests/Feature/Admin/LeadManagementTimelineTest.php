@@ -56,6 +56,7 @@ class LeadManagementTimelineTest extends TestCase
             $table->string('status')->default('pending')->index();
             $table->string('type')->nullable();
             $table->string('reference')->nullable()->index();
+            $table->json('metadata')->nullable();
             $table->timestamps();
         });
 
@@ -63,6 +64,7 @@ class LeadManagementTimelineTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('vet_registeration_id')->nullable()->index();
             $table->string('doctor_name')->nullable();
+            $table->string('doctor_mobile')->nullable();
             $table->boolean('exported_from_excell')->default(false)->index();
             $table->timestamps();
         });
@@ -243,5 +245,74 @@ class LeadManagementTimelineTest extends TestCase
         $jsonContent = $response->getContent();
         $this->assertNotFalse($jsonContent);
         $this->assertStringNotContainsString('Malformed UTF-8', $jsonContent);
+    }
+
+    public function test_lead_management_doctor_mobile_and_copy_appointment_message(): void
+    {
+        $doctor = DB::table('doctors')->insertGetId([
+            'doctor_name' => 'Dr. Ramesh Kumar',
+            'doctor_mobile' => '9988776655',
+            'exported_from_excell' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $user = User::query()->create([
+            'name' => 'Safiya Khan',
+            'email' => 'safiya@example.com',
+            'phone' => '919169965131',
+            'password' => 'secret',
+        ]);
+
+        $pet = DB::table('pets')->insertGetId([
+            'user_id' => $user->id,
+            'name' => 'Aslan',
+            'reported_symptom' => 'Fever and Cough',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $transaction = Transaction::query()->create([
+            'user_id' => $user->id,
+            'doctor_id' => $doctor,
+            'amount_paise' => 50000,
+            'status' => 'captured',
+            'type' => 'video_consult',
+            'reference' => 'TXN-TIMELINE-DYN',
+        ]);
+
+        // Get main lead-management page
+        $response = $this->withSession([
+            'is_admin' => true,
+            'admin_email' => (string) config('admin.email', 'admin@snoutiq.com'),
+            'role' => 'admin',
+        ])->get(route('admin.lead-management'));
+
+        $response->assertOk();
+        // Check that pets_details array structure exists in output
+        $response->assertSee('pets_details', false);
+        $response->assertSee('Aslan', false);
+        $response->assertSee('Fever and Cough', false);
+        $response->assertSee('9988776655', false);
+
+        // Update doctor via API and verify it returns doctor_mobile
+        $anotherDoctor = DB::table('doctors')->insertGetId([
+            'doctor_name' => 'Dr. Ramesh Kumar Updated',
+            'doctor_mobile' => '8877665544',
+            'exported_from_excell' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $updateResponse = $this->withSession([
+            'is_admin' => true,
+            'admin_email' => (string) config('admin.email', 'admin@snoutiq.com'),
+            'role' => 'admin',
+        ])->postJson(route('admin.transactions.appointments.doctor', ['transaction' => $transaction->id]), [
+            'doctor_id' => $anotherDoctor,
+        ]);
+
+        $updateResponse->assertOk();
+        $updateResponse->assertJsonPath('transaction.doctor_mobile', '8877665544');
     }
 }

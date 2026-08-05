@@ -1149,6 +1149,7 @@ class AdminPanelController extends Controller
 
         $hasPetType = $hasPetsTable && Schema::hasColumn('pets', 'pet_type');
         $hasLegacyPetType = $hasPetsTable && Schema::hasColumn('pets', 'type');
+        $hasReportedSymptom = $hasPetsTable && Schema::hasColumn('pets', 'reported_symptom');
         $petLeadBaseColumns = ['id', 'user_id', 'name'];
         if ($hasPetBreed) {
             $petLeadBaseColumns[] = 'breed';
@@ -1161,6 +1162,9 @@ class AdminPanelController extends Controller
         }
         if ($hasLegacyPetType) {
             $petLeadBaseColumns[] = 'type';
+        }
+        if ($hasReportedSymptom) {
+            $petLeadBaseColumns[] = 'reported_symptom';
         }
 
         $neuteringLeadCount = 0;
@@ -1403,10 +1407,12 @@ class AdminPanelController extends Controller
                 'conversion_transaction_at' => null,
                 'conversion_transaction_doctor_id' => null,
                 'conversion_transaction_doctor_name' => null,
+                'conversion_transaction_doctor_mobile' => null,
                 'conversion_transaction_clinic_id' => null,
                 'conversion_transaction_clinic_name' => null,
                 'related_transactions' => [],
                 'related_prescriptions' => [],
+                'pets_details' => [],
                 'monthly_revenue_projection' => [
                     'month' => now()->format('Y-m'),
                     'eligible_transactions_count' => 0,
@@ -2948,6 +2954,7 @@ class AdminPanelController extends Controller
                     ->get();
 
                 $doctorNameLookup = [];
+                $doctorMobileLookup = [];
                 $clinicNameLookup = [];
                 $petNameLookup = [];
 
@@ -2960,11 +2967,26 @@ class AdminPanelController extends Controller
                         ->values();
 
                     if ($doctorIds->isNotEmpty()) {
-                        $doctorNameLookup = Doctor::query()
-                            ->whereIn('id', $doctorIds->all())
-                            ->pluck('doctor_name', 'id')
+                        $doctorMobileColumn = null;
+                        foreach (['doctors_mobile', 'doctor_mobile'] as $candidateColumn) {
+                            if (Schema::hasColumn('doctors', $candidateColumn)) {
+                                $doctorMobileColumn = $candidateColumn;
+                                break;
+                            }
+                        }
+
+                        $doctorsQuery = Doctor::query()->whereIn('id', $doctorIds->all());
+                        $doctorNameLookup = $doctorsQuery->pluck('doctor_name', 'id')
                             ->mapWithKeys(fn ($doctorName, $doctorId) => [(int) $doctorId => (string) $doctorName])
                             ->all();
+
+                        if ($doctorMobileColumn) {
+                            $doctorMobileLookup = Doctor::query()
+                                ->whereIn('id', $doctorIds->all())
+                                ->pluck($doctorMobileColumn, 'id')
+                                ->mapWithKeys(fn ($doctorMobile, $doctorId) => [(int) $doctorId => (string) $doctorMobile])
+                                ->all();
+                        }
                     }
                 }
 
@@ -3079,6 +3101,9 @@ class AdminPanelController extends Controller
                         'doctor_id' => $hasTransactionDoctorId && is_numeric($leadTransaction->doctor_id) ? (int) $leadTransaction->doctor_id : null,
                         'doctor_name' => $hasTransactionDoctorId && is_numeric($leadTransaction->doctor_id)
                             ? ($doctorNameLookup[(int) $leadTransaction->doctor_id] ?? null)
+                            : null,
+                        'doctor_mobile' => $hasTransactionDoctorId && is_numeric($leadTransaction->doctor_id)
+                            ? ($doctorMobileLookup[(int) $leadTransaction->doctor_id] ?? null)
                             : null,
                         'clinic_id' => $hasTransactionClinicId && is_numeric($leadTransaction->clinic_id) ? (int) $leadTransaction->clinic_id : null,
                         'clinic_name' => $hasTransactionClinicId && is_numeric($leadTransaction->clinic_id)
@@ -3341,6 +3366,9 @@ class AdminPanelController extends Controller
                     $leadUser['conversion_transaction_doctor_name'] = !empty($matchedTransaction['doctor_name'])
                         ? (string) $matchedTransaction['doctor_name']
                         : null;
+                    $leadUser['conversion_transaction_doctor_mobile'] = !empty($matchedTransaction['doctor_mobile'])
+                        ? (string) $matchedTransaction['doctor_mobile']
+                        : null;
                     $leadUser['conversion_transaction_clinic_id'] = is_numeric($matchedTransaction['clinic_id'] ?? null)
                         ? (int) $matchedTransaction['clinic_id']
                         : null;
@@ -3580,6 +3608,18 @@ class AdminPanelController extends Controller
                                 ->map(fn ($name): string => trim((string) $name))
                                 ->filter(fn (string $name): bool => $name !== '')
                                 ->unique()
+                                ->values()
+                                ->all();
+                            $leadUser['pets_details'] = $petsForUser
+                                ->map(function (Pet $pet): array {
+                                    return [
+                                        'id' => (int) $pet->id,
+                                        'name' => trim((string) ($pet->name ?? '')),
+                                        'breed' => trim((string) ($pet->breed ?? '')),
+                                        'pet_type' => trim((string) ($pet->pet_type ?? $pet->type ?? '')),
+                                        'reported_symptom' => trim((string) ($pet->reported_symptom ?? '')),
+                                    ];
+                                })
                                 ->values()
                                 ->all();
 
@@ -4229,9 +4269,28 @@ class AdminPanelController extends Controller
                 ->limit(50)
                 ->get();
 
-            $doctorNames = Schema::hasColumn('transactions', 'doctor_id')
-                ? Doctor::query()->whereIn('id', $rows->pluck('doctor_id')->filter()->unique()->all())->pluck('doctor_name', 'id')
-                : collect();
+            $doctorMobileColumn = null;
+            foreach (['doctors_mobile', 'doctor_mobile'] as $candidateColumn) {
+                if (Schema::hasColumn('doctors', $candidateColumn)) {
+                    $doctorMobileColumn = $candidateColumn;
+                    break;
+                }
+            }
+
+            $doctorNames = collect();
+            $doctorMobiles = collect();
+            if (Schema::hasColumn('transactions', 'doctor_id')) {
+                $doctorsData = Doctor::query()
+                    ->whereIn('id', $rows->pluck('doctor_id')->filter()->unique()->all())
+                    ->get(array_filter(['id', 'doctor_name', $doctorMobileColumn]));
+                foreach ($doctorsData as $doc) {
+                    $doctorNames[(int) $doc->id] = (string) $doc->doctor_name;
+                    if ($doctorMobileColumn) {
+                        $doctorMobiles[(int) $doc->id] = (string) ($doc->$doctorMobileColumn ?? '');
+                    }
+                }
+            }
+
             $clinicNames = Schema::hasColumn('transactions', 'clinic_id')
                 ? VetRegisterationTemp::query()->whereIn('id', $rows->pluck('clinic_id')->filter()->unique()->all())->pluck('name', 'id')
                 : collect();
@@ -4239,7 +4298,7 @@ class AdminPanelController extends Controller
                 ? Pet::query()->whereIn('id', $rows->pluck('pet_id')->filter()->unique()->all())->pluck('name', 'id')
                 : collect();
 
-            $relatedTransactions = $rows->map(function ($row) use ($normalizeDateTime, $doctorNames, $clinicNames, $petNames): array {
+            $relatedTransactions = $rows->map(function ($row) use ($normalizeDateTime, $doctorNames, $doctorMobiles, $clinicNames, $petNames): array {
                 $doctorId = is_numeric($row->doctor_id ?? null) ? (int) $row->doctor_id : null;
                 $clinicId = is_numeric($row->clinic_id ?? null) ? (int) $row->clinic_id : null;
                 $petId = is_numeric($row->pet_id ?? null) ? (int) $row->pet_id : null;
@@ -4254,6 +4313,7 @@ class AdminPanelController extends Controller
                     'pet_name' => $petId ? (string) ($petNames[$petId] ?? '') : '',
                     'doctor_id' => $doctorId,
                     'doctor_name' => $doctorId ? (string) ($doctorNames[$doctorId] ?? '') : '',
+                    'doctor_mobile' => $doctorId ? (string) ($doctorMobiles[$doctorId] ?? '') : '',
                     'clinic_id' => $clinicId,
                     'clinic_name' => $clinicId ? (string) ($clinicNames[$clinicId] ?? '') : '',
                     'can_reassign_doctor' => true,
@@ -6720,9 +6780,22 @@ class AdminPanelController extends Controller
             'doctor_id' => ['required', 'integer'],
         ]);
 
+        $doctorMobileColumn = null;
+        foreach (['doctors_mobile', 'doctor_mobile'] as $candidateColumn) {
+            if (Schema::hasColumn('doctors', $candidateColumn)) {
+                $doctorMobileColumn = $candidateColumn;
+                break;
+            }
+        }
+
+        $selectFields = ['id', 'vet_registeration_id', 'doctor_name'];
+        if ($doctorMobileColumn) {
+            $selectFields[] = $doctorMobileColumn;
+        }
+
         $doctor = Doctor::query()
             ->with('clinic:id,name')
-            ->select('id', 'vet_registeration_id', 'doctor_name')
+            ->select($selectFields)
             ->where('exported_from_excell', 1)
             ->find((int) $data['doctor_id']);
 
@@ -6753,11 +6826,12 @@ class AdminPanelController extends Controller
                         $transaction->id,
                         $doctor->doctor_name ?? 'N/A',
                         $doctor->id
-                    ),
+                     ),
                     'transaction' => [
                         'id' => (int) $transaction->id,
                         'doctor_id' => $nextDoctorId,
                         'doctor_name' => $doctor->doctor_name,
+                        'doctor_mobile' => $doctorMobileColumn ? (string) ($doctor->$doctorMobileColumn ?? '') : '',
                         'clinic_id' => $nextClinicId,
                         'clinic_name' => $doctor->clinic?->name,
                     ],
@@ -6852,6 +6926,7 @@ class AdminPanelController extends Controller
                     'id' => (int) $transaction->id,
                     'doctor_id' => $nextDoctorId,
                     'doctor_name' => $doctor->doctor_name,
+                    'doctor_mobile' => $doctorMobileColumn ? (string) ($doctor->$doctorMobileColumn ?? '') : '',
                     'clinic_id' => $nextClinicId,
                     'clinic_name' => $doctor->clinic?->name,
                 ],
