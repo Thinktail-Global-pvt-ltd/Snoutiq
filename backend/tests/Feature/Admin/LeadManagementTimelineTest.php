@@ -389,4 +389,76 @@ class LeadManagementTimelineTest extends TestCase
         $this->assertEquals('Persian Cat Updated', $petUpdated->breed);
         $this->assertEquals('female', $petUpdated->pet_gender);
     }
+
+    public function test_google_merge_user_when_phone_exists(): void
+    {
+        // 1. Create a Phone User (B) in DB with a phone and a pet
+        $phoneUser = User::query()->create([
+            'phone' => '9988776655',
+            'name'  => 'Old Phone User',
+            'email' => null,
+        ]);
+        $phonePet = Pet::query()->create([
+            'user_id'          => $phoneUser->id,
+            'name'             => 'Simba',
+            'breed'            => 'Persian Cat',
+            'reported_symptom' => 'Lethargy',
+        ]);
+
+        // 2. Create a Google User (A) (simulate googleStoreUser)
+        $googleUser = User::query()->create([
+            'email'        => 'newgoogle@example.com',
+            'name'         => 'New Google User',
+            'google_token' => 'google_token_123',
+        ]);
+        $googlePet = Pet::query()->create([
+            'user_id' => $googleUser->id,
+            'name'    => 'Simba',
+            'breed'   => 'Persian Cat',
+        ]);
+
+        // 3. Call merge API with matching name and breed -> symptom should update, Google user & pet deleted
+        $responseMatch = $this->postJson('/api/google-merge-user', [
+            'phone'            => '9988776655',
+            'email'            => 'newgoogle@example.com',
+            'google_token'     => 'google_token_123_updated',
+            'pet_name'         => 'Simba',
+            'pet_breed'        => 'Persian Cat',
+            'reported_symptom' => 'Sneezing',
+        ]);
+
+        $responseMatch->assertOk();
+        $responseMatch->assertJsonPath('success', true);
+        $responseMatch->assertJsonPath('message', 'Data merged successfully. Temporary Google user deleted.');
+
+        // Assert Phone User now has email and google_token
+        $phoneUserMerged = User::query()->find($phoneUser->id);
+        $this->assertEquals('newgoogle@example.com', $phoneUserMerged->email);
+        $this->assertEquals('google_token_123_updated', $phoneUserMerged->google_token);
+
+        // Assert Google User A has been deleted
+        $this->assertNull(User::query()->find($googleUser->id));
+        $this->assertNull(Pet::query()->find($googlePet->id));
+
+        // Assert Phone User's Simba pet reported symptom updated to 'Sneezing'
+        $simbaPet = Pet::query()->find($phonePet->id);
+        $this->assertEquals('Sneezing', $simbaPet->reported_symptom);
+
+        // 4. Call merge API with non-matching breed -> should insert a new pet
+        $responseNewPet = $this->postJson('/api/google-merge-user', [
+            'phone'      => '9988776655',
+            'email'      => 'newgoogle@example.com',
+            'pet_name'   => 'Oscar',
+            'pet_breed'  => 'German Shepherd',
+            'pet_type'   => 'dog',
+        ]);
+
+        $responseNewPet->assertOk();
+        
+        // Assert a new pet was created for the phone user
+        $oscarPet = Pet::query()->where('user_id', $phoneUser->id)->where('name', 'Oscar')->first();
+        $this->assertNotNull($oscarPet);
+        $this->assertEquals('German Shepherd', $oscarPet->breed);
+        $this->assertEquals('dog', $oscarPet->pet_type);
+    }
 }

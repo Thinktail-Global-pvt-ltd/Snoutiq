@@ -3376,6 +3376,7 @@ Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
 
 Route::post('/google-login', [AuthController::class, 'googleLogin']);
 Route::post('/google-store-user', [AuthController::class, 'googleStoreUser']);
+Route::post('/google-merge-user', [AuthController::class, 'googleMergeUser']);
 Route::post('/auth/register',   [AuthController::class, 'register']);
 Route::get('/auth/users/{user}/pet-doc2-blob', [AuthController::class, 'userPetDoc2Blob'])
     ->whereNumber('user')
