@@ -2403,6 +2403,8 @@ public function login_bkp(Request $request)
         $request->validate([
             'phone'        => 'required|string',
             'name'         => 'required|string',
+            'otp'          => 'required|string',
+            'token'        => 'required|string',
             'email'        => 'nullable|email',
             'google_token' => 'nullable|string',
 
@@ -2421,7 +2423,30 @@ public function login_bkp(Request $request)
         try {
             $phone = trim($request->phone);
 
-            // 1. Resolve the temporary Google User
+            // 1. Verify OTP first
+            $normalizedPhone = $this->normalizePhone($phone);
+            if (!$normalizedPhone) {
+                return response()->json(['success' => false, 'message' => 'Invalid phone number.'], 422);
+            }
+
+            $isReviewNumber = $this->isReviewerAccessPhone($normalizedPhone);
+            if (!$isReviewNumber) {
+                $otpEntry = Otp::query()
+                    ->where('token', $request->token)
+                    ->where('type', 'whatsapp')
+                    ->where('value', $normalizedPhone)
+                    ->where('otp', $request->otp)
+                    ->where('expires_at', '>', now())
+                    ->first();
+
+                if (!$otpEntry) {
+                    return response()->json(['success' => false, 'message' => 'Invalid or expired OTP.'], 401);
+                }
+
+                $otpEntry->update(['is_verified' => 1]);
+            }
+
+            // 2. Resolve the temporary Google User
             $googleUser = Auth::user();
             if (!$googleUser && session()->has('user_id')) {
                 $googleUser = User::query()->find(session('user_id'));

@@ -25,6 +25,18 @@ class LeadManagementTimelineTest extends TestCase
         Schema::dropIfExists('transactions');
         Schema::dropIfExists('doctors');
         Schema::dropIfExists('users');
+        Schema::dropIfExists('otps');
+
+        Schema::create('otps', function (Blueprint $table): void {
+            $table->id();
+            $table->string("token");
+            $table->string("type");
+            $table->string("value");
+            $table->string('otp');
+            $table->integer("is_verified")->default(0);
+            $table->timestamp('expires_at');
+            $table->timestamps();
+        });
 
         Schema::create('pets', function (Blueprint $table): void {
             $table->id();
@@ -417,14 +429,27 @@ class LeadManagementTimelineTest extends TestCase
             'breed'   => 'Persian Cat',
         ]);
 
+        // Create matching OTP in DB
+        DB::table('otps')->insert([
+            'token'      => 'token_match_xyz',
+            'type'       => 'whatsapp',
+            'value'      => '919988776655',
+            'otp'        => '1122',
+            'expires_at' => now()->addMinutes(10),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         // 3. Call merge API with matching name and breed -> symptom should update, Google user & pet deleted
-        // Note: we pass ONLY name and phone to verify session lookup
+        // Note: we pass ONLY name, phone, otp and token to verify session lookup
         $responseMatch = $this->withSession([
             'user_id' => $googleUser->id,
         ])->postJson('/api/google-merge-user', [
             'phone'            => '9988776655',
             'name'             => 'Old Phone User Updated',
             'google_token'     => 'google_token_123_updated',
+            'otp'              => '1122',
+            'token'            => 'token_match_xyz',
             'pet_name'         => 'Simba',
             'pet_breed'        => 'Persian Cat',
             'reported_symptom' => 'Sneezing',
@@ -448,12 +473,25 @@ class LeadManagementTimelineTest extends TestCase
         $simbaPet = Pet::query()->find($phonePet->id);
         $this->assertEquals('Sneezing', $simbaPet->reported_symptom);
 
+        // Create new OTP for the second call
+        DB::table('otps')->insert([
+            'token'      => 'token_new_xyz',
+            'type'       => 'whatsapp',
+            'value'      => '919988776655',
+            'otp'        => '3344',
+            'expires_at' => now()->addMinutes(10),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         // 4. Call merge API with non-matching breed -> should insert a new pet
         $responseNewPet = $this->withSession([
             'user_id' => $phoneUserMerged->id, // logged in as merged user now
         ])->postJson('/api/google-merge-user', [
             'phone'      => '9988776655',
             'name'       => 'Old Phone User Updated',
+            'otp'        => '3344',
+            'token'      => 'token_new_xyz',
             'pet_name'   => 'Oscar',
             'pet_breed'  => 'German Shepherd',
             'pet_type'   => 'dog',
