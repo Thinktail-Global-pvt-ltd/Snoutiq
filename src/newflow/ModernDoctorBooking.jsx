@@ -170,53 +170,58 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
   useEffect(() => {
     async function fetchDoctors() {
       try {
-        const userId = user.id || user.user_id;
-        if (!userId) return;
-
+        const userId = user.id || user.user_id || authState?.user_id || authState?.userId;
         let doctorsList = [];
         let lastVetClinicId = null;
 
         // 1. Fetch Last Visited Vet / Clinic
-        try {
-          const lastVetRes = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {}
-          });
-          const lastVetData = await lastVetRes.json();
-          if (lastVetData?.success) {
-            lastVetClinicId = lastVetData?.data?.clinic?.id || lastVetData?.data?.clinic_id;
-            if (lastVetData?.data?.doctors && lastVetData.data.doctors.length > 0) {
-              lastVetData.data.doctors.forEach(doc => {
+        if (userId) {
+          try {
+            const lastVetRes = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            const lastVetData = await lastVetRes.json();
+            
+            const rawClinic = lastVetData?.data?.clinic || lastVetData?.clinic;
+            const rawDoctors = lastVetData?.data?.doctors || lastVetData?.doctors || [];
+
+            if (lastVetData?.success || rawClinic || (Array.isArray(rawDoctors) && rawDoctors.length > 0)) {
+              lastVetClinicId = rawClinic?.id || rawClinic?.clinic_id || lastVetData?.data?.clinic_id;
+              
+              if (Array.isArray(rawDoctors) && rawDoctors.length > 0) {
+                rawDoctors.forEach(doc => {
+                  doctorsList.push({
+                    ...doc,
+                    clinicId: rawClinic?.id || doc.clinic_id,
+                    clinicName: rawClinic?.clinic_name || rawClinic?.name || doc.clinic_name,
+                    isLastVisited: true
+                  });
+                });
+              } else if (orderType === "appointment" && rawClinic && (rawClinic.id || rawClinic.name || rawClinic.clinic_name)) {
+                const c = rawClinic;
                 doctorsList.push({
-                  ...doc,
-                  clinicId: lastVetData.data.clinic?.id || doc.clinic_id,
-                  clinicName: lastVetData.data.clinic?.clinic_name || doc.clinic_name,
+                  id: `clinic-vet-${c.id || c.clinic_id}`,
+                  doctor_id: `clinic-vet-${c.id || c.clinic_id}`,
+                  name: c.name || c.clinic_name || "Clinic Vet",
+                  doctor_name: c.name || c.clinic_name || "Clinic Vet",
+                  specialization: c.specialization || "In-Clinic Veterinary Practice",
+                  years_of_experience: 5,
+                  experience: 5,
+                  video_day_rate: c.clinic_day_fee || "300.00",
+                  video_night_rate: c.clinic_night_fee || "500.00",
+                  clinicId: c.id || c.clinic_id,
+                  clinicName: c.name || c.clinic_name,
+                  clinic_day_fee: c.clinic_day_fee,
+                  clinic_night_fee: c.clinic_night_fee,
+                  is_available: true,
+                  isFallbackClinic: true,
                   isLastVisited: true
                 });
-              });
-            } else if (orderType === "appointment" && lastVetData?.data?.clinic) {
-              const c = lastVetData.data.clinic;
-              doctorsList.push({
-                id: `clinic-vet-${c.id}`,
-                doctor_id: `clinic-vet-${c.id}`,
-                name: c.name || c.clinic_name || "Clinic Vet",
-                doctor_name: c.name || c.clinic_name || "Clinic Vet",
-                specialization: c.specialization || "In-Clinic Veterinary Practice",
-                years_of_experience: 5,
-                experience: 5,
-                video_day_rate: c.clinic_day_fee || "300.00",
-                video_night_rate: c.clinic_night_fee || "500.00",
-                clinicId: c.id,
-                clinicName: c.name || c.clinic_name,
-                clinic_day_fee: c.clinic_day_fee,
-                clinic_night_fee: c.clinic_night_fee,
-                is_available: true,
-                isFallbackClinic: true,
-                isLastVisited: true
-              });
+              }
             }
+          } catch (err) {
+            console.error("Failed to load last vet", err);
           }
-        } catch (err) {
-          console.error("Failed to load last vet", err);
         }
 
         // 2. Fetch Doctors / Clinics
