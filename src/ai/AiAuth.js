@@ -25,6 +25,7 @@ export const AI_AUTH_STORAGE_KEYS = {
   referralClinicId: "referral_clinic_id",
   clinicDoctors: "clinic_doctors",
   healthProfileCompleted: "snoutiq_health_profile_completed",
+  petId: "pet_id",
 };
 
 export const AI_PET_FORM_DRAFT_KEY = "ai_pet_form_draft";
@@ -774,6 +775,10 @@ export const persistAiAuthState = ({
   writeStorageValue(
     AI_AUTH_STORAGE_KEYS.referralClinicId,
     normalizeId(nextUser.referral_clinic_id) || null,
+  );
+  writeStorageValue(
+    AI_AUTH_STORAGE_KEYS.petId,
+    normalizeId(nextUser.pet_id || nextUser.pet?.id || nextUser.pet?.pet_id || (nextUser.pets && nextUser.pets[0] && (nextUser.pets[0].id || nextUser.pets[0].pet_id))) || null,
   );
   writeStorageValue(
     AI_AUTH_STORAGE_KEYS.fcmToken,

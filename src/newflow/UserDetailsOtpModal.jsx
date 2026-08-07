@@ -113,6 +113,7 @@ export default function UserDetailsOtpModal({ onClose, onComplete }) {
 
       // Auth state update — naya name/number save karo taaki dobara na maange
       const userData = data.user || data.data?.user || {};
+      const returnedPetId = data.pet_id || data.pet?.id || data.data?.pet_id || data.data?.pet?.id || userData.pet_id || (userData.pets && userData.pets[0] && (userData.pets[0].id || userData.pets[0].pet_id));
       const updatedUser = {
         ...existingUser,
         ...userData,
@@ -122,6 +123,7 @@ export default function UserDetailsOtpModal({ onClose, onComplete }) {
         mobile: normalizePhone(whatsappNumber),
         whatsapp_number: normalizePhone(whatsappNumber),
         whatsapp_verified: true,
+        ...(returnedPetId ? { pet_id: returnedPetId } : {}),
       };
 
       const nextToken = data.token || data.jwt || data.access_token || data.data?.token || token;
