@@ -29,6 +29,7 @@ const Home = lazy(() => import("./pages/Home"));
 const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
 const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
 const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
+const GoogleAuthTest = lazy(() => import("./pages/GoogleAuthTest"));
 const InternalUserDeletePage = lazy(() =>
   import("./pages/InternalUserDeletePage")
 );
@@ -295,6 +296,7 @@ export default function AppRoutes() {
         <Route path="/call-demo" element={<CallRecordingDemo />} />
         <Route path="/csv-upload" element={<CsvUploadPage />} />
         <Route path="/s3-upload-test" element={<S3UploadTest />} />
+        <Route path="/google-auth-test" element={<GoogleAuthTest />} />
         <Route
           path="/__ops/company-user-archive-r4k9d2x"
           element={<InternalUserDeletePage />}
