@@ -149,6 +149,7 @@ const InClinicFastBookingFlow = lazy(() => import("./ai/InClinicFastBookingFlow"
 const HomeVetBookingFlow = lazy(() => import("./ai/HomeVetBookingFlow"));
 const ProtectedBookingRoute = lazy(() => import("./ai/ProtectedBookingRoute"));
 const AppointmentThankYouPage = lazy(() => import("./ai/AppointmentThankYouPage"));
+const symptomCheckerApp = lazy(() => import("./newflow/SymptomCheckerApp.jsx"));
 const AppointmentPage = lazy(() =>
   import("./ai/usePetOverviewCards.jsx").then((module) => ({
     default: module.AppointmentPage,
@@ -196,7 +197,7 @@ export default function AppRoutes() {
 <Route path="/appointment-thank-you" element={<AppointmentThankYouPage />} />
 <Route path="/appointment-page" element={<AppointmentPage />} />
 <Route path="/followup-page" element={<FollowupPage />} />
-
+        <Route path="/symptom-checker" element={<SymptomCheckerApp />} />
         <Route path="/about" element={<NewAbout />} />
         <Route path="/parents" element={<NewCounsult />} />
         <Route path="/clinics" element={<NewClinics />} />

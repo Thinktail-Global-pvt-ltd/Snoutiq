@@ -394,7 +394,8 @@ const styles = {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "center",
-    background: "linear-gradient(135deg, #e8f5e9 0%, #f3e5f5 100%)",
+    background: "rgba(15, 23, 42, 0.4)",
+    backdropFilter: "blur(2px)",
     padding: "clamp(12px, 3vw, 24px)",
     boxSizing: "border-box",
     overflowY: "auto",
@@ -402,38 +403,38 @@ const styles = {
   },
   card: {
     background: "#fff",
-    borderRadius: "clamp(14px, 2vw, 18px)",
-    padding: "clamp(18px, 4vw, 36px)",
-    width: "min(100%, 520px)",
+    borderRadius: "20px",
+    padding: "24px",
+    width: "min(100%, 480px)",
     maxWidth: "100%",
-    boxShadow: "0 4px 24px rgba(0,0,0,0.10)",
+    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
     boxSizing: "border-box",
     margin: "0 auto",
   },
   logo: {
     textAlign: "center",
-    marginBottom: "8px",
-    fontSize: "clamp(2rem, 5vw, 2.25rem)",
-    fontWeight: "700",
-    color: "#2e7d32",
+    marginBottom: "12px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
   },
   subtitle: {
     textAlign: "center",
-    color: "#666",
-    fontSize: "clamp(13px, 3.3vw, 14px)",
+    color: "#64748b",
+    fontSize: "13px",
     lineHeight: 1.5,
-    marginBottom: "clamp(20px, 4vw, 28px)",
+    marginBottom: "16px",
     maxWidth: "28rem",
     marginInline: "auto",
   },
   sectionTitle: {
-    fontSize: "clamp(11px, 2.6vw, 12px)",
+    fontSize: "11px",
     fontWeight: "600",
-    color: "#888",
+    color: "#64748b",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
-    marginTop: "clamp(18px, 4vw, 20px)",
-    marginBottom: "12px",
+    marginTop: "16px",
+    marginBottom: "10px",
   },
   row: {
     display: "flex",
@@ -448,32 +449,32 @@ const styles = {
     minWidth: 0,
   },
   label: {
-    fontSize: "clamp(12px, 3vw, 13px)",
+    fontSize: "12px",
     fontWeight: "500",
-    color: "#444",
-    marginBottom: "5px",
+    color: "#334155",
+    marginBottom: "4px",
   },
   input: {
-    border: "1.5px solid #e0e0e0",
-    borderRadius: "8px",
-    padding: "11px 12px",
-    fontSize: "16px",
-    color: "#222",
+    border: "1.5px solid #e2e8f0",
+    borderRadius: "10px",
+    padding: "10px 12px",
+    fontSize: "14px",
+    color: "#0f172a",
     outline: "none",
     transition: "border-color 0.2s",
-    background: "#fafafa",
+    background: "#f8fafc",
     width: "100%",
     minWidth: 0,
     boxSizing: "border-box",
   },
   select: {
-    border: "1.5px solid #e0e0e0",
-    borderRadius: "8px",
-    padding: "11px 12px",
-    fontSize: "16px",
-    color: "#222",
+    border: "1.5px solid #e2e8f0",
+    borderRadius: "10px",
+    padding: "10px 12px",
+    fontSize: "14px",
+    color: "#0f172a",
     outline: "none",
-    background: "#fafafa",
+    background: "#f8fafc",
     cursor: "pointer",
     width: "100%",
     minWidth: 0,
@@ -488,109 +489,109 @@ const styles = {
   checkLabel: {
     display: "flex",
     alignItems: "center",
-    gap: "6px",
-    fontSize: "14px",
-    color: "#333",
+    gap: "8px",
+    fontSize: "13px",
+    color: "#334155",
     cursor: "pointer",
     flex: "1 1 140px",
     minWidth: 0,
   },
   helperText: {
-    marginTop: "6px",
-    fontSize: "12px",
-    lineHeight: 1.5,
-    color: "#6b7280",
+    marginTop: "4px",
+    fontSize: "11px",
+    lineHeight: 1.4,
+    color: "#64748b",
   },
   helperTextError: {
-    color: "#b91c1c",
+    color: "#ef4444",
   },
   locationCard: {
-    border: "1px solid #dbe7dc",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#f8fff8",
-    marginBottom: "14px",
+    border: "1px solid #f1f5f9",
+    borderRadius: "10px",
+    padding: "8px 12px",
+    background: "#f8fafc",
+    marginBottom: "12px",
   },
   locationCardHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: "12px",
-    flexWrap: "wrap",
+    gap: "8px",
   },
   locationTitle: {
-    fontSize: "14px",
+    fontSize: "12px",
     fontWeight: "600",
-    color: "#1f2937",
+    color: "#334155",
   },
   locationButton: {
-    border: "1px solid #2e7d32",
-    borderRadius: "999px",
-    padding: "8px 14px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    padding: "4px 8px",
     background: "#ffffff",
-    color: "#2e7d32",
-    fontSize: "13px",
+    color: "#2563eb",
+    fontSize: "11px",
     fontWeight: "600",
     cursor: "pointer",
+    transition: "all 0.2s",
   },
   locationMeta: {
-    marginTop: "8px",
-    fontSize: "12px",
-    lineHeight: 1.5,
-    color: "#4b5563",
+    marginTop: "6px",
+    fontSize: "11px",
+    lineHeight: 1.4,
+    color: "#64748b",
   },
   button: {
     width: "100%",
-    padding: "14px",
-    background: "#2e7d32",
+    padding: "12px 14px",
+    background: "#0f172a",
     color: "#fff",
     border: "none",
     borderRadius: "10px",
-    fontSize: "16px",
+    fontSize: "14px",
     fontWeight: "600",
     cursor: "pointer",
+    transition: "all 0.2s",
     marginTop: "8px",
-    transition: "background 0.2s",
     boxSizing: "border-box",
   },
   error: {
-    background: "#ffeaea",
-    border: "1px solid #f44336",
+    background: "#fef2f2",
+    border: "1px solid #fee2e2",
     borderRadius: "8px",
-    padding: "10px 14px",
-    color: "#c62828",
-    fontSize: "clamp(12px, 3vw, 13px)",
+    padding: "10px 12px",
+    color: "#ef4444",
+    fontSize: "12px",
     marginBottom: "14px",
     wordBreak: "break-word",
   },
   locationBadge: {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "8px",
-  marginTop: "10px",
-  padding: "8px 12px",
-  borderRadius: "999px",
-  background: "#ecfdf3",
-  border: "1px solid #a7f3d0",
-  color: "#047857",
-  fontSize: "12px",
-  fontWeight: "600",
-},
-locationBadgeDot: {
-  width: "8px",
-  height: "8px",
-  borderRadius: "999px",
-  background: "#10b981",
-},
-locationCoords: {
-  marginTop: "8px",
-  fontSize: "12px",
-  lineHeight: 1.5,
-  color: "#374151",
-},
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    marginTop: "8px",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    background: "#f0fdf4",
+    border: "1px solid #bbf7d0",
+    color: "#166534",
+    fontSize: "11px",
+    fontWeight: "600",
+  },
+  locationBadgeDot: {
+    width: "6px",
+    height: "6px",
+    borderRadius: "999px",
+    background: "#22c55e",
+  },
+  locationCoords: {
+    marginTop: "6px",
+    fontSize: "11px",
+    lineHeight: 1.4,
+    color: "#475569",
+  },
 };
 
-export default function PetForn({ onComplete, submitIntake }) {
+export default function PetForn({ onComplete, submitIntake, isModal = false, part = 1 }) {
   const [form, setForm] = useState(buildInitialForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -812,26 +813,28 @@ useEffect(() => {
 };
 
   const handleSubmit = async () => {
-    const sanitizedOwnerName = sanitizeOwnerName(form.owner_name);
+    const authState = readAiAuthState();
+    const currentUser = authState.user || {};
+    const fallbackOwnerName = currentUser?.name || currentUser?.owner_name || currentUser?.pet_owner_name || "Pet Parent";
+    const sanitizedOwnerName = sanitizeOwnerName(form.owner_name || fallbackOwnerName);
 
-    if (!form.pet_name.trim()) {
-      setError("Please fill in your pet's name.");
-      return;
+    if (part === 1) {
+      if (!form.pet_name.trim()) {
+        setError("Please fill in your pet's name.");
+        return;
+      }
+
+      if (!normalizeDateValue(form.pet_dob)) {
+        setError("Please select your pet's date of birth.");
+        return;
+      }
     }
 
-    if (!sanitizedOwnerName) {
-      setError("Please enter your name, not a phone number.");
-      return;
-    }
-
-    if (!normalizeDateValue(form.pet_dob)) {
-      setError("Please select your pet's date of birth.");
-      return;
-    }
-
-    if (form.dewormed && !normalizeDateValue(form.last_deworming_date)) {
-      setError("Please add the last deworming date.");
-      return;
+    if (part === 2) {
+      if (form.dewormed && !normalizeDateValue(form.last_deworming_date)) {
+        setError("Please add the last deworming date.");
+        return;
+      }
     }
 
     setError("");
@@ -935,9 +938,28 @@ if (typeof onComplete === "function") {
     }
   };
 
+  const containerStyle = isModal
+    ? {
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: "clamp(12px, 3vw, 24px)",
+        boxSizing: "border-box",
+      }
+    : styles.overlay;
+
+  const cardStyle = isModal
+    ? {
+        ...styles.card,
+        boxShadow: "none",
+        border: "none",
+        padding: "clamp(12px, 2vw, 24px)",
+      }
+    : styles.card;
+
   return (
-    <div style={styles.overlay}>
-      <div style={styles.card}>
+    <div style={containerStyle}>
+      <div style={cardStyle}>
         <div style={styles.logo}>
           <img
             src={logo}
@@ -946,198 +968,171 @@ if (typeof onComplete === "function") {
           />
         </div>
 
-        <div style={styles.sectionTitle}>About Your Pet</div>
+        {part === 1 ? (
+          <>
+            <div style={styles.sectionTitle}>About Your Pet</div>
 
-        <div style={styles.row}>
-          <div style={styles.field}>
-            <label style={styles.label}>Pet Name *</label>
-            <input
-              style={styles.input}
-              value={form.pet_name}
-              onChange={(event) => setField("pet_name", event.target.value)}
-              placeholder="e.g. Bruno"
-            />
-          </div>
-
-          <div style={styles.field}>
-            <label style={styles.label}>Pet Type</label>
-            <select
-              style={styles.select}
-              value={form.pet_type}
-              onChange={(event) =>
-                setForm((prev) => ({
-                  ...prev,
-                  pet_type: normalizePetType(event.target.value),
-                  breed: "",
-                }))
-              }
-            >
-              <option value="dog">Dog</option>
-              <option value="cat">Cat</option>
-            </select>
-          </div>
-        </div>
-
-        <div style={styles.row}>
-          <div style={styles.field}>
-            <label style={styles.label}>Breed</label>
-            <select
-              style={styles.select}
-              value={form.breed}
-              onChange={(event) => setField("breed", event.target.value)}
-              disabled={loadingBreeds}
-            >
-              <option value="">
-                {loadingBreeds ? "Loading breeds..." : "Select breed"}
-              </option>
-              {resolvedBreedOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            {breedLoadError || breedError ? (
-              <div style={{ ...styles.helperText, ...styles.helperTextError }}>
-                {breedLoadError || breedError}
+            <div style={styles.row}>
+              <div style={styles.field}>
+                <label style={styles.label}>Pet Name *</label>
+                <input
+                  style={styles.input}
+                  value={form.pet_name}
+                  onChange={(event) => setField("pet_name", event.target.value)}
+                  placeholder="e.g. Bruno"
+                />
               </div>
-            ) : (
-              <div style={styles.helperText}>
+
+              <div style={styles.field}>
+                <label style={styles.label}>Pet Type</label>
+                <select
+                  style={styles.select}
+                  value={form.pet_type}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      pet_type: normalizePetType(event.target.value),
+                      breed: "",
+                    }))
+                  }
+                >
+                  <option value="dog">Dog</option>
+                  <option value="cat">Cat</option>
+                </select>
               </div>
-            )}
-          </div>
-
-          <div style={styles.field}>
-            <label style={styles.label}>Sex</label>
-            <select
-              style={styles.select}
-              value={form.sex}
-              onChange={(event) => setField("sex", event.target.value)}
-            >
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-            </select>
-          </div>
-        </div>
-
-        <div style={styles.row}>
-          <div style={styles.field}>
-            <label style={styles.label}>Date of Birth *</label>
-            <input
-              style={styles.input}
-              type="date"
-              value={form.pet_dob}
-              onChange={(event) => setField("pet_dob", event.target.value)}
-              max={new Date().toISOString().split("T")[0]}
-            />
-            {agePreview ? (
-              <div style={styles.helperText}>{agePreview}</div>
-            ) : null}
-          </div>
-        </div>
-
-        <div style={styles.checkRow}>
-          {CHECK_OPTIONS.map(({ key, label }) => (
-            <label key={key} style={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={form[key]}
-                onChange={(event) => {
-                  const checked = event.target.checked;
-                  setForm((prev) => ({
-                    ...prev,
-                    [key]: checked,
-                    ...(key === "dewormed" && !checked
-                      ? { last_deworming_date: "" }
-                      : {}),
-                  }));
-                }}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-
-        {form.dewormed ? (
-          <div style={styles.field}>
-            <label style={styles.label}>Last Deworming Date *</label>
-            <input
-              style={styles.input}
-              type="date"
-              value={form.last_deworming_date}
-              onChange={(event) =>
-                setField("last_deworming_date", event.target.value)
-              }
-              max={new Date().toISOString().split("T")[0]}
-            />
-          </div>
-        ) : null}
-
-        <div style={styles.sectionTitle}>About You</div>
-
-        <div style={styles.field}>
-          <label style={styles.label}>Your Name *</label>
-          <input
-            style={styles.input}
-            value={form.owner_name}
-            onChange={(event) => setField("owner_name", event.target.value)}
-            placeholder="Your full name"
-          />
-        </div>
-
-        {/* <div style={styles.field}>
-          <label style={styles.label}>Phone (WhatsApp)</label>
-          <input
-            style={styles.input}
-            value={form.owner_phone}
-            onChange={(event) => setField("owner_phone", event.target.value)}
-            placeholder="+91 XXXXX XXXXX"
-          />
-        </div> */}
-
-        <div style={styles.locationCard}>
-          <div style={styles.locationCardHeader}>
-            <div style={styles.locationTitle}>Current location</div>
-            <button
-              type="button"
-              style={styles.locationButton}
-              onClick={captureCurrentLocation}
-              disabled={locationStatus === "loading"}
-            >
-              {locationStatus === "loading"
-                ? "Checking..."
-                : locationStatus === "ready"
-                  ? "Update location"
-                  : "Use current location"}
-            </button>
-          </div>
-
-          <div style={styles.locationMeta}>
-            {locationStatus === "ready"
-              ? "Your current location has been captured and will be used automatically."
-              : "Allow browser location to save latitude and longitude without showing extra fields."}
-          </div>
-
-          {locationStatus === "ready" && !locationError ? (
-            <>
-              <div style={styles.locationBadge}>
-                <span style={styles.locationBadgeDot} />
-                {locationSuccessMessage || "Location selected successfully."}
-              </div>
-            </>
-          ) : null}
-
-          {locationError ? (
-            <div style={{ ...styles.helperText, ...styles.helperTextError }}>
-              {locationError}
             </div>
-          ) : null}
-        </div>
-              {error ? <div style={styles.error}>{error}</div> : null}
+
+            <div style={styles.row}>
+              <div style={styles.field}>
+                <label style={styles.label}>Breed</label>
+                <select
+                  style={styles.select}
+                  value={form.breed}
+                  onChange={(event) => setField("breed", event.target.value)}
+                  disabled={loadingBreeds}
+                >
+                  <option value="">
+                    {loadingBreeds ? "Loading breeds..." : "Select breed"}
+                  </option>
+                  {resolvedBreedOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                {breedLoadError || breedError ? (
+                  <div style={{ ...styles.helperText, ...styles.helperTextError }}>
+                    {breedLoadError || breedError}
+                  </div>
+                ) : null}
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>Gender</label>
+                <select
+                  style={styles.select}
+                  value={form.sex}
+                  onChange={(event) => setField("sex", event.target.value)}
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={styles.row}>
+              <div style={styles.field}>
+                <label style={styles.label}>Date of Birth *</label>
+                <input
+                  style={styles.input}
+                  type="date"
+                  value={form.pet_dob}
+                  onChange={(event) => setField("pet_dob", event.target.value)}
+                  max={new Date().toISOString().split("T")[0]}
+                />
+                {agePreview ? (
+                  <div style={styles.helperText}>{agePreview}</div>
+                ) : null}
+              </div>
+            </div>
+
+            <div style={styles.locationCard}>
+              <div style={styles.locationCardHeader}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "12px" }}>📍</span>
+                  <span style={styles.locationTitle}>
+                    {locationStatus === "ready" ? "Location saved" : "Current location"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  style={styles.locationButton}
+                  onClick={captureCurrentLocation}
+                  disabled={locationStatus === "loading"}
+                >
+                  {locationStatus === "loading"
+                    ? "Checking..."
+                    : locationStatus === "ready"
+                      ? "Update"
+                      : "Detect location"}
+                </button>
+              </div>
+
+              {locationError ? (
+                <div style={{ ...styles.helperText, ...styles.helperTextError, marginTop: "4px" }}>
+                  {locationError}
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={styles.sectionTitle}>Pet Health History</div>
+
+            <div style={styles.checkRow}>
+              {CHECK_OPTIONS.map(({ key, label }) => (
+                <label key={key} style={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={form[key]}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        [key]: checked,
+                        ...(key === "dewormed" && !checked
+                          ? { last_deworming_date: "" }
+                          : {}),
+                      }));
+                    }}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+
+            {form.dewormed ? (
+              <div style={styles.field}>
+                <label style={styles.label}>Last Deworming Date *</label>
+                <input
+                  style={styles.input}
+                  type="date"
+                  value={form.last_deworming_date}
+                  onChange={(event) =>
+                    setField("last_deworming_date", event.target.value)
+                  }
+                  max={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {error ? <div style={styles.error}>{error}</div> : null}
 
         <button style={styles.button} onClick={handleSubmit} disabled={loading}>
-          {loading ? "Setting up..." : "Start Chat with AI"}
+          {loading ? "Saving..." : part === 1 ? "Save & Continue" : "Start Chat with AI"}
         </button>
-        
       </div>
     </div>
   );

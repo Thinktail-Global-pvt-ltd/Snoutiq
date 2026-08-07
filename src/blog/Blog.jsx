@@ -634,8 +634,9 @@ function LatestArticles({ posts, activeCategory, searchQuery }) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
-              {filteredPosts.map((post) => (
+            {/* Posts Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+              {filteredPosts.map((post, idx) => (
                 <BlogCard key={post.slug} post={post} />
               ))}
             </div>

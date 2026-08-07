@@ -24,6 +24,7 @@ export const AI_AUTH_STORAGE_KEYS = {
   lastVetId: "last_vet_id",
   referralClinicId: "referral_clinic_id",
   clinicDoctors: "clinic_doctors",
+  healthProfileCompleted: "snoutiq_health_profile_completed",
 };
 
 export const AI_PET_FORM_DRAFT_KEY = "ai_pet_form_draft";

@@ -8,6 +8,9 @@ export default {
     "./src/newflow/NewButton.jsx",
     "./src/newflow/NewFooter.jsx",
     "./src/newflow/ServiceCard.jsx",
+    "./src/newflow/SymptomCheckerApp.jsx",
+    "./src/newflow/SymptomCheckerSidebar.jsx",
+    "./src/newflow/SymptomCheckerFlow.jsx",
   ],
   theme: {
     extend: {

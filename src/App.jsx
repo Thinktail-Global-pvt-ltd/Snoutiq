@@ -55,7 +55,7 @@ const LoadingScreen = () => (
 );
 
 const loadHomePage = () =>
-  (homePagePromise ??= import("./newflow/HomePage"));
+  (homePagePromise ??= import("./newflow/SymptomCheckerApp"));
 const loadMainLayout = () =>
   (mainLayoutPromise ??= import("./layouts/MainLayout"));
 const loadAppRoutes = () => (appRoutesPromise ??= import("./AppRoutes"));
