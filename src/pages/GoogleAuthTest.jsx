@@ -129,6 +129,42 @@ const GoogleAuthTest = () => {
     if (profile) {
       setUserProfile(profile);
       addLog(`Authentication successful! Logged in as ${profile.name || profile.email}`);
+
+      // Send to backend endpoint to store in users table
+      const getBaseUrl = () => {
+        const envUrl = import.meta.env.VITE_BACKEND_BASE_URL;
+        if (envUrl) return `${envUrl}/api`;
+        const origin = window.location.origin;
+        if (origin.includes("snoutiq.com") && !origin.includes("app.snoutiq.com")) {
+          return `${origin}/backend/api`;
+        }
+        return "http://127.0.0.1:8000/api";
+      };
+
+      addLog("Sending payload to backend API /api/google-store-user...");
+      fetch(`${getBaseUrl()}/google-store-user`, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: profile.email,
+          name: profile.name,
+          google_token: response.credential,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            addLog(`Backend storage success! User ID registered: ${data.user_id}`);
+          } else {
+            addLog(`Backend storage failed: ${data.message || "Unknown error"}`);
+          }
+        })
+        .catch((err) => {
+          addLog(`Backend API error: ${err.message}`);
+        });
     } else {
       addLog("Failed to decode user profile from JWT.");
     }

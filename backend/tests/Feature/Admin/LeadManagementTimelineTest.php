@@ -42,6 +42,8 @@ class LeadManagementTimelineTest extends TestCase
             $table->string('phone')->nullable();
             $table->string('city')->nullable();
             $table->string('password')->nullable();
+            $table->string('google_token')->nullable();
+            $table->string('role')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -314,5 +316,49 @@ class LeadManagementTimelineTest extends TestCase
 
         $updateResponse->assertOk();
         $updateResponse->assertJsonPath('transaction.doctor_mobile', '8877665544');
+    }
+
+    public function test_google_store_user_creates_or_retrieves_user_with_null_defaults(): void
+    {
+        // 1. Create a brand new user with google-store-user endpoint
+        $email = 'googletestuser@example.com';
+        $response = $this->postJson('/api/google-store-user', [
+            'email'        => $email,
+            'name'         => 'Google Test User',
+            'google_token' => 'some_token_123',
+        ]);
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'message' => 'User stored successfully in users table.',
+        ]);
+
+        $userId = $response->json('user_id');
+        $this->assertGreaterThan(0, $userId);
+
+        // Fetch user from DB and assert other fields are null
+        $user = User::query()->find($userId);
+        $this->assertNotNull($user);
+        $this->assertEquals($email, $user->email);
+        $this->assertEquals('Google Test User', $user->name);
+        $this->assertEquals('some_token_123', $user->google_token);
+        $this->assertNull($user->phone);
+        $this->assertNull($user->password);
+        $this->assertNull($user->city);
+
+        // 2. Call the endpoint again with the same email and check it retrieves the existing user
+        $responseSecond = $this->postJson('/api/google-store-user', [
+            'email'        => $email,
+            'name'         => 'Google Test User Updated',
+            'google_token' => 'some_token_456',
+        ]);
+
+        $responseSecond->assertOk();
+        $this->assertEquals($userId, $responseSecond->json('user_id'));
+
+        $userUpdated = User::query()->find($userId);
+        $this->assertEquals('Google Test User Updated', $userUpdated->name);
+        $this->assertEquals('some_token_456', $userUpdated->google_token);
     }
 }

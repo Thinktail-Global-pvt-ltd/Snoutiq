@@ -2398,9 +2398,60 @@ public function login_bkp(Request $request)
 //     }
 // }
 
-public function googleLogin(Request $request)
-{
-    $request->validate([
+    public function googleStoreUser(Request $request)
+    {
+        $request->validate([
+            'email'        => 'required|email',
+            'name'         => 'nullable|string',
+            'google_token' => 'nullable|string',
+        ]);
+
+        try {
+            $user = User::query()->where('email', $request->email)->first();
+
+            if (!$user) {
+                $user = User::query()->create([
+                    'email'        => $request->email,
+                    'name'         => $request->name ?? null,
+                    'phone'        => null,
+                    'password'     => null,
+                    'city'         => null,
+                    'google_token' => $request->google_token ?? null,
+                    'role'         => 'pet',
+                ]);
+            } else {
+                $updated = false;
+                if ($request->has('google_token') && $user->google_token !== $request->google_token) {
+                    $user->google_token = $request->google_token;
+                    $updated = true;
+                }
+                if ($request->has('name') && $user->name !== $request->name) {
+                    $user->name = $request->name;
+                    $updated = true;
+                }
+                if ($updated) {
+                    $user->save();
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User stored successfully in users table.',
+                'user_id' => $user->id,
+                'user'    => $user,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to store user.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function googleLogin(Request $request)
+    {
+        $request->validate([
         'email'        => 'required|email',
         'google_token' => 'required|string',
         'role'         => 'required|string|in:pet,vet',
