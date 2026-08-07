@@ -418,9 +418,12 @@ class LeadManagementTimelineTest extends TestCase
         ]);
 
         // 3. Call merge API with matching name and breed -> symptom should update, Google user & pet deleted
-        $responseMatch = $this->postJson('/api/google-merge-user', [
+        // Note: we pass ONLY name and phone to verify session lookup
+        $responseMatch = $this->withSession([
+            'user_id' => $googleUser->id,
+        ])->postJson('/api/google-merge-user', [
             'phone'            => '9988776655',
-            'email'            => 'newgoogle@example.com',
+            'name'             => 'Old Phone User Updated',
             'google_token'     => 'google_token_123_updated',
             'pet_name'         => 'Simba',
             'pet_breed'        => 'Persian Cat',
@@ -431,10 +434,11 @@ class LeadManagementTimelineTest extends TestCase
         $responseMatch->assertJsonPath('success', true);
         $responseMatch->assertJsonPath('message', 'Data merged successfully. Temporary Google user deleted.');
 
-        // Assert Phone User now has email and google_token
+        // Assert Phone User now has email, name, and google_token
         $phoneUserMerged = User::query()->find($phoneUser->id);
         $this->assertEquals('newgoogle@example.com', $phoneUserMerged->email);
         $this->assertEquals('google_token_123_updated', $phoneUserMerged->google_token);
+        $this->assertEquals('Old Phone User Updated', $phoneUserMerged->name);
 
         // Assert Google User A has been deleted
         $this->assertNull(User::query()->find($googleUser->id));
@@ -445,9 +449,11 @@ class LeadManagementTimelineTest extends TestCase
         $this->assertEquals('Sneezing', $simbaPet->reported_symptom);
 
         // 4. Call merge API with non-matching breed -> should insert a new pet
-        $responseNewPet = $this->postJson('/api/google-merge-user', [
+        $responseNewPet = $this->withSession([
+            'user_id' => $phoneUserMerged->id, // logged in as merged user now
+        ])->postJson('/api/google-merge-user', [
             'phone'      => '9988776655',
-            'email'      => 'newgoogle@example.com',
+            'name'       => 'Old Phone User Updated',
             'pet_name'   => 'Oscar',
             'pet_breed'  => 'German Shepherd',
             'pet_type'   => 'dog',

@@ -2402,11 +2402,11 @@ public function login_bkp(Request $request)
     {
         $request->validate([
             'phone'        => 'required|string',
-            'email'        => 'required|email',
-            'name'         => 'nullable|string',
+            'name'         => 'required|string',
+            'email'        => 'nullable|email',
             'google_token' => 'nullable|string',
 
-            // Optional pet details
+            // Optional pet details (in case passed directly)
             'pet_name'     => 'nullable|string|max:120',
             'pet_breed'    => 'nullable|string|max:120',
             'breed'        => 'nullable|string|max:120',
@@ -2420,43 +2420,67 @@ public function login_bkp(Request $request)
 
         try {
             $phone = trim($request->phone);
-            $email = trim($request->email);
 
-            // 1. Check if a user with this phone number exists (B - Phone User)
+            // 1. Resolve the temporary Google User
+            $googleUser = Auth::user();
+            if (!$googleUser && session()->has('user_id')) {
+                $googleUser = User::query()->find(session('user_id'));
+            }
+            if (!$googleUser && $request->filled('email')) {
+                $googleUser = User::query()->where('email', $request->email)->first();
+            }
+
+            if (!$googleUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No active Google session found. Please authenticate via Google first.',
+                ], 401);
+            }
+
+            // Extract Google details
+            $email = $googleUser->email;
+            $googleToken = $request->google_token ?? $googleUser->google_token;
+
+            // 2. Fetch pets associated with this temporary Google user
+            $googlePets = collect();
+            if (Schema::hasTable('pets')) {
+                $userRefColumn = Schema::hasColumn('pets', 'user_id')
+                    ? 'user_id'
+                    : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+                if ($userRefColumn) {
+                    $googlePets = DB::table('pets')
+                        ->where($userRefColumn, $googleUser->id)
+                        ->get();
+                }
+            }
+
+            // 3. Check if a user with this phone number exists (B - Phone User)
             $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
             $last10Digits = strlen($cleanPhone) >= 10 ? substr($cleanPhone, -10) : $cleanPhone;
             $phoneUser = User::query()
                 ->where('phone', 'LIKE', '%' . $last10Digits)
                 ->first();
 
-            // 2. Check if a user with this email exists (A - Google User)
-            $googleUser = User::query()->where('email', $email)->first();
-
             if ($phoneUser) {
                 // Update email and google token on the phone user
                 $phoneUser->email = $email;
-                if ($request->has('google_token')) {
-                    $phoneUser->google_token = $request->google_token;
+                if (!empty($googleToken)) {
+                    $phoneUser->google_token = $googleToken;
                 }
-                if ($request->has('name') && !empty($request->name)) {
-                    $phoneUser->name = $request->name;
-                }
+                $phoneUser->name = $request->name;
                 $phoneUser->save();
 
-                // Check pet details if pet_name is provided in the request
-                $petName = trim($request->pet_name ?? '');
-                if (!empty($petName) && Schema::hasTable('pets')) {
-                    $userRefColumn = Schema::hasColumn('pets', 'user_id')
-                        ? 'user_id'
-                        : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
-
-                    if ($userRefColumn) {
+                // Merge Google User's pets to the Phone User
+                if ($userRefColumn && Schema::hasTable('pets')) {
+                    // Also merge any direct pet info sent in this request
+                    $directPetName = trim($request->pet_name ?? '');
+                    if (!empty($directPetName)) {
                         $incomingBreed = trim($request->pet_breed ?? $request->breed ?? '');
-
-                        // Check if phone user already has a pet with the same name and breed
+                        
                         $matchingPet = DB::table('pets')
                             ->where($userRefColumn, $phoneUser->id)
-                            ->where('name', $petName)
+                            ->where('name', $directPetName)
                             ->where('breed', $incomingBreed)
                             ->first();
 
@@ -2478,7 +2502,7 @@ public function login_bkp(Request $request)
                             };
 
                             $setColumn($userRefColumn, $phoneUser->id);
-                            $setColumn('name', $petName);
+                            $setColumn('name', $directPetName);
                             $setColumn('breed', $incomingBreed);
                             $setColumn('pet_age', $request->pet_age ?? null);
                             $setColumn('reported_symptom', $request->reported_symptom ?? null);
@@ -2497,80 +2521,121 @@ public function login_bkp(Request $request)
                             DB::table('pets')->insert($petPayload);
                         }
                     }
+
+                    // Process pets from the Google User session
+                    foreach ($googlePets as $gPet) {
+                        // Skip if it matches the direct one we just processed
+                        if (!empty($directPetName) && strcasecmp($gPet->name, $directPetName) === 0) {
+                            continue;
+                        }
+
+                        $matchingPet = DB::table('pets')
+                            ->where($userRefColumn, $phoneUser->id)
+                            ->where('name', $gPet->name)
+                            ->where('breed', $gPet->breed ?? null)
+                            ->first();
+
+                        if ($matchingPet) {
+                            if (Schema::hasColumn('pets', 'reported_symptom') && !empty($gPet->reported_symptom)) {
+                                DB::table('pets')
+                                    ->where('id', $matchingPet->id)
+                                    ->update([
+                                        'reported_symptom' => $gPet->reported_symptom,
+                                        'updated_at' => now(),
+                                    ]);
+                            }
+                        } else {
+                            // Copy Google Pet to Phone User
+                            $petPayload = [];
+                            $setColumn = function (string $col, $val) use (&$petPayload) {
+                                if (Schema::hasColumn('pets', $col)) {
+                                    $petPayload[$col] = $val;
+                                }
+                            };
+
+                            $setColumn($userRefColumn, $phoneUser->id);
+                            $setColumn('name', $gPet->name);
+                            $setColumn('breed', $gPet->breed ?? null);
+                            $setColumn('pet_age', $gPet->pet_age ?? null);
+                            $setColumn('pet_age_months', $gPet->pet_age_months ?? null);
+                            $setColumn('weight', $gPet->weight ?? null);
+                            $setColumn('reported_symptom', $gPet->reported_symptom ?? null);
+                            $setColumn('pet_type', $gPet->pet_type ?? null);
+                            $setColumn('type', $gPet->type ?? null);
+                            $setColumn('pet_gender', $gPet->pet_gender ?? null);
+                            $setColumn('gender', $gPet->gender ?? null);
+                            $setColumn('created_at', now());
+                            $setColumn('updated_at', now());
+
+                            DB::table('pets')->insert($petPayload);
+                        }
+                    }
                 }
 
-                // Delete the old Google user and its associated pets
-                if ($googleUser && $googleUser->id !== $phoneUser->id) {
+                // Delete the old Google User and its associated pets
+                if ($googleUser->id !== $phoneUser->id) {
                     if (Schema::hasTable('pets') && $userRefColumn) {
                         DB::table('pets')->where($userRefColumn, $googleUser->id)->delete();
                     }
                     $googleUser->delete();
                 }
 
+                // Log in the phone user to update the session
+                Auth::login($phoneUser);
+                session(['user_id' => $phoneUser->id]);
+
                 $finalUser = $phoneUser;
                 $merged = true;
             } else {
-                if ($googleUser) {
-                    $googleUser->phone = $phone;
-                    if ($request->has('name') && !empty($request->name)) {
-                        $googleUser->name = $request->name;
-                    }
-                    $googleUser->save();
-                    $finalUser = $googleUser;
-                } else {
-                    $finalUser = User::query()->create([
-                        'email'        => $email,
-                        'phone'        => $phone,
-                        'name'         => $request->name ?? null,
-                        'google_token' => $request->google_token ?? null,
-                        'role'         => 'pet',
-                    ]);
-                }
+                // If Phone User does not exist, assign phone and name to Google User
+                $googleUser->phone = $phone;
+                $googleUser->name = $request->name;
+                $googleUser->save();
 
-                if (!empty($request->pet_name) && Schema::hasTable('pets')) {
-                    $userRefColumn = Schema::hasColumn('pets', 'user_id')
-                        ? 'user_id'
-                        : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+                // Log in the Google user (it should already be logged in, but ensure session is set)
+                Auth::login($googleUser);
+                session(['user_id' => $googleUser->id]);
 
-                    if ($userRefColumn) {
-                        $petName = trim($request->pet_name);
-                        $petRow = DB::table('pets')
-                            ->where($userRefColumn, $finalUser->id)
-                            ->where('name', $petName)
-                            ->first();
+                // Update pet details from request if direct pet name is supplied
+                $directPetName = trim($request->pet_name ?? '');
+                if (!empty($directPetName) && Schema::hasTable('pets') && $userRefColumn) {
+                    $petRow = DB::table('pets')
+                        ->where($userRefColumn, $googleUser->id)
+                        ->where('name', $directPetName)
+                        ->first();
 
-                        $petPayload = [];
-                        $setColumn = function (string $col, $val) use (&$petPayload) {
-                            if (Schema::hasColumn('pets', $col)) {
-                                $petPayload[$col] = $val;
-                            }
-                        };
-
-                        $setColumn('name', $petName);
-                        $setColumn('breed', $request->pet_breed ?? $request->breed ?? null);
-                        $setColumn('pet_age', $request->pet_age ?? null);
-                        $setColumn('reported_symptom', $request->reported_symptom ?? null);
-
-                        $petType = $request->pet_type ?? $request->type ?? null;
-                        $setColumn('pet_type', $petType);
-                        $setColumn('type', $petType);
-
-                        $petGender = $request->pet_gender ?? $request->gender ?? null;
-                        $setColumn('pet_gender', $petGender);
-                        $setColumn('gender', $petGender);
-
-                        if (!$petRow) {
-                            $setColumn($userRefColumn, $finalUser->id);
-                            $setColumn('created_at', now());
-                            $setColumn('updated_at', now());
-                            DB::table('pets')->insert($petPayload);
-                        } else {
-                            $setColumn('updated_at', now());
-                            DB::table('pets')->where('id', $petRow->id)->update($petPayload);
+                    $petPayload = [];
+                    $setColumn = function (string $col, $val) use (&$petPayload) {
+                        if (Schema::hasColumn('pets', $col)) {
+                            $petPayload[$col] = $val;
                         }
+                    };
+
+                    $setColumn('name', $directPetName);
+                    $setColumn('breed', $request->pet_breed ?? $request->breed ?? null);
+                    $setColumn('pet_age', $request->pet_age ?? null);
+                    $setColumn('reported_symptom', $request->reported_symptom ?? null);
+
+                    $petType = $request->pet_type ?? $request->type ?? null;
+                    $setColumn('pet_type', $petType);
+                    $setColumn('type', $petType);
+
+                    $petGender = $request->pet_gender ?? $request->gender ?? null;
+                    $setColumn('pet_gender', $petGender);
+                    $setColumn('gender', $petGender);
+
+                    if (!$petRow) {
+                        $setColumn($userRefColumn, $googleUser->id);
+                        $setColumn('created_at', now());
+                        $setColumn('updated_at', now());
+                        DB::table('pets')->insert($petPayload);
+                    } else {
+                        $setColumn('updated_at', now());
+                        DB::table('pets')->where('id', $petRow->id)->update($petPayload);
                     }
                 }
 
+                $finalUser = $googleUser;
                 $merged = false;
             }
 
