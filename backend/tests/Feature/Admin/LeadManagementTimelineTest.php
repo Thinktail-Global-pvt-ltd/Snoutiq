@@ -392,9 +392,9 @@ class LeadManagementTimelineTest extends TestCase
 
     public function test_google_merge_user_when_phone_exists(): void
     {
-        // 1. Create a Phone User (B) in DB with a phone and a pet
+        // 1. Create a Phone User (B) in DB with a +91 prefix phone and a pet
         $phoneUser = User::query()->create([
-            'phone' => '9988776655',
+            'phone' => '+919988776655',
             'name'  => 'Old Phone User',
             'email' => null,
         ]);

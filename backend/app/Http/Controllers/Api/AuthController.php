@@ -2423,7 +2423,11 @@ public function login_bkp(Request $request)
             $email = trim($request->email);
 
             // 1. Check if a user with this phone number exists (B - Phone User)
-            $phoneUser = User::query()->where('phone', $phone)->first();
+            $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+            $last10Digits = strlen($cleanPhone) >= 10 ? substr($cleanPhone, -10) : $cleanPhone;
+            $phoneUser = User::query()
+                ->where('phone', 'LIKE', '%' . $last10Digits)
+                ->first();
 
             // 2. Check if a user with this email exists (A - Google User)
             $googleUser = User::query()->where('email', $email)->first();
