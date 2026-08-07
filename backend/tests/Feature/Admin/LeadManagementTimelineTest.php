@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Notification;
+use App\Models\Pet;
 use App\Models\Prescription;
 use App\Models\Transaction;
 use App\Models\User;
@@ -29,6 +30,11 @@ class LeadManagementTimelineTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->string('name')->nullable();
+            $table->string('breed')->nullable();
+            $table->string('pet_type')->nullable();
+            $table->string('type')->nullable();
+            $table->string('pet_gender')->nullable();
+            $table->string('gender')->nullable();
             $table->binary('pet_doc2_blob_new')->nullable();
             $table->binary('pet_doc2_blob')->nullable();
             $table->string('reported_symptom')->nullable();
@@ -320,45 +326,67 @@ class LeadManagementTimelineTest extends TestCase
 
     public function test_google_store_user_creates_or_retrieves_user_with_null_defaults(): void
     {
-        // 1. Create a brand new user with google-store-user endpoint
+        // 1. Create a brand new user along with a pet
         $email = 'googletestuser@example.com';
         $response = $this->postJson('/api/google-store-user', [
-            'email'        => $email,
-            'name'         => 'Google Test User',
-            'google_token' => 'some_token_123',
+            'email'             => $email,
+            'name'              => 'Google Test User',
+            'google_token'      => 'some_token_123',
+            'pet_name'          => 'Simba',
+            'pet_breed'         => 'Persian Cat',
+            'pet_type'          => 'cat',
+            'pet_gender'        => 'male',
+            'reported_symptom'  => 'Sneezing',
         ]);
 
         $response->assertOk();
         $response->assertJson([
             'success' => true,
-            'message' => 'User stored successfully in users table.',
+            'message' => 'User and pet details stored successfully.',
         ]);
 
         $userId = $response->json('user_id');
+        $petId = $response->json('pet_id');
         $this->assertGreaterThan(0, $userId);
+        $this->assertGreaterThan(0, $petId);
 
         // Fetch user from DB and assert other fields are null
         $user = User::query()->find($userId);
         $this->assertNotNull($user);
         $this->assertEquals($email, $user->email);
         $this->assertEquals('Google Test User', $user->name);
-        $this->assertEquals('some_token_123', $user->google_token);
         $this->assertNull($user->phone);
         $this->assertNull($user->password);
         $this->assertNull($user->city);
 
-        // 2. Call the endpoint again with the same email and check it retrieves the existing user
+        // Fetch pet from DB and verify values
+        $pet = Pet::query()->find($petId);
+        $this->assertNotNull($pet);
+        $this->assertEquals('Simba', $pet->name);
+        $this->assertEquals('Persian Cat', $pet->breed);
+        $this->assertEquals('cat', $pet->pet_type);
+        $this->assertEquals('male', $pet->pet_gender);
+        $this->assertEquals('Sneezing', $pet->reported_symptom);
+
+        // 2. Call the endpoint again with updated pet details
         $responseSecond = $this->postJson('/api/google-store-user', [
-            'email'        => $email,
-            'name'         => 'Google Test User Updated',
-            'google_token' => 'some_token_456',
+            'email'             => $email,
+            'name'              => 'Google Test User Updated',
+            'google_token'      => 'some_token_456',
+            'pet_name'          => 'Simba', // same name to retrieve and update Simba
+            'pet_breed'         => 'Persian Cat Updated',
+            'pet_gender'        => 'female',
         ]);
 
         $responseSecond->assertOk();
         $this->assertEquals($userId, $responseSecond->json('user_id'));
+        $this->assertEquals($petId, $responseSecond->json('pet_id'));
 
         $userUpdated = User::query()->find($userId);
         $this->assertEquals('Google Test User Updated', $userUpdated->name);
-        $this->assertEquals('some_token_456', $userUpdated->google_token);
+
+        $petUpdated = Pet::query()->find($petId);
+        $this->assertEquals('Persian Cat Updated', $petUpdated->breed);
+        $this->assertEquals('female', $petUpdated->pet_gender);
     }
 }

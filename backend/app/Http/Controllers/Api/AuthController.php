@@ -2404,9 +2404,23 @@ public function login_bkp(Request $request)
             'email'        => 'required|email',
             'name'         => 'nullable|string',
             'google_token' => 'nullable|string',
+
+            // Optional pet details (only pet_name is mandatory for inserting a pet)
+            'pet_name'     => 'nullable|string|max:120',
+            'pet_type'     => 'nullable|string|max:120',
+            'type'         => 'nullable|string|max:120',
+            'pet_breed'    => 'nullable|string|max:120',
+            'breed'        => 'nullable|string|max:120',
+            'pet_gender'   => 'nullable|string|max:50',
+            'gender'       => 'nullable|string|max:50',
+            'pet_age'      => 'nullable|integer|min:0|max:255',
+            'pet_age_months' => 'nullable|integer|min:0|max:255',
+            'weight'       => 'nullable|numeric|min:0',
+            'reported_symptom' => 'nullable|string',
         ]);
 
         try {
+            // 1. Create or retrieve User
             $user = User::query()->where('email', $request->email)->first();
 
             if (!$user) {
@@ -2434,11 +2448,65 @@ public function login_bkp(Request $request)
                 }
             }
 
+            // 2. Create or update Pet if pet_name is provided
+            $pet = null;
+            if (!empty($request->pet_name) && Schema::hasTable('pets')) {
+                $userRefColumn = Schema::hasColumn('pets', 'user_id')
+                    ? 'user_id'
+                    : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+                if ($userRefColumn) {
+                    $petName = trim($request->pet_name);
+                    $petRow = DB::table('pets')
+                        ->where($userRefColumn, $user->id)
+                        ->where('name', $petName)
+                        ->first();
+
+                    $petPayload = [];
+
+                    $setColumn = function (string $col, $val) use (&$petPayload) {
+                        if (Schema::hasColumn('pets', $col)) {
+                            $petPayload[$col] = $val;
+                        }
+                    };
+
+                    $setColumn('name', $petName);
+                    $setColumn('breed', $request->pet_breed ?? $request->breed ?? null);
+                    $setColumn('pet_age', $request->pet_age ?? null);
+                    $setColumn('pet_age_months', $request->pet_age_months ?? null);
+                    $setColumn('weight', $request->weight ?? null);
+                    $setColumn('reported_symptom', $request->reported_symptom ?? null);
+
+                    $petType = $request->pet_type ?? $request->type ?? null;
+                    $setColumn('pet_type', $petType);
+                    $setColumn('type', $petType);
+
+                    $petGender = $request->pet_gender ?? $request->gender ?? null;
+                    $setColumn('pet_gender', $petGender);
+                    $setColumn('gender', $petGender);
+
+                    if (!$petRow) {
+                        $setColumn($userRefColumn, $user->id);
+                        $setColumn('created_at', now());
+                        $setColumn('updated_at', now());
+                        $petId = DB::table('pets')->insertGetId($petPayload);
+                    } else {
+                        $setColumn('updated_at', now());
+                        DB::table('pets')->where('id', $petRow->id)->update($petPayload);
+                        $petId = $petRow->id;
+                    }
+
+                    $pet = Pet::query()->find($petId);
+                }
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'User stored successfully in users table.',
+                'message' => 'User and pet details stored successfully.',
                 'user_id' => $user->id,
                 'user'    => $user,
+                'pet_id'  => $pet ? $pet->id : null,
+                'pet'     => $pet,
             ]);
         } catch (\Exception $e) {
             return response()->json([

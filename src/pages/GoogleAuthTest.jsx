@@ -29,6 +29,14 @@ const GoogleAuthTest = () => {
   const [rawCredential, setRawCredential] = useState("");
   const buttonContainerRef = useRef(null);
 
+  // Pet details form state
+  const [petName, setPetName] = useState("");
+  const [petType, setPetType] = useState("");
+  const [petBreed, setPetBreed] = useState("");
+  const [petGender, setPetGender] = useState("");
+  const [petAge, setPetAge] = useState("");
+  const [reportedSymptom, setReportedSymptom] = useState("");
+
   const addLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs((prev) => [...prev, `[${timestamp}] ${message}`]);
@@ -152,12 +160,20 @@ const GoogleAuthTest = () => {
           email: profile.email,
           name: profile.name,
           google_token: response.credential,
+
+          // Optional pet details
+          pet_name: petName || null,
+          pet_type: petType || null,
+          pet_breed: petBreed || null,
+          pet_gender: petGender || null,
+          pet_age: petAge ? parseInt(petAge, 10) : null,
+          reported_symptom: reportedSymptom || null,
         }),
       })
         .then((res) => res.json())
         .then((data) => {
           if (data.success) {
-            addLog(`Backend storage success! User ID registered: ${data.user_id}`);
+            addLog(`Backend storage success! User ID: ${data.user_id}, Pet ID: ${data.pet_id || 'N/A'}`);
           } else {
             addLog(`Backend storage failed: ${data.message || "Unknown error"}`);
           }
@@ -221,6 +237,76 @@ const GoogleAuthTest = () => {
                 <span className="text-[10px] text-stone-400">
                   Tip: Get your Client ID from the Google Cloud Console.
                 </span>
+              </div>
+            </div>
+
+            {/* Pet Details Config Card */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-md flex flex-col gap-4">
+              <h2 className="text-md font-semibold text-indigo-300 flex items-center gap-2">
+                🐾 Pet Details (Optional - Leave blank to skip)
+              </h2>
+              
+              <div className="grid grid-cols-2 gap-3 text-left">
+                <div className="flex flex-col gap-1 col-span-2">
+                  <label className="text-[11px] text-stone-400 font-medium">Pet Name (Required to save Pet)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Simba"
+                    value={petName}
+                    onChange={(e) => setPetName(e.target.value)}
+                    className="bg-black/40 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-stone-400 font-medium">Pet Type</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. cat, dog"
+                    value={petType}
+                    onChange={(e) => setPetType(e.target.value)}
+                    className="bg-black/40 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-stone-400 font-medium">Pet Breed</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Persian Cat"
+                    value={petBreed}
+                    onChange={(e) => setPetBreed(e.target.value)}
+                    className="bg-black/40 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-stone-400 font-medium">Pet Gender</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. male, female"
+                    value={petGender}
+                    onChange={(e) => setPetGender(e.target.value)}
+                    className="bg-black/40 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-stone-400 font-medium">Pet Age (years)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 2"
+                    value={petAge}
+                    onChange={(e) => setPetAge(e.target.value)}
+                    className="bg-black/40 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 col-span-2">
+                  <label className="text-[11px] text-stone-400 font-medium">Reported Symptom</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Coughing, Vomiting"
+                    value={reportedSymptom}
+                    onChange={(e) => setReportedSymptom(e.target.value)}
+                    className="bg-black/40 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-stone-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
               </div>
             </div>
 
