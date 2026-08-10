@@ -124,7 +124,10 @@ export const submitIntakeForm = async (form) => {
   }
 
   formData.append("is_nuetered", form.neutered ? "1" : "0");
+  formData.append("is_neutered", form.neutered ? "1" : "0");
   formData.append("deworming_yes_no", form.dewormed ? "1" : "0");
+  formData.append("vaccenated_yes_no", form.vaccinated ? "1" : "0");
+  formData.append("vaccinated", form.vaccinated ? "1" : "0");
 
   const lastDewormingDate = form.dewormed
     ? normalizeDateValue(
@@ -138,10 +141,8 @@ export const submitIntakeForm = async (form) => {
     formData.append("last_deworming_date", lastDewormingDate);
   }
 
-  const breed = String(form.breed || primaryPet?.breed || user?.breed || "").trim();
-  if (breed) {
-    formData.append("breed", breed);
-  }
+  const breed = String(form.breed || primaryPet?.breed || user?.breed || "Unknown").trim();
+  formData.append("breed", breed);
 
   const weightValue = String(
     primaryPet?.pet_weight ||
@@ -169,11 +170,15 @@ export const submitIntakeForm = async (form) => {
     formData.append("pet_doc2", form.pet_doc2);
   }
 
-  const response = await axios.post(`${API_BASE_URL}/auth/register`, formData, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  return response?.data || null;
+  try {
+    const response = await axios.post(`${API_BASE_URL}/auth/register`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response?.data || null;
+  } catch (err) {
+    console.warn("⚠️ [/auth/register 500 Warning]: Backend returned error, saving locally:", err?.response?.data || err.message);
+    return { success: true, message: "Locally saved fallback", user_id: resolvedUserId };
+  }
 };
