@@ -356,6 +356,10 @@ class LeadManagementTimelineTest extends TestCase
             'success' => true,
             'message' => 'User and pet details stored successfully.',
         ]);
+        $this->assertNotNull($response->json('pet_id'));
+        $this->assertNotNull($response->json('pet'));
+        $this->assertIsArray($response->json('pets'));
+        $this->assertIsArray($response->json('user_pets'));
 
         $userId = $response->json('user_id');
         $petId = $response->json('pet_id');

@@ -2788,13 +2788,19 @@ public function login_bkp(Request $request)
                 }
             }
 
+            [$pets, $userPets] = $this->loadRelatedPets($user);
+            $pets = $this->withPetDoc2BlobUrls($pets);
+            $petId = $pets->first()?->id;
+
             return response()->json([
-                'success' => true,
-                'message' => 'User and pet details stored successfully.',
-                'user_id' => $user->id,
-                'user'    => $user,
-                'pet_id'  => $pet ? $pet->id : null,
-                'pet'     => $pet,
+                'success'   => true,
+                'message'   => 'User and pet details stored successfully.',
+                'user_id'   => $user->id,
+                'user'      => $user,
+                'pet_id'    => $petId,
+                'pet'       => $pets->first(),
+                'pets'      => $pets,
+                'user_pets' => $userPets,
             ]);
         } catch (\Exception $e) {
             return response()->json([
