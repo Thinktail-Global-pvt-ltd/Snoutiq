@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   clearAiPetFormDraft,
   readAiAuthState,
@@ -591,6 +591,156 @@ const styles = {
   },
 };
 
+function SearchableBreedSelect({ value, onChange, options, disabled, loading, placeholder = "Select breed" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.toLowerCase().trim();
+    return options.filter((opt) => opt.toLowerCase().includes(q));
+  }, [options, search]);
+
+  return (
+    <div ref={dropdownRef} style={{ position: "relative", width: "100%" }}>
+      <button
+        type="button"
+        disabled={disabled || loading}
+        onClick={() => setIsOpen((prev) => !prev)}
+        style={{
+          width: "100%",
+          padding: "10px 14px",
+          fontSize: "13px",
+          borderRadius: "12px",
+          border: "1px solid #e2e8f0",
+          backgroundColor: disabled || loading ? "#f8fafc" : "#ffffff",
+          color: value ? "#0f172a" : "#94a3b8",
+          textAlign: "left",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: disabled || loading ? "not-allowed" : "pointer",
+          outline: "none",
+          boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whitespace: "nowrap" }}>
+          {loading ? "Loading breeds..." : value || placeholder}
+        </span>
+        <span style={{ fontSize: "10px", color: "#64748b", marginLeft: "8px" }}>
+          {isOpen ? "▲" : "▼"}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            backgroundColor: "#ffffff",
+            borderRadius: "14px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+            padding: "8px",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div style={{ marginBottom: "6px" }}>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="🔍 Search breed..."
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                fontSize: "12px",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                outline: "none",
+                boxSizing: "border-box",
+                backgroundColor: "#f8fafc",
+                color: "#0f172a",
+              }}
+            />
+          </div>
+
+          <div style={{ overflowY: "auto", maxHeight: "180px" }}>
+            <div
+              onClick={() => {
+                onChange("");
+                setIsOpen(false);
+                setSearch("");
+              }}
+              style={{
+                padding: "8px 10px",
+                fontSize: "12px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                color: !value ? "#2563eb" : "#64748b",
+                fontWeight: !value ? "600" : "400",
+                backgroundColor: !value ? "#eff6ff" : "transparent",
+              }}
+            >
+              Select breed
+            </div>
+            {filteredOptions.length === 0 ? (
+              <div style={{ padding: "10px", fontSize: "12px", color: "#94a3b8", textAlign: "center" }}>
+                No matching breed found
+              </div>
+            ) : (
+              filteredOptions.map((opt) => (
+                <div
+                  key={opt}
+                  onClick={() => {
+                    onChange(opt);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  style={{
+                    padding: "8px 10px",
+                    fontSize: "12px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    color: value === opt ? "#2563eb" : "#1e293b",
+                    fontWeight: value === opt ? "600" : "400",
+                    backgroundColor: value === opt ? "#eff6ff" : "transparent",
+                    transition: "background-color 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (value !== opt) e.currentTarget.style.backgroundColor = "#f1f5f9";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (value !== opt) e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  {opt}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PetForn({ onComplete, submitIntake, isModal = false, part = 1 }) {
   const [form, setForm] = useState(buildInitialForm);
   const [loading, setLoading] = useState(false);
@@ -1008,21 +1158,14 @@ if (typeof onComplete === "function") {
             <div style={styles.row}>
               <div style={styles.field}>
                 <label style={styles.label}>Breed</label>
-                <select
-                  style={styles.select}
+                <SearchableBreedSelect
                   value={form.breed}
-                  onChange={(event) => setField("breed", event.target.value)}
+                  onChange={(selectedBreed) => setField("breed", selectedBreed)}
+                  options={resolvedBreedOptions}
+                  loading={loadingBreeds}
                   disabled={loadingBreeds}
-                >
-                  <option value="">
-                    {loadingBreeds ? "Loading breeds..." : "Select breed"}
-                  </option>
-                  {resolvedBreedOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select breed"
+                />
                 {breedLoadError || breedError ? (
                   <div style={{ ...styles.helperText, ...styles.helperTextError }}>
                     {breedLoadError || breedError}

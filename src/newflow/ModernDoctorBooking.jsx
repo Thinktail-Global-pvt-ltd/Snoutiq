@@ -799,17 +799,26 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
         {/* Right Details */}
         <div className="flex-1 flex flex-col justify-between">
           <div>
-            {featured && (
-              <span className="inline-block text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0 rounded mb-0.5 leading-4">
-                Recommended for {pet.name || pet.pet_name}
-              </span>
-            )}
+            <div className="flex items-center justify-between gap-1 mb-0.5 flex-wrap">
+              {featured ? (
+                <span className="inline-block text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded-md leading-3">
+                  Recommended for {pet.name || pet.pet_name}
+                </span>
+              ) : <div />}
+              
+              {Boolean(doc.experience) && String(doc.experience) !== "0" && (
+                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-full shadow-2xs whitespace-nowrap">
+                  🎓 {doc.experience} Yrs Exp
+                </span>
+              )}
+            </div>
+
             <h3 className="font-bold text-slate-800 text-[13px] leading-tight">{doc.name}</h3>
             <p className="text-[10px] text-slate-400 leading-tight">{doc.specialization}</p>
             {doc.clinicName && (
               <p className="text-[10px] font-medium text-slate-500 truncate">🏥 {doc.clinicName}</p>
             )}
-            <p className="text-[10px] font-semibold text-emerald-600">
+            <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">
               {isOnline ? "Online now · Consult available" : "Consult available"}
             </p>
           </div>
