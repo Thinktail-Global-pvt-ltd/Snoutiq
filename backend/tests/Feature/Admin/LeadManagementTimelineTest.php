@@ -458,6 +458,9 @@ class LeadManagementTimelineTest extends TestCase
         $responseMatch->assertOk();
         $responseMatch->assertJsonPath('success', true);
         $responseMatch->assertJsonPath('message', 'Data merged successfully. Temporary Google user deleted.');
+        $this->assertNotNull($responseMatch->json('pet_id'));
+        $this->assertIsArray($responseMatch->json('pets'));
+        $this->assertIsArray($responseMatch->json('user_pets'));
 
         // Assert Phone User now has email, name, and google_token
         $phoneUserMerged = User::query()->find($phoneUser->id);

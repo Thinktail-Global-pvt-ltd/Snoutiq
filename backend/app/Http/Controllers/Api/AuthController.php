@@ -2664,11 +2664,18 @@ public function login_bkp(Request $request)
                 $merged = false;
             }
 
+            [$pets, $userPets] = $this->loadRelatedPets($finalUser);
+            $pets = $this->withPetDoc2BlobUrls($pets);
+            $petId = $pets->first()?->id;
+
             return response()->json([
-                'success' => true,
-                'message' => $merged ? 'Data merged successfully. Temporary Google user deleted.' : 'User details saved successfully.',
-                'user_id' => $finalUser->id,
-                'user'    => $finalUser,
+                'success'   => true,
+                'message'   => $merged ? 'Data merged successfully. Temporary Google user deleted.' : 'User details saved successfully.',
+                'user_id'   => $finalUser->id,
+                'user'      => $finalUser,
+                'pet_id'    => $petId,
+                'pets'      => $pets,
+                'user_pets' => $userPets,
             ]);
         } catch (\Exception $e) {
             return response()->json([
