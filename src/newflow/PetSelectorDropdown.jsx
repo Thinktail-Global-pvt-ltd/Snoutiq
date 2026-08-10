@@ -13,9 +13,11 @@ export default function PetSelectorDropdown({ onAddNewPet }) {
 
   useEffect(() => {
     window.addEventListener("snoutiq_pet_changed", refreshState);
+    window.addEventListener("snoutiq_auth_changed", refreshState);
     window.addEventListener("storage", refreshState);
     return () => {
       window.removeEventListener("snoutiq_pet_changed", refreshState);
+      window.removeEventListener("snoutiq_auth_changed", refreshState);
       window.removeEventListener("storage", refreshState);
     };
   }, []);

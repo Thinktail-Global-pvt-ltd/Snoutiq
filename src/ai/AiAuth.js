@@ -789,6 +789,13 @@ export const persistAiAuthState = ({
     clinicDoctors ?? currentState.clinicDoctors ?? null,
   );
 
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new Event("snoutiq_pet_changed"));
+      window.dispatchEvent(new Event("snoutiq_auth_changed"));
+    } catch {}
+  }
+
   return {
     user: nextUser,
     token: nextToken,
