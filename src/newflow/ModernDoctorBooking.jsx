@@ -580,7 +580,7 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
       const data = await res.json();
 
       if (res.ok && data.success !== false) {
-        const lId = data.lock_id || data.data?.lock_id || data.id;
+        const lId = data.lockId || data.data?.lockId || data.lock_id || data.data?.lock_id || data.id;
         setLockId(lId);
       } else {
         console.warn("Slot lock non-200 response:", data);
@@ -655,13 +655,21 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
             contact: user.mobile || user.phone,
           },
           theme: { color: "#000000" },
+          modal: {
+            ondismiss: () => {
+              if (orderType === "appointment" && lockId) {
+                unlockCurrentSlot(lockId);
+              }
+              reject(new Error("Payment cancelled by user."));
+            },
+          },
           handler: (response) => resolve(response),
         });
-        rzp.on('payment.failed', () => {
+        rzp.on('payment.failed', (response) => {
           if (orderType === "appointment" && lockId) {
             unlockCurrentSlot(lockId);
           }
-          reject(new Error("Payment failed or cancelled."));
+          reject(new Error(response?.error?.description || "Payment failed or cancelled."));
         });
         rzp.open();
       });
@@ -688,32 +696,40 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
 
       // Final Appointment Submission for In-Clinic Flow
       if (orderType === "appointment") {
-        try {
-          const appointmentPayload = {
-            user_id: userId,
-            clinic_id: selectedDoctor.clinicId || selectedDoctor.id,
-            doctor_id: docIdToUse,
-            patient_name: user.name || user.owner_name || "Pet Parent",
-            patient_phone: user.phone || user.mobile || user.whatsapp_number || "",
-            pet_name: pet.name || pet.pet_name || "Pet",
-            pet_id: petId,
-            date: selectedDate,
-            time_slot: selectedTimeSlot,
-            amount: totalAmount,
-            currency: "INR",
-            razorpay_payment_id: paymentResult.razorpay_payment_id,
-            razorpay_order_id: paymentResult.razorpay_order_id,
-            razorpay_signature: paymentResult.razorpay_signature,
-            lock_id: lockId
-          };
+        const appointmentPayload = {
+          user_id: userId,
+          clinic_id: selectedDoctor.clinicId || selectedDoctor.id,
+          doctor_id: docIdToUse,
+          patient_name: user.name || user.owner_name || "Pet Parent",
+          patient_phone: user.phone || user.mobile || user.whatsapp_number || "",
+          pet_name: pet.name || pet.pet_name || "Pet",
+          pet_id: petId,
+          date: selectedDate,
+          time_slot: selectedTimeSlot,
+          amount: totalAmount,
+          currency: "INR",
+          razorpay_payment_id: paymentResult.razorpay_payment_id,
+          razorpay_order_id: paymentResult.razorpay_order_id,
+          razorpay_signature: paymentResult.razorpay_signature,
+          lock_id: lockId
+        };
 
-          await fetch(`${API_BASE}/appointments/submit`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: JSON.stringify(appointmentPayload)
-          });
-        } catch (apptErr) {
-          console.warn("Appointment submit call warning (non-blocking):", apptErr);
+        const apptRes = await fetch(`${API_BASE}/appointments/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify(appointmentPayload)
+        });
+        const apptData = await apptRes.json().catch(() => ({}));
+
+        if (!apptRes.ok || apptData?.success === false) {
+          throw new Error(
+            apptData?.message || `Payment successful, but we could not confirm your appointment. Please contact support with Payment ID: ${paymentResult.razorpay_payment_id}`
+          );
+        }
+
+        // Release slot lock after successful booking creation
+        if (lockId) {
+          unlockCurrentSlot(lockId);
         }
       }
 

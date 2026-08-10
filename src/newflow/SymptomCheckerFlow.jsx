@@ -345,13 +345,21 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
         }
       }
 
+function stripBase64Prefix(dataUrl) {
+  if (!dataUrl) return dataUrl;
+  const commaIndex = dataUrl.indexOf(",");
+  return dataUrl.startsWith("data:") && commaIndex !== -1
+    ? dataUrl.slice(commaIndex + 1)
+    : dataUrl;
+}
+
       const isFirstMessage = messages.length === 0;
       const endpoint = isFirstMessage ? "/symptom-check" : "/symptom-followup";
       
       const payload = {
         session_id: currentSessionId,
         message: textToSubmit,
-        image_base64: imgData?.base64 || undefined,
+        image_base64: imgData?.base64 ? stripBase64Prefix(imgData.base64) : undefined,
         image_mime: imgData?.mime || undefined,
       };
 
