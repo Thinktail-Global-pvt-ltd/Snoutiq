@@ -92,6 +92,7 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   const [bookingOrderType, setBookingOrderType] = useState("video_consult");
   const [showImageModal, setShowImageModal] = useState(false);
   const [attachedImage, setAttachedImage] = useState(null);
+  const [previewImageSrc, setPreviewImageSrc] = useState(null);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [petFormPart, setPetFormPart] = useState(1);
   const [pendingFollowUp, setPendingFollowUp] = useState(null);
@@ -305,8 +306,11 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
 
   const handleSubmit = async (e, forcedQuestion = null) => {
     if (e) e.preventDefault();
-    const textToSubmit = forcedQuestion || inputValue.trim();
-    if (!textToSubmit && !attachedImage) return;
+    let textToSubmit = forcedQuestion || inputValue.trim();
+    if (!textToSubmit && attachedImage) {
+      textToSubmit = "Please examine this attached photo of my pet.";
+    }
+    if (!textToSubmit) return;
 
     if (!token) {
       setShowAuthGate(true);
@@ -508,9 +512,29 @@ function stripBase64Prefix(dataUrl) {
             </p>
             <div className="w-full max-w-3xl">
               {attachedImage && (
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm text-blue-700 border border-blue-200">
-                  <ImagePlus size={16} /> Image attached
-                  <button onClick={() => setAttachedImage(null)} className="ml-2 hover:text-blue-900"><X size={16} /></button>
+                <div className="relative inline-block group mb-3">
+                  <div 
+                    onClick={() => setPreviewImageSrc(attachedImage.uri || attachedImage.base64)}
+                    className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group hover:opacity-90 transition-all bg-slate-100"
+                    title="Click to view full photo"
+                  >
+                    <img 
+                      src={attachedImage.uri || attachedImage.base64} 
+                      alt="attached preview" 
+                      className="w-full h-full object-cover" 
+                    />
+                    <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">View</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAttachedImage(null)}
+                    className="absolute -top-2 -right-2 bg-slate-900 hover:bg-red-600 text-white rounded-full p-1 shadow-md transition-colors z-10"
+                    title="Remove photo"
+                  >
+                    <X size={12} />
+                  </button>
                 </div>
               )}
               <form onSubmit={handleSubmit} className="relative flex items-center shadow-lg border border-slate-200 rounded-full bg-white p-2 mb-8">
@@ -525,13 +549,13 @@ function stripBase64Prefix(dataUrl) {
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Describe your pet's symptoms..."
+                  placeholder={attachedImage ? "Describe what is in the photo..." : "Describe your pet's symptoms..."}
                   className="flex-1 bg-transparent px-2 py-3 text-lg outline-none"
                 />
                 <button
                   type="submit"
-                  disabled={(!inputValue.trim() && !attachedImage)}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                  disabled={!inputValue.trim() || loading}
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 transition-colors"
                 >
                   <Send size={20} />
                 </button>
@@ -565,8 +589,12 @@ function stripBase64Prefix(dataUrl) {
                   <div className={`max-w-[85%] ${msg.role === 'user' ? 'rounded-2xl bg-slate-900 text-white rounded-tr-none px-5 py-4' : 'w-full'}`}>
                     
                     {msg.role === 'user' && msg.image && (
-                      <div className="mb-3 rounded-lg overflow-hidden border border-slate-700">
-                        <img src={msg.image} alt="uploaded" className="max-h-48 object-cover" />
+                      <div 
+                        onClick={() => setPreviewImageSrc(msg.image)}
+                        className="mb-3 rounded-2xl overflow-hidden border border-slate-700 cursor-pointer hover:opacity-90 transition-all max-w-xs"
+                        title="Click to view full image"
+                      >
+                        <img src={msg.image} alt="uploaded" className="max-h-48 w-full object-cover" />
                       </div>
                     )}
                     
@@ -640,10 +668,30 @@ function stripBase64Prefix(dataUrl) {
 
             <div className="fixed bottom-0 left-0 right-0 md:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4">
               {attachedImage && (
-                <div className="mx-auto max-w-4xl mb-2 flex">
-                  <div className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-200">
-                    <ImagePlus size={14} /> Image attached
-                    <button onClick={() => setAttachedImage(null)} className="ml-1 hover:text-blue-900"><X size={14} /></button>
+                <div className="mb-2 flex items-center justify-start">
+                  <div className="relative inline-block group">
+                    <div 
+                      onClick={() => setPreviewImageSrc(attachedImage.uri || attachedImage.base64)}
+                      className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group hover:opacity-90 transition-all bg-slate-100"
+                      title="Click to view full photo"
+                    >
+                      <img 
+                        src={attachedImage.uri || attachedImage.base64} 
+                        alt="attached preview" 
+                        className="w-full h-full object-cover" 
+                      />
+                      <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">View</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAttachedImage(null)}
+                      className="absolute -top-2 -right-2 bg-slate-900 hover:bg-red-600 text-white rounded-full p-1 shadow-md transition-colors z-10"
+                      title="Remove photo"
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
                 </div>
               )}
@@ -659,14 +707,14 @@ function stripBase64Prefix(dataUrl) {
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Describe your pet's symptoms..."
+                  placeholder={attachedImage ? "Describe what is in the photo..." : "Describe your pet's symptoms..."}
                   disabled={loading}
                   className="flex-1 bg-transparent px-4 py-2 outline-none disabled:opacity-50 text-slate-900 min-w-0"
                 />
                 <button
                   type="submit"
-                  disabled={(!inputValue.trim() && !attachedImage) || loading}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors shrink-0"
+                  disabled={!inputValue.trim() || loading}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 transition-colors shrink-0"
                 >
                   <Send size={18} />
                 </button>
@@ -718,6 +766,26 @@ function stripBase64Prefix(dataUrl) {
             preSelectedPet={pet}
             orderType={bookingOrderType}
           />
+        )}
+
+        {previewImageSrc && (
+          <ModalShell>
+            <div className="relative max-w-2xl max-h-[85vh] bg-slate-900 rounded-3xl overflow-hidden p-2 shadow-2xl flex flex-col items-center justify-center animate-[scaleIn_0.2s_ease-out]">
+              <button
+                type="button"
+                onClick={() => setPreviewImageSrc(null)}
+                className="absolute top-4 right-4 z-20 bg-black/70 hover:bg-black text-white p-2 rounded-full transition-colors"
+                title="Close preview"
+              >
+                <X size={20} />
+              </button>
+              <img 
+                src={previewImageSrc} 
+                alt="Enlarged photo preview" 
+                className="max-w-full max-h-[75vh] object-contain rounded-2xl" 
+              />
+            </div>
+          </ModalShell>
         )}
       </div>
     </>
