@@ -98,11 +98,49 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   const [pendingFollowUp, setPendingFollowUp] = useState(null);
   
   const messagesEndRef = useRef(null);
-  
-  const authState = readAiAuthState();
+  const [authState, setAuthState] = useState(() => readAiAuthState());
   const token = authState?.token;
   const user = authState?.user || {};
   const pet = user.pet || (user.pets ? user.pets[0] : null) || {};
+
+  useEffect(() => {
+    const handlePetChange = () => {
+      const fresh = readAiAuthState();
+      console.log("🐾 [SymptomCheckerFlow] Auth/Pet State Updated:", fresh?.user?.pet_name);
+      setAuthState(fresh);
+    };
+    const handleOpenModal = () => {
+      setPetFormPart(1);
+      setShowPetModal(true);
+    };
+    window.addEventListener("snoutiq_pet_changed", handlePetChange);
+    window.addEventListener("storage", handlePetChange);
+    window.addEventListener("snoutiq_open_pet_modal", handleOpenModal);
+    return () => {
+      window.removeEventListener("snoutiq_pet_changed", handlePetChange);
+      window.removeEventListener("storage", handlePetChange);
+      window.removeEventListener("snoutiq_open_pet_modal", handleOpenModal);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user && (user.id || user.user_id)) {
+      console.log("%c==========================================", "color: #10b981; font-weight: bold;");
+      console.log("%c🐾 [SAVED AUTH PET DETAILS]:", "color: #10b981; font-weight: bold; font-size: 13px;");
+      console.log("👉 Active Pet ID:", user?.pet_id || pet?.id || pet?.pet_id || "None");
+      console.log("👉 Active Pet Name:", user?.pet_name || pet?.name || pet?.pet_name || "None");
+      console.log("👉 Active Pet Breed:", pet?.breed || user?.breed || "None");
+      console.log("👉 Active Pet Species/Type:", pet?.pet_type || pet?.species || user?.pet_type || "None");
+      console.log("👉 Active Pet Gender:", pet?.pet_gender || pet?.sex || user?.pet_gender || "None");
+      console.log("👉 Active Pet Age / DOB:", pet?.pet_dob || pet?.dob || user?.pet_dob || `Age: ${pet?.pet_age ?? user?.pet_age ?? "None"}`);
+      console.log("👉 Neutered / Spayed Status:", pet?.is_neutered ?? pet?.is_nuetered ?? pet?.neutered ?? "Not set (null)");
+      console.log("👉 Vaccinated Status:", pet?.vaccenated_yes_no ?? pet?.vaccinated ?? "Not set (null)");
+      console.log("👉 Dewormed Status:", pet?.deworming_yes_no ?? pet?.dewormed ?? "Not set (null)");
+      console.log("📦 Full Active Pet Object:", pet);
+      console.log("🐶 All User Pets Array (Total: " + (user?.pets?.length || 0) + "):", user?.pets || []);
+      console.log("%c==========================================", "color: #10b981; font-weight: bold;");
+    }
+  }, [authState]);
 
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
@@ -264,9 +302,11 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   };
 
   const getUserSymptomText = () => {
-    const userMsg = messages.find(m => m.role === "user");
-    if (userMsg && userMsg.text) {
-      return userMsg.text;
+    const userMsgs = messages.filter(m => m.role === "user" && m.text).map(m => m.text);
+    if (userMsgs.length > 0) {
+      const latestMsg = userMsgs[userMsgs.length - 1];
+      localStorage.setItem("symptom_description", latestMsg);
+      return latestMsg;
     }
     const stored = localStorage.getItem("symptom_description");
     if (stored) return stored;
@@ -304,6 +344,15 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
     return cards;
   };
 
+  const isHealthProfileDoneForPet = (petObj) => {
+    if (!petObj) return false;
+    const petId = petObj.id || petObj.pet_id || "active";
+    const perPetKey = `snoutiq_health_profile_completed_${petId}`;
+    if (localStorage.getItem(perPetKey) === "true") return true;
+    if (petObj.health_profile_completed === true || petObj.health_details_filled === true) return true;
+    return false;
+  };
+
   const handleSubmit = async (e, forcedQuestion = null) => {
     if (e) e.preventDefault();
     let textToSubmit = forcedQuestion || inputValue.trim();
@@ -322,12 +371,10 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
       return;
     }
 
-    const hasHealthProfile = localStorage.getItem("snoutiq_health_profile_completed") === "true";
-    const user = authState?.user || {};
-    const primaryPet = user?.pet || (user?.pets ? user.pets[0] : null) || {};
-    const alreadyHasHealthDetails = primaryPet && (primaryPet.is_nuetered !== undefined || primaryPet.vaccenated_yes_no !== undefined || primaryPet.deworming_yes_no !== undefined);
-
-    if (messages.length >= 2 && !hasHealthProfile && !alreadyHasHealthDetails) {
+    const healthDone = isHealthProfileDoneForPet(pet);
+    // Part 2 Modal (Vaccine, Deworming, Neutering) triggers on 2nd chat message (messages.length >= 1)
+    if (messages.length >= 1 && !healthDone) {
+      console.log("➡️ 2nd Chat Message detected. Opening Part 2 Modal (Vaccine, Deworming, Neutering)...");
       setPetFormPart(2);
       setShowPetModal(true);
       return;
@@ -374,7 +421,7 @@ function stripBase64Prefix(dataUrl) {
           owner_name: String(user.name || user.owner_name || "Owner"),
           pet_name: String(pet.name || pet.pet_name || "Pet"),
           breed: String(pet.breed || "Unknown"),
-          dob: String(pet.pet_dob || pet.dob || "2023-01-01").substring(0, 10), // Ensure Y-m-d format
+          dob: String(pet.pet_dob || pet.dob || "2023-01-01").substring(0, 10),
           location: String(user.location || "Unknown"),
           lat: user.lat ? Number(user.lat) : undefined,
           long: (user.long || user.lng) ? Number(user.long || user.lng) : undefined,
@@ -399,7 +446,6 @@ function stripBase64Prefix(dataUrl) {
           pushMessage({ role: "assistant", text: `Validation Error: ${errMessage}` });
           return;
         }
-        // Fallback
         const fallbackData = await callLegacyFallback(textToSubmit, currentSessionId);
         console.log("💬 Legacy fallback chat response:", fallbackData);
         pushMessage({
@@ -434,21 +480,39 @@ function stripBase64Prefix(dataUrl) {
   };
 
   const handleAuthSuccess = () => {
+    console.log("🔐 [Auth Modal Success Callback Fired]");
     setShowAuthGate(false);
     const freshAuth = readAiAuthState();
-    if (!hasUsablePetProfile(freshAuth)) {
+    setAuthState(freshAuth);
+
+    const isUsable = hasUsablePetProfile(freshAuth);
+    console.log("🐶 [Post-Auth Pet Profile Check]:", { isUsable, user: freshAuth?.user });
+    if (!isUsable) {
+      console.log("➡️ Opening Pet Profile Form Modal (Part 1)...");
+      setPetFormPart(1);
       setShowPetModal(true);
     } else {
+      console.log("➡️ Basic Pet Profile exists. Submitting 1st chat message...");
       setPendingSubmit(true);
     }
   };
 
   const handlePetFormComplete = () => {
-    setShowPetModal(false);
+    const freshAuth = readAiAuthState();
+    setAuthState(freshAuth);
+
+    const freshUser = freshAuth?.user || {};
+    const freshPet = freshUser.pet || (freshUser.pets ? freshUser.pets[0] : null) || {};
+    const freshPetId = freshPet?.id || freshPet?.pet_id || "active";
+
     if (petFormPart === 1) {
+      console.log("➡️ Part 1 complete! Closing Modal 1 and submitting 1st chat message...");
+      setShowPetModal(false);
       setPendingSubmit(true);
     } else {
-      localStorage.setItem("snoutiq_health_profile_completed", "true");
+      console.log("➡️ Part 2 Health Details completed for pet:", freshPetId);
+      localStorage.setItem(`snoutiq_health_profile_completed_${freshPetId}`, "true");
+      setShowPetModal(false);
       if (pendingFollowUp) {
         const { questionText, answerText } = pendingFollowUp;
         setPendingFollowUp(null);
@@ -460,12 +524,8 @@ function stripBase64Prefix(dataUrl) {
   };
 
   const handleFollowUpAnswer = async (questionText, answerText) => {
-    const hasHealthProfile = localStorage.getItem("snoutiq_health_profile_completed") === "true";
-    const user = authState?.user || {};
-    const primaryPet = user?.pet || (user?.pets ? user.pets[0] : null) || {};
-    const alreadyHasHealthDetails = primaryPet && (primaryPet.is_nuetered !== undefined || primaryPet.vaccenated_yes_no !== undefined || primaryPet.deworming_yes_no !== undefined);
-
-    if (!hasHealthProfile && !alreadyHasHealthDetails) {
+    const healthDone = isHealthProfileDoneForPet(pet);
+    if (!healthDone) {
       setPetFormPart(2);
       setPendingFollowUp({ questionText, answerText });
       setShowPetModal(true);

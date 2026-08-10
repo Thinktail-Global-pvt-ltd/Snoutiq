@@ -111,9 +111,18 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
   const [searchQuery, setSearchQuery] = useState("");
   
   const [flowStep, setFlowStep] = useState("list"); // "list" | "describe" | "checkout"
-  const [issueText, setIssueText] = useState(symptomText || "");
+  const [issueText, setIssueText] = useState(() => symptomText || localStorage.getItem("symptom_description") || "");
   const [attachedImages, setAttachedImages] = useState([]);
   const [consentGiven, setConsentGiven] = useState(false);
+
+  useEffect(() => {
+    if (symptomText && symptomText !== issueText) {
+      setIssueText(symptomText);
+    } else if (!issueText) {
+      const stored = localStorage.getItem("symptom_description");
+      if (stored) setIssueText(stored);
+    }
+  }, [symptomText]);
   
   // Appointment Flow Specific States
   const [selectedDate, setSelectedDate] = useState("");

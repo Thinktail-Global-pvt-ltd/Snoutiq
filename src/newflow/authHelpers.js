@@ -62,14 +62,6 @@ export const hasUsablePetProfile = (authState) => {
       ? user.pets[0]
       : null;
 
-  const registrationFlag =
-    normalizeBoolean(authState?.registrationComplete) ||
-    normalizeBoolean(user?.registrationComplete) ||
-    normalizeBoolean(user?.registration_complete) ||
-    normalizeBoolean(user?.profileCompleted);
-
-  if (registrationFlag) return true;
-
   const petName = String(
     primaryPet?.name ?? primaryPet?.pet_name ?? user?.pet_name ?? ""
   ).trim();
@@ -78,7 +70,10 @@ export const hasUsablePetProfile = (authState) => {
     user?.pet_owner_name ?? user?.owner_name ?? user?.name ?? ""
   );
 
-  return Boolean(petName && ownerName);
+  const isUsable = Boolean(petName && ownerName);
+  console.log("📋 [hasUsablePetProfile Check]:", { petName, ownerName, user_id: user?.id || user?.user_id, pet_id: user?.pet_id || primaryPet?.id, isUsable });
+
+  return isUsable;
 };
 
 export const submitIntakeForm = async (form) => {

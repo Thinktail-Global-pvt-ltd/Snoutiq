@@ -791,6 +791,7 @@ const [locationUpdatedAt, setLocationUpdatedAt] = useState(
   }, [form]);
 
   useEffect(() => {
+    if (isModal) return;
     const authState = readAiAuthState();
 
     if (hasUsablePetProfile(authState)) {
@@ -805,7 +806,7 @@ const [locationUpdatedAt, setLocationUpdatedAt] = useState(
         );
       }
     }
-  }, [onComplete]);
+  }, [onComplete, isModal]);
 
 useEffect(() => {
   const authState = readAiAuthState();

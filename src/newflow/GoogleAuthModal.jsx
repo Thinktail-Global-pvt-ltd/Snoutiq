@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
-import { buildAiUserData, persistAiAuthState } from "../ai/AiAuth";
+import { buildAiUserData, persistAiAuthState, readAiAuthState } from "../ai/AiAuth";
 import logo from '../assets/images/logo.png';
 
 const API_CONFIG = {
@@ -36,6 +36,7 @@ const decodeJwt = (token) => {
 export default function GoogleAuthModal({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [loginCompleted, setLoginCompleted] = useState(false);
 
   const processGoogleLogin = async (googleToken) => {
     setLoading(true);
@@ -52,8 +53,15 @@ export default function GoogleAuthModal({ onLoginSuccess }) {
       const responseData = response.data || {};
       console.log("🔑 Google Login API Response:", responseData);
       const userData = responseData.user || responseData.data?.user || null;
-      const pets = responseData.pets || responseData.data?.pets || [];
-      const primaryPet = Array.isArray(pets) && pets.length ? pets[0] : null;
+      const existingUser = readAiAuthState()?.user || {};
+      const existingPet = existingUser?.pet || (Array.isArray(existingUser?.pets) && existingUser.pets.length > 0 ? existingUser.pets[0] : null);
+
+      const apiPets = responseData.pets || responseData.data?.pets || [];
+      const pets = (Array.isArray(apiPets) && apiPets.length > 0) 
+        ? apiPets 
+        : (existingUser?.pets?.length > 0 ? existingUser.pets : (existingPet ? [existingPet] : []));
+      const primaryPet = (Array.isArray(pets) && pets.length) ? pets[0] : existingPet;
+      
       const latestChat = responseData.latest_chat || responseData.data?.latest_chat || null;
       const latestCallSession = responseData.latest_call_session || responseData.data?.latest_call_session || null;
 
@@ -71,15 +79,16 @@ export default function GoogleAuthModal({ onLoginSuccess }) {
       }
 
       const mergedPetData = primaryPet ? {
-        pet_name: primaryPet.name || userData?.pet_name,
-        pet_gender: primaryPet.pet_gender || userData?.pet_gender,
-        breed: primaryPet.breed || userData?.breed,
-        pet_age: primaryPet.pet_age ?? userData?.pet_age,
-        pet_doc1: primaryPet.pet_doc1 || userData?.pet_doc1,
-        pet_doc2: primaryPet.pet_doc2 || userData?.pet_doc2,
+        pet_name: primaryPet.name || primaryPet.pet_name || userData?.pet_name || existingUser?.pet_name,
+        pet_gender: primaryPet.pet_gender || userData?.pet_gender || existingUser?.pet_gender,
+        breed: primaryPet.breed || userData?.breed || existingUser?.breed,
+        pet_age: primaryPet.pet_age ?? userData?.pet_age ?? existingUser?.pet_age,
+        pet_doc1: primaryPet.pet_doc1 || userData?.pet_doc1 || existingUser?.pet_doc1,
+        pet_doc2: primaryPet.pet_doc2 || userData?.pet_doc2 || existingUser?.pet_doc2,
       } : {};
 
       const finalUserData = buildAiUserData({
+        ...existingUser,
         ...(userData || {}),
         ...mergedPetData,
         id: rawUserId,
@@ -101,12 +110,12 @@ export default function GoogleAuthModal({ onLoginSuccess }) {
       });
 
       console.log("👤 Saved User Data (Google):", finalUserData);
+      setLoginCompleted(true);
       if (typeof onLoginSuccess === "function") {
-        await onLoginSuccess(finalUserData, authToken);
+        onLoginSuccess(finalUserData, authToken);
       }
     } catch (err) {
       setError(err?.response?.data?.message || err.message || "An unexpected error occurred");
-    } finally {
       setLoading(false);
     }
   };
@@ -127,22 +136,19 @@ export default function GoogleAuthModal({ onLoginSuccess }) {
         </div>
       )}
 
-      {loading ? (
+      {(loading || loginCompleted) ? (
         <div className="py-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-sm text-slate-500">Signing you in...</p>
         </div>
       ) : (
-        <GoogleOAuthProvider clientId="325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError("Google Login Failed")}
-            useOneTap
-            shape="rectangular"
-            size="large"
-            theme="outline"
-          />
-        </GoogleOAuthProvider>
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => setError("Google Login Failed")}
+          shape="rectangular"
+          size="large"
+          theme="outline"
+        />
       )}
       
       <p className="mt-8 text-xs text-slate-400">

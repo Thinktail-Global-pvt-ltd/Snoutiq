@@ -113,22 +113,38 @@ export default function UserDetailsOtpModal({ onClose, onComplete }) {
 
       // Auth state update — naya name/number save karo taaki dobara na maange
       const userData = data.user || data.data?.user || {};
+      const existingPet = existingUser?.pet || (Array.isArray(existingUser?.pets) && existingUser.pets.length > 0 ? existingUser.pets[0] : null);
       const returnedPetId = data.pet_id || data.pet?.id || data.data?.pet_id || data.data?.pet?.id || userData.pet_id || (userData.pets && userData.pets[0] && (userData.pets[0].id || userData.pets[0].pet_id));
+      
+      const apiPets = userData.pets || data.pets || data.data?.pets;
+      const finalPets = (Array.isArray(apiPets) && apiPets.length > 0)
+        ? apiPets
+        : (existingUser?.pets?.length > 0 ? existingUser.pets : (existingPet ? [existingPet] : []));
+      const finalPet = (Array.isArray(finalPets) && finalPets.length > 0)
+        ? finalPets[0]
+        : existingPet;
+
+      console.log("🔑 [OTP Verification Response]:", data);
+      console.log("🐶 [OTP Pet Preservation]:", { existingPet, apiPets, finalPet, finalPets, returnedPetId });
+
       const updatedUser = {
         ...existingUser,
         ...userData,
+        ...(finalPet ? { pet: finalPet } : {}),
+        ...(finalPets.length > 0 ? { pets: finalPets } : {}),
         name: name.trim(),
         owner_name: name.trim(),
         phone: normalizePhone(whatsappNumber),
         mobile: normalizePhone(whatsappNumber),
         whatsapp_number: normalizePhone(whatsappNumber),
         whatsapp_verified: true,
-        ...(returnedPetId ? { pet_id: returnedPetId } : {}),
+        pet_name: finalPet?.name || finalPet?.pet_name || existingUser?.pet_name || "",
+        pet_id: returnedPetId || finalPet?.id || finalPet?.pet_id || existingUser?.pet_id || "",
       };
 
       const nextToken = data.token || data.jwt || data.access_token || data.data?.token || token;
 
-      console.log("👤 Saved User Data (OTP):", updatedUser);
+      console.log("👤 [Saved User Data (OTP Success)]:", updatedUser);
       persistAiAuthState({
         user: updatedUser,
         token: nextToken,
