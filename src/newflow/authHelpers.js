@@ -71,8 +71,6 @@ export const hasUsablePetProfile = (authState) => {
   );
 
   const isUsable = Boolean(petName && ownerName);
-  console.log("📋 [hasUsablePetProfile Check]:", { petName, ownerName, user_id: user?.id || user?.user_id, pet_id: user?.pet_id || primaryPet?.id, isUsable });
-
   return isUsable;
 };
 

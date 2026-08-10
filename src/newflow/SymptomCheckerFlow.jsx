@@ -106,7 +106,6 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   useEffect(() => {
     const handlePetChange = () => {
       const fresh = readAiAuthState();
-      console.log("🐾 [SymptomCheckerFlow] Auth/Pet State Updated:", fresh?.user?.pet_name);
       setAuthState(fresh);
     };
     const handleOpenModal = () => {
@@ -122,25 +121,6 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
       window.removeEventListener("snoutiq_open_pet_modal", handleOpenModal);
     };
   }, []);
-
-  useEffect(() => {
-    if (user && (user.id || user.user_id)) {
-      console.log("%c==========================================", "color: #10b981; font-weight: bold;");
-      console.log("%c🐾 [SAVED AUTH PET DETAILS]:", "color: #10b981; font-weight: bold; font-size: 13px;");
-      console.log("👉 Active Pet ID:", user?.pet_id || pet?.id || pet?.pet_id || "None");
-      console.log("👉 Active Pet Name:", user?.pet_name || pet?.name || pet?.pet_name || "None");
-      console.log("👉 Active Pet Breed:", pet?.breed || user?.breed || "None");
-      console.log("👉 Active Pet Species/Type:", pet?.pet_type || pet?.species || user?.pet_type || "None");
-      console.log("👉 Active Pet Gender:", pet?.pet_gender || pet?.sex || user?.pet_gender || "None");
-      console.log("👉 Active Pet Age / DOB:", pet?.pet_dob || pet?.dob || user?.pet_dob || `Age: ${pet?.pet_age ?? user?.pet_age ?? "None"}`);
-      console.log("👉 Neutered / Spayed Status:", pet?.is_neutered ?? pet?.is_nuetered ?? pet?.neutered ?? "Not set (null)");
-      console.log("👉 Vaccinated Status:", pet?.vaccenated_yes_no ?? pet?.vaccinated ?? "Not set (null)");
-      console.log("👉 Dewormed Status:", pet?.deworming_yes_no ?? pet?.dewormed ?? "Not set (null)");
-      console.log("📦 Full Active Pet Object:", pet);
-      console.log("🐶 All User Pets Array (Total: " + (user?.pets?.length || 0) + "):", user?.pets || []);
-      console.log("%c==========================================", "color: #10b981; font-weight: bold;");
-    }
-  }, [authState]);
 
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];

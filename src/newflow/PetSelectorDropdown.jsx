@@ -71,7 +71,6 @@ export default function PetSelectorDropdown({ onAddNewPet }) {
       pet_dob: pet.pet_dob || pet.dob || user.pet_dob,
     };
 
-    console.log("🐾 [PetSelector] Selected Pet:", pet.name || pet.pet_name, pet);
     persistAiAuthState({ user: nextUser, token: authState.token });
     window.dispatchEvent(new Event("snoutiq_pet_changed"));
     setIsOpen(false);

@@ -51,7 +51,6 @@ export default function GoogleAuthModal({ onLoginSuccess }) {
 
       const response = await apiClient.post(API_CONFIG.endpoints.googleLogin, payload);
       const responseData = response.data || {};
-      console.log("🔑 Google Login API Response:", responseData);
       const userData = responseData.user || responseData.data?.user || null;
       const existingUser = readAiAuthState()?.user || {};
       const existingPet = existingUser?.pet || (Array.isArray(existingUser?.pets) && existingUser.pets.length > 0 ? existingUser.pets[0] : null);
@@ -109,7 +108,6 @@ export default function GoogleAuthModal({ onLoginSuccess }) {
         latestCallSession,
       });
 
-      console.log("👤 Saved User Data (Google):", finalUserData);
       setLoginCompleted(true);
       if (typeof onLoginSuccess === "function") {
         onLoginSuccess(finalUserData, authToken);
