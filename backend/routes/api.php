@@ -907,6 +907,11 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             'distance_km' => $distance,
             'google_rating' => $rating,
             'google_user_ratings_total' => $ratingsCount,
+            'clinic_services' => $clinicServices->map(function ($service) {
+                $serviceData = (array) $service;
+                unset($serviceData['machinery_image_blob']);
+                return $serviceData;
+            })->all(),
             'clinic_image' => $clinic_image_url,
             'clinic_image_url' => $clinic_image_url,
             'clinic_video' => $clinic_video_url,
@@ -3213,6 +3218,13 @@ Route::get('/users/last-vet-details', function (Request $request) {
         }
     }
 
+    $clinicServices = collect();
+    if (Schema::hasTable('groomer_services')) {
+        $clinicServices = DB::table('groomer_services')
+            ->where('user_id', $clinic->id)
+            ->get();
+    }
+
     $clinicData = $clinic->toArray();
     $clinicData['clinic_image'] = empty($clinic->clinic_image)
         ? null
@@ -3224,6 +3236,11 @@ Route::get('/users/last-vet-details', function (Request $request) {
     $clinicData['clinic_video_url'] = $clinicData['clinic_video'];
     $clinicData['google_rating'] = $rating;
     $clinicData['google_user_ratings_total'] = $ratingsCount;
+    $clinicData['clinic_services'] = $clinicServices->map(function ($service) {
+        $serviceData = (array) $service;
+        unset($serviceData['machinery_image_blob']);
+        return $serviceData;
+    })->all();
 
     return response()->json([
         'success' => true,

@@ -646,6 +646,14 @@ class LeadManagementTimelineTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        // Insert groomer service for Review Clinic
+        DB::table('groomer_services')->insert([
+            'user_id' => $clinicId,
+            'main_service' => 'Grooming',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $userId = DB::table('users')->insertGetId([
             'name' => 'Pet Parent',
             'email' => 'parent@example.com',
@@ -659,6 +667,8 @@ class LeadManagementTimelineTest extends TestCase
         $responseLastVet->assertOk();
         $this->assertEquals(4.7, $responseLastVet->json('data.clinic.google_rating'));
         $this->assertEquals(99, $responseLastVet->json('data.clinic.google_user_ratings_total'));
+        $this->assertNotEmpty($responseLastVet->json('data.clinic.clinic_services'));
+        $this->assertEquals('Grooming', $responseLastVet->json('data.clinic.clinic_services.0.main_service'));
 
         // Seed doctor for this clinic to show in /inclinic-lists-new-after-10th-may-registerations
         DB::table('doctors')->insert([
@@ -677,6 +687,8 @@ class LeadManagementTimelineTest extends TestCase
         $this->assertNotNull($clinicResult);
         $this->assertEquals(4.7, $clinicResult['google_rating']);
         $this->assertEquals(99, $clinicResult['google_user_ratings_total']);
+        $this->assertNotEmpty($clinicResult['clinic_services']);
+        $this->assertEquals('Grooming', $clinicResult['clinic_services'][0]['main_service']);
     }
 
     public function test_clinic_details_endpoint_rating_and_caching(): void
