@@ -998,6 +998,9 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
     $nowIst = \Illuminate\Support\Carbon::now('Asia/Kolkata');
     $currentDayOfWeek = (int) $nowIst->dayOfWeek;
 
+    $lat = $request->filled('lat') ? (float) $request->input('lat') : ($request->filled('latitude') ? (float) $request->input('latitude') : null);
+    $lng = $request->filled('lng') ? (float) $request->input('lng') : ($request->filled('longitude') ? (float) $request->input('longitude') : null);
+
     $availableDoctorIds = collect([$alwaysAvailableDoctorId]);
 
     if (Schema::hasTable('doctor_video_availability')) {
@@ -1013,6 +1016,7 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
     }
 
     $doctorsQuery = Doctor::query()
+        ->with('clinic')
         ->whereIn('id', $availableDoctorIds->all())
         ->where(function ($q) use ($alwaysAvailableDoctorId) {
             $q->where('exported_from_excell', 1)
@@ -1032,14 +1036,78 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
         ], 404);
     }
 
-    $formatted = $doctors->map(function (Doctor $doctor) {
+    $formatted = $doctors->map(function (Doctor $doctor) use ($lat, $lng) {
         $item = $doctor->toArray();
         $item['doctor_image_blob_url'] = empty($doctor->doctor_image_blob)
             ? null
             : route('api.doctors.blob-image', ['doctor' => $doctor->id]);
 
+        $item['clinic_name'] = null;
+        $item['clinic_address'] = null;
+        $item['clinic_lat'] = null;
+        $item['clinic_lng'] = null;
+        $item['google_rating'] = null;
+        $item['google_user_ratings_total'] = null;
+        $item['distance_km'] = null;
+
+        $clinic = $doctor->clinic; // VetRegisterationTemp
+        if ($clinic) {
+            $item['clinic_name'] = $clinic->name;
+            $item['clinic_address'] = $clinic->address;
+            $item['clinic_lat'] = $clinic->lat !== null ? (float) $clinic->lat : null;
+            $item['clinic_lng'] = $clinic->lng !== null ? (float) $clinic->lng : null;
+
+            $rating = $clinic->rating !== null ? (float) $clinic->rating : null;
+            $ratingsCount = $clinic->user_ratings_total !== null ? (int) $clinic->user_ratings_total : null;
+
+            // If rating is missing but we have a place_id, query Google Places and cache in DB
+            if ($rating === null && !empty($clinic->place_id)) {
+                try {
+                    $placesService = app(\App\Services\GooglePlacesLookupService::class);
+                    $details = $placesService->placeDetails($clinic->place_id);
+                    if (!empty($details['success']) && isset($details['place']['rating'])) {
+                        $rating = (float) $details['place']['rating'];
+                        $ratingsCount = isset($details['place']['user_ratings_total']) ? (int) $details['place']['user_ratings_total'] : 0;
+
+                        // Save cache to database
+                        $clinic->rating = $rating;
+                        $clinic->user_ratings_total = $ratingsCount;
+                        $clinic->save();
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('google_rating_fetch_failed_for_excell_doctor', [
+                        'clinic_id' => $clinic->id,
+                        'place_id' => $clinic->place_id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            $item['google_rating'] = $rating;
+            $item['google_user_ratings_total'] = $ratingsCount;
+
+            if ($lat !== null && $lng !== null && $clinic->lat !== null && $clinic->lng !== null) {
+                $earthRadius = 6371.0;
+                $dLat = deg2rad((float)$clinic->lat - $lat);
+                $dLon = deg2rad((float)$clinic->lng - $lng);
+                $a = sin($dLat / 2) * sin($dLat / 2) +
+                     cos(deg2rad($lat)) * cos(deg2rad((float)$clinic->lat)) *
+                     sin($dLon / 2) * sin($dLon / 2);
+                $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+                $item['distance_km'] = round($earthRadius * $c, 2);
+            }
+        }
+
         return $item;
-    })->values();
+    });
+
+    if ($lat !== null && $lng !== null) {
+        $formatted = $formatted->sortBy(function ($item) {
+            return $item['distance_km'] === null ? INF : $item['distance_km'];
+        });
+    }
+
+    $formatted = $formatted->values();
 
     if ($doctorId !== '') {
         return response()->json([

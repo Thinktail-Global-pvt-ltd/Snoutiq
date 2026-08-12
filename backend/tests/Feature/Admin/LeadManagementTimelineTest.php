@@ -26,6 +26,28 @@ class LeadManagementTimelineTest extends TestCase
         Schema::dropIfExists('doctors');
         Schema::dropIfExists('users');
         Schema::dropIfExists('otps');
+        Schema::dropIfExists('vet_registerations_temp');
+        Schema::dropIfExists('doctor_video_availability');
+
+        Schema::create('vet_registerations_temp', function (Blueprint $table): void {
+            $table->id();
+            $table->string('name')->nullable();
+            $table->string('address')->nullable();
+            $table->string('place_id')->nullable();
+            $table->decimal('lat', 10, 8)->nullable();
+            $table->decimal('lng', 11, 8)->nullable();
+            $table->decimal('rating', 3, 2)->nullable();
+            $table->integer('user_ratings_total')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('doctor_video_availability', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('doctor_id')->index();
+            $table->integer('day_of_week');
+            $table->integer('is_active')->default(0);
+            $table->timestamps();
+        });
 
         Schema::create('otps', function (Blueprint $table): void {
             $table->id();
@@ -511,5 +533,81 @@ class LeadManagementTimelineTest extends TestCase
         $this->assertNotNull($oscarPet);
         $this->assertEquals('German Shepherd', $oscarPet->breed);
         $this->assertEquals('dog', $oscarPet->pet_type);
+    }
+
+    public function test_exported_from_excell_doctors_rating_and_sorting(): void
+    {
+        // 1. Setup doctor video availability table
+        if (Schema::hasTable('doctor_video_availability')) {
+            DB::table('doctor_video_availability')->truncate();
+        }
+
+        // Create 2 clinics
+        $clinicFar = DB::table('vet_registerations_temp')->insertGetId([
+            'name' => 'Far Clinic',
+            'address' => 'Far Address',
+            'lat' => 28.6139, // Delhi
+            'lng' => 77.2090,
+            'rating' => 4.5,
+            'user_ratings_total' => 120,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $clinicNear = DB::table('vet_registerations_temp')->insertGetId([
+            'name' => 'Near Clinic',
+            'address' => 'Near Address',
+            'lat' => 26.2185, // Close to Gwalior (26.2181)
+            'lng' => 78.2246,
+            'rating' => 4.9,
+            'user_ratings_total' => 250,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Create 2 Doctors
+        $doctorFarId = DB::table('doctors')->insertGetId([
+            'doctor_name' => 'Dr. Far',
+            'vet_registeration_id' => $clinicFar,
+            'exported_from_excell' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $doctorNearId = DB::table('doctors')->insertGetId([
+            'doctor_name' => 'Dr. Near',
+            'vet_registeration_id' => $clinicNear,
+            'exported_from_excell' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $currentDayOfWeek = (int) \Illuminate\Support\Carbon::now('Asia/Kolkata')->dayOfWeek;
+        if (Schema::hasTable('doctor_video_availability')) {
+            DB::table('doctor_video_availability')->insert([
+                ['doctor_id' => $doctorFarId, 'day_of_week' => $currentDayOfWeek, 'is_active' => 1],
+                ['doctor_id' => $doctorNearId, 'day_of_week' => $currentDayOfWeek, 'is_active' => 1],
+            ]);
+        }
+
+        // Hit route without coordinates
+        $responseNoCoords = $this->getJson('/api/exported_from_excell_doctors');
+        $responseNoCoords->assertOk();
+        $dataNoCoords = $responseNoCoords->json('data');
+
+        // Locate far doctor entry
+        $farDoctorResult = collect($dataNoCoords)->firstWhere('id', $doctorFarId);
+        $this->assertEquals('Far Clinic', $farDoctorResult['clinic_name']);
+        $this->assertEquals(4.5, $farDoctorResult['google_rating']);
+        $this->assertEquals(120, $farDoctorResult['google_user_ratings_total']);
+
+        // Hit route with Gwalior coordinates -> Near Doctor should sort first
+        $responseWithCoords = $this->getJson('/api/exported_from_excell_doctors?lat=26.2181&lng=78.2245');
+        $responseWithCoords->assertOk();
+        $dataWithCoords = $responseWithCoords->json('data');
+
+        $this->assertEquals($doctorNearId, $dataWithCoords[0]['id']); // Near Doctor is first
+        $this->assertEquals($doctorFarId, $dataWithCoords[1]['id']); // Far Doctor is second
+        $this->assertLessThan($dataWithCoords[1]['distance_km'], $dataWithCoords[0]['distance_km']);
     }
 }
