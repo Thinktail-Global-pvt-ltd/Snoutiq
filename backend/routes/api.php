@@ -843,12 +843,40 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             }
         }
 
+        $rating = $clinic->rating !== null ? (float) $clinic->rating : null;
+        $ratingsCount = $clinic->user_ratings_total !== null ? (int) $clinic->user_ratings_total : null;
+
+        // If rating is missing but we have a place_id, query Google Places and cache in DB
+        if ($rating === null && !empty($clinic->place_id)) {
+            try {
+                $placesService = app(\App\Services\GooglePlacesLookupService::class);
+                $details = $placesService->placeDetails($clinic->place_id);
+                if (!empty($details['success']) && isset($details['place']['rating'])) {
+                    $rating = (float) $details['place']['rating'];
+                    $ratingsCount = isset($details['place']['user_ratings_total']) ? (int) $details['place']['user_ratings_total'] : 0;
+
+                    // Save cache to database
+                    $clinic->rating = $rating;
+                    $clinic->user_ratings_total = $ratingsCount;
+                    $clinic->save();
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('google_rating_fetch_failed_for_inclinic_lists_new', [
+                    'clinic_id' => $clinic->id,
+                    'place_id' => $clinic->place_id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
         return [
             'id' => (int) $clinic->id,
             'name' => $clinic->name ?? 'Unnamed Clinic',
             'city' => $clinic->city ?? '—',
             'pincode' => $clinic->pincode ?? null,
             'distance_km' => $distance,
+            'google_rating' => $rating,
+            'google_user_ratings_total' => $ratingsCount,
             'clinic_image' => $clinic_image_url,
             'clinic_image_url' => $clinic_image_url,
             'clinic_video' => $clinic_video_url,
@@ -3051,6 +3079,31 @@ Route::get('/users/last-vet-details', function (Request $request) {
         })
         ->values();
 
+    $rating = $clinic->rating !== null ? (float) $clinic->rating : null;
+    $ratingsCount = $clinic->user_ratings_total !== null ? (int) $clinic->user_ratings_total : null;
+
+    if ($rating === null && !empty($clinic->place_id)) {
+        try {
+            $placesService = app(\App\Services\GooglePlacesLookupService::class);
+            $details = $placesService->placeDetails($clinic->place_id);
+            if (!empty($details['success']) && isset($details['place']['rating'])) {
+                $rating = (float) $details['place']['rating'];
+                $ratingsCount = isset($details['place']['user_ratings_total']) ? (int) $details['place']['user_ratings_total'] : 0;
+
+                // Save cache to database
+                $clinic->rating = $rating;
+                $clinic->user_ratings_total = $ratingsCount;
+                $clinic->save();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('google_rating_fetch_failed_for_last_vet_details', [
+                'clinic_id' => $clinic->id,
+                'place_id' => $clinic->place_id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
     $clinicData = $clinic->toArray();
     $clinicData['clinic_image'] = empty($clinic->clinic_image)
         ? null
@@ -3060,6 +3113,8 @@ Route::get('/users/last-vet-details', function (Request $request) {
         ? null
         : route('clinics.media.video', ['clinic' => $clinic->id]);
     $clinicData['clinic_video_url'] = $clinicData['clinic_video'];
+    $clinicData['google_rating'] = $rating;
+    $clinicData['google_user_ratings_total'] = $ratingsCount;
 
     return response()->json([
         'success' => true,

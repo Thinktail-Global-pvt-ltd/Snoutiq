@@ -28,6 +28,14 @@ class LeadManagementTimelineTest extends TestCase
         Schema::dropIfExists('otps');
         Schema::dropIfExists('vet_registerations_temp');
         Schema::dropIfExists('doctor_video_availability');
+        Schema::dropIfExists('groomer_services');
+
+        Schema::create('groomer_services', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->index();
+            $table->string('main_service')->nullable();
+            $table->timestamps();
+        });
 
         Schema::create('vet_registerations_temp', function (Blueprint $table): void {
             $table->id();
@@ -84,6 +92,9 @@ class LeadManagementTimelineTest extends TestCase
             $table->string('password')->nullable();
             $table->string('google_token')->nullable();
             $table->string('role')->nullable();
+            $table->unsignedBigInteger('last_vet_id')->nullable()->index();
+            $table->string('latitude')->nullable();
+            $table->string('longitude')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -609,5 +620,52 @@ class LeadManagementTimelineTest extends TestCase
         $this->assertEquals($doctorNearId, $dataWithCoords[0]['id']); // Near Doctor is first
         $this->assertEquals($doctorFarId, $dataWithCoords[1]['id']); // Far Doctor is second
         $this->assertLessThan($dataWithCoords[1]['distance_km'], $dataWithCoords[0]['distance_km']);
+    }
+
+    public function test_last_vet_details_and_inclinic_lists_ratings(): void
+    {
+        // Create user with last_vet_id
+        $clinicId = DB::table('vet_registerations_temp')->insertGetId([
+            'name' => 'Review Clinic',
+            'address' => 'Gwalior Center',
+            'lat' => 26.2181,
+            'lng' => 78.2245,
+            'rating' => 4.7,
+            'user_ratings_total' => 99,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $userId = DB::table('users')->insertGetId([
+            'name' => 'Pet Parent',
+            'email' => 'parent@example.com',
+            'last_vet_id' => $clinicId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Hit /users/last-vet-details
+        $responseLastVet = $this->getJson("/api/users/last-vet-details?user_id={$userId}");
+        $responseLastVet->assertOk();
+        $this->assertEquals(4.7, $responseLastVet->json('data.clinic.google_rating'));
+        $this->assertEquals(99, $responseLastVet->json('data.clinic.google_user_ratings_total'));
+
+        // Seed doctor for this clinic to show in /inclinic-lists-new-after-10th-may-registerations
+        DB::table('doctors')->insert([
+            'vet_registeration_id' => $clinicId,
+            'doctor_name' => 'Dr. Reviewer',
+            'exported_from_excell' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Hit /inclinic-lists-new-after-10th-may-registerations
+        $responseInClinic = $this->getJson('/api/inclinic-lists-new-after-10th-may-registerations?from_date=2026-05-10');
+        $responseInClinic->assertOk();
+        
+        $clinicResult = collect($responseInClinic->json('data'))->firstWhere('id', $clinicId);
+        $this->assertNotNull($clinicResult);
+        $this->assertEquals(4.7, $clinicResult['google_rating']);
+        $this->assertEquals(99, $clinicResult['google_user_ratings_total']);
     }
 }
