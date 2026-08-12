@@ -576,6 +576,14 @@ class LeadManagementTimelineTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        // Insert groomer service for Far Clinic
+        DB::table('groomer_services')->insert([
+            'user_id' => $clinicFar,
+            'main_service' => 'Vaccination',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         // Create 2 Doctors
         $doctorFarId = DB::table('doctors')->insertGetId([
             'doctor_name' => 'Dr. Far',
@@ -611,6 +619,8 @@ class LeadManagementTimelineTest extends TestCase
         $this->assertEquals('Far Clinic', $farDoctorResult['clinic_name']);
         $this->assertEquals(4.5, $farDoctorResult['google_rating']);
         $this->assertEquals(120, $farDoctorResult['google_user_ratings_total']);
+        $this->assertNotEmpty($farDoctorResult['clinic_services']);
+        $this->assertEquals('Vaccination', $farDoctorResult['clinic_services'][0]['main_service']);
 
         // Hit route with Gwalior coordinates -> Near Doctor should sort first
         $responseWithCoords = $this->getJson('/api/exported_from_excell_doctors?lat=26.2181&lng=78.2245');

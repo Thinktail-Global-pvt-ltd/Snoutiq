@@ -1094,7 +1094,16 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
         ], 404);
     }
 
-    $formatted = $doctors->map(function (Doctor $doctor) use ($lat, $lng) {
+    $clinicIds = $doctors->pluck('vet_registeration_id')->filter()->unique()->all();
+    $servicesByClinic = collect();
+    if (!empty($clinicIds) && Schema::hasTable('groomer_services')) {
+        $servicesByClinic = DB::table('groomer_services')
+            ->whereIn('user_id', $clinicIds)
+            ->get()
+            ->groupBy('user_id');
+    }
+
+    $formatted = $doctors->map(function (Doctor $doctor) use ($lat, $lng, $servicesByClinic) {
         $item = $doctor->toArray();
         $item['doctor_image_blob_url'] = empty($doctor->doctor_image_blob)
             ? null
@@ -1107,9 +1116,17 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
         $item['google_rating'] = null;
         $item['google_user_ratings_total'] = null;
         $item['distance_km'] = null;
+        $item['clinic_services'] = [];
 
         $clinic = $doctor->clinic; // VetRegisterationTemp
         if ($clinic) {
+            $clinicServices = $servicesByClinic->get($clinic->id, collect());
+            $item['clinic_services'] = $clinicServices->map(function ($service) {
+                $serviceData = (array) $service;
+                unset($serviceData['machinery_image_blob']);
+                return $serviceData;
+            })->all();
+
             $item['clinic_name'] = $clinic->name;
             $item['clinic_address'] = $clinic->address;
             $item['clinic_lat'] = $clinic->lat !== null ? (float) $clinic->lat : null;
