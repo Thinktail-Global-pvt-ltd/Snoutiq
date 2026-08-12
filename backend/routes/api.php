@@ -846,6 +846,36 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
         $rating = $clinic->rating !== null ? (float) $clinic->rating : null;
         $ratingsCount = $clinic->user_ratings_total !== null ? (int) $clinic->user_ratings_total : null;
 
+        // If rating is missing and place_id is empty, use text search to find clinic
+        if ($rating === null && empty($clinic->place_id) && !empty($clinic->name)) {
+            try {
+                $placesService = app(\App\Services\GooglePlacesLookupService::class);
+                $found = $placesService->findPlaceByNameAndLocation($clinic->name, $clinic->city ?? $clinic->address);
+                if ($found) {
+                    $rating = $found['rating'];
+                    $ratingsCount = $found['user_ratings_total'];
+
+                    // Save cache to database
+                    $clinic->place_id = $found['place_id'];
+                    $clinic->rating = $rating;
+                    $clinic->user_ratings_total = $ratingsCount;
+                    if (empty($clinic->lat) && !empty($found['lat'])) {
+                        $clinic->lat = $found['lat'];
+                    }
+                    if (empty($clinic->lng) && !empty($found['lng'])) {
+                        $clinic->lng = $found['lng'];
+                    }
+                    $clinic->save();
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('google_places_text_search_failed_for_inclinic_lists_new', [
+                    'clinic_id' => $clinic->id,
+                    'clinic_name' => $clinic->name,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
         // If rating is missing but we have a place_id, query Google Places and cache in DB
         if ($rating === null && !empty($clinic->place_id)) {
             try {
@@ -1087,6 +1117,38 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
 
             $rating = $clinic->rating !== null ? (float) $clinic->rating : null;
             $ratingsCount = $clinic->user_ratings_total !== null ? (int) $clinic->user_ratings_total : null;
+
+            // If rating is missing and place_id is empty, use text search to find clinic
+            if ($rating === null && empty($clinic->place_id) && !empty($clinic->name)) {
+                try {
+                    $placesService = app(\App\Services\GooglePlacesLookupService::class);
+                    $found = $placesService->findPlaceByNameAndLocation($clinic->name, $clinic->city ?? $clinic->address);
+                    if ($found) {
+                        $rating = $found['rating'];
+                        $ratingsCount = $found['user_ratings_total'];
+
+                        // Save cache to database
+                        $clinic->place_id = $found['place_id'];
+                        $clinic->rating = $rating;
+                        $clinic->user_ratings_total = $ratingsCount;
+                        if (empty($clinic->lat) && !empty($found['lat'])) {
+                            $clinic->lat = $found['lat'];
+                            $item['clinic_lat'] = (float) $found['lat'];
+                        }
+                        if (empty($clinic->lng) && !empty($found['lng'])) {
+                            $clinic->lng = $found['lng'];
+                            $item['clinic_lng'] = (float) $found['lng'];
+                        }
+                        $clinic->save();
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('google_places_text_search_failed_for_excell_doctor', [
+                        'clinic_id' => $clinic->id,
+                        'clinic_name' => $clinic->name,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
 
             // If rating is missing but we have a place_id, query Google Places and cache in DB
             if ($rating === null && !empty($clinic->place_id)) {
@@ -3081,6 +3143,36 @@ Route::get('/users/last-vet-details', function (Request $request) {
 
     $rating = $clinic->rating !== null ? (float) $clinic->rating : null;
     $ratingsCount = $clinic->user_ratings_total !== null ? (int) $clinic->user_ratings_total : null;
+
+    // If rating is missing and place_id is empty, use text search to find clinic
+    if ($rating === null && empty($clinic->place_id) && !empty($clinic->name)) {
+        try {
+            $placesService = app(\App\Services\GooglePlacesLookupService::class);
+            $found = $placesService->findPlaceByNameAndLocation($clinic->name, $clinic->city ?? $clinic->address);
+            if ($found) {
+                $rating = $found['rating'];
+                $ratingsCount = $found['user_ratings_total'];
+
+                // Save cache to database
+                $clinic->place_id = $found['place_id'];
+                $clinic->rating = $rating;
+                $clinic->user_ratings_total = $ratingsCount;
+                if (empty($clinic->lat) && !empty($found['lat'])) {
+                    $clinic->lat = $found['lat'];
+                }
+                if (empty($clinic->lng) && !empty($found['lng'])) {
+                    $clinic->lng = $found['lng'];
+                }
+                $clinic->save();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('google_places_text_search_failed_for_last_vet_details', [
+                'clinic_id' => $clinic->id,
+                'clinic_name' => $clinic->name,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
 
     if ($rating === null && !empty($clinic->place_id)) {
         try {

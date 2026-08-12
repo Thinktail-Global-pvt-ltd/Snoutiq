@@ -281,6 +281,52 @@ class GooglePlacesLookupService
         ];
     }
 
+    public function findPlaceByNameAndLocation(string $name, ?string $location): ?array
+    {
+        $apiKey = $this->resolveApiKey();
+        if ($apiKey === null) {
+            return null;
+        }
+
+        $query = $name;
+        if (!empty($location)) {
+            $query .= ' ' . $location;
+        }
+
+        $response = Http::timeout(10)
+            ->retry(1, 200)
+            ->get('https://maps.googleapis.com/maps/api/place/textsearch/json', [
+                'query' => $query,
+                'key' => $apiKey,
+            ]);
+
+        if (!$response->successful()) {
+            return null;
+        }
+
+        $payload = $response->json();
+        $status = strtoupper((string) ($payload['status'] ?? 'UNKNOWN_ERROR'));
+        if ($status !== 'OK') {
+            return null;
+        }
+
+        $results = $payload['results'] ?? [];
+        if (empty($results)) {
+            return null;
+        }
+
+        // Return the first matching result
+        $first = $results[0];
+        return [
+            'place_id' => $first['place_id'] ?? null,
+            'rating' => isset($first['rating']) ? (float) $first['rating'] : null,
+            'user_ratings_total' => isset($first['user_ratings_total']) ? (int) $first['user_ratings_total'] : null,
+            'lat' => $first['geometry']['location']['lat'] ?? null,
+            'lng' => $first['geometry']['location']['lng'] ?? null,
+            'formatted_address' => $first['formatted_address'] ?? null,
+        ];
+    }
+
     public function suggestedSlotsForPlace(
         string $placeId,
         ?string $startDate = null,
