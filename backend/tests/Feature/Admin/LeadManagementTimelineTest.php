@@ -668,4 +668,22 @@ class LeadManagementTimelineTest extends TestCase
         $this->assertEquals(4.7, $clinicResult['google_rating']);
         $this->assertEquals(99, $clinicResult['google_user_ratings_total']);
     }
+
+    public function test_clinic_details_endpoint_rating_and_caching(): void
+    {
+        $clinicId = DB::table('vet_registerations_temp')->insertGetId([
+            'name' => 'Details Test Clinic',
+            'address' => 'Gwalior Address',
+            'rating' => 4.8,
+            'user_ratings_total' => 150,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson("/api/clinics/{$clinicId}/details");
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('clinic.rating', 4.8);
+        $response->assertJsonPath('clinic.user_ratings_total', 150);
+    }
 }
