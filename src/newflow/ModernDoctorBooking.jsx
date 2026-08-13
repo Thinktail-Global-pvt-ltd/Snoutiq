@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { X, ChevronRight, Search, Shield, CreditCard, CheckCircle, Users, ChevronDown, ChevronUp, Calendar, Clock, Loader2 } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, Users, Calendar, Clock, Loader2, Filter, Star, MapPin, Award, Check } from "lucide-react";
 import { readAiAuthState } from "../ai/AiAuth";
 import UserDetailsOtpModal from "./UserDetailsOtpModal";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
@@ -33,33 +33,9 @@ function normalizeImage(value) {
   const text = (value || "").trim();
   if (!text) return "";
   if (/^https?:\/\//i.test(text)) return text;
-  if (text.startsWith("/")) return `https://snoutiq.com${text}`;
-  return `https://snoutiq.com/${text}`;
+  const cleanPath = text.startsWith("/") ? text.slice(1) : text;
+  return `https://snoutiq.com/backend/${cleanPath}`;
 }
-
-function currentSlot() {
-  const hour = new Date().getHours();
-  return hour >= 8 && hour < 20 ? "day" : "night";
-}
-
-function resolveDoctorFee(doctor, slot = currentSlot()) {
-  const preferred = slot === "night"
-      ? doctor.feeNight || doctor.feeDay || doctor.fee
-      : doctor.feeDay || doctor.feeNight || doctor.fee;
-  return Number(preferred || 0) || 0;
-}
-
-const resolveAvailability = (doc) => {
-  if (doc.is_available === true || String(doc.doctor_status||"").toLowerCase().includes("available")) 
-    return { isAvailable: true, label: "Online now" };
-  return { isAvailable: false, label: "Video consult available" };
-};
-
-const resolveResponseTime = (doc, slot) => {
-  return slot === "night" 
-    ? (doc.response_time_for_online_consults_night || doc.response_time_for_online_consults_day || "")
-    : (doc.response_time_for_online_consults_day || doc.response_time_for_online_consults_night || "");
-};
 
 const formatSpecialization = (val) => {
   if (!val) return "General Vet";
@@ -80,6 +56,75 @@ const formatSpecialization = (val) => {
   }
   return String(val).replace(/[\[\]\\"]/g, "").trim() || "General Vet";
 };
+
+// LIVE Real-Time Pricing Evaluation (Day: 8:00 AM - 8:00 PM, Night: 8:01 PM - 7:59 AM)
+function isDayTimeNow() {
+  const now = new Date();
+  const hour = now.getHours();
+  // 8:00 AM (8) to 8:00 PM (19:59). 20:00 (8:00 PM) to 7:59 AM is night time.
+  return hour >= 8 && hour < 20;
+}
+
+function getDoctorCurrentPrice(doc) {
+  if (!doc) return 499;
+  const isDay = isDayTimeNow();
+  const dayRate = Number(doc.feeDay || doc.video_day_rate || doc.clinic_day_fee || 499);
+  const nightRate = Number(doc.feeNight || doc.video_night_rate || doc.video_day_rate || doc.clinic_night_fee || 650);
+  return isDay ? dayRate : nightRate;
+}
+
+function getClinicCurrentPrice(clinic) {
+  if (!clinic) return "499";
+  
+  // Extract from clinic_services[0].price first as requested
+  const servicePrice = clinic.clinic_services && clinic.clinic_services.length > 0 
+    ? clinic.clinic_services[0]?.price 
+    : null;
+
+  if (servicePrice !== null && servicePrice !== undefined && servicePrice !== "" && !isNaN(Number(servicePrice)) && Number(servicePrice) > 0) {
+    return String(Math.round(Number(servicePrice)));
+  }
+
+  // Secondary fallback if clinic_services is empty/null
+  const dayFee = clinic.clinic_day_fee ?? clinic.price ?? clinic.consultation_fee ?? clinic.fee;
+  if (dayFee !== null && dayFee !== undefined && dayFee !== "" && !isNaN(Number(dayFee)) && Number(dayFee) > 0) {
+    return String(Math.round(Number(dayFee)));
+  }
+
+  // Fallback to static 499 if empty/null
+  return "499";
+}
+
+function isSlotAfterCurrentTime(slotTimeStr, selectedDateStr) {
+  if (!slotTimeStr) return false;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const todayStr = `${year}-${month}-${day}`;
+  
+  if (selectedDateStr && selectedDateStr > todayStr) {
+    return true;
+  }
+  if (selectedDateStr && selectedDateStr < todayStr) {
+    return false;
+  }
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const match = String(slotTimeStr).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return true;
+
+  let hours = parseInt(match[1], 10);
+  const mins = parseInt(match[2], 10);
+  const ampm = match[3] ? match[3].toUpperCase() : null;
+
+  if (ampm === "PM" && hours < 12) hours += 12;
+  if (ampm === "AM" && hours === 12) hours = 0;
+
+  const slotMinutes = hours * 60 + mins;
+  return slotMinutes > currentMinutes;
+}
 
 function getUpcomingDates(count = 7) {
   const dates = [];
@@ -106,17 +151,50 @@ function getUpcomingDates(count = 7) {
 
 export default function ModernDoctorBooking({ onClose, symptomText, preSelectedPet, orderType = "video_consult" }) {
   const [doctors, setDoctors] = useState([]);
+  const [clinicsList, setClinicsList] = useState([]);
+  const [selectedClinic, setSelectedClinic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   
+  const [selectedExpFilter, setSelectedExpFilter] = useState("any"); // "any" | "1" | "3" | "5" | "10"
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [viewProfileDoctor, setViewProfileDoctor] = useState(null);
+
   const [flowStep, setFlowStep] = useState("list"); // "list" | "describe" | "checkout"
   const [issueText, setIssueText] = useState(() => symptomText || localStorage.getItem("symptom_description") || "");
   const [attachedImages, setAttachedImages] = useState([]);
-  const [consentGiven, setConsentGiven] = useState(false);
+  const [consentGiven, setConsentGiven] = useState(true);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setAttachedImages(prev => [...prev, { id: Date.now() + Math.random(), src: event.target.result, file }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeAttachedImage = (idToRemove) => {
+    setAttachedImages(prev => prev.filter(img => img.id !== idToRemove));
+  };
+
+  const scrollContainerRef = useRef(null);
+
+  // ALWAYS scroll container to top when screen opens, step changes, or profile modal opens
   useEffect(() => {
-    if (symptomText && symptomText !== issueText) {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+  }, [flowStep, viewProfileDoctor]);
+
+  // Sync symptomText dynamically when passed down asynchronously
+  useEffect(() => {
+    if (symptomText) {
       setIssueText(symptomText);
     } else if (!issueText) {
       const stored = localStorage.getItem("symptom_description");
@@ -130,32 +208,39 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
   const [resolvedDoctorId, setResolvedDoctorId] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [loadingDateAvail, setLoadingDateAvail] = useState(false);
   const [dateAvailError, setDateAvailError] = useState("");
   const [lockId, setLockId] = useState(null);
 
+  const [paymentPreference, setPaymentPreference] = useState("pay_online"); // "pay_online" | "pay_at_clinic"
   const [gstInvoiceChecked, setGstInvoiceChecked] = useState(false);
   const [gstNumber, setGstNumber] = useState("");
-  const [showAllDoctors, setShowAllDoctors] = useState(false);
-  
-  const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
-  const [pendingDoctor, setPendingDoctor] = useState(null);
 
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [viewProfileDoctor, setViewProfileDoctor] = useState(null);
 
   const authState = readAiAuthState();
   const token = authState?.token;
   const user = authState?.user || {};
-  const pet = preSelectedPet || (user.pets && user.pets[0]) || {};
 
-  // Handle slot unlock helper
+  let rawPet = preSelectedPet || (user.pets && user.pets[0]) || authState?.pet || {};
+  if (!rawPet || Object.keys(rawPet).length === 0) {
+    try {
+      const storedPet = localStorage.getItem("selected_pet_data") || localStorage.getItem("current_pet");
+      if (storedPet) rawPet = JSON.parse(storedPet);
+    } catch (e) {}
+  }
+  const pet = rawPet;
+
+  const displayUserName = user.name || user.owner_name || user.first_name || user.user_name || user.full_name || localStorage.getItem("user_name") || "Pet Parent";
+  const displayUserMobile = user.mobile || user.phone || user.phone_number || user.user_mobile || user.contact || localStorage.getItem("user_mobile") || "N/A";
+  
+  const displayPetName = pet.name || pet.pet_name || pet.title || localStorage.getItem("pet_name") || "Pet";
+  const displayPetBreed = pet.breed || pet.pet_breed || pet.species || pet.pet_species || pet.pet_type || pet.type || pet.category || localStorage.getItem("pet_breed") || "Dog/Cat";
+
   const unlockCurrentSlot = async (lockIdToUnlock) => {
     const targetLockId = lockIdToUnlock || lockId;
     if (!targetLockId) return;
-
     try {
       await fetch(`${API_BASE}/doctors/slots/unlock`, {
         method: "POST",
@@ -163,7 +248,7 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
         body: JSON.stringify({ lock_id: targetLockId })
       });
     } catch (err) {
-      console.warn("Slot unlock error (non-blocking):", err);
+      console.warn("Slot unlock error:", err);
     } finally {
       setLockId(null);
     }
@@ -176,260 +261,135 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
     onClose?.();
   };
 
+  // Data Fetching & Rating Merging Logic
   useEffect(() => {
-    async function fetchDoctors() {
+    async function fetchData() {
+      setLoading(true);
+      const userId = user.id || user.user_id || authState?.user_id || authState?.userId || 1179;
+
       try {
-        const userId = user.id || user.user_id || authState?.user_id || authState?.userId;
-        let doctorsList = [];
-        let lastVetClinicId = null;
-
-        // 1. Fetch Last Visited Vet / Clinic
-        if (userId) {
-          try {
-            const lastVetRes = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
-            const lastVetData = await lastVetRes.json();
-            
-            const rawClinic = lastVetData?.data?.clinic || lastVetData?.clinic;
-            const rawDoctors = lastVetData?.data?.doctors || lastVetData?.doctors || [];
-
-            if (lastVetData?.success || rawClinic || (Array.isArray(rawDoctors) && rawDoctors.length > 0)) {
-              lastVetClinicId = rawClinic?.id || rawClinic?.clinic_id || lastVetData?.data?.clinic_id;
-              
-              if (Array.isArray(rawDoctors) && rawDoctors.length > 0) {
-                rawDoctors.forEach(doc => {
-                  doctorsList.push({
-                    ...doc,
-                    clinicId: rawClinic?.id || doc.clinic_id,
-                    clinicName: rawClinic?.clinic_name || rawClinic?.name || doc.clinic_name,
-                    isLastVisited: true
-                  });
-                });
-              } else if (orderType === "appointment" && rawClinic && (rawClinic.id || rawClinic.name || rawClinic.clinic_name)) {
-                const c = rawClinic;
-                doctorsList.push({
-                  id: `clinic-vet-${c.id || c.clinic_id}`,
-                  doctor_id: `clinic-vet-${c.id || c.clinic_id}`,
-                  name: c.name || c.clinic_name || "Clinic Vet",
-                  doctor_name: c.name || c.clinic_name || "Clinic Vet",
-                  specialization: c.specialization || "In-Clinic Veterinary Practice",
-                  years_of_experience: 5,
-                  experience: 5,
-                  video_day_rate: c.clinic_day_fee || "300.00",
-                  video_night_rate: c.clinic_night_fee || "500.00",
-                  clinicId: c.id || c.clinic_id,
-                  clinicName: c.name || c.clinic_name,
-                  clinic_day_fee: c.clinic_day_fee,
-                  clinic_night_fee: c.clinic_night_fee,
-                  is_available: true,
-                  isFallbackClinic: true,
-                  isLastVisited: true
-                });
-              }
-            }
-          } catch (err) {
-            console.error("Failed to load last vet", err);
-          }
-        }
-
-        // 2. Fetch Doctors / Clinics
         if (orderType === "appointment") {
-          // In-Clinic Flow: GET /inclinic-lists-new-after-10th-may-registerations?user_id={userId}
+          let inclinicRes;
           try {
-            let inclinicRes;
-            try {
-              inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
-              });
-              if (!inclinicRes.ok) throw new Error("Inclinic auth fetch failed");
-            } catch (e) {
-              // Retry without Bearer token header if failed
-              inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`);
-            }
-
-            const inclinicData = await inclinicRes.json();
-            const clinics = Array.isArray(inclinicData?.data?.data) 
-              ? inclinicData.data.data 
-              : (Array.isArray(inclinicData?.data) 
-                ? inclinicData.data 
-                : (Array.isArray(inclinicData?.clinics) ? inclinicData.clinics : []));
-
-            clinics.forEach(clinic => {
-              const cId = clinic.id || clinic.clinic_id;
-              if (Array.isArray(clinic.doctors) && clinic.doctors.length > 0) {
-                clinic.doctors.forEach(doc => {
-                  doctorsList.push({
-                    ...doc,
-                    clinicId: cId,
-                    clinicName: clinic.name || clinic.clinic_name,
-                    clinic_day_fee: clinic.clinic_day_fee,
-                    clinic_night_fee: clinic.clinic_night_fee
-                  });
-                });
-              } else {
-                // Clinic doctors array is empty - create fallback doctor entry using "clinic-vet-{clinicId}" pattern
-                doctorsList.push({
-                  id: `clinic-vet-${cId}`,
-                  doctor_id: `clinic-vet-${cId}`,
-                  name: clinic.name || clinic.clinic_name || "Clinic Vet",
-                  doctor_name: clinic.name || clinic.clinic_name || "Clinic Vet",
-                  specialization_select_all_that_apply: clinic.specialization || "In-Clinic Veterinary Practice",
-                  specialization: clinic.specialization || "In-Clinic Veterinary Practice",
-                  years_of_experience: 5,
-                  experience: 5,
-                  video_day_rate: clinic.clinic_day_fee || "300.00",
-                  video_night_rate: clinic.clinic_night_fee || "500.00",
-                  clinicId: cId,
-                  clinicName: clinic.name || clinic.clinic_name,
-                  clinic_day_fee: clinic.clinic_day_fee,
-                  clinic_night_fee: clinic.clinic_night_fee,
-                  doctor_status: "available",
-                  is_available: true,
-                  isFallbackClinic: true
-                });
-              }
+            inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
-          } catch (err) {
-            console.error("Failed to load inclinic list", err);
+            if (!inclinicRes.ok) throw new Error("Inclinic auth fetch failed");
+          } catch (e) {
+            inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`);
           }
+          const inclinicData = await inclinicRes.json();
+          const rawClinicsData = Array.isArray(inclinicData?.data?.data) 
+            ? inclinicData.data.data 
+            : (Array.isArray(inclinicData?.data) ? inclinicData.data : (Array.isArray(inclinicData?.clinics) ? inclinicData.clinics : []));
+          setClinicsList(rawClinicsData);
         } else {
-          // Video Consult Flow (Unchanged)
-          try {
-            const nearbyRes = await fetch(`${API_BASE}/nearby-vets?user_id=${userId}`, {
+          const [docRes, clinicRes] = await Promise.all([
+            fetch(`${API_BASE}/exported_from_excell_doctors`, {
               headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
-            if (nearbyRes.ok) {
-              const nearbyData = await nearbyRes.json();
-              const clinics = Array.isArray(nearbyData?.data?.data) ? nearbyData.data.data : (Array.isArray(nearbyData?.data) ? nearbyData.data : []);
-              
-              clinics.forEach(clinic => {
-                if (Array.isArray(clinic.doctors) && clinic.doctors.length > 0) {
-                  clinic.doctors.forEach(doc => {
-                    doctorsList.push({
-                      ...doc,
-                      clinicId: clinic.id || clinic.clinic_id,
-                      clinicName: clinic.name || clinic.clinic_name
-                    });
-                  });
-                }
-              });
-            }
-          } catch (err) {
-            console.error("Failed to load nearby vets", err);
-          }
-
-          try {
-            const fallbackRes = await fetch(`${API_BASE}/exported_from_excell_doctors`, {
+            }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
               headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
-            const fallbackData = await fallbackRes.json();
-            
-            const clinics = Array.isArray(fallbackData?.data?.data) ? fallbackData.data.data : [];
-            clinics.forEach(clinic => {
-              if (Array.isArray(clinic.doctors)) {
-                clinic.doctors.forEach(doc => {
-                  doctorsList.push({
-                    ...doc,
-                    clinicId: doc.clinic_id || clinic?.clinic_id || clinic?.id,
-                    clinicName: doc.clinic_name || clinic?.clinic_name || clinic?.name
-                  });
-                });
-              }
-            });
+            }).then(r => r.ok ? r.json() : null).catch(() => null)
+          ]);
 
-            const directDoctors = Array.isArray(fallbackData?.doctors) 
-              ? fallbackData.doctors 
-              : (Array.isArray(fallbackData?.data?.doctors) 
-                ? fallbackData.data.doctors 
-                : (Array.isArray(fallbackData?.data) 
-                  ? fallbackData.data 
-                  : (Array.isArray(fallbackData) ? fallbackData : [])));
-            
-            directDoctors.forEach(doc => {
-               doctorsList.push({
-                  ...doc,
-                  clinicId: doc.clinic_id || doc.vet_registeration_id || fallbackData?.clinic?.id,
-                  clinicName: doc.clinic_name || fallbackData?.clinic?.clinic_name || "Clinic"
-               });
-            });
-          } catch(e) {
-            console.error("Failed to load fallback doctors", e);
-          }
+          const rawDocs = Array.isArray(docRes?.doctors) 
+            ? docRes.doctors 
+            : (Array.isArray(docRes?.data?.doctors) 
+              ? docRes.data.doctors 
+              : (Array.isArray(docRes?.data) ? docRes.data : (Array.isArray(docRes) ? docRes : [])));
+
+          const rawClinics = Array.isArray(clinicRes?.data?.data) 
+            ? clinicRes.data.data 
+            : (Array.isArray(clinicRes?.data) ? clinicRes.data : []);
+
+          const clinicMap = new Map();
+          rawClinics.forEach(c => {
+            const key = String(c.id || c.clinic_id || "");
+            if (key) clinicMap.set(key, c);
+          });
+
+          const enrichedDoctors = rawDocs.map(doc => {
+            const regId = String(doc.vet_registeration_id || doc.clinic_id || doc.clinicId || "");
+            const clinic = clinicMap.get(regId);
+            const expYears = parseInt(doc.years_of_experience || doc.experience || 0);
+
+            const rawRating = doc.google_rating ?? doc.clinic?.rating ?? clinic?.google_rating ?? clinic?.rating;
+            const parsedRating = (rawRating !== null && rawRating !== undefined && rawRating !== "" && !isNaN(Number(rawRating)))
+              ? Number(rawRating) 
+              : null;
+
+            const reviewCount = doc.google_user_ratings_total ?? doc.clinic?.user_ratings_total ?? clinic?.google_user_ratings_total ?? clinic?.user_ratings_total ?? 0;
+
+            const imgUrl = doc.doctor_image_blob_url || normalizeImage(doc.doctor_image || doc.doctor_blob_url || doc.doctor_image_url || doc.image);
+
+            return {
+              ...doc,
+              id: doc.id || doc.doctor_id,
+              name: doc.doctor_name || doc.name || "Doctor",
+              image: imgUrl,
+              degree: doc.degree || "BVSc",
+              experience: expYears,
+              years_of_experience: String(expYears),
+              specialization: formatSpecialization(doc.specialization_select_all_that_apply || doc.specialization),
+              feeDay: Number(doc.video_day_rate || doc.clinic_day_fee || 499),
+              feeNight: Number(doc.video_night_rate || doc.video_day_rate || doc.clinic_night_fee || 650),
+              bio: doc.bio || "",
+              status: doc.doctor_status || "available",
+              responseTimeDay: doc.response_time_for_online_consults_day || "0 To 15 Mins",
+              responseTimeNight: doc.response_time_for_online_consults_night || "15 To 20 Mins",
+              followUpPolicy: doc.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta || "",
+              googleRating: parsedRating,
+              googleReviewCount: Number(reviewCount),
+              clinicCity: doc.clinic?.city || doc.clinic_address || clinic?.city || "",
+              clinicName: doc.clinic_name || doc.clinic?.name || clinic?.name || "",
+              vet_registeration_id: regId
+            };
+          });
+
+          setDoctors(enrichedDoctors);
         }
-
-        // Process and Merge
-        const processed = doctorsList.map(doc => {
-          const docClinicId = doc.clinicId || doc.clinic_id;
-          const isMatch = lastVetClinicId && String(docClinicId) === String(lastVetClinicId);
-          return {
-            id: doc.doctor_id || doc.id || doc.userId,
-            name: doc.doctor_name || doc.name || doc.full_name || "Doctor",
-            image: normalizeImage(doc.doctor_image_url || doc.doctor_image_blob_url || doc.image || doc.doctor_image),
-            specialization: formatSpecialization(doc.specialization_select_all_that_apply || doc.specialization),
-            experience: doc.years_of_experience || doc.experience || 0,
-            feeDay: Number(doc.clinic_day_fee || doc.video_day_rate || doc.day_fee || doc.consultation_fee_day || doc.fee || doc.doctors_price || 300),
-            feeNight: Number(doc.clinic_night_fee || doc.video_night_rate || doc.night_fee || doc.consultation_fee_night || doc.fee || doc.doctors_price || 500),
-            available: resolveAvailability(doc).isAvailable,
-            clinicId: docClinicId,
-            clinicName: doc.clinicName || doc.clinic_name,
-            isLastVisited: doc.isLastVisited || Boolean(isMatch),
-            isFallbackClinic: doc.isFallbackClinic || false,
-            availability: resolveAvailability(doc),
-            responseTime: resolveResponseTime(doc, currentSlot())
-          };
-        });
-
-        // Deduplicate
-        const unique = [];
-        const seen = new Set();
-        processed.forEach(doc => {
-          const uniqueKey = `${doc.clinicId}_${doc.id}`;
-          if (!seen.has(uniqueKey)) {
-            seen.add(uniqueKey);
-            unique.push(doc);
-          }
-        });
-
-        // Sort: Last Visited first
-        unique.sort((a, b) => (b.isLastVisited ? 1 : 0) - (a.isLastVisited ? 1 : 0));
-        
-        setDoctors(unique);
       } catch (err) {
-        console.error("Failed to process doctors", err);
+        console.error("Failed to load booking data", err);
       } finally {
         setLoading(false);
       }
     }
-    if (token) fetchDoctors();
+    fetchData();
   }, [token, orderType]);
 
-  const filteredDoctors = doctors.filter(doc => 
-    doc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    doc.specialization.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter Doctors by Search & Experience
+  const filteredDoctors = useMemo(() => {
+    const minYears = parseInt(selectedExpFilter) || 0;
+    return doctors.filter(doc => {
+      const matchesSearch = (doc.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            (doc.specialization || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            (doc.clinicCity || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesExp = (doc.experience || 0) >= minYears;
+      return matchesSearch && matchesExp;
+    });
+  }, [doctors, searchQuery, selectedExpFilter]);
 
-  const slot = currentSlot();
-  const fee = selectedDoctor ? resolveDoctorFee(selectedDoctor, slot) : 0;
+  // Filter Clinics by Search
+  const filteredClinics = useMemo(() => {
+    return clinicsList.filter(c => 
+      (c.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (c.city || "").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [clinicsList, searchQuery]);
+
+  // Live Current Fee calculation
+  const currentFee = selectedDoctor ? getDoctorCurrentPrice(selectedDoctor) : (selectedClinic ? Number(getClinicCurrentPrice(selectedClinic)) : 499);
   const GST_RATE = 0.18;
-  const gstAmount = Math.round(fee * GST_RATE);
-  const totalAmount = fee + gstAmount;
+  const gstAmount = Math.round(currentFee * GST_RATE);
+  const totalAmount = currentFee + gstAmount;
 
-  const trustedDoctors = useMemo(() => filteredDoctors.filter(d => d.isLastVisited), [filteredDoctors]);
-  const otherDoctors = useMemo(() => filteredDoctors.filter(d => !d.isLastVisited), [filteredDoctors]);
-
-  const hasCompleteProfile = (u) => {
-    const hasName = Boolean(u.name || u.owner_name || u.pet_owner_name);
-    const rawPhone = String(u.phone || u.mobile || u.whatsapp_number || u.last_otp_verified_at || "");
-    const cleanPhone = rawPhone.replace(/[^\d]/g, "");
-    const hasPhone = (cleanPhone.length === 10) || (cleanPhone.length === 12 && cleanPhone.startsWith("91"));
-    return hasName && hasPhone;
-  };
-
-  // Appointment Flow: Date availability & active slots fetcher
-  const fetchDateAvailabilityAndSlots = async (dateStr, targetDoc) => {
+  // Fetch slots for In-Clinic Appointment
+  const fetchDateAvailabilityAndSlots = async (dateStr, targetDoc, targetClinic) => {
     const docToUse = targetDoc || selectedDoctor;
-    const clinicId = docToUse?.clinicId || docToUse?.id;
+    const clinicObj = targetClinic || selectedClinic;
+    const clinicId = clinicObj?.id || clinicObj?.clinic_id || docToUse?.clinicId || docToUse?.vet_registeration_id || docToUse?.id;
+
     if (!clinicId) return;
 
     setSelectedDate(dateStr);
@@ -439,200 +399,204 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
     setDateAvailError("");
     setLoadingSlots(true);
 
-    let docIdToUse = docToUse?.id;
-
     try {
-      // 1. Resolve Doctor ID from clinic availability
-      const availRes = await fetch(
-        `${API_BASE}/clinics/${clinicId}/doctor-availability?service_type=in_clinic&date=${dateStr}`,
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-      );
-      const availData = await availRes.json();
-      
-      const docIds = availData?.doctor_ids || availData?.data?.doctor_ids || availData?.doctors || availData?.data?.doctors || [];
-      const normalizedDocIds = Array.isArray(docIds) ? docIds : (docIds ? [docIds] : []);
-
-      if (normalizedDocIds.length === 1) {
-        docIdToUse = normalizedDocIds[0];
-        setResolvedDoctorId(docIdToUse);
-      } else if (normalizedDocIds.length > 1) {
-        const match = normalizedDocIds.find(id => String(id) === String(docToUse?.id));
-        docIdToUse = match || normalizedDocIds[0];
-        setResolvedDoctorId(docIdToUse);
-      } else {
-        if (docToUse?.id && !String(docToUse.id).startsWith("clinic-vet-")) {
-          docIdToUse = docToUse.id;
-          setResolvedDoctorId(docIdToUse);
+      let docIdToUse = docToUse?.id;
+      try {
+        const availRes = await fetch(`${API_BASE}/clinics/${clinicId}/doctor-availability?service_type=in_clinic&date=${dateStr}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (availRes.ok) {
+          const availData = await availRes.json();
+          if (availData.available_doctor_id || availData.doctor_id) {
+            docIdToUse = availData.available_doctor_id || availData.doctor_id;
+          } else if (Array.isArray(availData.doctor_ids) && availData.doctor_ids.length > 0) {
+            docIdToUse = availData.doctor_ids[0];
+          }
         }
+      } catch (e) {}
+
+      setResolvedDoctorId(docIdToUse);
+
+      let slotsData = null;
+      try {
+        const slotsRes = await fetch(`${API_BASE}/doctors/${docIdToUse}/slots/summary?date=${dateStr}&service_type=in_clinic`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (slotsRes.ok) slotsData = await slotsRes.json();
+      } catch (e) {}
+
+      if (!slotsData || !slotsData.success || !Array.isArray(slotsData.slots) || slotsData.slots.length === 0) {
+        try {
+          const altRes = await fetch(`${API_BASE}/doctors/active-slots?doctor_id=${docIdToUse}&date=${dateStr}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (altRes.ok) {
+            const altData = await altRes.json();
+            if (altData.success && Array.isArray(altData.active_hours)) {
+              const extracted = [];
+              altData.active_hours.forEach(ah => {
+                if (Array.isArray(ah.slots)) {
+                  ah.slots.forEach(s => extracted.push(typeof s === "string" ? { start: s, label: s, isBooked: false } : s));
+                }
+              });
+              if (extracted.length > 0) slotsData = { success: true, slots: extracted };
+            }
+          }
+        } catch (e) {}
       }
 
-      // 2. Fetch Active Slots for resolved doctor
-      if (docIdToUse) {
-        const slotsRes = await fetch(
-          `${API_BASE}/doctors/active-slots?doctor_id=${docIdToUse}&date=${dateStr}`,
-          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-        );
-        const slotsData = await slotsRes.json();
-        
-        const activeHours = slotsData?.active_hours || slotsData?.data?.active_hours || [];
-        let allSlots = [];
+      const rawSlotsList = slotsData?.slots || slotsData?.data?.slots || [];
+      if (Array.isArray(rawSlotsList) && rawSlotsList.length > 0) {
+        let allSlots = rawSlotsList.map(s => {
+          if (typeof s === "string") return { start: s, label: s, isBooked: false };
+          return { start: s.start || s.time || "", label: s.label || s.time || s.start || "", isBooked: s.is_booked === true || s.booked === true };
+        }).filter(s => s.start);
 
-        if (Array.isArray(activeHours) && activeHours.length > 0) {
-          activeHours.forEach(ah => {
-            if (Array.isArray(ah.slots)) {
-              ah.slots.forEach(s => {
-                allSlots.push({
-                  start: s.start || s.start_time || "",
-                  end: s.end || s.end_time || "",
-                  label: s.label || (s.start ? `${s.start} - ${s.end}` : String(s)),
-                  isBooked: s.is_booked === true || s.booked === true
-                });
-              });
-            }
-          });
-        }
-
-        if (allSlots.length === 0) {
-          const rawSlots = slotsData?.slots || slotsData?.data?.slots || slotsData?.data || (Array.isArray(slotsData) ? slotsData : []);
-          (Array.isArray(rawSlots) ? rawSlots : []).forEach(s => {
-            if (typeof s === "string") {
-              allSlots.push({ start: s, end: "", label: s, isBooked: false });
-            } else {
-              allSlots.push({
-                start: s.start || s.start_time || s.time || "",
-                end: s.end || s.end_time || "",
-                label: s.label || s.time || (s.start ? `${s.start} - ${s.end}` : ""),
-                isBooked: s.is_booked === true || s.booked === true
-              });
-            }
-          });
-        }
-
-        // Filter past slots if selectedDate is TODAY
-        const todayStr = new Date().toISOString().split("T")[0];
-        const isToday = dateStr === todayStr || slotsData?.is_today === true;
-        
-        if (isToday) {
-          const now = new Date();
-          const currentMinutes = now.getHours() * 60 + now.getMinutes();
-          
-          allSlots = allSlots.filter(s => {
-            if (!s.start) return true;
-            const [h, m] = s.start.split(":").map(Number);
-            if (isNaN(h)) return true;
-            const slotMinutes = h * 60 + (m || 0);
-            return slotMinutes > currentMinutes;
-          });
-        }
-
-        // Filter out booked slots and limit to ONLY 5 SLOTS!
-        const unbookedSlots = allSlots.filter(s => !s.isBooked);
-        const firstFiveSlots = unbookedSlots.slice(0, 5);
-
-        if (firstFiveSlots.length === 0) {
-          setDateAvailError("No active slots available for this date. Please select another date.");
+        const unbooked = allSlots.filter(s => !s.isBooked && isSlotAfterCurrentTime(s.start || s.label, dateStr));
+        const upcoming6Slots = unbooked.slice(0, 6);
+        if (upcoming6Slots.length > 0) {
+          setAvailableSlots(upcoming6Slots);
         } else {
-          setDateAvailError("");
+          setDateAvailError("No upcoming slots left for today. Please select another date.");
         }
-
-        setAvailableSlots(firstFiveSlots);
       } else {
-        setDateAvailError("No doctor available on this date. Please choose another date.");
+        setDateAvailError("No active slots found for this date.");
       }
     } catch (err) {
-      console.error("Failed to fetch slots for date", err);
-      setDateAvailError("Could not load slots for this date. Please try another date.");
+      setDateAvailError("Error loading slots.");
     } finally {
       setLoadingSlots(false);
     }
   };
 
+  const handleSelectClinic = (clinic) => {
+    setSelectedClinic(clinic);
+    const clinicPrice = Number(getClinicCurrentPrice(clinic));
+    const clinicDocs = Array.isArray(clinic.doctors) && clinic.doctors.length > 0 ? clinic.doctors : [];
+    const firstDoc = clinicDocs[0] ? {
+      id: clinicDocs[0].id || clinicDocs[0].doctor_id,
+      name: clinicDocs[0].doctor_name || clinicDocs[0].name || "Doctor",
+      image: normalizeImage(clinicDocs[0].doctor_blob_url || clinicDocs[0].doctor_image_blob_url || clinicDocs[0].doctor_image),
+      specialization: formatSpecialization(clinicDocs[0].specialization_select_all_that_apply),
+      degree: clinicDocs[0].degree || "BVSc",
+      experience: clinicDocs[0].years_of_experience || 5,
+      feeDay: clinicPrice,
+      feeNight: clinicPrice,
+      clinicId: clinic.id || clinic.clinic_id,
+      clinicName: clinic.name
+    } : {
+      id: `clinic-vet-${clinic.id}`,
+      name: clinic.name || "Clinic Vet",
+      degree: "BVSc",
+      experience: 5,
+      clinicId: clinic.id || clinic.clinic_id,
+      clinicName: clinic.name,
+      feeDay: clinicPrice,
+      feeNight: clinicPrice
+    };
+
+    setSelectedDoctor(firstDoc);
+    const todayStr = getUpcomingDates(7)[0].dateStr;
+    fetchDateAvailabilityAndSlots(todayStr, firstDoc, clinic);
+    setFlowStep("describe");
+  };
+
   const handleBookNowClick = (doc) => {
     setSelectedDoctor(doc);
     if (orderType === "appointment") {
-      const todayStr = getUpcomingDates(7)[0].dateStr;
-      fetchDateAvailabilityAndSlots(todayStr, doc);
+      fetchDateAvailabilityAndSlots(getUpcomingDates(7)[0].dateStr, doc);
     }
-    if (hasCompleteProfile(user)) {
-      setFlowStep("describe");
-    } else {
-      setPendingDoctor(doc);
-      setShowUserDetailsModal(true);
-    }
+    setFlowStep("describe");
   };
 
-  // Appointment Flow: Slot Lock & Checkout Handler
   const handleLockSlotAndCheckout = async () => {
     const docIdToUse = resolvedDoctorId || selectedDoctor?.id;
-    if (!selectedDate || !selectedTimeSlot || !docIdToUse) return;
+    if (orderType === "appointment" && (!selectedDate || !selectedTimeSlot || !docIdToUse)) return;
+
+    // Talk to Vet requires at least 1 photo attachment and disclaimer acceptance
+    if (orderType !== "appointment") {
+      if (attachedImages.length === 0) {
+        setError("At least one image is required to continue.");
+        return;
+      }
+      if (!disclaimerAccepted) {
+        setError("Please check the agreement box before continuing to payment.");
+        return;
+      }
+    }
 
     setProcessing(true);
     setError("");
 
     try {
-      const res = await fetch(`${API_BASE}/doctors/${docIdToUse}/slots/lock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({
-          date: selectedDate,
-          time_slot: selectedTimeSlot
-        })
-      });
-
-      if (res.status === 404) {
-        console.warn("Slot lock API returned 404. Proceeding to checkout directly.");
-        setLockId(null);
-        setFlowStep("checkout");
-        return;
+      if (orderType === "appointment") {
+        const res = await fetch(`${API_BASE}/doctors/${docIdToUse}/slots/lock`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ date: selectedDate, time_slot: selectedTimeSlot })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLockId(data.lockId || data.data?.lockId || data.lock_id);
+        }
       }
-
-      const data = await res.json();
-
-      if (res.ok && data.success !== false) {
-        const lId = data.lockId || data.data?.lockId || data.lock_id || data.data?.lock_id || data.id;
-        setLockId(lId);
-      } else {
-        console.warn("Slot lock non-200 response:", data);
-        setLockId(null);
-      }
-      
       setFlowStep("checkout");
     } catch (err) {
-      console.warn("Slot locking error (non-blocking fallback to checkout):", err);
-      setLockId(null);
       setFlowStep("checkout");
     } finally {
       setProcessing(false);
     }
   };
 
-  // Payment Execution
   const handlePayment = async () => {
-    const userId = user.id || user.user_id || authState?.user_id || authState?.userId;
-    const petId = pet?.id || pet?.pet_id || user?.pet_id || (user?.pets && user.pets[0] && (user.pets[0].id || user.pets[0].pet_id)) || 0;
-    const docIdToUse = resolvedDoctorId || selectedDoctor?.id || selectedDoctor?.doctor_id;
-    const clinicIdToUse = selectedDoctor?.clinicId || selectedDoctor?.clinic_id || docIdToUse;
+    const userId = user.id || user.user_id || authState?.user_id || authState?.userId || 1179;
+    const petId = pet?.id || pet?.pet_id || 0;
+    const docIdToUse = resolvedDoctorId || selectedDoctor?.id;
+    const clinicIdToUse = selectedClinic?.id || selectedDoctor?.clinicId || docIdToUse;
     
-    if (!userId || !selectedDoctor?.id) {
-      setError("Missing booking details. Please refresh and try again.");
+    // Live Time-based Price calculation at payment instant
+    const liveFee = selectedDoctor ? getDoctorCurrentPrice(selectedDoctor) : (selectedClinic ? Number(getClinicCurrentPrice(selectedClinic)) : 499);
+    const liveGst = Math.round(liveFee * GST_RATE);
+    const liveTotal = liveFee + liveGst;
+
+    if (orderType === "appointment" && (!selectedDate || !selectedTimeSlot)) {
+      setError("Please select date and time slot first.");
       return;
     }
-    
+
     setProcessing(true);
     setError("");
-    
+
+    if (orderType === "appointment" && paymentPreference === "pay_at_clinic") {
+      try {
+        await fetch(`${API_BASE}/appointments/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ user_id: userId, clinic_id: clinicIdToUse, doctor_id: docIdToUse, pet_id: petId, date: selectedDate, time_slot: selectedTimeSlot, amount: liveTotal, payment_method: "pay_at_clinic", lock_id: lockId })
+        });
+        if (lockId) unlockCurrentSlot(lockId);
+        setSuccess(true);
+        alert("Visit Confirmed! You can pay ₹" + liveTotal + " at the clinic reception.");
+        onClose?.();
+      } catch (err) {
+        setError("Booking failed");
+      } finally {
+        setProcessing(false);
+      }
+      return;
+    }
+
     try {
       const orderPayload = {
-        amount: totalAmount,
+        amount: liveTotal,
         order_type: orderType || "video_consult",
         user_id: userId,
         doctor_id: docIdToUse,
         clinic_id: clinicIdToUse,
         pet_id: petId,
         gst_enabled: gstInvoiceChecked ? 1 : 0,
-        gst_percent: 18,
-        gst_amount: gstAmount,
-        base_amount: fee,
+        gst_amount: liveGst,
+        base_amount: liveFee,
         gst_number: gstInvoiceChecked ? gstNumber : "",
       };
 
@@ -642,7 +606,6 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
         body: JSON.stringify(orderPayload)
       });
       const orderData = await orderRes.json();
-      
       if (!orderRes.ok) throw new Error(orderData.message || "Failed to create order");
       
       const razorpayKey = orderData?.key || orderData?.data?.key;
@@ -651,741 +614,862 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
       const isLoaded = await loadRazorpayScript();
       if (!isLoaded) throw new Error("Could not load payment gateway.");
 
-      const paymentResult = await new Promise((resolve, reject) => {
+      const paymentResult = await new Promise((resolve) => {
         const rzp = new window.Razorpay({
           key: razorpayKey,
-          amount: totalAmount * 100,
+          amount: liveTotal * 100,
           currency: "INR",
           name: "SnoutIQ",
           description: `${orderType === "appointment" ? "Clinic Visit" : "Video Consult"} with ${selectedDoctor.name}`,
           order_id: orderId,
-          prefill: {
-            name: user.name || user.owner_name,
-            contact: user.mobile || user.phone,
-          },
-          theme: { color: "#000000" },
-          modal: {
-            ondismiss: () => {
-              if (orderType === "appointment" && lockId) {
-                unlockCurrentSlot(lockId);
-              }
-              reject(new Error("Payment cancelled by user."));
-            },
-          },
+          prefill: { name: user.name || user.owner_name, contact: user.mobile || user.phone },
+          theme: { color: "#0052FF" },
           handler: (response) => resolve(response),
-        });
-        rzp.on('payment.failed', (response) => {
-          if (orderType === "appointment" && lockId) {
-            unlockCurrentSlot(lockId);
-          }
-          reject(new Error(response?.error?.description || "Payment failed or cancelled."));
         });
         rzp.open();
       });
 
-      const verifyPayload = {
-        razorpay_order_id: paymentResult.razorpay_order_id,
-        razorpay_payment_id: paymentResult.razorpay_payment_id,
-        razorpay_signature: paymentResult.razorpay_signature,
-        user_id: userId,
-        doctor_id: docIdToUse,
-        pet_id: petId,
-        description: issueText || symptomText || (orderType === "appointment" ? "Clinic Visit Booking" : "Video Consult Booking"),
-        order_type: orderType || "video_consult",
-      };
-
-      const verifyRes = await fetch(`${API_BASE}/rzp/verify`, {
+      await fetch(`${API_BASE}/rzp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(verifyPayload)
+        body: JSON.stringify({ ...paymentResult, user_id: userId, doctor_id: docIdToUse, pet_id: petId, order_type: orderType || "video_consult" })
       });
-      const verifyData = await verifyRes.json();
-      
-      if (!verifyData.success) throw new Error("Payment verification failed");
 
-      // Final Appointment Submission for In-Clinic Flow
       if (orderType === "appointment") {
-        const appointmentPayload = {
-          user_id: userId,
-          clinic_id: selectedDoctor.clinicId || selectedDoctor.id,
-          doctor_id: docIdToUse,
-          patient_name: user.name || user.owner_name || "Pet Parent",
-          patient_phone: user.phone || user.mobile || user.whatsapp_number || "",
-          pet_name: pet.name || pet.pet_name || "Pet",
-          pet_id: petId,
-          date: selectedDate,
-          time_slot: selectedTimeSlot,
-          amount: totalAmount,
-          currency: "INR",
-          razorpay_payment_id: paymentResult.razorpay_payment_id,
-          razorpay_order_id: paymentResult.razorpay_order_id,
-          razorpay_signature: paymentResult.razorpay_signature,
-          lock_id: lockId
-        };
-
-        const apptRes = await fetch(`${API_BASE}/appointments/submit`, {
+        await fetch(`${API_BASE}/appointments/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify(appointmentPayload)
+          body: JSON.stringify({ user_id: userId, clinic_id: clinicIdToUse, doctor_id: docIdToUse, pet_id: petId, date: selectedDate, time_slot: selectedTimeSlot, amount: liveTotal, ...paymentResult, lock_id: lockId })
         });
-        const apptData = await apptRes.json().catch(() => ({}));
-
-        if (!apptRes.ok || apptData?.success === false) {
-          throw new Error(
-            apptData?.message || `Payment successful, but we could not confirm your appointment. Please contact support with Payment ID: ${paymentResult.razorpay_payment_id}`
-          );
-        }
-
-        // Release slot lock after successful booking creation
-        if (lockId) {
-          unlockCurrentSlot(lockId);
-        }
       }
 
-      // Non-blocking image upload
-      try {
-        const firstImage = attachedImages[0];
-        if (firstImage?.file) {
-          const formData = new FormData();
-          formData.append("_method", "PUT");
-          formData.append("pet_id", String(petId));
-          formData.append("user_id", String(userId));
-          formData.append("question", issueText || symptomText || "");
-          formData.append("video_calling_upload_file", firstImage.file);
-
-          await fetch(`${API_BASE}/chat/dog-disease/question`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData,
-          });
-        }
-      } catch (uploadErr) {
-        console.warn("Symptom image upload failed (non-blocking):", uploadErr);
-      }
-
+      if (lockId) unlockCurrentSlot(lockId);
       setSuccess(true);
+      alert("Payment successful & consultation confirmed!");
+      onClose?.();
     } catch (err) {
-      console.error(err);
-      if (orderType === "appointment" && lockId) {
-        unlockCurrentSlot(lockId);
-      }
-      setError(err.message || "An error occurred during payment.");
+      console.error("Payment error", err);
+      setError(err.message || "Payment failed");
     } finally {
       setProcessing(false);
     }
   };
 
-  if (success) {
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl w-full max-w-sm p-4 text-center shadow-2xl">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="text-green-600 w-10 h-10" />
-          </div>
-          <h2 className="text-lg font-bold text-slate-900 mb-1">Booking Confirmed!</h2>
-          <p className="text-slate-600 mb-6 text-sm">
-            Your {orderType === "appointment" ? "Clinic Appointment" : "Video Consultation"} with <span className="font-semibold text-slate-900">{selectedDoctor?.name}</span> has been successfully booked.
-          </p>
-          {orderType === "appointment" && selectedDate && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-6 text-xs text-slate-700">
-              <p>📅 <span className="font-bold">{selectedDate}</span> at <span className="font-bold">{selectedTimeSlot}</span></p>
-              <p className="text-slate-500 mt-1">🏥 {selectedDoctor?.clinicName || "Veterinary Clinic"}</p>
-            </div>
-          )}
-          <button onClick={handleModalClose} className="w-full py-3 bg-black text-white font-bold rounded-xl text-sm hover:bg-slate-800 transition-colors shadow-md">
-            Done
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-100 w-full min-h-screen overflow-hidden animate-[slideInRight_0.25s_cubic-bezier(0.16,1,0.3,1)]">
+      
+      {/* Full Page Mobile / App Style Top Header Bar */}
+      <div className="sticky top-0 z-30 flex items-center justify-between px-3.5 py-2.5 bg-white border-b border-slate-200 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <button 
+            onClick={() => {
+              if (flowStep === "describe") setFlowStep("list");
+              else if (flowStep === "checkout") setFlowStep("describe");
+              else handleModalClose();
+            }} 
+            className="p-1.5 -ml-1 text-slate-700 hover:text-black bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  const isPhotoRequired = orderType !== "appointment";
-  const canContinueToPayment = issueText.trim() && (!isPhotoRequired || attachedImages.length > 0) && consentGiven;
-
-  const renderDoctorCard = (doc, featured = false) => {
-    const isOnline = doc.availability?.isAvailable;
-    return (
-      <div key={`${doc.clinicId}_${doc.id}`} className="bg-white border border-slate-100 rounded-xl p-2.5 pl-11 pr-2.5 hover:shadow-sm transition-all flex flex-col relative ml-4 mt-1" style={{minHeight: '82px'}}>
-        {/* Left overlapping avatar */}
-        <div className="absolute left-[-16px] top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-xl bg-white p-0.5 shadow-[0_2px_6px_rgba(0,0,0,0.1)] border border-slate-100 flex items-center justify-center">
-          {doc.image ? (
-            <img src={doc.image} alt={doc.name} className="w-full h-full rounded-lg object-cover" />
-          ) : (
-            <div className="w-full h-full rounded-lg bg-slate-800 text-white flex items-center justify-center text-sm font-bold">
-              {doc.name.charAt(0)}
-            </div>
-          )}
-          {isOnline && (
-            <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 border border-white rounded-full" />
-          )}
-        </div>
-
-        {/* Right Details */}
-        <div className="flex-1 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between gap-1 mb-0.5 flex-wrap">
-              {featured ? (
-                <span className="inline-block text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded-md leading-3">
-                  Recommended for {pet.name || pet.pet_name}
-                </span>
-              ) : <div />}
-              
-              {Boolean(doc.experience) && String(doc.experience) !== "0" && (
-                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-full shadow-2xs whitespace-nowrap">
-                  🎓 {doc.experience} Yrs Exp
-                </span>
-              )}
-            </div>
-
-            <h3 className="font-bold text-slate-800 text-[13px] leading-tight">{doc.name}</h3>
-            <p className="text-[10px] text-slate-400 leading-tight">{doc.specialization}</p>
-            {doc.clinicName && (
-              <p className="text-[10px] font-medium text-slate-500 truncate">🏥 {doc.clinicName}</p>
-            )}
-            <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">
-              {isOnline ? "Online now · Consult available" : "Consult available"}
+            <h1 className="text-sm font-bold text-slate-900 leading-tight">
+              {flowStep === "checkout" 
+                ? 'Confirm Consultation' 
+                : flowStep === "describe" 
+                  ? (orderType === "appointment" ? 'Clinic Visit Details' : 'Describe Pet Symptoms')
+                  : (orderType === "appointment" ? 'Trusted Veterinary Clinics' : 'Talk to Verified Vets')}
+            </h1>
+            <p className="text-[10px] text-slate-500 font-medium">
+              {orderType === "appointment" ? "In-clinic appointment booking" : "Online video consultation"}
             </p>
           </div>
-
-          <div className="flex items-center justify-between border-t border-slate-50 pt-1 mt-1">
-            <span className="text-[11px] font-extrabold text-slate-800">
-              {formatCurrency(resolveDoctorFee(doc, slot))}/Consult
-            </span>
-            <div className="flex gap-1">
-              <button 
-                onClick={() => setViewProfileDoctor(doc)}
-                className="px-2.5 py-0.5 border border-slate-200 text-blue-600 text-[10px] font-semibold rounded-full hover:bg-slate-50 transition-all"
-              >
-                View Profile
-              </button>
-              <button 
-                onClick={() => handleBookNowClick(doc)}
-                className="px-2.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-full transition-all"
-              >
-                {orderType === "appointment" ? "Book Visit" : "Talk to Vet"}
-              </button>
-            </div>
-          </div>
         </div>
+
+        <button onClick={handleModalClose} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors text-slate-600">
+          <X className="w-4 h-4" />
+        </button>
       </div>
-    );
-  };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 md:p-6 lg:p-12 animate-[fadeIn_0.2s_ease-out]">
-      <style>{`
-        @keyframes scaleInUp {
-          from { opacity: 0; transform: scale(0.96) translateY(12px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-      
-      <div className="bg-white md:rounded-3xl shadow-xl flex-1 flex flex-col max-w-5xl mx-auto w-full overflow-hidden border border-slate-200 animate-[scaleInUp_0.25s_ease-out]">
+      {/* Main Content View Body */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto bg-slate-50 p-3 md:p-4 max-w-4xl mx-auto w-full space-y-3">
         
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            {flowStep !== "list" && (
-              <button 
-                onClick={() => {
-                  if (flowStep === "describe") setFlowStep("list");
-                  else if (flowStep === "checkout") setFlowStep("describe");
-                }} 
-                className="text-slate-500 hover:text-black transition-colors"
-              >
-                <ChevronRight className="w-5 h-5 rotate-180" />
-              </button>
-            )}
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                {flowStep === "checkout" 
-                  ? 'Secure Checkout' 
-                  : flowStep === "describe" 
-                    ? 'Describe & Select Appointment Details' 
-                    : orderType === "appointment" ? 'Select Veterinary Clinic' : 'Select a Veterinarian'}
-              </h2>
-              <p className="text-xs text-slate-400">
-                {flowStep === "checkout" 
-                  ? 'Complete your payment' 
-                  : flowStep === "describe" 
-                    ? 'Tell us what is wrong and pick your visit date/time' 
-                    : 'Choose a specialist for your pet'}
-              </p>
-            </div>
-          </div>
-          <button onClick={handleModalClose} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors text-slate-600">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto bg-slate-50/50">
-          {flowStep === "list" && (
-            <div className="p-4">
-              <div className="relative mb-4 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        {/* STEP 0: List View */}
+        {flowStep === "list" && (
+          <div className="space-y-3">
+            
+            {/* Search Bar + Experience Filter */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input 
                   type="text" 
-                  placeholder="Search doctors, clinics or specializations..." 
+                  placeholder={orderType === "appointment" ? "Search clinics by name, city..." : "Search doctors by name, specialization..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-3 text-sm outline-none focus:border-blue-400 transition-colors shadow-sm"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-[11px] outline-none focus:border-blue-600 transition-colors shadow-xs"
                 />
               </div>
 
-              {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[1, 2, 3, 4, 5, 6].map(i => (
-                    <div key={i} className="bg-white border border-slate-100 rounded-3xl p-5 animate-pulse">
-                      <div className="flex gap-4 mb-4">
-                        <div className="w-16 h-16 bg-slate-100 rounded-2xl"></div>
-                        <div className="flex-1 space-y-2 py-2">
-                          <div className="h-4 bg-slate-100 rounded w-3/4"></div>
-                          <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+              {orderType !== "appointment" && (
+                <button
+                  onClick={() => setShowFilterModal(true)}
+                  className={`px-3 py-2 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs ${
+                    selectedExpFilter !== "any" 
+                      ? "bg-blue-600 text-white border-blue-600" 
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>{selectedExpFilter !== "any" ? `${selectedExpFilter}+ Yrs` : "Filter"}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Content List: 2-COLUMN GRID ON WEBSITE VIEW */}
+            {loading ? (
+              <div className="py-12 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span>Loading verified vets & clinics...</span>
+              </div>
+            ) : orderType === "appointment" ? (
+              /* PART 2: CLINICS LIST (2-COLUMN GRID ON DESKTOP) */
+              filteredClinics.length === 0 ? (
+                <div className="p-5 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">No clinics found matching your search.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {filteredClinics.map(clinic => {
+                    const feeVal = getClinicCurrentPrice(clinic);
+                    const imgUrl = clinic.clinic_image_url || clinic.clinic_image || "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=600&q=80";
+                    const doctorsCount = clinic.doctors_count || (Array.isArray(clinic.doctors) ? clinic.doctors.length : 1);
+                    const isTrusted = (clinic.google_rating || 5.0) >= 4.5;
+
+                    return (
+                      <div key={clinic.id} className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                        <div className="relative h-32 w-full bg-slate-800">
+                          <img src={imgUrl} alt={clinic.name} className="w-full h-full object-cover" />
+                          {isTrusted && (
+                            <span className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-bold text-slate-800 shadow-sm flex items-center gap-1">
+                              ★ Trust
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
+                          <div>
+                            <div className="flex items-start justify-between gap-1.5">
+                              <div>
+                                <h3 className="font-bold text-slate-900 text-xs leading-snug line-clamp-1">{clinic.name}</h3>
+                                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                                  📍 {clinic.address || clinic.city || "Gurugram"}{clinic.pincode ? `, ${clinic.pincode}` : ""}
+                                </p>
+                              </div>
+                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0">
+                                ₹{feeVal}
+                              </span>
+                            </div>
+
+                            {/* Rating badge in SAME UI as Talk to Vet */}
+                            <div className="flex items-center gap-1.5 mt-2 text-[10px] flex-wrap">
+                              <span className="bg-amber-50 text-amber-900 border border-amber-200/80 font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                                ⭐ {clinic.google_rating || 5.0} <span className="text-amber-700 font-medium">({clinic.google_user_ratings_total || 50})</span>
+                              </span>
+                              <span className="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md">
+                                👤 {doctorsCount} Vet{doctorsCount > 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                            <span className="text-[10px] text-slate-400 font-medium">In-clinic visit</span>
+                            <button 
+                              onClick={() => handleSelectClinic(clinic)}
+                              className="bg-[#0052FF] hover:bg-[#0046DB] text-white font-bold text-[11px] px-3.5 py-1.5 rounded-full transition-all shadow-xs flex items-center gap-1"
+                            >
+                              Book Visit →
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="h-12 bg-slate-100 rounded-xl mt-4"></div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              /* PART 1: DOCTORS LIST (2-COLUMN GRID ON DESKTOP) */
+              filteredDoctors.length === 0 ? (
+                <div className="p-5 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">No doctors found matching filters.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {filteredDoctors.map(doc => {
+                    const isOnline = doc.status === "available" || doc.available;
+                    const displayPrice = getDoctorCurrentPrice(doc);
+
+                    return (
+                      <div key={doc.id} className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-2">
+                        <div className="flex items-start gap-2.5">
+                          {/* Left Doctor Avatar (Matches exact screenshot styling) */}
+                          <div className="relative w-14 h-14 rounded-2xl bg-[#e8f2fe] flex-shrink-0 border border-slate-200/80">
+                            {doc.image ? (
+                              <img src={doc.image} alt={doc.name} className="w-full h-full object-cover rounded-2xl" />
+                            ) : (
+                              <div className="w-full h-full bg-[#e8f2fe] text-[#0066cc] font-extrabold flex items-center justify-center text-xs rounded-2xl">
+                                DR
+                              </div>
+                            )}
+                            {isOnline && (
+                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#00c853] rounded-full border-2 border-white" title="Online now" />
+                            )}
+                          </div>
+
+                          {/* Right Details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-1 flex-wrap">
+                              <div>
+                                <h3 className="font-bold text-slate-900 text-xs leading-tight truncate">{doc.name}</h3>
+                                
+                                {/* Old Experience Badge */}
+                                <p className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
+                                  {doc.degree || "BVSc"} · {doc.experience || 5} yrs exp
+                                </p>
+                              </div>
+                              
+                              {/* Old Amber Google Rating Badge */}
+                              <span className="bg-amber-50 text-amber-900 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-amber-200/70 flex items-center gap-0.5 flex-shrink-0">
+                                ⭐ {doc.googleRating || 5.0} <span className="text-amber-700 font-medium">({doc.googleReviewCount || 50})</span>
+                              </span>
+                            </div>
+
+                            {/* Specialization Line */}
+                            <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
+                              {doc.specialization}
+                            </p>
+
+                            {/* Online Status Line */}
+                            <p className="text-[10px] font-medium text-emerald-600 mt-0.5 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                              <span>{isOnline ? "Online now" : "Available"} - Connects in {doc.responseTimeDay || "0 To 15 Mins"}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Bottom Row (Price on Left, Action Pill Buttons on Right) */}
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                          <div className="text-slate-900 font-extrabold text-xs">
+                            ₹{displayPrice}<span className="text-[10px] font-normal text-slate-400">/Consult</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => setViewProfileDoctor(doc)}
+                              className="px-3 py-1 border border-blue-200 text-blue-600 hover:bg-blue-50 text-[11px] font-bold rounded-full transition-all"
+                            >
+                              View Profile
+                            </button>
+                            <button
+                              onClick={() => handleBookNowClick(doc)}
+                              className="px-3.5 py-1 bg-[#0052FF] hover:bg-[#0046DB] text-white text-[11px] font-bold rounded-full transition-all shadow-xs"
+                            >
+                              Talk to Vet
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+          </div>
+        )}
+
+        {/* STEP 1: Describe Issue / Date Slots */}
+        {flowStep === "describe" && (
+          <div className="space-y-2.5 max-w-xl mx-auto">
+            
+            {/* Header info */}
+            {orderType === "appointment" ? (
+              <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-xs">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-xs">{selectedClinic?.name || selectedDoctor?.clinicName || "Clinic"}</h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{selectedClinic?.city || "Gurugram"}{selectedClinic?.pincode ? `, ${selectedClinic.pincode}` : ""}</p>
+                  <span className="inline-block mt-1 bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px] px-2 py-0.5 rounded-md">
+                    ★ {selectedClinic?.google_rating || 5.0} ({selectedClinic?.google_user_ratings_total || 78})
+                  </span>
+                </div>
+                <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 text-lg font-bold flex-shrink-0">
+                  🏥
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 shadow-xs">
+                {selectedDoctor?.image ? (
+                  <img src={selectedDoctor.image} alt={selectedDoctor.name} className="w-12 h-12 rounded-xl object-cover border border-slate-200 flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center text-sm flex-shrink-0">
+                    {selectedDoctor?.name?.charAt(0)}
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-bold text-slate-900 text-xs">{selectedDoctor?.name}</h3>
+                  <p className="text-[11px] font-semibold text-blue-600 mt-0.5">{selectedDoctor?.degree} · {selectedDoctor?.experience} Yrs Exp</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{selectedDoctor?.specialization}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Symptom Input Textarea Card */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-xs">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-slate-900">What issue is your pet facing?</label>
+                <span className="text-[10px] text-slate-400 font-medium">Keep it short and clear</span>
+              </div>
+
+              <textarea
+                value={issueText}
+                onChange={(e) => setIssueText(e.target.value)}
+                maxLength={500}
+                placeholder="Example: Vomiting since morning, not eating, low energy..."
+                className="w-full h-20 bg-slate-50/40 border border-slate-200 rounded-xl p-2.5 text-[11px] outline-none focus:border-blue-600 shadow-xs resize-none"
+              />
+              <p className="text-[10px] text-slate-400 text-left">{issueText.length}/500</p>
+            </div>
+
+            {/* Photo Upload Attachment Card */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-[11px] font-bold text-slate-900">Add a photo</h4>
+                  <p className="text-[10px] text-slate-400">Upload a clear image of the issue.</p>
+                </div>
+                
+                <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg shadow-xs transition-all inline-flex items-center gap-1 flex-shrink-0">
+                  <span className="text-xs">☁</span> Add Photo
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    multiple
+                    onChange={handleImageUpload} 
+                    className="hidden" 
+                  />
+                </label>
+              </div>
+
+              <p className="text-[10px] text-slate-400">
+                {orderType !== "appointment" ? "At least one image is required to continue." : "Photo attachment is optional for clinic visit."}
+              </p>
+
+              {attachedImages.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pt-1">
+                  {attachedImages.map(img => (
+                    <div key={img.id} className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-200 flex-shrink-0 group">
+                      <img src={img.src} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeAttachedImage(img.id)}
+                        className="absolute top-0.5 right-0.5 bg-black/70 hover:bg-black text-white p-0.5 rounded-full transition-colors"
+                      >
+                        <X size={10} />
+                      </button>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div>
-                  {trustedDoctors.length > 0 && (
-                    <div className="mb-2">
-                      <h3 className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                        <CheckCircle size={11} /> Your Trusted Vet
-                      </h3>
-                      <div className="grid grid-cols-1 gap-1.5">
-                        {trustedDoctors.map(doc => renderDoctorCard(doc, true))}
-                      </div>
-                    </div>
-                  )}
-
-                  {otherDoctors.length > 0 && (
-                    <div className="mt-1">
-                      {trustedDoctors.length > 0 ? (
-                        <>
-                          <div className="pt-2 pb-1">
-                            <button
-                              onClick={() => setShowAllDoctors(!showAllDoctors)}
-                              className="w-full flex items-center justify-between py-2.5 px-3 bg-sky-50 border border-sky-100 rounded-xl text-[11px] font-semibold text-sky-600 transition-all"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <Users className="w-3.5 h-3.5 text-sky-500" />
-                                <span>{showAllDoctors ? "View less vets" : `View more vets for ${pet.name || pet.pet_name || "your pet"}`}</span>
-                              </div>
-                              {showAllDoctors ? (
-                                <ChevronUp className="w-3.5 h-3.5 text-sky-500" />
-                              ) : (
-                                <ChevronDown className="w-3.5 h-3.5 text-sky-500" />
-                              )}
-                            </button>
-                          </div>
-
-                          {showAllDoctors && (
-                            <div className="mt-2">
-                              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5 border-t border-slate-100 pt-2 ml-4">Other Available Vets</h3>
-                              <div className="grid grid-cols-1 gap-1.5">
-                                {otherDoctors.map(doc => renderDoctorCard(doc, false))}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {otherDoctors.map(doc => renderDoctorCard(doc, false))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
               )}
             </div>
-          )}
 
-          {flowStep === "describe" && (
-            <div className="p-4 max-w-xl mx-auto space-y-3.5">
-              {/* Issue Description Textarea */}
-              <div>
-                <h3 className="text-xs font-bold text-slate-900 mb-1.5">Describe the issue</h3>
-                <textarea
-                  value={issueText}
-                  onChange={(e) => setIssueText(e.target.value)}
-                  maxLength={500}
-                  placeholder="Example: Vomiting since morning, not eating, low energy..."
-                  className="w-full h-20 border border-slate-200 rounded-xl p-2.5 text-xs focus:border-black outline-none resize-none shadow-sm"
-                />
-                <p className="text-[10px] text-slate-400 text-right mt-0.5">{issueText.length}/500</p>
+            {/* Red Light Guidance Alert Box (Only for Talk to Vet) */}
+            {orderType !== "appointment" && (
+              <div className="bg-red-50/80 border border-red-100 rounded-xl p-3 space-y-1.5 text-[11px] text-red-800 shadow-xs">
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500 font-bold text-xs leading-none mt-0.5">•</span>
+                  <span>Share clear symptoms and at least one photo for faster review.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500 font-bold text-xs leading-none mt-0.5">•</span>
+                  <span>Online consultation is for guidance. Emergency cases may still need a clinic visit.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500 font-bold text-xs leading-none mt-0.5">•</span>
+                  <span>Consultation starts after payment confirmation and doctor assignment.</span>
+                </div>
               </div>
+            )}
 
-              {/* Photo Upload */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  {orderType === "appointment" ? "Add a photo (optional)" : "Add a photo (required)"}
-                </label>
+            {/* Agreement Checkbox Container (Only for Talk to Vet) */}
+            {orderType !== "appointment" && (
+              <label className="flex items-start gap-2.5 bg-white border border-slate-200 rounded-xl p-3 cursor-pointer hover:border-slate-300 transition-all shadow-xs">
                 <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onloadend = () => setAttachedImages([{ uri: reader.result, name: file.name, file }]);
-                    reader.readAsDataURL(file);
-                  }}
-                  className="text-xs border border-slate-200 p-1.5 rounded-lg w-full bg-white"
+                  type="checkbox"
+                  checked={disclaimerAccepted}
+                  onChange={(e) => setDisclaimerAccepted(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-0.5 flex-shrink-0"
                 />
-                {attachedImages.length > 0 && (
-                  <img src={attachedImages[0].uri} className="mt-2 w-20 h-20 rounded-xl object-cover border border-slate-200" alt="attached" />
-                )}
-              </div>
+                <span className="text-[11px] text-slate-700 font-medium leading-tight">
+                  I understand online consultation is for guidance. Emergency cases may need a clinic visit.
+                </span>
+              </label>
+            )}
 
-              {/* Appointment Specific Section: Date & Active Slot Select on the SAME Describe Page */}
-              {orderType === "appointment" && (
-                <div className="border-t border-slate-100 pt-3 space-y-3">
-                  {/* Date Chips Row (Horizontal Scroll) */}
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 mb-2 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-blue-600" /> Select Appointment Date
-                    </h4>
-                    
-                    <div className="flex overflow-x-auto no-scrollbar gap-2 pb-1 scroll-smooth">
-                      {getUpcomingDates(7).map((d) => {
-                        const isSelected = selectedDate === d.dateStr;
+            {/* APPOINTMENT DATE/SLOTS */}
+            {orderType === "appointment" && (
+              <>
+                {/* STATIONED MEDICAL STAFF */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">STATIONED MEDICAL STAFF</span>
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {(selectedClinic?.doctors && selectedClinic.doctors.length > 0 ? selectedClinic.doctors : [selectedDoctor]).map(doc => {
+                      const dName = doc.doctor_name || doc.name || "Doctor";
+                      const isSel = selectedDoctor?.id === doc.id || selectedDoctor?.id === doc.doctor_id;
+                      const avatarUrl = normalizeImage(doc.doctor_blob_url || doc.doctor_image_blob_url || doc.doctor_image_url || doc.image);
+
+                      return (
+                        <div 
+                          key={doc.id || doc.doctor_id} 
+                          onClick={() => {
+                            const formattedDoc = {
+                              id: doc.id || doc.doctor_id,
+                              name: dName,
+                              degree: doc.degree || "BVSc",
+                              experience: doc.years_of_experience || 5,
+                              clinicId: selectedClinic?.id,
+                              clinicName: selectedClinic?.name
+                            };
+                            setSelectedDoctor(formattedDoc);
+                            fetchDateAvailabilityAndSlots(selectedDate || getUpcomingDates(7)[0].dateStr, formattedDoc, selectedClinic);
+                          }}
+                          className={`p-2 rounded-xl border text-center cursor-pointer transition-all flex flex-col items-center justify-center min-w-[96px] ${
+                            isSel ? "border-blue-600 bg-blue-50/60 shadow-xs" : "border-slate-200 bg-white hover:border-slate-300"
+                          }`}
+                        >
+                          {avatarUrl ? (
+                            <img src={avatarUrl} alt={dName} className="w-10 h-10 rounded-full object-cover mb-1 border border-slate-200" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center mb-1">
+                              {dName.charAt(0)}
+                            </div>
+                          )}
+                          <p className="text-[11px] font-bold text-slate-900 leading-tight truncate max-w-[85px]">{dName}</p>
+                          <p className="text-[9px] text-slate-400 mt-0.5">Doctor</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* VISIT DATE */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">VISIT DATE</span>
+                  <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                    {getUpcomingDates(7).map(d => {
+                      const isSel = selectedDate === d.dateStr;
+                      return (
+                        <button
+                          key={d.dateStr}
+                          onClick={() => fetchDateAvailabilityAndSlots(d.dateStr, selectedDoctor, selectedClinic)}
+                          className={`flex-1 min-w-[56px] py-2 px-1.5 rounded-xl border text-center transition-all ${
+                            isSel ? "border-blue-600 bg-blue-600 text-white font-bold shadow-xs" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                          }`}
+                        >
+                          <p className={`text-[9px] uppercase font-semibold ${isSel ? "text-blue-100" : "text-slate-400"}`}>{d.dayName}</p>
+                          <p className="text-xs font-bold mt-0.5">{d.dateNum}</p>
+                          <p className={`text-[9px] ${isSel ? "text-blue-100" : "text-slate-400"}`}>{d.monthName}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* AVAILABLE SLOTS */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">AVAILABLE SLOTS</span>
+                  {loadingSlots ? (
+                    <div className="py-4 text-center text-xs text-slate-500 flex items-center justify-center gap-1.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                      Loading slots...
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <div className="p-3 text-center bg-white border border-slate-200 rounded-xl text-xs text-slate-500">
+                      {dateAvailError || "No active slots available for this date. Please select another date."}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                      {availableSlots.map((s, idx) => {
+                        const slotLabel = s.label || s.start;
+                        const isSel = selectedTimeSlot === slotLabel;
                         return (
                           <button
-                            key={d.dateStr}
-                            type="button"
-                            onClick={() => fetchDateAvailabilityAndSlots(d.dateStr)}
-                            className={`flex-shrink-0 px-3 py-2 rounded-xl border text-center transition-all ${
-                              isSelected
-                                ? "border-blue-600 bg-blue-50/70 text-blue-700 font-bold shadow-sm"
-                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                            key={idx}
+                            onClick={() => setSelectedTimeSlot(slotLabel)}
+                            className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-all ${
+                              isSel ? "border-blue-600 bg-blue-50 text-blue-700 font-bold ring-1 ring-blue-600" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                             }`}
                           >
-                            <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">{d.dayName}</p>
-                            <p className="text-xs font-extrabold whitespace-nowrap">{d.dateNum} {d.monthName}</p>
+                            {slotLabel}
                           </button>
                         );
                       })}
                     </div>
-                  </div>
-
-                  {/* Active Slots (Only 5 Slots shown after current time) */}
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 mb-2 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-blue-600" /> Select Time Slot (Next 5 Available)
-                    </h4>
-
-                    {loadingSlots || loadingDateAvail ? (
-                      <div className="py-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
-                        Loading available time slots...
-                      </div>
-                    ) : availableSlots.length === 0 ? (
-                      <div className="p-3 text-center bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
-                        {dateAvailError || "No active slots available for this date. Please select another date."}
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {availableSlots.map((slotObj, idx) => {
-                          const slotText = slotObj.label || slotObj.start;
-                          const isSelected = selectedTimeSlot === slotText;
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => setSelectedTimeSlot(slotText)}
-                              className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all ${
-                                isSelected
-                                  ? "bg-blue-600 text-white shadow-md font-bold"
-                                  : "bg-white text-slate-800 border border-slate-200 hover:border-slate-300"
-                              }`}
-                            >
-                              {slotText}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-              )}
+              </>
+            )}
 
-              {/* Consent Checkbox */}
-              <label className="flex items-start gap-2 cursor-pointer bg-slate-50 border border-slate-200 rounded-xl p-2.5">
-                <input 
-                  type="checkbox" 
-                  checked={consentGiven} 
-                  onChange={(e) => setConsentGiven(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-black focus:ring-black mt-0.5"
-                />
-                <span className="text-[11px] text-slate-600">
-                  I understand online/clinic consultation guidance. Emergency cases may need immediate hospital care.
+            {error && (
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold rounded-xl flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* STEP 1 NEXT BUTTON */}
+            <button
+              disabled={
+                processing || 
+                (orderType === "appointment" && (!selectedDate || !selectedTimeSlot)) ||
+                (orderType !== "appointment" && (!disclaimerAccepted || attachedImages.length === 0))
+              }
+              onClick={handleLockSlotAndCheckout}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl disabled:opacity-40 disabled:bg-slate-200 disabled:text-slate-400 shadow-sm transition-all flex items-center justify-center gap-1.5 mt-3"
+            >
+              {processing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Continue to payment >"}
+            </button>
+
+          </div>
+        )}
+
+        {/* STEP 2: Checkout */}
+        {flowStep === "checkout" && (
+          <div className="space-y-2.5 max-w-xl mx-auto">
+
+            {/* COMPACT POINT-WISE SUMMARY CARD */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs space-y-2 text-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                <h3 className="font-extrabold text-slate-900 text-[11px] uppercase tracking-wider text-blue-600">Booking Summary</h3>
+                <span className="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full text-[10px] border border-blue-100">
+                  {orderType === "appointment" ? "In-Clinic Visit" : "Video Consultation"}
                 </span>
-              </label>
+              </div>
 
-              {error && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl p-2.5">
-                  {error}
-                </p>
-              )}
+              {/* Compact 2-Column Point Grid (Less Space, No Heavy Scrolling) */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* Doctor Info */}
+                <div className="bg-slate-50/70 p-2 rounded-lg border border-slate-100">
+                  <p className="text-[9px] uppercase font-bold text-slate-400">Doctor</p>
+                  <p className="font-extrabold text-slate-900 text-xs truncate">{selectedDoctor?.name || "Vet Doctor"}</p>
+                  <p className="text-[10px] text-slate-500 truncate">{selectedDoctor?.degree || "BVSc"}</p>
+                </div>
 
-              {/* CTA Button */}
-              <button
-                disabled={
-                  !canContinueToPayment || 
-                  (orderType === "appointment" && (!selectedDate || !selectedTimeSlot || processing))
-                }
-                onClick={() => {
-                  if (orderType === "appointment") {
-                    handleLockSlotAndCheckout();
-                  } else {
-                    setFlowStep("checkout");
-                  }
-                }}
-                className="w-full py-2.5 bg-black text-white rounded-xl text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors shadow-md flex items-center justify-center gap-2"
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Locking slot...
-                  </>
-                ) : (
-                  "Proceed to Checkout →"
-                )}
-              </button>
-            </div>
-          )}
+                {/* Pet Parent (User) Info */}
+                <div className="bg-slate-50/70 p-2 rounded-lg border border-slate-100">
+                  <p className="text-[9px] uppercase font-bold text-slate-400">Pet Parent</p>
+                  <p className="font-extrabold text-slate-900 text-xs truncate">{displayUserName}</p>
+                  <p className="text-[10px] text-slate-500 truncate">📞 {displayUserMobile}</p>
+                </div>
 
-          {flowStep === "checkout" && (
-            <div className="p-3 max-w-3xl mx-auto w-full flex flex-col md:flex-row gap-2">
-              {/* Left Column: Summary */}
-              <div className="flex-1">
-                <h3 className="text-sm font-bold text-slate-900 mb-2">Patient Details</h3>
-                <div className="bg-white border border-slate-200 rounded-2xl p-2.5 mb-4 shadow-sm text-xs">
-                  <div className="flex justify-between py-1.5 border-b border-slate-100">
-                    <span className="text-slate-500">Pet</span>
-                    <span className="font-semibold text-slate-900">{pet.name || pet.pet_name}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-slate-100">
-                    <span className="text-slate-500">Owner</span>
-                    <span className="font-semibold text-slate-900">{user.name || user.owner_name}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-slate-100">
-                    <span className="text-slate-500">Symptom</span>
-                    <span className="font-semibold text-slate-900 max-w-[200px] text-right truncate" title={issueText || symptomText}>{issueText || symptomText}</span>
-                  </div>
-                  {orderType === "appointment" && selectedDate && (
+                {/* Pet Info */}
+                <div className="bg-slate-50/70 p-2 rounded-lg border border-slate-100">
+                  <p className="text-[9px] uppercase font-bold text-slate-400">Pet</p>
+                  <p className="font-extrabold text-slate-900 text-xs truncate">🐾 {displayPetName}</p>
+                  <p className="text-[10px] text-slate-500 truncate">{displayPetBreed}</p>
+                </div>
+
+                {/* Schedule / Consult Mode Info */}
+                <div className="bg-slate-50/70 p-2 rounded-lg border border-slate-100">
+                  <p className="text-[9px] uppercase font-bold text-slate-400">
+                    {orderType === "appointment" ? "Visit Schedule" : "Consult Mode"}
+                  </p>
+                  {orderType === "appointment" ? (
                     <>
-                      <div className="flex justify-between py-1.5 border-b border-slate-100">
-                        <span className="text-slate-500">Visit Date</span>
-                        <span className="font-semibold text-blue-700">{selectedDate}</span>
-                      </div>
-                      <div className="flex justify-between py-1.5 border-b border-slate-100">
-                        <span className="text-slate-500">Time Slot</span>
-                        <span className="font-semibold text-blue-700">{selectedTimeSlot}</span>
-                      </div>
+                      <p className="font-extrabold text-slate-900 text-xs truncate">📅 {selectedDate}</p>
+                      <p className="text-[10px] text-blue-700 font-bold truncate">⏰ {selectedTimeSlot}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-extrabold text-slate-900 text-xs truncate">⚡ Instant Video</p>
+                      <p className="text-[10px] text-emerald-700 font-bold truncate">Connects in 0-15m</p>
                     </>
                   )}
                 </div>
-
-                <h3 className="text-sm font-bold text-slate-900 mb-2">Doctor / Clinic Details</h3>
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-                  {selectedDoctor?.image ? (
-                    <img src={selectedDoctor.image} alt={selectedDoctor.name} className="w-12 h-12 rounded-xl object-cover" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold">
-                      {selectedDoctor?.name?.charAt(0)}
-                    </div>
-                  )}
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{selectedDoctor?.name}</h4>
-                    <p className="text-xs text-slate-500">{selectedDoctor?.specialization}</p>
-                    {selectedDoctor?.clinicName && (
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">🏥 {selectedDoctor.clinicName}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Payment */}
-              <div className="w-full md:w-80">
-                <div className="bg-white border border-slate-200 rounded-xl p-2.5 mb-3 shadow-sm">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={gstInvoiceChecked}
-                      onChange={(e) => {
-                        setGstInvoiceChecked(e.target.checked);
-                        if (!e.target.checked) setGstNumber("");
-                      }}
-                      className="w-4 h-4 rounded border-slate-300 text-black focus:ring-black"
-                    />
-                    <div>
-                      <p className="text-xs font-semibold text-slate-900">Need GST invoice</p>
-                      <p className="text-[11px] text-slate-500">Add GST details for business billing</p>
-                    </div>
-                  </label>
-                  {gstInvoiceChecked && (
-                    <input
-                      type="text"
-                      maxLength={15}
-                      value={gstNumber}
-                      onChange={(e) => setGstNumber(e.target.value.toUpperCase().replace(/\s+/g, ""))}
-                      placeholder="Enter 15-digit GST number"
-                      className="mt-3 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs uppercase tracking-wide focus:border-black outline-none"
-                    />
-                  )}
-                </div>
-
-                <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xl">
-                  <h3 className="text-sm font-bold text-slate-900 mb-4">Payment Summary</h3>
-                  
-                  <div className="space-y-2 text-xs mb-4">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Consultation Fee</span>
-                      <span className="font-semibold text-slate-900">{formatCurrency(fee)}</span>
-                    </div>
-                    
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">GST (18%)</span>
-                      <span className="font-semibold text-slate-900">{formatCurrency(gstAmount)}</span>
-                    </div>
-
-                    <div className="border-t border-slate-100 pt-2 flex justify-between font-bold text-sm text-slate-900">
-                      <span>Total Amount</span>
-                      <span className="text-blue-600">{formatCurrency(totalAmount)}</span>
-                    </div>
-                  </div>
-
-                  {error && (
-                    <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-2 mb-3">
-                      {error}
-                    </p>
-                  )}
-
-                  <button
-                    onClick={handlePayment}
-                    disabled={processing}
-                    className="w-full py-2.5 bg-black text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    {processing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Processing...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4" /> Pay {formatCurrency(totalAmount)}
-                      </>
-                    )}
-                  </button>
-                </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Doctor Profile Modal */}
-      {viewProfileDoctor && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/50 animate-[fadeIn_0.15s_ease-out]" onClick={() => setViewProfileDoctor(null)}>
-          <div
-            className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-[scaleInUp_0.2s_ease-out]"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-              <span className="text-sm font-bold text-slate-800">Doctor Profile</span>
-              <button onClick={() => setViewProfileDoctor(null)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors">
-                <X className="w-4 h-4 text-slate-500" />
-              </button>
+
+            {/* SECURE CHECKOUT */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 shadow-xs text-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">SECURE CHECKOUT</span>
+              <div className="flex justify-between py-0.5 text-slate-700">
+                <span>Consultation Fee ({isDayTimeNow() ? "Day Rate" : "Night Rate"})</span>
+                <span className="font-bold text-slate-900">₹{currentFee}</span>
+              </div>
+              <div className="flex justify-between py-0.5 text-slate-700">
+                <span>Taxes & GST (18%)</span>
+                <span className="font-bold text-slate-900">₹{gstAmount}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-t border-slate-100 font-extrabold text-xs text-slate-900">
+                <span>Total payable</span>
+                <span className="text-blue-700 text-sm">₹{totalAmount}</span>
+              </div>
             </div>
 
-            {/* Doctor Info */}
-            <div className="p-5">
-              <div className="flex gap-4 mb-4">
-                {viewProfileDoctor.image ? (
-                  <img src={viewProfileDoctor.image} alt={viewProfileDoctor.name} className="w-20 h-20 rounded-2xl object-cover border border-slate-100 shadow-sm flex-shrink-0" />
-                ) : (
-                  <div className="w-20 h-20 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-2xl font-bold flex-shrink-0">
-                    {viewProfileDoctor.name?.charAt(0)}
-                  </div>
-                )}
+            {/* GST Invoice */}
+            <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={gstInvoiceChecked}
+                  onChange={(e) => setGstInvoiceChecked(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-0.5" 
+                />
                 <div>
-                  <h3 className="font-bold text-slate-900 text-base leading-tight">{viewProfileDoctor.name}</h3>
-                  <p className="text-xs text-slate-500 mt-1">{viewProfileDoctor.specialization}</p>
-                  {viewProfileDoctor.experience && (
-                    <span className="inline-block mt-1.5 text-xs font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">
-                      {viewProfileDoctor.experience}y experience
-                    </span>
-                  )}
-                  <p className="text-xs font-semibold text-emerald-600 mt-1.5">
-                    {viewProfileDoctor.availability?.isAvailable ? "🟢 Online now" : "Consult available"}
-                  </p>
+                  <p className="text-xs font-bold text-slate-800">GST Invoice</p>
+                  <p className="text-[10px] text-slate-400">Need GST invoice - Add GST details for business billing</p>
                 </div>
-              </div>
-
-              {/* Divider row */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-slate-50 rounded-xl p-3 text-center">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-0.5">Consultation Fee</p>
-                  <p className="text-base font-extrabold text-slate-800">{formatCurrency(resolveDoctorFee(viewProfileDoctor, slot))}</p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3 text-center">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-0.5">Experience</p>
-                  <p className="text-base font-extrabold text-slate-800">{viewProfileDoctor.experience || "—"}y</p>
-                </div>
-              </div>
-
-              {viewProfileDoctor.clinicName && (
-                <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-xl mb-4">
-                  <span className="text-blue-500 text-sm">🏥</span>
-                  <p className="text-xs text-blue-700 font-medium">{viewProfileDoctor.clinicName}</p>
-                </div>
+              </label>
+              {gstInvoiceChecked && (
+                <input
+                  type="text"
+                  maxLength={15}
+                  value={gstNumber}
+                  onChange={(e) => setGstNumber(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                  placeholder="Enter 15-digit GST number"
+                  className="mt-2 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs uppercase focus:border-blue-500 outline-none"
+                />
               )}
+            </div>
 
-              {/* CTA */}
-              <button
-                onClick={() => {
-                  setViewProfileDoctor(null);
-                  handleBookNowClick(viewProfileDoctor);
-                }}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl transition-all shadow-md"
-              >
-                {orderType === "appointment" ? "Book Visit" : "Talk to Vet"}
+            {/* PAYMENT PREFERENCE (Only for In-Clinic Flow) */}
+            {orderType === "appointment" && (
+              <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">PAYMENT PREFERENCE</span>
+                
+                <label className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                  paymentPreference === "pay_online" ? "border-blue-600 bg-blue-50/50" : "border-slate-200 hover:border-slate-300"
+                }`}>
+                  <input 
+                    type="radio" 
+                    name="pay_pref" 
+                    checked={paymentPreference === "pay_online"}
+                    onChange={() => setPaymentPreference("pay_online")}
+                    className="mt-0.5 text-blue-600 focus:ring-blue-500" 
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Pay Online</p>
+                    <p className="text-[10px] text-slate-500">Secure UPI, card or netbanking. Instant booking confirmation.</p>
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                  paymentPreference === "pay_at_clinic" ? "border-blue-600 bg-blue-50/50" : "border-slate-200 hover:border-slate-300"
+                }`}>
+                  <input 
+                    type="radio" 
+                    name="pay_pref" 
+                    checked={paymentPreference === "pay_at_clinic"}
+                    onChange={() => setPaymentPreference("pay_at_clinic")}
+                    className="mt-0.5 text-blue-600 focus:ring-blue-500" 
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Pay at Clinic</p>
+                    <p className="text-[10px] text-slate-500">Confirm your visit now and pay directly at the clinic reception.</p>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {error && (
+              <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
+                {error}
+              </div>
+            )}
+
+            {/* FINAL ACTION BUTTON */}
+            <button
+              disabled={processing}
+              onClick={handlePayment}
+              className="w-full py-3 bg-gradient-to-r from-sky-600 to-cyan-500 text-white font-extrabold text-xs rounded-xl shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-1.5"
+            >
+              {processing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (orderType === "appointment" && paymentPreference === "pay_at_clinic") ? (
+                `Confirm Visit ₹${totalAmount} →`
+              ) : (
+                `Pay ₹${totalAmount} & Book →`
+              )}
+            </button>
+
+          </div>
+        )}
+
+      </div>
+
+      {/* FILTER MODAL */}
+      {showFilterModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 animate-[fadeIn_0.15s_ease-out]" onClick={() => setShowFilterModal(false)}>
+          <div className="bg-white w-full max-w-xs rounded-2xl p-4 shadow-2xl space-y-3 animate-[scaleInUp_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-xs font-bold text-slate-900">Filter Vets by Experience</h3>
+              <button onClick={() => setShowFilterModal(false)} className="p-1 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600">
+                <X size={14} />
               </button>
+            </div>
+
+            <div className="space-y-1.5">
+              {[
+                { label: "Any Experience", val: "any" },
+                { label: "1+ Years", val: "1" },
+                { label: "3+ Years", val: "3" },
+                { label: "5+ Years", val: "5" },
+                { label: "10+ Years", val: "10" }
+              ].map(opt => (
+                <button
+                  key={opt.val}
+                  onClick={() => {
+                    setSelectedExpFilter(opt.val);
+                    setShowFilterModal(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+                    selectedExpFilter === opt.val
+                      ? "border-blue-600 bg-blue-50 text-blue-700 font-bold"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {showUserDetailsModal && (
-        <UserDetailsOtpModal
-          onClose={() => {
-            setShowUserDetailsModal(false);
-            setPendingDoctor(null);
-          }}
-          onComplete={() => {
-            setShowUserDetailsModal(false);
-            if (pendingDoctor) {
-              setSelectedDoctor(pendingDoctor);
-              if (orderType === "appointment") {
-                const todayStr = getUpcomingDates(7)[0].dateStr;
-                fetchDateAvailabilityAndSlots(todayStr, pendingDoctor);
-              }
-              setFlowStep("describe");
-              setPendingDoctor(null);
-            }
-          }}
-        />
+      {/* VIEW PROFILE MODAL — RAZORPAY UI STYLE */}
+      {viewProfileDoctor && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 animate-[fadeIn_0.15s_ease-out]" onClick={() => setViewProfileDoctor(null)}>
+          <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl border border-slate-200 animate-[scaleInUp_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            
+            {/* Razorpay Signature Style Navy Top Banner Header */}
+            <div className="bg-[#0c2340] text-white px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-blue-500/20 border border-blue-400/40 flex items-center justify-center">
+                  <Shield className="w-3.5 h-3.5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-300">Verified Doctor Profile</h3>
+                  <p className="text-xs font-bold text-white leading-tight">{viewProfileDoctor.name}</p>
+                </div>
+              </div>
+
+              <button onClick={() => setViewProfileDoctor(null)} className="p-1 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Body Info in Razorpay Card Layout */}
+            <div className="p-3 max-h-[70vh] overflow-y-auto space-y-2.5 bg-slate-50/50">
+              
+              {/* Doctor Avatar Card */}
+              <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
+                  {viewProfileDoctor.image ? (
+                    <img src={viewProfileDoctor.image} alt={viewProfileDoctor.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-slate-900 text-white font-bold flex items-center justify-center text-sm">
+                      {viewProfileDoctor.name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-1">
+                    <h4 className="font-extrabold text-slate-900 text-xs">{viewProfileDoctor.name}</h4>
+                    <span className="bg-blue-50 text-blue-700 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 border border-blue-200">
+                      <Check size={8} /> Verified
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-semibold text-blue-600 mt-0.5">
+                    {viewProfileDoctor.degree} · {viewProfileDoctor.experience} Yrs Exp
+                  </p>
+                  {viewProfileDoctor.googleRating !== null && (
+                    <span className="inline-flex items-center gap-1 mt-0.5 bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded-md text-[10px] font-bold">
+                      ⭐ {viewProfileDoctor.googleRating} ({viewProfileDoctor.googleReviewCount})
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* LIVE PRICING BREAKDOWN CARD */}
+              <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs space-y-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium text-[11px]">Consultation Mode</span>
+                  <span className="font-bold text-slate-900 text-[11px]">Video Consultation</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-1">
+                  <span className="text-slate-500 font-medium text-[10px]">
+                    Current Rate ({isDayTimeNow() ? "Day Rate" : "Night Rate"})
+                  </span>
+                  <span className="font-extrabold text-emerald-700 text-xs">
+                    ₹{getDoctorCurrentPrice(viewProfileDoctor)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Specialization */}
+              <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs space-y-1.5">
+                <h5 className="text-[9px] font-bold uppercase tracking-wider text-slate-400">SPECIALIZATIONS</h5>
+                <div className="flex flex-wrap gap-1">
+                  {viewProfileDoctor.specialization.split(",").map((s, idx) => (
+                    <span key={idx} className="bg-slate-100 text-slate-700 text-[10px] font-medium px-2 py-0.5 rounded-md">
+                      {s.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Doctor Bio */}
+              {viewProfileDoctor.bio && (
+                <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs space-y-1">
+                  <h5 className="text-[9px] font-bold uppercase tracking-wider text-slate-400">ABOUT DOCTOR</h5>
+                  <p className="text-[11px] text-slate-700 leading-snug whitespace-pre-line">
+                    {viewProfileDoctor.bio}
+                  </p>
+                </div>
+              )}
+
+              {/* Response Time & Follow-up */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-emerald-50/70 border border-emerald-200/70 rounded-lg p-2">
+                  <p className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider">Day Response</p>
+                  <p className="font-extrabold text-emerald-900 mt-0.5 text-[11px]">{viewProfileDoctor.responseTimeDay || "0 To 15 Mins"}</p>
+                </div>
+                <div className="bg-blue-50/70 border border-blue-200/70 rounded-lg p-2">
+                  <p className="text-[9px] font-bold text-blue-800 uppercase tracking-wider">Night Response</p>
+                  <p className="font-extrabold text-blue-900 mt-0.5 text-[11px]">{viewProfileDoctor.responseTimeNight || "15 To 20 Mins"}</p>
+                </div>
+              </div>
+
+              {viewProfileDoctor.followUpPolicy && (
+                <div className="bg-purple-50/70 border border-purple-200/70 rounded-lg p-2 text-[11px] text-purple-900 font-semibold flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />
+                  <span>{viewProfileDoctor.followUpPolicy}</span>
+                </div>
+              )}
+
+            </div>
+
+            {/* Razorpay Signature Bottom CTA Button */}
+            <div className="p-3 bg-white border-t border-slate-200">
+              <button
+                onClick={() => {
+                  const doc = viewProfileDoctor;
+                  setViewProfileDoctor(null);
+                  handleBookNowClick(doc);
+                }}
+                className="w-full py-2.5 bg-[#0052FF] hover:bg-[#0046DB] text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+              >
+                Proceed to Book (₹{getDoctorCurrentPrice(viewProfileDoctor)}) →
+              </button>
+            </div>
+
+          </div>
+        </div>
       )}
+
     </div>
   );
 }

@@ -290,7 +290,7 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
     }
     const stored = localStorage.getItem("symptom_description");
     if (stored) return stored;
-    return bookingOrderType === "appointment" ? "Clinic Visit Booking" : "Video Consult Booking";
+    return "";
   };
 
   const getProcessedServiceCards = (raw) => {
@@ -777,9 +777,7 @@ function stripBase64Prefix(dataUrl) {
         {showPetModal && (
           <ModalShell>
             <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-white shadow-2xl max-h-[90vh] flex flex-col">
-              <button onClick={() => setShowPetModal(false)} className="absolute top-4 right-4 z-50 p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-500 hover:text-slate-900 transition-colors">
-                <X size={20} />
-              </button>
+              {/* Pet Details Modal - Close button removed so user cannot dismiss without filling */}
               <div className="w-full overflow-y-auto">
                 <PetForn 
                   submitIntake={submitIntakeForm} 
