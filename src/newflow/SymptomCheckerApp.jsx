@@ -3,6 +3,7 @@ import SymptomCheckerSidebar from "./SymptomCheckerSidebar";
 import SymptomCheckerFlow from "./SymptomCheckerFlow";
 import { Menu } from "lucide-react";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
+import snoutiq_app_icon1 from "../assets/images/logo.png";
 
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import PetSelectorDropdown from "./PetSelectorDropdown";
@@ -46,7 +47,7 @@ export default function SymptomCheckerApp() {
             >
               <Menu size={24} />
             </button>
-            <img src={snoutiq_app_icon} alt="Snoutiq" className="h-6 w-6 rounded-xl ml-3" />
+            <img src={snoutiq_app_icon1} alt="Snoutiq" className="h-6 w-6 rounded-xl ml-3" />
             <span className="ml-2 font-bold text-slate-900">AI Chat</span>
           </div>
 
@@ -56,8 +57,8 @@ export default function SymptomCheckerApp() {
         {/* Desktop Header */}
         <div className="hidden md:flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
           <div className="flex items-center gap-2">
-            <img src={snoutiq_app_icon} alt="Snoutiq" className="h-6 w-6 rounded-xl ml-2" />
-            <span className="font-semibold text-slate-700">AI Chat</span>
+            <img src={snoutiq_app_icon1} alt="Snoutiq" className="h-4 ml-2" />
+            {/* <span className="font-semibold text-slate-700">AI Chat</span> */}
           </div>
 
           <PetSelectorDropdown onAddNewPet={handleOpenPetModal} />

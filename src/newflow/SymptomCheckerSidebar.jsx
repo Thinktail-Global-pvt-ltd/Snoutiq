@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import { apiBaseUrl } from "../lib/api";
 import { readAiAuthState } from "../ai/AiAuth";
-import snoutiq_app_icon from "../assets/images/logo.png";
+// import snoutiq_app_icon from "../assets/images/logo.png";
+import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 
 const PAGES = [
   { name: "Register for Vet", path: "/vets", icon: Stethoscope },
@@ -101,7 +102,7 @@ export default function SymptomCheckerSidebar({ isOpen, setIsOpen, activeChatRoo
       {/* Header */}
       <div className="flex h-14 items-center justify-between px-4 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <img src={snoutiq_app_icon} alt="Snoutiq" className="h-4 " />
+          <img src={snoutiq_app_icon} alt="Snoutiq" className="h-8 w-8 rounded-full" />
         </div>
         <button onClick={() => setIsOpen(false)} className="md:hidden text-slate-500 hover:text-slate-800">
           <X size={20} />
