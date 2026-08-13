@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import SymptomCheckerSidebar from "./SymptomCheckerSidebar";
 import SymptomCheckerFlow from "./SymptomCheckerFlow";
-import { Menu } from "lucide-react";
+import { Menu, PanelLeft } from "lucide-react";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 import snoutiq_app_icon1 from "../assets/images/logo.png";
 
@@ -9,7 +9,8 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import PetSelectorDropdown from "./PetSelectorDropdown";
 
 export default function SymptomCheckerApp() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // mobile drawer
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true); // desktop collapse
   const [activeChatRoomToken, setActiveChatRoomToken] = useState(
     () => sessionStorage.getItem("snoutiq_active_chat_token") || null
   );
@@ -41,6 +42,8 @@ export default function SymptomCheckerApp() {
       <SymptomCheckerSidebar 
         isOpen={isSidebarOpen} 
         setIsOpen={setIsSidebarOpen}
+        isDesktopOpen={isDesktopSidebarOpen}
+        setIsDesktopOpen={setIsDesktopSidebarOpen}
         activeChatRoomToken={activeChatRoomToken}
         onSelectChat={(token) => {
           handleSetActiveChatRoomToken(token);
@@ -50,7 +53,7 @@ export default function SymptomCheckerApp() {
         historyRefreshKey={historyRefreshKey}
       />
       
-      <div className="flex flex-1 flex-col relative w-full h-full">
+      <div className="flex flex-1 flex-col relative w-full h-full min-w-0">
         {/* Mobile Header */}
         <div className="md:hidden flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4">
           <div className="flex items-center">
@@ -70,6 +73,16 @@ export default function SymptomCheckerApp() {
         {/* Desktop Header */}
         <div className="hidden md:flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
           <div className="flex items-center gap-2">
+            {/* Expand button — only visible when the desktop sidebar is collapsed */}
+            {!isDesktopSidebarOpen && (
+              <button
+                onClick={() => setIsDesktopSidebarOpen(true)}
+                className="text-slate-500 hover:text-slate-800 p-1.5 rounded-md hover:bg-slate-100 transition-colors mr-1"
+                title="Expand sidebar"
+              >
+                <PanelLeft size={20} />
+              </button>
+            )}
             <img src={snoutiq_app_icon1} alt="Snoutiq" className="h-4 ml-2" />
             {/* <span className="font-semibold text-slate-700">AI Chat</span> */}
           </div>
@@ -82,6 +95,7 @@ export default function SymptomCheckerApp() {
             activeChatRoomToken={activeChatRoomToken}
             setActiveChatRoomToken={handleSetActiveChatRoomToken}
             onMessageSent={() => setHistoryRefreshKey(prev => prev + 1)}
+            isDesktopSidebarOpen={isDesktopSidebarOpen}
           />
         </div>
       </div>

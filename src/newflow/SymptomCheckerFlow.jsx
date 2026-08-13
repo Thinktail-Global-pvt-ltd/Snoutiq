@@ -81,7 +81,7 @@ function ImageUploadModal({ onClose, onUpload }) {
   );
 }
 
-export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatRoomToken, onMessageSent }) {
+export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatRoomToken, onMessageSent, isDesktopSidebarOpen = true }) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
@@ -737,7 +737,11 @@ function stripBase64Prefix(dataUrl) {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 md:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4">
+            <div
+              className={`fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 transition-all duration-300 ${
+                isDesktopSidebarOpen ? "md:left-64" : "md:left-16"
+              }`}
+            >
               {attachedImage && (
                 <div className="mb-2 flex items-center justify-start">
                   <div className="relative inline-block group">
