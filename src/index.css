@@ -67,3 +67,9 @@ html {
     height: 11.5rem !important;
   }
 }
+
+/* Hide Behold Instagram widget attribution badge */
+behold-widget [class*="badge"],
+behold-widget a[href*="behold.so"] {
+  display: none !important;
+}

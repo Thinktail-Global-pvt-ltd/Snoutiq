@@ -30,6 +30,7 @@ const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
 const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
 const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
 const GoogleAuthTest = lazy(() => import("./pages/GoogleAuthTest"));
+const InstagramTest = lazy(() => import("./pages/InstagramTest"));
 const InternalUserDeletePage = lazy(() =>
   import("./pages/InternalUserDeletePage")
 );
@@ -149,7 +150,7 @@ const InClinicFastBookingFlow = lazy(() => import("./ai/InClinicFastBookingFlow"
 const HomeVetBookingFlow = lazy(() => import("./ai/HomeVetBookingFlow"));
 const ProtectedBookingRoute = lazy(() => import("./ai/ProtectedBookingRoute"));
 const AppointmentThankYouPage = lazy(() => import("./ai/AppointmentThankYouPage"));
-const symptomCheckerApp = lazy(() => import("./newflow/SymptomCheckerApp.jsx"));
+const SymptomCheckerApp = lazy(() => import("./newflow/SymptomCheckerApp"));
 const AppointmentPage = lazy(() =>
   import("./ai/usePetOverviewCards.jsx").then((module) => ({
     default: module.AppointmentPage,
@@ -298,6 +299,7 @@ export default function AppRoutes() {
         <Route path="/csv-upload" element={<CsvUploadPage />} />
         <Route path="/s3-upload-test" element={<S3UploadTest />} />
         <Route path="/google-auth-test" element={<GoogleAuthTest />} />
+        <Route path="/instagram-test" element={<InstagramTest />} />
         <Route
           path="/__ops/company-user-archive-r4k9d2x"
           element={<InternalUserDeletePage />}
