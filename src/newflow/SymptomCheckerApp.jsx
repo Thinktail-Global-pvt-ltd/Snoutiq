@@ -60,8 +60,8 @@ export default function SymptomCheckerApp() {
             >
               <Menu size={24} />
             </button>
-            <img src={snoutiq_app_icon1} alt="Snoutiq" className="h-6 w-6 rounded-xl ml-3" />
-            <span className="ml-2 font-bold text-slate-900">AI Chat</span>
+            <img src={snoutiq_app_icon1} alt="Snoutiq" className="h-4 ml-3" />
+            {/* <span className="ml-2 font-bold text-slate-900">AI Chat</span> */}
           </div>
 
           <PetSelectorDropdown onAddNewPet={handleOpenPetModal} />

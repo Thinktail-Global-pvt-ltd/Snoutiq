@@ -10,7 +10,7 @@ export function NewFooter() {
     <footer className="border-t border-slate-200 bg-white py-10 text-slate-600 sm:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Top row */}
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-5 md:items-start">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-4 md:items-start">
           {/* 1. Brand */}
           <div>
             <a
@@ -68,7 +68,7 @@ export function NewFooter() {
           </div>
 
           {/* 2. Services */}
-          <div>
+          {/* <div>
             <h3 className="mb-4 font-semibold text-slate-900">Services</h3>
             <ul className="space-y-2 text-sm">
               <li><Link to="/veterinary-doctor-online-india" className="hover:text-brand transition-colors">Video Consultation</Link></li>
@@ -77,13 +77,13 @@ export function NewFooter() {
               <li><Link to="/dog-neutering-delhi" className="hover:text-brand transition-colors">Dog Neutering</Link></li>
               <li><Link to="/cat-neutering-delhi" className="hover:text-brand transition-colors">Cat Neutering</Link></li>
             </ul>
-          </div>
+          </div> */}
 
           {/* 3. Resources */}
           <div>
             <h3 className="mb-4 font-semibold text-slate-900">Resources</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/ask" className="hover:text-brand transition-colors">Symptom Checker</Link></li>
+              <li><Link to="/" className="hover:text-brand transition-colors">Symptom Checker</Link></li>
               <li><Link to="/vet-insights" className="hover:text-brand transition-colors">Vet Insights</Link></li>
               <li><Link to="/blog" className="hover:text-brand transition-colors">Blog</Link></li>
               <li><Link to="/vet-insights/interview-dr-sharma-emergency-care" className="hover:text-brand transition-colors">Emergency Care Guide</Link></li>

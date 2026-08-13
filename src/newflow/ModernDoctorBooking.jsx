@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, Users, Calendar, Clock, Loader2, Filter, Star, MapPin, Award, Check } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, Users, Calendar, Clock, Loader2, Filter, Star, MapPin, Award, Check, Sparkles } from "lucide-react";
 import { readAiAuthState } from "../ai/AiAuth";
 import UserDetailsOtpModal from "./UserDetailsOtpModal";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
@@ -150,7 +150,7 @@ function isSlotAfterCurrentTime(slotTimeStr, selectedDateStr) {
   const match = String(slotTimeStr).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
   if (!match) return true;
 
-  let hours = parseInt(match[1], 10);
+  let hours = parseInt(match, 10);
   const mins = parseInt(match[2], 10);
   const ampm = match[3] ? match[3].toUpperCase() : null;
 
@@ -898,7 +898,7 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-100 w-full min-h-screen overflow-hidden animate-[slideInRight_0.25s_cubic-bezier(0.16,1,0.3,1)]">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-100 w-full min-h-screen overflow-hidden animate-">
       
       {/* Full Page Mobile / App Style Top Header Bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between px-3.5 py-2.5 bg-white border-b border-slate-200 shadow-xs">
@@ -966,6 +966,18 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
                 </button>
               )}
             </div>
+
+            {/* AI Assessment Alert Card (Only in Talk to Vet Flow) */}
+            {orderType !== "appointment" && (
+              <div className="bg-[#f0f6ff] border border-[#dbeafe] rounded-2xl p-3 flex items-center gap-2.5 shadow-2xs">
+                <div className="p-1 rounded-lg bg-blue-100/60 text-blue-600 flex-shrink-0">
+                  <Sparkles className="w-4 h-4 fill-blue-600 text-blue-600" />
+                </div>
+                <p className="text-xs font-semibold text-slate-800 leading-snug">
+                  <span className="font-bold">{displayPetName}</span>&apos;s AI assessment is ready to share with your veterinarian.
+                </p>
+              </div>
+            )}
 
             {/* Content List: 2-COLUMN GRID ON WEBSITE VIEW */}
             {loading ? (
