@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import Hero from './HeroSection';
 import FeatureCard from '../components/FeatureCard';
 import Workflow from '../components/Workflow';
@@ -184,7 +185,11 @@ const ClinicsSolutionPage = () => {
 
   return (
     <>
-    <Header/>
+      <Helmet>
+        <meta name="robots" content="index,follow" />
+        <link rel="canonical" href="https://snoutiq.com/clinics-solution" />
+      </Helmet>
+      <Header/>
       <Hero
         badge="Built for Veterinary Clinics"
         title="Transform Your Clinic into a Modern Digital Practice"

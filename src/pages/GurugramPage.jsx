@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import Hero from './HeroSection';
 import FeatureCard from '../components/FeatureCard';
 import Benefits from '../components/Benefits';
@@ -185,7 +186,11 @@ const GurugramPage = () => {
 
   return (
     <>
-    <Header/>
+      <Helmet>
+        <meta name="robots" content="index,follow" />
+        <link rel="canonical" href="https://snoutiq.com/gurugram" />
+      </Helmet>
+      <Header/>
       <Hero
         badge="Trusted by  Gurugram Professionals"
         title="Gurugram's  Veterinary Practice Management Software"

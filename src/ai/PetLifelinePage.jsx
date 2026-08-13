@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 
 const DEFAULT_PET_ID = 935;
 const API_BASE = "https://snoutiq.com/backend/api";
@@ -958,6 +959,9 @@ export default function PetLifelinePage() {
       className="min-h-screen"
       style={{ backgroundColor: SCREEN_BACKGROUND, color: TEXT_PRIMARY }}
     >
+      <Helmet>
+        <meta name="robots" content="noindex,follow" />
+      </Helmet>
       <div className="mx-auto max-w-4xl px-4 pb-8 pt-4">
         <header className="mb-4 flex items-center rounded-2xl border border-black/10 bg-white px-4 py-3">
           <button

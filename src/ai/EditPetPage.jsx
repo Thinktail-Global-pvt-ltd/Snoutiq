@@ -1,6 +1,7 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { updateAiUserData } from "./AiAuth";
 
 const API_BASE_URL = "https://snoutiq.com/backend/api";
@@ -906,6 +907,9 @@ export default function EditPetPage() {
 
   return (
     <div style={styles.page}>
+      <Helmet>
+        <meta name="robots" content="noindex,follow" />
+      </Helmet>
       <div style={styles.headerShell}>
         <div style={styles.headerInner}>
           <button

@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { loadVetAuth, saveVetAuth } from "../lib/vetAuth";
 import { registerDoctorPush } from "../lib/firebaseMessaging";
 
@@ -78,22 +79,27 @@ const VetDashboard = () => {
   };
 
   return (
-    <Suspense fallback={<LoadingScreen />}>
-      {auth ? (
-        <VetDashboardScreen
-          auth={auth}
-          onLogout={() => navigate("/auth", { replace: true })}
-        />
-      ) : (
-        <VetLoginScreen
-          onLogin={handleLogin}
-          onRegisterClick={() =>
-            navigate("/auth", { state: { mode: "register" } })
-          }
-          onBack={() => navigate("/")}
-        />
-      )}
-    </Suspense>
+    <>
+      <Helmet>
+        <meta name="robots" content="noindex,follow" />
+      </Helmet>
+      <Suspense fallback={<LoadingScreen />}>
+        {auth ? (
+          <VetDashboardScreen
+            auth={auth}
+            onLogout={() => navigate("/auth", { replace: true })}
+          />
+        ) : (
+          <VetLoginScreen
+            onLogin={handleLogin}
+            onRegisterClick={() =>
+              navigate("/auth", { state: { mode: "register" } })
+            }
+            onBack={() => navigate("/")}
+          />
+        )}
+      </Suspense>
+    </>
   );
 };
 

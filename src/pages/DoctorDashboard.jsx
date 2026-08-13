@@ -809,6 +809,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { socket } from "./socket";
 import {
   requestFcmToken,
@@ -1150,6 +1151,9 @@ export default function DoctorDashboard({ doctorId = 501 }) {
 
   return (
     <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
+      <Helmet>
+        <meta name="robots" content="noindex,follow" />
+      </Helmet>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 20 }}>
         <h2>Doctor Dashboard</h2>
         <span style={{
