@@ -16,11 +16,11 @@ if (!fs.existsSync(baseIndexPath)) {
 
 const templateHtml = fs.readFileSync(baseIndexPath, 'utf-8');
 
-console.log('🔄 Prerendering static HTML routes for SEO crawlers...');
+console.log('🔄 Prerendering static HTML routes with titles and meta descriptions...');
 
 let createdCount = 0;
 
-PUBLIC_ROUTES.forEach(({ path: routePath }) => {
+PUBLIC_ROUTES.forEach(({ path: routePath, title, description }) => {
   const cleanPath =
     routePath.length > 1 && routePath.endsWith('/')
       ? routePath.slice(0, -1)
@@ -34,10 +34,21 @@ PUBLIC_ROUTES.forEach(({ path: routePath }) => {
 
   let pageHtml = templateHtml;
 
-  // If head contains existing canonical/og:url, clean it up first
+  // Clean up existing tags
   pageHtml = pageHtml.replace(/<link\s+rel=["']canonical["'][^>]*>/gi, '');
   pageHtml = pageHtml.replace(/<meta\s+property=["']og:url["'][^>]*>/gi, '');
   pageHtml = pageHtml.replace(/<meta\s+property=["']twitter:url["'][^>]*>/gi, '');
+
+  if (title) {
+    pageHtml = pageHtml.replace(/<title>[^<]*<\/title>/gi, `<title>${title}</title>`);
+    pageHtml = pageHtml.replace(/<meta\s+name=["']title["'][^>]*>/gi, `<meta name="title" content="${title}" />`);
+    pageHtml = pageHtml.replace(/<meta\s+property=["']og:title["'][^>]*>/gi, `<meta property="og:title" content="${title}" />`);
+  }
+
+  if (description) {
+    pageHtml = pageHtml.replace(/<meta\s+name=["']description["'][^>]*>/gi, `<meta name="description" content="${description}" />`);
+    pageHtml = pageHtml.replace(/<meta\s+property=["']og:description["'][^>]*>/gi, `<meta property="og:description" content="${description}" />`);
+  }
 
   const injectTags = `\n    ${canonicalTag}\n    ${ogUrlTag}\n    ${twitterUrlTag}\n  `;
   pageHtml = pageHtml.replace('</head>', `${injectTags}</head>`);

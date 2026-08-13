@@ -187,6 +187,8 @@ const DelhiPage = () => {
   return (
     <>
       <Helmet>
+        <title>Connect with Vets in Delhi for Pet Health Advice | SnoutIQ</title>
+        <meta name="description" content="Living in Delhi with pets? Get expert pet health guidance and online consultations through SnoutIQ. Connect with qualified vets for advice on your pet's well-being. Focus on informed care." />
         <meta name="robots" content="index,follow" />
         <link rel="canonical" href="https://snoutiq.com/delhi" />
       </Helmet>

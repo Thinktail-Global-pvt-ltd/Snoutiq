@@ -40,6 +40,8 @@ export default function SymptomCheckerApp() {
   return (
     <GoogleOAuthProvider clientId="325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com">
       <Helmet>
+        <title>SnoutIQ: Expert Online Vet Consultation for Your Pet</title>
+        <meta name="description" content="SnoutIQ offers online vet consultation for Indian pet parents. Get expert guidance for your pet's health. We provide consultation, not guaranteed diagnosis." />
         <meta name="robots" content="index,follow" />
         <link rel="canonical" href="https://snoutiq.com/" />
       </Helmet>
