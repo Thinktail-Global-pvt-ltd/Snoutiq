@@ -46,8 +46,9 @@ PUBLIC_ROUTES.forEach(({ path: routePath }) => {
     fs.writeFileSync(baseIndexPath, pageHtml, 'utf-8');
     createdCount++;
   } else {
-    // e.g. /delhi -> dist/delhi/index.html
-    const targetDir = path.join(distDir, cleanPath);
+    // Relative folder under distDir: e.g. /delhi -> delhi
+    const relativeSubDir = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+    const targetDir = path.join(distDir, relativeSubDir);
     fs.mkdirSync(targetDir, { recursive: true });
     const targetFilePath = path.join(targetDir, 'index.html');
     fs.writeFileSync(targetFilePath, pageHtml, 'utf-8');
