@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useEffect, useRef } from "react";
+import { HelmetProvider } from "react-helmet-async";
 import {
   BrowserRouter as Router,
   Navigate,
@@ -153,57 +154,59 @@ const VetNearMeSuccessPage = lazyNamedExport(loadVetNearMeSuccessPage);
 
 function App() {
   return (
-    <Router>
-      <ScrollToTopAndHash />
+    <HelmetProvider>
+      <Router>
+        <ScrollToTopAndHash />
 
-      <Suspense fallback={<LoadingScreen />}>
-        <Routes>
-          <Route
-            path={VET_NEAR_ME_LEGACY_BASE_PATH}
-            element={<Navigate replace to={VET_NEAR_ME_BASE_PATH} />}
-          />
-          <Route
-            path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/pet-details`}
-            element={
-              <Navigate
-                replace
-                to={`${VET_NEAR_ME_BASE_PATH}/pet-details`}
-              />
-            }
-          />
-          <Route
-            path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/payment`}
-            element={
-              <Navigate replace to={`${VET_NEAR_ME_BASE_PATH}/payment`} />
-            }
-          />
-          <Route
-            path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/success`}
-            element={
-              <Navigate replace to={`${VET_NEAR_ME_BASE_PATH}/success`} />
-            }
-          />
-
-          <Route
-            path={`${VET_NEAR_ME_BASE_PATH}`}
-            element={<VetNearMeBookingLayout />}
-          >
-            <Route index element={<VetNearMeLeadPage />} />
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
             <Route
-              path="pet-details"
-              element={<VetNearMePetDetailsPage />}
+              path={VET_NEAR_ME_LEGACY_BASE_PATH}
+              element={<Navigate replace to={VET_NEAR_ME_BASE_PATH} />}
             />
-            <Route path="payment" element={<VetNearMePaymentPage />} />
-            <Route path="success" element={<VetNearMeSuccessPage />} />
-          </Route>
+            <Route
+              path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/pet-details`}
+              element={
+                <Navigate
+                  replace
+                  to={`${VET_NEAR_ME_BASE_PATH}/pet-details`}
+                />
+              }
+            />
+            <Route
+              path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/payment`}
+              element={
+                <Navigate replace to={`${VET_NEAR_ME_BASE_PATH}/payment`} />
+              }
+            />
+            <Route
+              path={`${VET_NEAR_ME_LEGACY_BASE_PATH}/success`}
+              element={
+                <Navigate replace to={`${VET_NEAR_ME_BASE_PATH}/success`} />
+              }
+            />
 
-          <Route element={<MainLayout />}>
-            <Route path={HOME_PATH} element={<HomePage />} />
-            <Route path="*" element={<AppRoutes />} />
-          </Route>
-        </Routes>
-      </Suspense>
-    </Router>
+            <Route
+              path={`${VET_NEAR_ME_BASE_PATH}`}
+              element={<VetNearMeBookingLayout />}
+            >
+              <Route index element={<VetNearMeLeadPage />} />
+              <Route
+                path="pet-details"
+                element={<VetNearMePetDetailsPage />}
+              />
+              <Route path="payment" element={<VetNearMePaymentPage />} />
+              <Route path="success" element={<VetNearMeSuccessPage />} />
+            </Route>
+
+            <Route element={<MainLayout />}>
+              <Route path={HOME_PATH} element={<HomePage />} />
+              <Route path="*" element={<AppRoutes />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      </Router>
+    </HelmetProvider>
   );
 }
 
