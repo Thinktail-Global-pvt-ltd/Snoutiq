@@ -198,7 +198,7 @@ export default function AppRoutes() {
 <Route path="/appointment-thank-you" element={<AppointmentThankYouPage />} />
 <Route path="/appointment-page" element={<AppointmentPage />} />
 <Route path="/followup-page" element={<FollowupPage />} />
-        <Route path="/symptom-checker" element={<SymptomCheckerApp />} />
+        <Route path="/symptom-checker" element={<Navigate to="/" replace />} />
         <Route path="/about" element={<NewAbout />} />
         <Route path="/parents" element={<NewCounsult />} />
         <Route path="/clinics" element={<NewClinics />} />

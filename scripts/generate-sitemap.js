@@ -11,7 +11,6 @@ const TODAY = new Date().toISOString();
 const STATIC_ROUTES = [
   // Primary Pages
   { path: '/', priority: '1.0' },
-  { path: '/symptom-checker', priority: '0.8' },
   { path: '/delhi', priority: '0.8' },
   { path: '/gurugram', priority: '0.8' },
   { path: '/clinics-solution', priority: '0.8' },

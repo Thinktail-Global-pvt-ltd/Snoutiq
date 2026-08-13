@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useRef } from "react";
-import { HelmetProvider } from "react-helmet-async";
+import { Helmet, HelmetProvider } from "react-helmet-async";
 import {
   BrowserRouter as Router,
   Navigate,
@@ -7,6 +7,21 @@ import {
   Routes,
   useLocation,
 } from "react-router-dom";
+
+const GlobalCanonical = () => {
+  const { pathname } = useLocation();
+  const cleanPath =
+    pathname.length > 1 && pathname.endsWith("/")
+      ? pathname.slice(0, -1)
+      : pathname;
+  const canonicalUrl = `https://snoutiq.com${cleanPath}`;
+
+  return (
+    <Helmet>
+      <link rel="canonical" href={canonicalUrl} />
+    </Helmet>
+  );
+};
 
 const HOME_PATH = "/";
 const VET_NEAR_ME_BASE_PATH = "/vet-at-home-gurgaon";
@@ -157,6 +172,7 @@ function App() {
     <HelmetProvider>
       <Router>
         <ScrollToTopAndHash />
+        <GlobalCanonical />
 
         <Suspense fallback={<LoadingScreen />}>
           <Routes>

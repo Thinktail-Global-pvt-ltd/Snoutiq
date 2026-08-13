@@ -41,7 +41,7 @@ export default function SymptomCheckerApp() {
     <GoogleOAuthProvider clientId="325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com">
       <Helmet>
         <meta name="robots" content="index,follow" />
-        <link rel="canonical" href="https://snoutiq.com/symptom-checker" />
+        <link rel="canonical" href="https://snoutiq.com/" />
       </Helmet>
       <div className="flex h-screen w-full overflow-hidden bg-slate-50">
       <SymptomCheckerSidebar 
