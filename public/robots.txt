@@ -2,12 +2,16 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /private/
+Disallow: /doctor-dashboard/
+Disallow: /vet-dashboard
+Disallow: /profile
+Disallow: /pet-lifeline/
 
 # Important: This website provides online veterinary consultation services
 # Focused on pet care guidance, triage, and follow-up support
 # Designed for pet parents seeking expert veterinary advice from home
 
-Sitemap: https://www.snoutiq.com/sitemap.xml
+Sitemap: https://snoutiq.com/sitemap.xml
 
 # Healthcare Compliance Notice:
 # Service Type: Online veterinary consultation and triage
