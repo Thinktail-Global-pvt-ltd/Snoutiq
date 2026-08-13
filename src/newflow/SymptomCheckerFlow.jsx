@@ -96,6 +96,7 @@ export default function SymptomCheckerFlow({
 }) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -115,6 +116,7 @@ export default function SymptomCheckerFlow({
 
   const [isInputFocused, setIsInputFocused] = useState(false);
 
+  const skipHistoryFetchRef = useRef(false);
   const messagesEndRef = useRef(null);
   const [authState, setAuthState] = useState(() => readAiAuthState());
   const token = authState?.token;
@@ -156,13 +158,124 @@ export default function SymptomCheckerFlow({
     }
   }, [pendingSubmit, token, authState, inputValue, attachedImage]);
 
+  // 👇 NEW: Chat history load karo jab activeChatRoomToken set/change ho
   useEffect(() => {
-    if (activeChatRoomToken && token) {
-      loadChatHistory(activeChatRoomToken);
-    } else {
-      setMessages([]);
+    if (!activeChatRoomToken) {
+      setMessages([]); // naya chat / koi token nahi hai
+      return;
     }
-  }, [activeChatRoomToken, token]);
+
+    if (skipHistoryFetchRef.current) {
+      skipHistoryFetchRef.current = false;
+      return;
+    }
+
+    const loadChatHistory = async () => {
+      setHistoryLoading(true);
+      setMessages([]); // purani messages clear karo pehle
+
+      const authState = readAiAuthState();
+      const currentToken = authState?.token;
+      const userId = authState?.user?.id || authState?.user?.user_id;
+
+      try {
+        const res = await fetch(
+          `${apiBaseUrl()}/api/ask/chat-rooms/${encodeURIComponent(activeChatRoomToken)}/chats?user_id=${userId}&sort=asc`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
+            },
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error(`History fetch failed: ${res.status}`);
+        }
+
+        const data = await res.json();
+        const chats = data?.chats || data?.data?.chats || [];
+
+        // Backend ka { question, answer } format ko UI ke message format mein convert karo
+        const restoredMessages = [];
+        chats.forEach((chat) => {
+          if (chat.question) {
+            restoredMessages.push({
+              id: `q-${chat.id || Math.random()}`,
+              role: "user",
+              text: chat.question,
+              createdAt: chat.created_at,
+            });
+          }
+          if (chat.answer || chat.response) {
+            let uiData = {};
+            try {
+              uiData = chat.ui
+                ? typeof chat.ui === "string"
+                  ? JSON.parse(chat.ui)
+                  : chat.ui
+                : {};
+            } catch (e) {}
+
+            restoredMessages.push({
+              id: `a-${chat.id || Math.random()}`,
+              role: "assistant",
+              text: chat.answer || chat.response || "Analyzed",
+              raw_response: chat.raw_response || { ...chat, ui: uiData },
+              createdAt: chat.created_at,
+            });
+          }
+        });
+
+        setMessages(restoredMessages);
+      } catch (err) {
+        console.warn("History load failed, trying legacy fallback:", err);
+
+        // 👇 Fallback: legacy /symptom-session/{token} try karo
+        try {
+          const legacyRes = await fetch(
+            `${apiBaseUrl()}/api/symptom-session/${encodeURIComponent(activeChatRoomToken)}`,
+            {
+              headers: {
+                ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
+              },
+            }
+          );
+          if (legacyRes.ok) {
+            const legacyData = await legacyRes.json();
+            const legacyChats =
+              legacyData?.chats ||
+              legacyData?.data?.chats ||
+              legacyData?.state?.follow_up_history ||
+              [];
+            const restored = [];
+            legacyChats.forEach((chat, idx) => {
+              if (chat.question)
+                restored.push({
+                  id: `q-${chat.id || idx}`,
+                  role: "user",
+                  text: chat.question,
+                });
+              if (chat.answer || chat.response)
+                restored.push({
+                  id: `a-${chat.id || idx}`,
+                  role: "assistant",
+                  text: chat.answer || chat.response || "Analyzed",
+                  raw_response: chat,
+                });
+            });
+            setMessages(restored);
+          }
+        } catch (legacyErr) {
+          console.error("Legacy history fetch also failed:", legacyErr);
+        }
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    loadChatHistory();
+  }, [activeChatRoomToken]);
 
   const pushMessage = (msg) =>
     setMessages((prev) => [
@@ -174,96 +287,6 @@ export default function SymptomCheckerFlow({
       ...prev.slice(0, -1),
       { id: Date.now() + Math.random(), ...msg },
     ]);
-
-  const loadChatHistory = async (roomToken) => {
-    setLoading(true);
-    try {
-      // PRIMARY: new chat-rooms endpoint
-      const res = await fetch(
-        `${apiBaseUrl()}/api/ask/chat-rooms/${encodeURIComponent(roomToken)}/chats?user_id=${user.id || user.user_id}&sort=asc`,
-        {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (res.status === 200) {
-        const data = await res.json();
-        if (data.chats && Array.isArray(data.chats)) {
-          const historyMessages = [];
-          data.chats.forEach((chat) => {
-            if (chat.question)
-              historyMessages.push({
-                id: `q_${chat.id || Math.random()}`,
-                role: "user",
-                text: chat.question,
-              });
-            if (chat.answer || chat.response) {
-              let uiData = {};
-              try {
-                uiData = chat.ui
-                  ? typeof chat.ui === "string"
-                    ? JSON.parse(chat.ui)
-                    : chat.ui
-                  : {};
-              } catch (e) {}
-              historyMessages.push({
-                id: `a_${chat.id || Math.random()}`,
-                role: "assistant",
-                text: chat.answer || "Analyzed",
-                raw_response: { ...chat, ui: uiData },
-              });
-            }
-          });
-          setMessages(historyMessages);
-          return;
-        }
-      }
-
-      // FALLBACK: legacy symptom-session endpoint (when primary returns 404)
-      if (res.status === 404) {
-        console.warn(
-          "Primary /chat-rooms endpoint returned 404 — trying fallback /symptom-session...",
-        );
-        const fallbackRes = await fetch(
-          `${apiBaseUrl()}/api/symptom-session/${encodeURIComponent(roomToken)}`,
-          {
-            headers: {
-              Accept: "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-        if (fallbackRes.ok) {
-          const fallbackData = await fallbackRes.json();
-          const history = fallbackData.state?.follow_up_history || [];
-          const historyMessages = [];
-          history.forEach((item, index) => {
-            if (item.question)
-              historyMessages.push({
-                id: `fq_${index}`,
-                role: "user",
-                text: item.question,
-              });
-            if (item.answer)
-              historyMessages.push({
-                id: `fa_${index}`,
-                role: "assistant",
-                text: item.answer,
-              });
-          });
-          setMessages(historyMessages);
-          return;
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load history", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const createChatRoom = async () => {
     const res = await fetch(`${apiBaseUrl()}/api/ask/chat-rooms/new`, {
@@ -483,6 +506,7 @@ export default function SymptomCheckerFlow({
       let currentSessionId = activeChatRoomToken;
       if (!currentSessionId) {
         currentSessionId = await createChatRoom();
+        skipHistoryFetchRef.current = true;
         setActiveChatRoomToken(currentSessionId);
         if (typeof onMessageSent === "function") {
           onMessageSent();
@@ -691,7 +715,7 @@ export default function SymptomCheckerFlow({
   return (
     <>
       <div className="flex h-full min-h-[100vh] flex-col bg-white">
-        {messages.length === 0 ? (
+        {messages.length === 0 && !historyLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center px-5 py-8 text-center sm:px-6">
             <h3 className="mb-3 text-[13px] font-semibold text-[#aaa89f] sm:text-sm">
               Trusted by 300+ pet parents
@@ -827,7 +851,16 @@ export default function SymptomCheckerFlow({
             )}
 
             <div className="flex-1 overflow-y-auto space-y-6 pb-24">
-              {messages.map((msg) => (
+              {historyLoading && (
+                <div className="flex items-center justify-center py-10">
+                  <div className="flex items-center gap-2 text-slate-400 text-sm">
+                    <Loader2 size={18} className="animate-spin" />
+                    Loading conversation...
+                  </div>
+                </div>
+              )}
+
+              {!historyLoading && messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
