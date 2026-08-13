@@ -744,14 +744,14 @@ export default function SymptomCheckerFlow({
                   </button>
                 </div>
               )}
- <form
-  onSubmit={handleSubmit}
-  className={`relative flex w-full items-center rounded-full bg-white p-1.5 transition-all duration-200 ${
-    isInputFocused
-      ? "border-2 border-slate-900 shadow-[0_0_0_4px_rgba(15,23,42,0.08),0_8px_25px_rgba(15,23,42,0.12)]"
-      : "border border-slate-200 shadow-md hover:border-slate-300"
-  }`}
->
+              <form
+                onSubmit={handleSubmit}
+                className={`relative flex w-full items-center rounded-full bg-white p-1.5 transition-all duration-200 ${
+                  isInputFocused
+                    ? "border-2 border-slate-900 shadow-[0_0_0_4px_rgba(15,23,42,0.08),0_8px_25px_rgba(15,23,42,0.12)]"
+                    : "border border-slate-200 shadow-md hover:border-slate-300"
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => setShowImageModal(true)}
@@ -759,58 +759,58 @@ export default function SymptomCheckerFlow({
                 >
                   <ImagePlus size={19} />
                 </button>
-  <input
-  type="text"
-  value={inputValue}
-  onChange={(e) => setInputValue(e.target.value)}
-  onFocus={() => setIsInputFocused(true)}
-  onBlur={() => setIsInputFocused(false)}
-  placeholder={
-    attachedImage
-      ? "Describe what is in the photo..."
-      : "Describe your pet's symptoms..."
-  }
-  className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 sm:px-4 sm:text-base"
-/>
-             <button
-  type="submit"
-  disabled={!inputValue.trim() || loading}
-  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-md transition-all duration-200 hover:scale-105 hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
->
-  <Send size={19} />
-</button>
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
+                  placeholder={
+                    attachedImage
+                      ? "Describe what is in the photo..."
+                      : "Describe your pet's symptoms..."
+                  }
+                  className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 sm:px-4 sm:text-base"
+                />
+                <button
+                  type="submit"
+                  disabled={!inputValue.trim() || loading}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-md transition-all duration-200 hover:scale-105 hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Send size={19} />
+                </button>
               </form>
-             <div className="flex w-full flex-wrap justify-center gap-2.5 sm:gap-3 mt-2">
+              <div className="flex w-full flex-wrap justify-center gap-2.5 sm:gap-3 mt-2">
+                <button
+                  onClick={() =>
+                    handleSubmit(null, "Vomiting or stomach upset")
+                  }
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                >
+                  Vomiting or stomach upset
+                </button>
 
-  <button
-    onClick={() => handleSubmit(null, "Vomiting or stomach upset")}
-    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
-  >
-    Vomiting or stomach upset
-  </button>
+                <button
+                  onClick={() => handleSubmit(null, "Lethargic and not eating")}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                >
+                  Lethargic and not eating
+                </button>
 
-  <button
-    onClick={() => handleSubmit(null, "Lethargic and not eating")}
-    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
-  >
-    Lethargic and not eating
-  </button>
+                <button
+                  onClick={() => handleSubmit(null, "Diarrhea")}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                >
+                  Diarrhea
+                </button>
 
-  <button
-    onClick={() => handleSubmit(null, "Diarrhea")}
-    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
-  >
-    Diarrhea
-  </button>
-
-  <button
-    onClick={() => handleSubmit(null, "Limping or skin issue")}
-    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
-  >
-    Limping or skin issue
-  </button>
-
-</div>
+                <button
+                  onClick={() => handleSubmit(null, "Limping or skin issue")}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                >
+                  Limping or skin issue
+                </button>
+              </div>
             </div>
           </div>
         ) : (
