@@ -88,8 +88,8 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   const [loading, setLoading] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [showPetModal, setShowPetModal] = useState(false);
-  const [showDoctorsModal, setShowDoctorsModal] = useState(false);
-  const [bookingOrderType, setBookingOrderType] = useState("video_consult");
+  const [showDoctorsModal, setShowDoctorsModal] = useState(() => sessionStorage.getItem("snoutiq_modal_open") === "1");
+  const [bookingOrderType, setBookingOrderType] = useState(() => sessionStorage.getItem("snoutiq_modal_order_type") || "video_consult");
   const [showImageModal, setShowImageModal] = useState(false);
   const [attachedImage, setAttachedImage] = useState(null);
   const [previewImageSrc, setPreviewImageSrc] = useState(null);
@@ -152,29 +152,52 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   const loadChatHistory = async (roomToken) => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl()}/api/ask/chat-rooms/${roomToken}/chats?user_id=${user.id || user.user_id}&sort=asc`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.chats && Array.isArray(data.chats)) {
-        const historyMessages = [];
-        data.chats.forEach(chat => {
-          if (chat.question) historyMessages.push({ id: `q_${chat.id || Math.random()}`, role: "user", text: chat.question });
-          if (chat.answer || chat.response) {
-            let uiData = {};
-            try {
-              uiData = chat.ui ? (typeof chat.ui === 'string' ? JSON.parse(chat.ui) : chat.ui) : {};
-            } catch(e) {}
-            
-            historyMessages.push({
-              id: `a_${chat.id || Math.random()}`,
-              role: "assistant",
-              text: chat.answer || "Analyzed",
-              raw_response: { ...chat, ui: uiData }
-            });
-          }
-        });
-        setMessages(historyMessages);
+      // PRIMARY: new chat-rooms endpoint
+      const res = await fetch(
+        `${apiBaseUrl()}/api/ask/chat-rooms/${encodeURIComponent(roomToken)}/chats?user_id=${user.id || user.user_id}&sort=asc`,
+        { headers: { "Accept": "application/json", "Authorization": `Bearer ${token}` } }
+      );
+
+      if (res.status === 200) {
+        const data = await res.json();
+        if (data.chats && Array.isArray(data.chats)) {
+          const historyMessages = [];
+          data.chats.forEach(chat => {
+            if (chat.question) historyMessages.push({ id: `q_${chat.id || Math.random()}`, role: "user", text: chat.question });
+            if (chat.answer || chat.response) {
+              let uiData = {};
+              try { uiData = chat.ui ? (typeof chat.ui === 'string' ? JSON.parse(chat.ui) : chat.ui) : {}; } catch(e) {}
+              historyMessages.push({
+                id: `a_${chat.id || Math.random()}`,
+                role: "assistant",
+                text: chat.answer || "Analyzed",
+                raw_response: { ...chat, ui: uiData }
+              });
+            }
+          });
+          setMessages(historyMessages);
+          return;
+        }
+      }
+
+      // FALLBACK: legacy symptom-session endpoint (when primary returns 404)
+      if (res.status === 404) {
+        console.warn("Primary /chat-rooms endpoint returned 404 — trying fallback /symptom-session...");
+        const fallbackRes = await fetch(
+          `${apiBaseUrl()}/api/symptom-session/${encodeURIComponent(roomToken)}`,
+          { headers: { "Accept": "application/json", "Authorization": `Bearer ${token}` } }
+        );
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          const history = fallbackData.state?.follow_up_history || [];
+          const historyMessages = [];
+          history.forEach((item, index) => {
+            if (item.question) historyMessages.push({ id: `fq_${index}`, role: "user", text: item.question });
+            if (item.answer) historyMessages.push({ id: `fa_${index}`, role: "assistant", text: item.answer });
+          });
+          setMessages(historyMessages);
+          return;
+        }
       }
     } catch (err) {
       console.error("Failed to load history", err);
@@ -186,18 +209,23 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   const createChatRoom = async () => {
     const res = await fetch(`${apiBaseUrl()}/api/ask/chat-rooms/new`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${token}` },
       body: JSON.stringify({
         user_id: user.id || user.user_id,
-        title: `Chat for ${pet.name || pet.pet_name}`,
+        title: `Chat for ${pet.name || pet.pet_name || 'Pet'}`,
         pet_id: pet.id || pet.pet_id,
         pet_name: pet.name || pet.pet_name,
         pet_breed: pet.breed,
+        pet_location: user.location || "India",
         species: pet.pet_type || "dog"
       })
     });
     const data = await res.json();
-    return data.chat_room_token || data.session_id;
+    if (data.status === "success") {
+      return data.chat_room_token || data.session_id;
+    }
+    // fallback — use whatever token is available
+    return data.chat_room_token || data.context_token || data.session_id;
   };
 
   const callLegacyFallback = async (question, roomToken) => {
@@ -274,7 +302,10 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
     console.log("🔍 Resolved action type:", resolvedType, "from raw:", cta);
 
     if (resolvedType === "video_consult" || resolvedType === "clinic") {
-      setBookingOrderType(resolvedType === "clinic" ? "appointment" : "video_consult");
+      const orderType = resolvedType === "clinic" ? "appointment" : "video_consult";
+      setBookingOrderType(orderType);
+      sessionStorage.setItem("snoutiq_modal_order_type", orderType);
+      sessionStorage.setItem("snoutiq_modal_open", "1");
       setShowDoctorsModal(true);
     } else {
       navigate("/clinics");
@@ -799,7 +830,11 @@ function stripBase64Prefix(dataUrl) {
         
         {showDoctorsModal && (
           <ModernDoctorBooking 
-            onClose={() => setShowDoctorsModal(false)} 
+            onClose={() => {
+              sessionStorage.removeItem("snoutiq_modal_open");
+              sessionStorage.removeItem("snoutiq_modal_order_type");
+              setShowDoctorsModal(false);
+            }} 
             symptomText={getUserSymptomText()}
             preSelectedPet={pet}
             orderType={bookingOrderType}
