@@ -10,10 +10,23 @@ import PetSelectorDropdown from "./PetSelectorDropdown";
 
 export default function SymptomCheckerApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeChatRoomToken, setActiveChatRoomToken] = useState(null);
+  const [activeChatRoomToken, setActiveChatRoomToken] = useState(
+    () => sessionStorage.getItem("snoutiq_active_chat_token") || null
+  );
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
+  // Persist active chat token across refreshes
+  const handleSetActiveChatRoomToken = (token) => {
+    if (token) {
+      sessionStorage.setItem("snoutiq_active_chat_token", token);
+    } else {
+      sessionStorage.removeItem("snoutiq_active_chat_token");
+    }
+    setActiveChatRoomToken(token);
+  };
+
   const handleNewChat = () => {
+    sessionStorage.removeItem("snoutiq_active_chat_token");
     setActiveChatRoomToken(null);
     setIsSidebarOpen(false);
   };
@@ -30,7 +43,7 @@ export default function SymptomCheckerApp() {
         setIsOpen={setIsSidebarOpen}
         activeChatRoomToken={activeChatRoomToken}
         onSelectChat={(token) => {
-          setActiveChatRoomToken(token);
+          handleSetActiveChatRoomToken(token);
           setIsSidebarOpen(false);
         }}
         onNewChat={handleNewChat} 
@@ -67,7 +80,7 @@ export default function SymptomCheckerApp() {
         <div className="flex-1 overflow-y-auto bg-slate-50">
           <SymptomCheckerFlow 
             activeChatRoomToken={activeChatRoomToken}
-            setActiveChatRoomToken={setActiveChatRoomToken}
+            setActiveChatRoomToken={handleSetActiveChatRoomToken}
             onMessageSent={() => setHistoryRefreshKey(prev => prev + 1)}
           />
         </div>
