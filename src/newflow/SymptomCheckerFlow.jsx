@@ -9,13 +9,13 @@ import { useNavigate } from "react-router-dom";
 import { hasUsablePetProfile, submitIntakeForm } from "./authHelpers";
 import ModernDoctorBooking from "./ModernDoctorBooking";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
-import { 
-  BannerCard, 
-  HealthScore, 
-  DoNowCard, 
-  ListSection, 
-  ServiceCard, 
-  FollowUpQuestion 
+import {
+  BannerCard,
+  HealthScore,
+  DoNowCard,
+  ListSection,
+  ServiceCard,
+  FollowUpQuestion,
 } from "./AssessmentUI";
 
 function ModalShell({ children }) {
@@ -57,22 +57,29 @@ function ImageUploadModal({ onClose, onUpload }) {
   return (
     <ModalShell>
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+        >
           <X size={20} />
         </button>
         <h3 className="text-xl font-bold text-slate-900 mb-4">Upload Image</h3>
-        <div 
+        <div
           onClick={() => fileInputRef.current?.click()}
           className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
         >
           <ImagePlus className="mx-auto h-12 w-12 text-slate-400 mb-4" />
-          <p className="text-sm font-medium text-slate-700">Click to upload image</p>
-          <p className="text-xs text-slate-500 mt-2">Will be attached to your next message</p>
-          <input 
-            type="file" 
-            accept="image/*" 
-            className="hidden" 
-            ref={fileInputRef} 
+          <p className="text-sm font-medium text-slate-700">
+            Click to upload image
+          </p>
+          <p className="text-xs text-slate-500 mt-2">
+            Will be attached to your next message
+          </p>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={fileInputRef}
             onChange={handleFileChange}
           />
         </div>
@@ -81,22 +88,33 @@ function ImageUploadModal({ onClose, onUpload }) {
   );
 }
 
-export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatRoomToken, onMessageSent, isDesktopSidebarOpen = true }) {
+export default function SymptomCheckerFlow({
+  activeChatRoomToken,
+  setActiveChatRoomToken,
+  onMessageSent,
+  isDesktopSidebarOpen = true,
+}) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [showPetModal, setShowPetModal] = useState(false);
-  const [showDoctorsModal, setShowDoctorsModal] = useState(() => sessionStorage.getItem("snoutiq_modal_open") === "1");
-  const [bookingOrderType, setBookingOrderType] = useState(() => sessionStorage.getItem("snoutiq_modal_order_type") || "video_consult");
+  const [showDoctorsModal, setShowDoctorsModal] = useState(
+    () => sessionStorage.getItem("snoutiq_modal_open") === "1",
+  );
+  const [bookingOrderType, setBookingOrderType] = useState(
+    () => sessionStorage.getItem("snoutiq_modal_order_type") || "video_consult",
+  );
   const [showImageModal, setShowImageModal] = useState(false);
   const [attachedImage, setAttachedImage] = useState(null);
   const [previewImageSrc, setPreviewImageSrc] = useState(null);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [petFormPart, setPetFormPart] = useState(1);
   const [pendingFollowUp, setPendingFollowUp] = useState(null);
-  
+
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
   const messagesEndRef = useRef(null);
   const [authState, setAuthState] = useState(() => readAiAuthState());
   const token = authState?.token;
@@ -146,8 +164,16 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
     }
   }, [activeChatRoomToken, token]);
 
-  const pushMessage = (msg) => setMessages((prev) => [...prev, { id: Date.now() + Math.random(), ...msg }]);
-  const replaceLastMessage = (msg) => setMessages((prev) => [...prev.slice(0, -1), { id: Date.now() + Math.random(), ...msg }]);
+  const pushMessage = (msg) =>
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now() + Math.random(), ...msg },
+    ]);
+  const replaceLastMessage = (msg) =>
+    setMessages((prev) => [
+      ...prev.slice(0, -1),
+      { id: Date.now() + Math.random(), ...msg },
+    ]);
 
   const loadChatHistory = async (roomToken) => {
     setLoading(true);
@@ -155,23 +181,39 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
       // PRIMARY: new chat-rooms endpoint
       const res = await fetch(
         `${apiBaseUrl()}/api/ask/chat-rooms/${encodeURIComponent(roomToken)}/chats?user_id=${user.id || user.user_id}&sort=asc`,
-        { headers: { "Accept": "application/json", "Authorization": `Bearer ${token}` } }
+        {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
 
       if (res.status === 200) {
         const data = await res.json();
         if (data.chats && Array.isArray(data.chats)) {
           const historyMessages = [];
-          data.chats.forEach(chat => {
-            if (chat.question) historyMessages.push({ id: `q_${chat.id || Math.random()}`, role: "user", text: chat.question });
+          data.chats.forEach((chat) => {
+            if (chat.question)
+              historyMessages.push({
+                id: `q_${chat.id || Math.random()}`,
+                role: "user",
+                text: chat.question,
+              });
             if (chat.answer || chat.response) {
               let uiData = {};
-              try { uiData = chat.ui ? (typeof chat.ui === 'string' ? JSON.parse(chat.ui) : chat.ui) : {}; } catch(e) {}
+              try {
+                uiData = chat.ui
+                  ? typeof chat.ui === "string"
+                    ? JSON.parse(chat.ui)
+                    : chat.ui
+                  : {};
+              } catch (e) {}
               historyMessages.push({
                 id: `a_${chat.id || Math.random()}`,
                 role: "assistant",
                 text: chat.answer || "Analyzed",
-                raw_response: { ...chat, ui: uiData }
+                raw_response: { ...chat, ui: uiData },
               });
             }
           });
@@ -182,18 +224,35 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
 
       // FALLBACK: legacy symptom-session endpoint (when primary returns 404)
       if (res.status === 404) {
-        console.warn("Primary /chat-rooms endpoint returned 404 — trying fallback /symptom-session...");
+        console.warn(
+          "Primary /chat-rooms endpoint returned 404 — trying fallback /symptom-session...",
+        );
         const fallbackRes = await fetch(
           `${apiBaseUrl()}/api/symptom-session/${encodeURIComponent(roomToken)}`,
-          { headers: { "Accept": "application/json", "Authorization": `Bearer ${token}` } }
+          {
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
           const history = fallbackData.state?.follow_up_history || [];
           const historyMessages = [];
           history.forEach((item, index) => {
-            if (item.question) historyMessages.push({ id: `fq_${index}`, role: "user", text: item.question });
-            if (item.answer) historyMessages.push({ id: `fa_${index}`, role: "assistant", text: item.answer });
+            if (item.question)
+              historyMessages.push({
+                id: `fq_${index}`,
+                role: "user",
+                text: item.question,
+              });
+            if (item.answer)
+              historyMessages.push({
+                id: `fa_${index}`,
+                role: "assistant",
+                text: item.answer,
+              });
           });
           setMessages(historyMessages);
           return;
@@ -209,16 +268,20 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   const createChatRoom = async () => {
     const res = await fetch(`${apiBaseUrl()}/api/ask/chat-rooms/new`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         user_id: user.id || user.user_id,
-        title: `Chat for ${pet.name || pet.pet_name || 'Pet'}`,
+        title: `Chat for ${pet.name || pet.pet_name || "Pet"}`,
         pet_id: pet.id || pet.pet_id,
         pet_name: pet.name || pet.pet_name,
         pet_breed: pet.breed,
         pet_location: user.location || "India",
-        species: pet.pet_type || "dog"
-      })
+        species: pet.pet_type || "dog",
+      }),
     });
     const data = await res.json();
     if (data.status === "success") {
@@ -231,7 +294,10 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   const callLegacyFallback = async (question, roomToken) => {
     const res = await fetch(`${apiBaseUrl()}/api/chat/send`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         user_id: user.id || user.user_id,
         question: question,
@@ -243,14 +309,16 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
         pet_breed: pet.breed,
         breed: pet.breed,
         pet_age: pet.pet_age,
-        location: user.location
-      })
+        location: user.location,
+      }),
     });
     return await res.json();
   };
 
   const resolveActionType = (cta = {}) => {
-    const type = String(cta?.type || "").toLowerCase().replace(/[\s-]+/g, "_");
+    const type = String(cta?.type || "")
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
     const label = String(cta?.label || "").toLowerCase();
     const deeplink = String(cta?.deeplink || "").toLowerCase();
 
@@ -278,9 +346,9 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
     }
 
     if (
-      type === "clinic" || 
-      type.includes("clinic") || 
-      deeplink.includes("clinic") || 
+      type === "clinic" ||
+      type.includes("clinic") ||
+      deeplink.includes("clinic") ||
       label.includes("clinic")
     ) {
       return "clinic";
@@ -294,15 +362,17 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
       setShowAuthGate(true);
       return;
     }
-    
-    const resolvedType = typeof cta === "string" 
-      ? resolveActionType({ type: cta }) 
-      : resolveActionType(cta);
-      
+
+    const resolvedType =
+      typeof cta === "string"
+        ? resolveActionType({ type: cta })
+        : resolveActionType(cta);
+
     console.log("🔍 Resolved action type:", resolvedType, "from raw:", cta);
 
     if (resolvedType === "video_consult" || resolvedType === "clinic") {
-      const orderType = resolvedType === "clinic" ? "appointment" : "video_consult";
+      const orderType =
+        resolvedType === "clinic" ? "appointment" : "video_consult";
       setBookingOrderType(orderType);
       sessionStorage.setItem("snoutiq_modal_order_type", orderType);
       sessionStorage.setItem("snoutiq_modal_open", "1");
@@ -313,7 +383,9 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   };
 
   const getUserSymptomText = () => {
-    const userMsgs = messages.filter(m => m.role === "user" && m.text).map(m => m.text);
+    const userMsgs = messages
+      .filter((m) => m.role === "user" && m.text)
+      .map((m) => m.text);
     if (userMsgs.length > 0) {
       const latestMsg = userMsgs[userMsgs.length - 1];
       localStorage.setItem("symptom_description", latestMsg);
@@ -327,7 +399,7 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
   const getProcessedServiceCards = (raw) => {
     let cards = raw?.ui?.service_cards;
     if (!Array.isArray(cards)) return cards;
-    
+
     if (raw?.buttons?.secondary?.type === "clinic" && cards.length > 1) {
       return cards.map((card, idx) => {
         if (idx === 1) {
@@ -340,13 +412,13 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
             bullets: [
               "Skip the long queues",
               "Consult with verified local vets",
-              "Physical checkup & diagnostics"
+              "Physical checkup & diagnostics",
             ],
             cta: {
               ...raw.buttons.secondary,
               label: "Book Appointment",
-              type: "clinic"
-            }
+              type: "clinic",
+            },
           };
         }
         return card;
@@ -360,7 +432,11 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
     const petId = petObj.id || petObj.pet_id || "active";
     const perPetKey = `snoutiq_health_profile_completed_${petId}`;
     if (localStorage.getItem(perPetKey) === "true") return true;
-    if (petObj.health_profile_completed === true || petObj.health_details_filled === true) return true;
+    if (
+      petObj.health_profile_completed === true ||
+      petObj.health_details_filled === true
+    )
+      return true;
     return false;
   };
 
@@ -385,13 +461,19 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
     const healthDone = isHealthProfileDoneForPet(pet);
     // Part 2 Modal (Vaccine, Deworming, Neutering) triggers on 2nd chat message (messages.length >= 1)
     if (messages.length >= 1 && !healthDone) {
-      console.log("➡️ 2nd Chat Message detected. Opening Part 2 Modal (Vaccine, Deworming, Neutering)...");
+      console.log(
+        "➡️ 2nd Chat Message detected. Opening Part 2 Modal (Vaccine, Deworming, Neutering)...",
+      );
       setPetFormPart(2);
       setShowPetModal(true);
       return;
     }
 
-    pushMessage({ role: "user", text: textToSubmit, image: attachedImage?.base64 });
+    pushMessage({
+      role: "user",
+      text: textToSubmit,
+      image: attachedImage?.base64,
+    });
     setInputValue("");
     const imgData = attachedImage;
     setAttachedImage(null);
@@ -407,21 +489,23 @@ export default function SymptomCheckerFlow({ activeChatRoomToken, setActiveChatR
         }
       }
 
-function stripBase64Prefix(dataUrl) {
-  if (!dataUrl) return dataUrl;
-  const commaIndex = dataUrl.indexOf(",");
-  return dataUrl.startsWith("data:") && commaIndex !== -1
-    ? dataUrl.slice(commaIndex + 1)
-    : dataUrl;
-}
+      function stripBase64Prefix(dataUrl) {
+        if (!dataUrl) return dataUrl;
+        const commaIndex = dataUrl.indexOf(",");
+        return dataUrl.startsWith("data:") && commaIndex !== -1
+          ? dataUrl.slice(commaIndex + 1)
+          : dataUrl;
+      }
 
       const isFirstMessage = messages.length === 0;
       const endpoint = isFirstMessage ? "/symptom-check" : "/symptom-followup";
-      
+
       const payload = {
         session_id: currentSessionId,
         message: textToSubmit,
-        image_base64: imgData?.base64 ? stripBase64Prefix(imgData.base64) : undefined,
+        image_base64: imgData?.base64
+          ? stripBase64Prefix(imgData.base64)
+          : undefined,
         image_mime: imgData?.mime || undefined,
       };
 
@@ -435,7 +519,8 @@ function stripBase64Prefix(dataUrl) {
           dob: String(pet.pet_dob || pet.dob || "2023-01-01").substring(0, 10),
           location: String(user.location || "Unknown"),
           lat: user.lat ? Number(user.lat) : undefined,
-          long: (user.long || user.lng) ? Number(user.long || user.lng) : undefined,
+          long:
+            user.long || user.lng ? Number(user.long || user.lng) : undefined,
           user_id: String(user.id || user.user_id || "1"),
           pet_id: String(pet.id || pet.pet_id || "1"),
           user: user,
@@ -445,24 +530,36 @@ function stripBase64Prefix(dataUrl) {
 
       let res = await fetch(`${apiBaseUrl()}/api${endpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify(payload)
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         if (res.status === 422) {
           const errData = await res.json();
           console.error("422 Validation Error:", errData);
-          const errMessage = errData.message || JSON.stringify(errData.errors || errData);
-          pushMessage({ role: "assistant", text: `Validation Error: ${errMessage}` });
+          const errMessage =
+            errData.message || JSON.stringify(errData.errors || errData);
+          pushMessage({
+            role: "assistant",
+            text: `Validation Error: ${errMessage}`,
+          });
           return;
         }
-        const fallbackData = await callLegacyFallback(textToSubmit, currentSessionId);
+        const fallbackData = await callLegacyFallback(
+          textToSubmit,
+          currentSessionId,
+        );
         console.log("💬 Legacy fallback chat response:", fallbackData);
         pushMessage({
           role: "assistant",
-          text: fallbackData?.data?.answer || "We received your query via fallback.",
-          raw_response: fallbackData
+          text:
+            fallbackData?.data?.answer ||
+            "We received your query via fallback.",
+          raw_response: fallbackData,
         });
         if (typeof onMessageSent === "function") {
           onMessageSent();
@@ -474,17 +571,22 @@ function stripBase64Prefix(dataUrl) {
       console.log("💬 Chat response:", data);
       pushMessage({
         role: "assistant",
-        text: data?.response?.what_we_think_is_happening || data?.vet_summary || "Analyzed",
-        raw_response: data
+        text:
+          data?.response?.what_we_think_is_happening ||
+          data?.vet_summary ||
+          "Analyzed",
+        raw_response: data,
       });
 
       if (typeof onMessageSent === "function") {
         onMessageSent();
       }
-
     } catch (err) {
       console.error(err);
-      pushMessage({ role: "assistant", text: "There was an error communicating with the server." });
+      pushMessage({
+        role: "assistant",
+        text: "There was an error communicating with the server.",
+      });
     } finally {
       setLoading(false);
     }
@@ -497,13 +599,18 @@ function stripBase64Prefix(dataUrl) {
     setAuthState(freshAuth);
 
     const isUsable = hasUsablePetProfile(freshAuth);
-    console.log("🐶 [Post-Auth Pet Profile Check]:", { isUsable, user: freshAuth?.user });
+    console.log("🐶 [Post-Auth Pet Profile Check]:", {
+      isUsable,
+      user: freshAuth?.user,
+    });
     if (!isUsable) {
       console.log("➡️ Opening Pet Profile Form Modal (Part 1)...");
       setPetFormPart(1);
       setShowPetModal(true);
     } else {
-      console.log("➡️ Basic Pet Profile exists. Submitting 1st chat message...");
+      console.log(
+        "➡️ Basic Pet Profile exists. Submitting 1st chat message...",
+      );
       setPendingSubmit(true);
     }
   };
@@ -513,16 +620,22 @@ function stripBase64Prefix(dataUrl) {
     setAuthState(freshAuth);
 
     const freshUser = freshAuth?.user || {};
-    const freshPet = freshUser.pet || (freshUser.pets ? freshUser.pets[0] : null) || {};
+    const freshPet =
+      freshUser.pet || (freshUser.pets ? freshUser.pets[0] : null) || {};
     const freshPetId = freshPet?.id || freshPet?.pet_id || "active";
 
     if (petFormPart === 1) {
-      console.log("➡️ Part 1 complete! Closing Modal 1 and submitting 1st chat message...");
+      console.log(
+        "➡️ Part 1 complete! Closing Modal 1 and submitting 1st chat message...",
+      );
       setShowPetModal(false);
       setPendingSubmit(true);
     } else {
       console.log("➡️ Part 2 Health Details completed for pet:", freshPetId);
-      localStorage.setItem(`snoutiq_health_profile_completed_${freshPetId}`, "true");
+      localStorage.setItem(
+        `snoutiq_health_profile_completed_${freshPetId}`,
+        "true",
+      );
       setShowPetModal(false);
       if (pendingFollowUp) {
         const { questionText, answerText } = pendingFollowUp;
@@ -548,21 +661,25 @@ function stripBase64Prefix(dataUrl) {
       const payload = {
         session_id: activeChatRoomToken,
         question: questionText,
-        answer: answerText
+        answer: answerText,
       };
       const res = await fetch(`${apiBaseUrl()}/api/symptom-answer`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify(payload)
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       console.log("💬 Follow-up chat response:", data);
-      
+
       // Update the last assistant message with the revised assessment
       replaceLastMessage({
         role: "assistant",
-        text: data?.response?.what_we_think_is_happening || "Revised assessment.",
-        raw_response: data
+        text:
+          data?.response?.what_we_think_is_happening || "Revised assessment.",
+        raw_response: data,
       });
     } catch (err) {
       console.error(err);
@@ -574,28 +691,47 @@ function stripBase64Prefix(dataUrl) {
   return (
     <>
       <div className="flex h-full min-h-[100vh] flex-col bg-white">
-        
         {messages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4 tracking-tight">Smarter care for your pet's health.</h1>
-            <p className="text-lg text-slate-500 mb-8 max-w-2xl">
-              Describe a symptom or upload a photo to get instant guidance from AI trained on vet insights.
+          <div className="flex-1 flex flex-col items-center justify-center px-5 py-8 text-center sm:px-6">
+            <h3 className="mb-3 text-[13px] font-semibold text-[#aaa89f] sm:text-sm">
+              Trusted by 300+ pet parents
+            </h3>
+
+            <h1 className="mb-4 max-w-2xl text-[32px] leading-[1.15] font-medium tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
+              Smarter care for your pet's health.
+            </h1>
+
+            <p className="mb-7 max-w-xl text-[16px] leading-7 text-[#77756d] sm:text-lg">
+              Describe a symptom or upload a photo to get instant guidance from
+              AI trained on vet insights.
             </p>
+
+            <div className="mb-6 w-full max-w-xl rounded-xl border border-[#eeece5] bg-[#f5f4ee] px-4 py-3 text-center">
+              <p className="text-[13px] leading-5 text-[#77756d] sm:text-sm">
+                Guidance to support your vet, not replace one.
+              </p>
+            </div>
             <div className="w-full max-w-3xl">
               {attachedImage && (
                 <div className="relative inline-block group mb-3">
-                  <div 
-                    onClick={() => setPreviewImageSrc(attachedImage.uri || attachedImage.base64)}
+                  <div
+                    onClick={() =>
+                      setPreviewImageSrc(
+                        attachedImage.uri || attachedImage.base64,
+                      )
+                    }
                     className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group hover:opacity-90 transition-all bg-slate-100"
                     title="Click to view full photo"
                   >
-                    <img 
-                      src={attachedImage.uri || attachedImage.base64} 
-                      alt="attached preview" 
-                      className="w-full h-full object-cover" 
+                    <img
+                      src={attachedImage.uri || attachedImage.base64}
+                      alt="attached preview"
+                      className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">View</span>
+                      <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">
+                        View
+                      </span>
                     </div>
                   </div>
                   <button
@@ -608,131 +744,243 @@ function stripBase64Prefix(dataUrl) {
                   </button>
                 </div>
               )}
-              <form onSubmit={handleSubmit} className="relative flex items-center shadow-lg border border-slate-200 rounded-full bg-white p-2 mb-8">
+ <form
+  onSubmit={handleSubmit}
+  className={`relative flex w-full items-center rounded-full bg-white p-1.5 transition-all duration-200 ${
+    isInputFocused
+      ? "border-2 border-slate-900 shadow-[0_0_0_4px_rgba(15,23,42,0.08),0_8px_25px_rgba(15,23,42,0.12)]"
+      : "border border-slate-200 shadow-md hover:border-slate-300"
+  }`}
+>
                 <button
                   type="button"
                   onClick={() => setShowImageModal(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors ml-2"
+                  className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 sm:ml-2"
                 >
-                  <ImagePlus size={20} />
+                  <ImagePlus size={19} />
                 </button>
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={attachedImage ? "Describe what is in the photo..." : "Describe your pet's symptoms..."}
-                  className="flex-1 bg-transparent px-2 py-3 text-lg outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!inputValue.trim() || loading}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 transition-colors"
-                >
-                  <Send size={20} />
-                </button>
+  <input
+  type="text"
+  value={inputValue}
+  onChange={(e) => setInputValue(e.target.value)}
+  onFocus={() => setIsInputFocused(true)}
+  onBlur={() => setIsInputFocused(false)}
+  placeholder={
+    attachedImage
+      ? "Describe what is in the photo..."
+      : "Describe your pet's symptoms..."
+  }
+  className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 sm:px-4 sm:text-base"
+/>
+             <button
+  type="submit"
+  disabled={!inputValue.trim() || loading}
+  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-md transition-all duration-200 hover:scale-105 hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+>
+  <Send size={19} />
+</button>
               </form>
-              <div className="flex flex-wrap justify-center gap-3">
-                <button onClick={() => handleSubmit(null, "Vomiting or stomach upset")} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm">🐶 Vomiting or stomach upset</button>
-                <button onClick={() => handleSubmit(null, "Lethargic & not eating")} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm">🐱 Lethargic & not eating</button>
-              </div>
+             <div className="flex w-full flex-wrap justify-center gap-2.5 sm:gap-3 mt-2">
+
+  <button
+    onClick={() => handleSubmit(null, "Vomiting or stomach upset")}
+    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+  >
+    Vomiting or stomach upset
+  </button>
+
+  <button
+    onClick={() => handleSubmit(null, "Lethargic and not eating")}
+    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+  >
+    Lethargic and not eating
+  </button>
+
+  <button
+    onClick={() => handleSubmit(null, "Diarrhea")}
+    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+  >
+    Diarrhea
+  </button>
+
+  <button
+    onClick={() => handleSubmit(null, "Limping or skin issue")}
+    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+  >
+    Limping or skin issue
+  </button>
+
+</div>
             </div>
           </div>
         ) : (
           <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4">
-             {pet?.name && (
+            {pet?.name && (
               <div className="mx-auto mb-6 flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
                 <div className="text-xl">🐾</div>
                 <div className="text-sm">
-                  <span className="font-semibold text-slate-900">Active profile: {pet.name}</span>
+                  <span className="font-semibold text-slate-900">
+                    Active profile: {pet.name}
+                  </span>
                 </div>
               </div>
             )}
-            
+
             <div className="flex-1 overflow-y-auto space-y-6 pb-24">
               {messages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {!msg.role.includes('user') && (
-                     <div className="mt-1 mr-3 flex h-8 w-8 items-center justify-center">
-                        <img src={snoutiq_app_icon} alt="AI" className="h-8 w-8 rounded-full" />
-                     </div>
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {!msg.role.includes("user") && (
+                    <div className="mt-1 mr-3 flex h-8 w-8 items-center justify-center">
+                      <img
+                        src={snoutiq_app_icon}
+                        alt="AI"
+                        className="h-8 w-8 rounded-full"
+                      />
+                    </div>
                   )}
-                  
-                  <div className={`max-w-[85%] ${msg.role === 'user' ? 'rounded-2xl bg-slate-900 text-white rounded-tr-none px-5 py-4' : 'w-full'}`}>
-                    
-                    {msg.role === 'user' && msg.image && (
-                      <div 
+
+                  <div
+                    className={`max-w-[85%] ${msg.role === "user" ? "rounded-2xl bg-slate-900 text-white rounded-tr-none px-5 py-4" : "w-full"}`}
+                  >
+                    {msg.role === "user" && msg.image && (
+                      <div
                         onClick={() => setPreviewImageSrc(msg.image)}
                         className="mb-3 rounded-2xl overflow-hidden border border-slate-700 cursor-pointer hover:opacity-90 transition-all max-w-xs"
                         title="Click to view full image"
                       >
-                        <img src={msg.image} alt="uploaded" className="max-h-48 w-full object-cover" />
+                        <img
+                          src={msg.image}
+                          alt="uploaded"
+                          className="max-h-48 w-full object-cover"
+                        />
                       </div>
                     )}
-                    
-                    {msg.role === 'user' ? (
+
+                    {msg.role === "user" ? (
                       <p className="whitespace-pre-wrap">{msg.text}</p>
                     ) : (
                       <div className="w-full">
                         {/* AI Rich Response Rendering */}
                         {msg.raw_response?.ui?.banner && (
-                          <BannerCard banner={msg.raw_response.ui.banner} theme={msg.raw_response.ui.theme} />
-                        )}
-                        
-                        {msg.raw_response?.ui?.health_score?.value != null && (
-                          <HealthScore scoreData={msg.raw_response.ui.health_score} />
-                        )}
-                        
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mb-6">
-                          <p className="whitespace-pre-wrap text-slate-800 leading-relaxed mb-4">{msg.raw_response?.response?.what_we_think_is_happening || msg.text}</p>
-                          
-                          {msg.raw_response?.response?.do_now && (
-                            <DoNowCard text={msg.raw_response.response.do_now} />
-                          )}
-                          
-                          <ListSection title="What to watch" items={msg.raw_response?.response?.what_to_watch} />
-                          <ListSection title="Safe to do while waiting" items={msg.raw_response?.response?.safe_to_do_while_waiting} />
-                        </div>
-
-                        {msg.raw_response?.follow_up_question && (
-                          <FollowUpQuestion 
-                            questionData={msg.raw_response.follow_up_question} 
-                            onAnswer={handleFollowUpAnswer} 
+                          <BannerCard
+                            banner={msg.raw_response.ui.banner}
+                            theme={msg.raw_response.ui.theme}
                           />
                         )}
 
-                        {getProcessedServiceCards(msg.raw_response)?.map((card, idx) => (
-                          <ServiceCard key={idx} card={card} onAction={handleAction} />
-                        ))}
-                        
+                        {msg.raw_response?.ui?.health_score?.value != null && (
+                          <HealthScore
+                            scoreData={msg.raw_response.ui.health_score}
+                          />
+                        )}
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mb-6">
+                          <p className="whitespace-pre-wrap text-slate-800 leading-relaxed mb-4">
+                            {msg.raw_response?.response
+                              ?.what_we_think_is_happening || msg.text}
+                          </p>
+
+                          {msg.raw_response?.response?.do_now && (
+                            <DoNowCard
+                              text={msg.raw_response.response.do_now}
+                            />
+                          )}
+
+                          <ListSection
+                            title="What to watch"
+                            items={msg.raw_response?.response?.what_to_watch}
+                          />
+                          <ListSection
+                            title="Safe to do while waiting"
+                            items={
+                              msg.raw_response?.response
+                                ?.safe_to_do_while_waiting
+                            }
+                          />
+                        </div>
+
+                        {msg.raw_response?.follow_up_question && (
+                          <FollowUpQuestion
+                            questionData={msg.raw_response.follow_up_question}
+                            onAnswer={handleFollowUpAnswer}
+                          />
+                        )}
+
+                        {getProcessedServiceCards(msg.raw_response)?.map(
+                          (card, idx) => (
+                            <ServiceCard
+                              key={idx}
+                              card={card}
+                              onAction={handleAction}
+                            />
+                          ),
+                        )}
+
                         {/* Fallback buttons if no service cards but buttons exist */}
-                        {(!msg.raw_response?.ui?.service_cards || msg.raw_response.ui.service_cards.length === 0) && msg.raw_response?.buttons && (
-                           <div className="flex gap-3">
+                        {(!msg.raw_response?.ui?.service_cards ||
+                          msg.raw_response.ui.service_cards.length === 0) &&
+                          msg.raw_response?.buttons && (
+                            <div className="flex gap-3">
                               {msg.raw_response.buttons.primary && (
-                                <button onClick={() => handleAction(msg.raw_response.buttons.primary)} className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 shadow-sm transition-colors">
-                                  {String(msg.raw_response.buttons.primary.label).toLowerCase().includes("clinic") ? "Book Appointment" : msg.raw_response.buttons.primary.label}
+                                <button
+                                  onClick={() =>
+                                    handleAction(
+                                      msg.raw_response.buttons.primary,
+                                    )
+                                  }
+                                  className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 shadow-sm transition-colors"
+                                >
+                                  {String(
+                                    msg.raw_response.buttons.primary.label,
+                                  )
+                                    .toLowerCase()
+                                    .includes("clinic")
+                                    ? "Book Appointment"
+                                    : msg.raw_response.buttons.primary.label}
                                 </button>
                               )}
                               {msg.raw_response.buttons.secondary && (
-                                <button onClick={() => handleAction(msg.raw_response.buttons.secondary)} className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors">
-                                  {String(msg.raw_response.buttons.secondary.label).toLowerCase().includes("clinic") ? "Book Appointment" : msg.raw_response.buttons.secondary.label}
+                                <button
+                                  onClick={() =>
+                                    handleAction(
+                                      msg.raw_response.buttons.secondary,
+                                    )
+                                  }
+                                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
+                                >
+                                  {String(
+                                    msg.raw_response.buttons.secondary.label,
+                                  )
+                                    .toLowerCase()
+                                    .includes("clinic")
+                                    ? "Book Appointment"
+                                    : msg.raw_response.buttons.secondary.label}
                                 </button>
                               )}
-                           </div>
-                        )}
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
                 </div>
               ))}
               {loading && (
-                 <div className="flex justify-start">
-                    <div className="mt-1 mr-3 flex h-8 w-8 items-center justify-center rounded-full">
-                        <img src={snoutiq_app_icon} alt="AI" className="h-8 w-8 rounded-full" />
-                     </div>
-                    <div className="rounded-2xl bg-white border border-slate-200 shadow-sm rounded-tl-none px-5 py-4 text-slate-500 flex items-center gap-2">
-                       <Loader2 className="w-4 h-4 animate-spin" /> Analyzing symptoms...
-                    </div>
-                 </div>
+                <div className="flex justify-start">
+                  <div className="mt-1 mr-3 flex h-8 w-8 items-center justify-center rounded-full">
+                    <img
+                      src={snoutiq_app_icon}
+                      alt="AI"
+                      className="h-8 w-8 rounded-full"
+                    />
+                  </div>
+                  <div className="rounded-2xl bg-white border border-slate-200 shadow-sm rounded-tl-none px-5 py-4 text-slate-500 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Analyzing
+                    symptoms...
+                  </div>
+                </div>
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -745,18 +993,24 @@ function stripBase64Prefix(dataUrl) {
               {attachedImage && (
                 <div className="mb-2 flex items-center justify-start">
                   <div className="relative inline-block group">
-                    <div 
-                      onClick={() => setPreviewImageSrc(attachedImage.uri || attachedImage.base64)}
+                    <div
+                      onClick={() =>
+                        setPreviewImageSrc(
+                          attachedImage.uri || attachedImage.base64,
+                        )
+                      }
                       className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group hover:opacity-90 transition-all bg-slate-100"
                       title="Click to view full photo"
                     >
-                      <img 
-                        src={attachedImage.uri || attachedImage.base64} 
-                        alt="attached preview" 
-                        className="w-full h-full object-cover" 
+                      <img
+                        src={attachedImage.uri || attachedImage.base64}
+                        alt="attached preview"
+                        className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">View</span>
+                        <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">
+                          View
+                        </span>
                       </div>
                     </div>
                     <button
@@ -770,19 +1024,26 @@ function stripBase64Prefix(dataUrl) {
                   </div>
                 </div>
               )}
-              <form onSubmit={handleSubmit} className="mx-auto max-w-4xl relative flex items-center border border-slate-200 rounded-full bg-white p-1.5 shadow-sm focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400">
-                 <button
+              <form
+                onSubmit={handleSubmit}
+                className="mx-auto max-w-4xl relative flex items-center border border-slate-200 rounded-full bg-white p-1.5 shadow-sm focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400"
+              >
+                <button
                   type="button"
                   onClick={() => setShowImageModal(true)}
                   className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors ml-1 mr-1 shrink-0"
                 >
                   <ImagePlus size={20} />
                 </button>
-                 <input
+                <input
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={attachedImage ? "Describe what is in the photo..." : "Describe your pet's symptoms..."}
+                  placeholder={
+                    attachedImage
+                      ? "Describe what is in the photo..."
+                      : "Describe your pet's symptoms..."
+                  }
                   disabled={loading}
                   className="flex-1 bg-transparent px-4 py-2 outline-none disabled:opacity-50 text-slate-900 min-w-0"
                 />
@@ -801,44 +1062,47 @@ function stripBase64Prefix(dataUrl) {
         {showAuthGate && (
           <ModalShell>
             <div className="relative w-full max-w-md rounded-2xl overflow-hidden bg-white shadow-2xl">
-              <button onClick={() => setShowAuthGate(false)} className="absolute top-4 right-4 z-50 p-2 bg-slate-100 rounded-full shadow-sm text-slate-500 hover:bg-slate-200 hover:text-slate-900">
+              <button
+                onClick={() => setShowAuthGate(false)}
+                className="absolute top-4 right-4 z-50 p-2 bg-slate-100 rounded-full shadow-sm text-slate-500 hover:bg-slate-200 hover:text-slate-900"
+              >
                 <X size={20} />
               </button>
               <GoogleAuthModal onLoginSuccess={handleAuthSuccess} />
             </div>
           </ModalShell>
         )}
-        
+
         {showPetModal && (
           <ModalShell>
             <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-white shadow-2xl max-h-[90vh] flex flex-col">
               {/* Pet Details Modal - Close button removed so user cannot dismiss without filling */}
               <div className="w-full overflow-y-auto">
-                <PetForn 
-                  submitIntake={submitIntakeForm} 
-                  onComplete={handlePetFormComplete} 
-                  isModal={true} 
+                <PetForn
+                  submitIntake={submitIntakeForm}
+                  onComplete={handlePetFormComplete}
+                  isModal={true}
                   part={petFormPart}
                 />
               </div>
             </div>
           </ModalShell>
         )}
-        
+
         {showImageModal && (
-          <ImageUploadModal 
-            onClose={() => setShowImageModal(false)} 
-            onUpload={(base64, mime) => setAttachedImage({ base64, mime })} 
+          <ImageUploadModal
+            onClose={() => setShowImageModal(false)}
+            onUpload={(base64, mime) => setAttachedImage({ base64, mime })}
           />
         )}
-        
+
         {showDoctorsModal && (
-          <ModernDoctorBooking 
+          <ModernDoctorBooking
             onClose={() => {
               sessionStorage.removeItem("snoutiq_modal_open");
               sessionStorage.removeItem("snoutiq_modal_order_type");
               setShowDoctorsModal(false);
-            }} 
+            }}
             symptomText={getUserSymptomText()}
             preSelectedPet={pet}
             orderType={bookingOrderType}
@@ -856,10 +1120,10 @@ function stripBase64Prefix(dataUrl) {
               >
                 <X size={20} />
               </button>
-              <img 
-                src={previewImageSrc} 
-                alt="Enlarged photo preview" 
-                className="max-w-full max-h-[75vh] object-contain rounded-2xl" 
+              <img
+                src={previewImageSrc}
+                alt="Enlarged photo preview"
+                className="max-w-full max-h-[75vh] object-contain rounded-2xl"
               />
             </div>
           </ModalShell>
