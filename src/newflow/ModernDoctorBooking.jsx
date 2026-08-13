@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, Users, Calendar, Clock, Loader2, Filter, Star, MapPin, Award, Check } from "lucide-react";
 import { readAiAuthState } from "../ai/AiAuth";
 import UserDetailsOtpModal from "./UserDetailsOtpModal";
@@ -85,15 +85,50 @@ function getClinicCurrentPrice(clinic) {
     return String(Math.round(Number(servicePrice)));
   }
 
-  // Secondary fallback if clinic_services is empty/null
-  const dayFee = clinic.clinic_day_fee ?? clinic.price ?? clinic.consultation_fee ?? clinic.fee;
-  if (dayFee !== null && dayFee !== undefined && dayFee !== "" && !isNaN(Number(dayFee)) && Number(dayFee) > 0) {
-    return String(Math.round(Number(dayFee)));
-  }
-
   // Fallback to static 499 if empty/null
   return "499";
 }
+
+function enrichDoctorObject(doc, clinicMap = new Map()) {
+  if (!doc) return null;
+  const regId = String(doc.vet_registeration_id || doc.clinic_id || doc.clinicId || "");
+  const clinic = clinicMap.get(regId);
+  const expYears = parseInt(doc.years_of_experience || doc.experience || 0);
+
+  const rawRating = doc.google_rating ?? doc.clinic?.rating ?? clinic?.google_rating ?? clinic?.rating;
+  const parsedRating = (rawRating !== null && rawRating !== undefined && rawRating !== "" && !isNaN(Number(rawRating)))
+    ? Number(rawRating) 
+    : 5.0;
+
+  const reviewCount = doc.google_user_ratings_total ?? doc.clinic?.user_ratings_total ?? clinic?.google_user_ratings_total ?? clinic?.user_ratings_total ?? 50;
+
+  const imgUrl = doc.doctor_image_blob_url || normalizeImage(doc.doctor_image || doc.doctor_blob_url || doc.doctor_image_url || doc.image);
+
+  return {
+    ...doc,
+    id: doc.id || doc.doctor_id,
+    doctor_id: doc.doctor_id || doc.id,
+    name: doc.doctor_name || doc.name || "Doctor",
+    image: imgUrl,
+    degree: doc.degree || "BVSc",
+    experience: expYears,
+    years_of_experience: String(expYears),
+    specialization: formatSpecialization(doc.specialization_select_all_that_apply || doc.specialization),
+    feeDay: Number(doc.video_day_rate || doc.clinic_day_fee || 499),
+    feeNight: Number(doc.video_night_rate || doc.video_day_rate || doc.clinic_night_fee || 650),
+    bio: doc.bio || "",
+    status: doc.doctor_status || "available",
+    responseTimeDay: doc.response_time_for_online_consults_day || "0 To 15 Mins",
+    responseTimeNight: doc.response_time_for_online_consults_night || "15 To 20 Mins",
+    followUpPolicy: doc.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta || "",
+    googleRating: parsedRating,
+    googleReviewCount: Number(reviewCount),
+    clinicCity: doc.clinic?.city || doc.clinic_address || clinic?.city || "",
+    clinicName: doc.clinic_name || doc.clinic?.name || clinic?.name || "",
+    vet_registeration_id: regId
+  };
+}
+
 
 function isSlotAfterCurrentTime(slotTimeStr, selectedDateStr) {
   if (!slotTimeStr) return false;
@@ -150,8 +185,22 @@ function getUpcomingDates(count = 7) {
 }
 
 export default function ModernDoctorBooking({ onClose, symptomText, preSelectedPet, orderType = "video_consult" }) {
-  const [doctors, setDoctors] = useState([]);
-  const [clinicsList, setClinicsList] = useState([]);
+  // Doctor States
+  const [lastVetDoctors, setLastVetDoctors] = useState([]);
+  const [hasLastVet, setHasLastVet] = useState(false);
+  const [showAllVets, setShowAllVets] = useState(false);
+  const [allVetsLoading, setAllVetsLoading] = useState(false);
+  const [allVetsLoaded, setAllVetsLoaded] = useState(false);
+  const [otherDoctors, setOtherDoctors] = useState([]);
+
+  // Clinic States (Book Visit Flow)
+  const [lastVetClinics, setLastVetClinics] = useState([]);
+  const [hasLastClinic, setHasLastClinic] = useState(false);
+  const [showAllClinics, setShowAllClinics] = useState(false);
+  const [allClinicsLoading, setAllClinicsLoading] = useState(false);
+  const [allClinicsLoaded, setAllClinicsLoaded] = useState(false);
+  const [otherClinics, setOtherClinics] = useState([]);
+
   const [selectedClinic, setSelectedClinic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -219,9 +268,10 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const authState = readAiAuthState();
+  const authState = useMemo(() => readAiAuthState(), []);
   const token = authState?.token;
   const user = authState?.user || {};
+  const userId = user.id || user.user_id || authState?.user_id || authState?.userId || 1179;
 
   let rawPet = preSelectedPet || (user.pets && user.pets[0]) || authState?.pet || {};
   if (!rawPet || Object.keys(rawPet).length === 0) {
@@ -261,122 +311,230 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
     onClose?.();
   };
 
-  // Data Fetching & Rating Merging Logic
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const userId = user.id || user.user_id || authState?.user_id || authState?.userId || 1179;
+  // Helper to fetch all doctors
+  const fetchAllDoctors = useCallback(async () => {
+    setAllVetsLoading(true);
 
+    try {
+      const [docRes, clinicRes] = await Promise.all([
+        fetch(`${API_BASE}/exported_from_excell_doctors`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }).then(r => r.ok ? r.json() : null).catch(() => null)
+      ]);
+
+      const rawDocs = Array.isArray(docRes?.doctors) 
+        ? docRes.doctors 
+        : (Array.isArray(docRes?.data?.doctors) 
+          ? docRes.data.doctors 
+          : (Array.isArray(docRes?.data) ? docRes.data : (Array.isArray(docRes) ? docRes : [])));
+
+      const rawClinics = Array.isArray(clinicRes?.data?.data) 
+        ? clinicRes.data.data 
+        : (Array.isArray(clinicRes?.data) ? clinicRes.data : []);
+
+      const clinicMap = new Map();
+      rawClinics.forEach(c => {
+        const key = String(c.id || c.clinic_id || "");
+        if (key) clinicMap.set(key, c);
+      });
+
+      const enrichedDoctors = rawDocs.map(doc => enrichDoctorObject(doc, clinicMap)).filter(Boolean);
+      setOtherDoctors(enrichedDoctors);
+      setAllVetsLoaded(true);
+    } catch (err) {
+      console.error("Failed to load all doctors", err);
+    } finally {
+      setAllVetsLoading(false);
+      setLoading(false);
+    }
+  }, [token, userId]);
+
+  // Helper to fetch all clinics (Book Visit Flow)
+  const fetchAllClinics = useCallback(async () => {
+    setAllClinicsLoading(true);
+    try {
+      let inclinicRes;
       try {
-        if (orderType === "appointment") {
-          let inclinicRes;
-          try {
-            inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {}
+        inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (!inclinicRes.ok) throw new Error("Inclinic auth fetch failed");
+      } catch (e) {
+        inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`);
+      }
+      const inclinicData = await inclinicRes.json();
+      const rawClinicsData = Array.isArray(inclinicData?.data?.data) 
+        ? inclinicData.data.data 
+        : (Array.isArray(inclinicData?.data) ? inclinicData.data : (Array.isArray(inclinicData?.clinics) ? inclinicData.clinics : []));
+      setOtherClinics(rawClinicsData);
+      setAllClinicsLoaded(true);
+    } catch (e) {
+      console.error("Failed to load inclinic list:", e);
+    } finally {
+      setAllClinicsLoading(false);
+      setLoading(false);
+    }
+  }, [token, userId]);
+
+  // STEP 1 — Initial Data Fetching for both Talk to Vet & Book Visit
+  useEffect(() => {
+    async function loadInitialData() {
+      setLoading(true);
+
+      if (orderType === "appointment") {
+        // Book Visit Flow: STEP 1 Check last-vet-details FIRST
+        try {
+          const res = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          const data = await res.json();
+          
+          const rawLastClinics = data?.data?.clinics || data?.clinics || (Array.isArray(data?.data) ? data.data.filter(x => x.clinic_name || x.name || x.clinic) : []);
+          const docs = data?.data?.doctors || data?.doctors || [];
+          let extractedClinics = [...rawLastClinics];
+
+          if (extractedClinics.length === 0 && docs.length > 0) {
+            docs.forEach(d => {
+              if (d.clinic) {
+                extractedClinics.push(d.clinic);
+              } else if (d.clinic_name || d.clinic_id) {
+                extractedClinics.push({
+                  id: d.clinic_id || d.id,
+                  name: d.clinic_name || "Veterinary Clinic",
+                  city: d.clinic_address || d.city || "Gurugram",
+                  address: d.clinic_address || "",
+                  google_rating: d.google_rating || 5.0,
+                  google_user_ratings_total: d.google_user_ratings_total || 50,
+                  doctors: [d]
+                });
+              }
             });
-            if (!inclinicRes.ok) throw new Error("Inclinic auth fetch failed");
-          } catch (e) {
-            inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`);
           }
-          const inclinicData = await inclinicRes.json();
-          const rawClinicsData = Array.isArray(inclinicData?.data?.data) 
-            ? inclinicData.data.data 
-            : (Array.isArray(inclinicData?.data) ? inclinicData.data : (Array.isArray(inclinicData?.clinics) ? inclinicData.clinics : []));
-          setClinicsList(rawClinicsData);
+
+          const uniqueLastClinics = [];
+          const seenIds = new Set();
+          extractedClinics.forEach(c => {
+            const cId = String(c.id || c.clinic_id || c.name);
+            if (cId && !seenIds.has(cId)) {
+              seenIds.add(cId);
+              uniqueLastClinics.push(c);
+            }
+          });
+
+          const hasClinics = data?.success === true && uniqueLastClinics.length > 0;
+
+          if (hasClinics) {
+            setLastVetClinics(uniqueLastClinics);
+            setHasLastClinic(true);
+            setLoading(false);
+          } else {
+            setHasLastClinic(false);
+            await fetchAllClinics();
+          }
+        } catch (err) {
+          console.warn("last-vet-details clinic check failed, loading all clinics as fallback:", err);
+          setHasLastClinic(false);
+          await fetchAllClinics();
+        }
+        return;
+      }
+
+      // Talk to Vet Flow: STEP 1 Check last-vet-details FIRST
+      try {
+        const res = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const data = await res.json();
+        const docs = data?.data?.doctors || data?.doctors || (Array.isArray(data?.data) ? data.data : []);
+
+        const hasVet = data?.success === true && Array.isArray(docs) && docs.length > 0;
+
+        if (hasVet) {
+          const enrichedLastVet = docs.map(d => enrichDoctorObject(d)).filter(Boolean);
+          setLastVetDoctors(enrichedLastVet);
+          setHasLastVet(true);
+          setLoading(false);
         } else {
-          const [docRes, clinicRes] = await Promise.all([
-            fetch(`${API_BASE}/exported_from_excell_doctors`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {}
-            }).then(r => r.ok ? r.json() : null).catch(() => null),
-            fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {}
-            }).then(r => r.ok ? r.json() : null).catch(() => null)
-          ]);
-
-          const rawDocs = Array.isArray(docRes?.doctors) 
-            ? docRes.doctors 
-            : (Array.isArray(docRes?.data?.doctors) 
-              ? docRes.data.doctors 
-              : (Array.isArray(docRes?.data) ? docRes.data : (Array.isArray(docRes) ? docRes : [])));
-
-          const rawClinics = Array.isArray(clinicRes?.data?.data) 
-            ? clinicRes.data.data 
-            : (Array.isArray(clinicRes?.data) ? clinicRes.data : []);
-
-          const clinicMap = new Map();
-          rawClinics.forEach(c => {
-            const key = String(c.id || c.clinic_id || "");
-            if (key) clinicMap.set(key, c);
-          });
-
-          const enrichedDoctors = rawDocs.map(doc => {
-            const regId = String(doc.vet_registeration_id || doc.clinic_id || doc.clinicId || "");
-            const clinic = clinicMap.get(regId);
-            const expYears = parseInt(doc.years_of_experience || doc.experience || 0);
-
-            const rawRating = doc.google_rating ?? doc.clinic?.rating ?? clinic?.google_rating ?? clinic?.rating;
-            const parsedRating = (rawRating !== null && rawRating !== undefined && rawRating !== "" && !isNaN(Number(rawRating)))
-              ? Number(rawRating) 
-              : null;
-
-            const reviewCount = doc.google_user_ratings_total ?? doc.clinic?.user_ratings_total ?? clinic?.google_user_ratings_total ?? clinic?.user_ratings_total ?? 0;
-
-            const imgUrl = doc.doctor_image_blob_url || normalizeImage(doc.doctor_image || doc.doctor_blob_url || doc.doctor_image_url || doc.image);
-
-            return {
-              ...doc,
-              id: doc.id || doc.doctor_id,
-              name: doc.doctor_name || doc.name || "Doctor",
-              image: imgUrl,
-              degree: doc.degree || "BVSc",
-              experience: expYears,
-              years_of_experience: String(expYears),
-              specialization: formatSpecialization(doc.specialization_select_all_that_apply || doc.specialization),
-              feeDay: Number(doc.video_day_rate || doc.clinic_day_fee || 499),
-              feeNight: Number(doc.video_night_rate || doc.video_day_rate || doc.clinic_night_fee || 650),
-              bio: doc.bio || "",
-              status: doc.doctor_status || "available",
-              responseTimeDay: doc.response_time_for_online_consults_day || "0 To 15 Mins",
-              responseTimeNight: doc.response_time_for_online_consults_night || "15 To 20 Mins",
-              followUpPolicy: doc.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta || "",
-              googleRating: parsedRating,
-              googleReviewCount: Number(reviewCount),
-              clinicCity: doc.clinic?.city || doc.clinic_address || clinic?.city || "",
-              clinicName: doc.clinic_name || doc.clinic?.name || clinic?.name || "",
-              vet_registeration_id: regId
-            };
-          });
-
-          setDoctors(enrichedDoctors);
+          setHasLastVet(false);
+          await fetchAllDoctors();
         }
       } catch (err) {
-        console.error("Failed to load booking data", err);
-      } finally {
-        setLoading(false);
+        console.warn("last-vet-details check failed, loading all doctors as fallback:", err);
+        setHasLastVet(false);
+        await fetchAllDoctors();
       }
     }
-    fetchData();
-  }, [token, orderType]);
 
-  // Filter Doctors by Search & Experience
-  const filteredDoctors = useMemo(() => {
+    loadInitialData();
+  }, [token, orderType, userId, fetchAllDoctors, fetchAllClinics]);
+
+  const handleViewMoreClick = () => {
+    setShowAllVets(true);
+    if (!allVetsLoaded) {
+      fetchAllDoctors();
+    }
+  };
+
+  const handleViewMoreClinicsClick = () => {
+    setShowAllClinics(true);
+    if (!allClinicsLoaded) {
+      fetchAllClinics();
+    }
+  };
+
+  // Filter Last Vet Doctors by Search & Experience
+  const filteredLastVetDoctors = useMemo(() => {
     const minYears = parseInt(selectedExpFilter) || 0;
-    return doctors.filter(doc => {
+    return lastVetDoctors.filter(doc => {
       const matchesSearch = (doc.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (doc.specialization || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (doc.clinicCity || "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesExp = (doc.experience || 0) >= minYears;
       return matchesSearch && matchesExp;
     });
-  }, [doctors, searchQuery, selectedExpFilter]);
+  }, [lastVetDoctors, searchQuery, selectedExpFilter]);
 
-  // Filter Clinics by Search
-  const filteredClinics = useMemo(() => {
-    return clinicsList.filter(c => 
-      (c.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (c.city || "").toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter Other Doctors by Search & Experience, EXCLUDING duplicates from lastVetDoctors
+  const filteredOtherDoctors = useMemo(() => {
+    const minYears = parseInt(selectedExpFilter) || 0;
+    const deduplicated = otherDoctors.filter(
+      doc => !lastVetDoctors.some(lv => String(lv.doctor_id || lv.id) === String(doc.id || doc.doctor_id))
     );
-  }, [clinicsList, searchQuery]);
+
+    return deduplicated.filter(doc => {
+      const matchesSearch = (doc.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            (doc.specialization || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            (doc.clinicCity || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesExp = (doc.experience || 0) >= minYears;
+      return matchesSearch && matchesExp;
+    });
+  }, [otherDoctors, lastVetDoctors, searchQuery, selectedExpFilter]);
+
+  // Filter Last Vet Clinics by Search
+  const filteredLastVetClinics = useMemo(() => {
+    return lastVetClinics.filter(c => 
+      (c.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (c.city || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.address || "").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [lastVetClinics, searchQuery]);
+
+  // Filter Other Clinics by Search, EXCLUDING duplicates from lastVetClinics
+  const filteredOtherClinics = useMemo(() => {
+    const deduplicated = otherClinics.filter(
+      c => !lastVetClinics.some(lc => String(lc.id || lc.clinic_id) === String(c.id || c.clinic_id))
+    );
+
+    return deduplicated.filter(c => 
+      (c.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (c.city || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.address || "").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [otherClinics, lastVetClinics, searchQuery]);
+
 
   // Live Current Fee calculation
   const currentFee = selectedDoctor ? getDoctorCurrentPrice(selectedDoctor) : (selectedClinic ? Number(getClinicCurrentPrice(selectedClinic)) : 499);
@@ -655,6 +813,90 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
     }
   };
 
+  const renderDoctorCard = (doc, isTrusted = false) => {
+    const isOnline = doc.status === "available" || doc.available;
+    const displayPrice = getDoctorCurrentPrice(doc);
+
+    return (
+      <div key={doc.id || doc.doctor_id} className={`bg-white border rounded-2xl p-3 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-2 relative ${isTrusted ? 'border-emerald-300 ring-1 ring-emerald-400/40 bg-emerald-50/10' : 'border-slate-200/90'}`}>
+        <div className="flex items-start gap-2.5">
+          {/* Left Doctor Avatar */}
+          <div className="relative w-14 h-14 rounded-2xl bg-[#e8f2fe] flex-shrink-0 border border-slate-200/80">
+            {doc.image ? (
+              <img src={doc.image} alt={doc.name} className="w-full h-full object-cover rounded-2xl" />
+            ) : (
+              <div className="w-full h-full bg-[#e8f2fe] text-[#0066cc] font-extrabold flex items-center justify-center text-xs rounded-2xl">
+                DR
+              </div>
+            )}
+            {isOnline && (
+              <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#00c853] rounded-full border-2 border-white" title="Online now" />
+            )}
+          </div>
+
+          {/* Right Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-1 flex-wrap">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="font-bold text-slate-900 text-xs leading-tight truncate">{doc.name}</h3>
+                  {isTrusted && (
+                    <span className="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border border-emerald-200">
+                      Trusted
+                    </span>
+                  )}
+                </div>
+                
+                {/* Experience Badge */}
+                <p className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
+                  {doc.degree || "BVSc"} · {doc.experience || 5} yrs exp
+                </p>
+              </div>
+              
+              {/* Amber Google Rating Badge */}
+              <span className="bg-amber-50 text-amber-900 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-amber-200/70 flex items-center gap-0.5 flex-shrink-0">
+                ⭐ {doc.googleRating || 5.0} <span className="text-amber-700 font-medium">({doc.googleReviewCount || 50})</span>
+              </span>
+            </div>
+
+            {/* Specialization Line */}
+            <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
+              {doc.specialization}
+            </p>
+
+            {/* Online Status Line */}
+            <p className="text-[10px] font-medium text-emerald-600 mt-0.5 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+              <span>{isOnline ? "Online now" : "Available"} - Connects in {doc.responseTimeDay || "0 To 15 Mins"}</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom Row */}
+        <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+          <div className="text-slate-900 font-extrabold text-xs">
+            ₹{displayPrice}<span className="text-[10px] font-normal text-slate-400">/Consult</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setViewProfileDoctor(doc)}
+              className="px-3 py-1 border border-blue-200 text-blue-600 hover:bg-blue-50 text-[11px] font-bold rounded-full transition-all"
+            >
+              View Profile
+            </button>
+            <button
+              onClick={() => handleBookNowClick(doc)}
+              className="px-3.5 py-1 bg-[#0052FF] hover:bg-[#0046DB] text-white text-[11px] font-bold rounded-full transition-all shadow-xs"
+            >
+              Talk to Vet
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-slate-100 w-full min-h-screen overflow-hidden animate-[slideInRight_0.25s_cubic-bezier(0.16,1,0.3,1)]">
       
@@ -732,151 +974,220 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
                 <span>Loading verified vets & clinics...</span>
               </div>
             ) : orderType === "appointment" ? (
-              /* PART 2: CLINICS LIST (2-COLUMN GRID ON DESKTOP) */
-              filteredClinics.length === 0 ? (
-                <div className="p-5 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">No clinics found matching your search.</div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {filteredClinics.map(clinic => {
-                    const feeVal = getClinicCurrentPrice(clinic);
-                    const imgUrl = clinic.clinic_image_url || clinic.clinic_image || "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=600&q=80";
-                    const doctorsCount = clinic.doctors_count || (Array.isArray(clinic.doctors) ? clinic.doctors.length : 1);
-                    const isTrusted = (clinic.google_rating || 5.0) >= 4.5;
+              /* PART 2: CLINICS LIST WITH LAST-VET AND LAZY LOADING */
+              (() => {
+                const renderClinicCard = (clinic, isTrustedClinic = false) => {
+                  const feeVal = getClinicCurrentPrice(clinic);
+                  const imgUrl = clinic.clinic_image_url || clinic.clinic_image || "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=600&q=80";
+                  const doctorsCount = clinic.doctors_count || (Array.isArray(clinic.doctors) ? clinic.doctors.length : 1);
+                  const isTrusted = isTrustedClinic || (clinic.google_rating || 5.0) >= 4.5;
 
-                    return (
-                      <div key={clinic.id} className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
-                        <div className="relative h-32 w-full bg-slate-800">
-                          <img src={imgUrl} alt={clinic.name} className="w-full h-full object-cover" />
-                          {isTrusted && (
-                            <span className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-bold text-slate-800 shadow-sm flex items-center gap-1">
-                              ★ Trust
+                  return (
+                    <div key={clinic.id || clinic.name} className={`bg-white border rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${isTrustedClinic ? 'border-emerald-300 ring-1 ring-emerald-400/40' : 'border-slate-200/90'}`}>
+                      <div className="relative h-32 w-full bg-slate-800">
+                        <img src={imgUrl} alt={clinic.name} className="w-full h-full object-cover" />
+                        {isTrusted && (
+                          <span className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-bold text-slate-800 shadow-sm flex items-center gap-1">
+                            ★ Trust
+                          </span>
+                        )}
+                        {isTrustedClinic && (
+                          <span className="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full shadow-sm">
+                            Your Clinic
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
+                        <div>
+                          <div className="flex items-start justify-between gap-1.5">
+                            <div>
+                              <h3 className="font-bold text-slate-900 text-xs leading-snug line-clamp-1">{clinic.name}</h3>
+                              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                                📍 {clinic.address || clinic.city || "Gurugram"}{clinic.pincode ? `, ${clinic.pincode}` : ""}
+                              </p>
+                            </div>
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0">
+                              ₹{feeVal}
                             </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 mt-2 text-[10px] flex-wrap">
+                            <span className="bg-amber-50 text-amber-900 border border-amber-200/80 font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                              ⭐ {clinic.google_rating || 5.0} <span className="text-amber-700 font-medium">({clinic.google_user_ratings_total || 50})</span>
+                            </span>
+                            <span className="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md">
+                              👤 {doctorsCount} Vet{doctorsCount > 1 ? "s" : ""}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                          <span className="text-[10px] text-slate-400 font-medium">In-clinic visit</span>
+                          <button 
+                            onClick={() => handleSelectClinic(clinic)}
+                            className="bg-[#0052FF] hover:bg-[#0046DB] text-white font-bold text-[11px] px-3.5 py-1.5 rounded-full transition-all shadow-xs flex items-center gap-1"
+                          >
+                            Book Visit →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                };
+
+                return hasLastClinic ? (
+                  <div className="space-y-3">
+                    {/* ⭐ Your Trusted Clinic Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between px-0.5">
+                        <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                          <span>⭐ Your Trusted Clinic</span>
+                          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                            Recommended for {displayPetName}
+                          </span>
+                        </h3>
+                      </div>
+
+                      {filteredLastVetClinics.length === 0 ? (
+                        <div className="p-4 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">
+                          No trusted clinics match your search.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {filteredLastVetClinics.map(clinic => renderClinicCard(clinic, true))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* View More Clinics Button */}
+                    {!showAllClinics && (
+                      <div className="pt-1 text-center">
+                        <button
+                          onClick={handleViewMoreClinicsClick}
+                          disabled={allClinicsLoading}
+                          className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl border border-blue-200 transition-all flex items-center justify-center gap-2 shadow-xs"
+                        >
+                          {allClinicsLoading ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                              <span>Loading more clinics for {displayPetName}...</span>
+                            </>
+                          ) : (
+                            <span>View more clinics for {displayPetName} ↓</span>
                           )}
-                        </div>
-                        
-                        <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
-                          <div>
-                            <div className="flex items-start justify-between gap-1.5">
-                              <div>
-                                <h3 className="font-bold text-slate-900 text-xs leading-snug line-clamp-1">{clinic.name}</h3>
-                                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-                                  📍 {clinic.address || clinic.city || "Gurugram"}{clinic.pincode ? `, ${clinic.pincode}` : ""}
-                                </p>
-                              </div>
-                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0">
-                                ₹{feeVal}
-                              </span>
-                            </div>
-
-                            {/* Rating badge in SAME UI as Talk to Vet */}
-                            <div className="flex items-center gap-1.5 mt-2 text-[10px] flex-wrap">
-                              <span className="bg-amber-50 text-amber-900 border border-amber-200/80 font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
-                                ⭐ {clinic.google_rating || 5.0} <span className="text-amber-700 font-medium">({clinic.google_user_ratings_total || 50})</span>
-                              </span>
-                              <span className="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md">
-                                👤 {doctorsCount} Vet{doctorsCount > 1 ? "s" : ""}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                            <span className="text-[10px] text-slate-400 font-medium">In-clinic visit</span>
-                            <button 
-                              onClick={() => handleSelectClinic(clinic)}
-                              className="bg-[#0052FF] hover:bg-[#0046DB] text-white font-bold text-[11px] px-3.5 py-1.5 rounded-full transition-all shadow-xs flex items-center gap-1"
-                            >
-                              Book Visit →
-                            </button>
-                          </div>
-                        </div>
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
-              )
+                    )}
+
+                    {/* Other Available Clinics Section */}
+                    {showAllClinics && (
+                      <div className="space-y-2 pt-2 border-t border-slate-200/80">
+                        <h3 className="text-xs font-bold text-slate-900 px-0.5">Other Nearby Clinics</h3>
+                        {allClinicsLoading ? (
+                          <div className="py-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                            <span>Loading available clinics...</span>
+                          </div>
+                        ) : filteredOtherClinics.length === 0 ? (
+                          <div className="p-4 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">
+                            No other clinics found matching your search.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {filteredOtherClinics.map(clinic => renderClinicCard(clinic, false))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* CASE B: hasLastClinic === false -> DIRECT FULL CLINIC LIST */
+                  filteredOtherClinics.length === 0 ? (
+                    <div className="p-5 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">No clinics found matching your search.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {filteredOtherClinics.map(clinic => renderClinicCard(clinic, false))}
+                    </div>
+                  )
+                );
+              })()
             ) : (
-              /* PART 1: DOCTORS LIST (2-COLUMN GRID ON DESKTOP) */
-              filteredDoctors.length === 0 ? (
-                <div className="p-5 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">No doctors found matching filters.</div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  {filteredDoctors.map(doc => {
-                    const isOnline = doc.status === "available" || doc.available;
-                    const displayPrice = getDoctorCurrentPrice(doc);
+              /* PART 1: DOCTORS LIST WITH LAST-VET AND LAZY LOADING */
+              hasLastVet ? (
+                <div className="space-y-3">
+                  {/* ⭐ Your Trusted Vet Section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-0.5">
+                      <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                        <span>⭐ Your Trusted Vet</span>
+                        <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                          Recommended for {displayPetName}
+                        </span>
+                      </h3>
+                    </div>
 
-                    return (
-                      <div key={doc.id} className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-2">
-                        <div className="flex items-start gap-2.5">
-                          {/* Left Doctor Avatar (Matches exact screenshot styling) */}
-                          <div className="relative w-14 h-14 rounded-2xl bg-[#e8f2fe] flex-shrink-0 border border-slate-200/80">
-                            {doc.image ? (
-                              <img src={doc.image} alt={doc.name} className="w-full h-full object-cover rounded-2xl" />
-                            ) : (
-                              <div className="w-full h-full bg-[#e8f2fe] text-[#0066cc] font-extrabold flex items-center justify-center text-xs rounded-2xl">
-                                DR
-                              </div>
-                            )}
-                            {isOnline && (
-                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#00c853] rounded-full border-2 border-white" title="Online now" />
-                            )}
-                          </div>
-
-                          {/* Right Details */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-1 flex-wrap">
-                              <div>
-                                <h3 className="font-bold text-slate-900 text-xs leading-tight truncate">{doc.name}</h3>
-                                
-                                {/* Old Experience Badge */}
-                                <p className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
-                                  {doc.degree || "BVSc"} · {doc.experience || 5} yrs exp
-                                </p>
-                              </div>
-                              
-                              {/* Old Amber Google Rating Badge */}
-                              <span className="bg-amber-50 text-amber-900 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-amber-200/70 flex items-center gap-0.5 flex-shrink-0">
-                                ⭐ {doc.googleRating || 5.0} <span className="text-amber-700 font-medium">({doc.googleReviewCount || 50})</span>
-                              </span>
-                            </div>
-
-                            {/* Specialization Line */}
-                            <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
-                              {doc.specialization}
-                            </p>
-
-                            {/* Online Status Line */}
-                            <p className="text-[10px] font-medium text-emerald-600 mt-0.5 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                              <span>{isOnline ? "Online now" : "Available"} - Connects in {doc.responseTimeDay || "0 To 15 Mins"}</span>
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Bottom Row (Price on Left, Action Pill Buttons on Right) */}
-                        <div className="flex items-center justify-between border-t border-slate-100 pt-2">
-                          <div className="text-slate-900 font-extrabold text-xs">
-                            ₹{displayPrice}<span className="text-[10px] font-normal text-slate-400">/Consult</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => setViewProfileDoctor(doc)}
-                              className="px-3 py-1 border border-blue-200 text-blue-600 hover:bg-blue-50 text-[11px] font-bold rounded-full transition-all"
-                            >
-                              View Profile
-                            </button>
-                            <button
-                              onClick={() => handleBookNowClick(doc)}
-                              className="px-3.5 py-1 bg-[#0052FF] hover:bg-[#0046DB] text-white text-[11px] font-bold rounded-full transition-all shadow-xs"
-                            >
-                              Talk to Vet
-                            </button>
-                          </div>
-                        </div>
+                    {filteredLastVetDoctors.length === 0 ? (
+                      <div className="p-4 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">
+                        No trusted vets match your search query.
                       </div>
-                    );
-                  })}
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {filteredLastVetDoctors.map(doc => renderDoctorCard(doc, true))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* View More Vets Button */}
+                  {!showAllVets && (
+                    <div className="pt-1 text-center">
+                      <button
+                        onClick={handleViewMoreClick}
+                        disabled={allVetsLoading}
+                        className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl border border-blue-200 transition-all flex items-center justify-center gap-2 shadow-xs"
+                      >
+                        {allVetsLoading ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                            <span>Loading more vets for {displayPetName}...</span>
+                          </>
+                        ) : (
+                          <span>View more vets for {displayPetName} ↓</span>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Other Available Vets Section */}
+                  {showAllVets && (
+                    <div className="space-y-2 pt-2 border-t border-slate-200/80">
+                      <h3 className="text-xs font-bold text-slate-900 px-0.5">Other Available Vets</h3>
+                      {allVetsLoading ? (
+                        <div className="py-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                          <span>Loading available vets...</span>
+                        </div>
+                      ) : filteredOtherDoctors.length === 0 ? (
+                        <div className="p-4 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">
+                          No other doctors found matching filters.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {filteredOtherDoctors.map(doc => renderDoctorCard(doc, false))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
+              ) : (
+                /* CASE B: hasLastVet === false -> DIRECT NORMAL DOCTOR LIST */
+                filteredOtherDoctors.length === 0 ? (
+                  <div className="p-5 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">No doctors found matching filters.</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {filteredOtherDoctors.map(doc => renderDoctorCard(doc, false))}
+                  </div>
+                )
               )
             )}
           </div>
@@ -1058,24 +1369,67 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
                 {/* VISIT DATE */}
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">VISIT DATE</span>
-                  <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-                    {getUpcomingDates(7).map(d => {
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 snap-x snap-mandatory">
+                    {getUpcomingDates(30).slice(0, 5).map(d => {
                       const isSel = selectedDate === d.dateStr;
+                      const today = new Date(); today.setHours(0,0,0,0);
+                      const dDate = new Date(d.dateStr); dDate.setHours(0,0,0,0);
+                      const isPast = dDate < today;
                       return (
                         <button
                           key={d.dateStr}
-                          onClick={() => fetchDateAvailabilityAndSlots(d.dateStr, selectedDoctor, selectedClinic)}
-                          className={`flex-1 min-w-[56px] py-2 px-1.5 rounded-xl border text-center transition-all ${
-                            isSel ? "border-blue-600 bg-blue-600 text-white font-bold shadow-xs" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                          disabled={isPast}
+                          onClick={() => !isPast && fetchDateAvailabilityAndSlots(d.dateStr, selectedDoctor, selectedClinic)}
+                          className={`flex-shrink-0 snap-start w-14 py-2 px-1.5 rounded-xl border text-center transition-all ${
+                            isPast
+                              ? "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed opacity-50"
+                              : isSel
+                                ? "border-blue-600 bg-blue-600 text-white font-bold shadow-xs"
+                                : "border-slate-200 bg-white text-slate-700 hover:border-blue-300"
                           }`}
                         >
-                          <p className={`text-[9px] uppercase font-semibold ${isSel ? "text-blue-100" : "text-slate-400"}`}>{d.dayName}</p>
+                          <p className={`text-[9px] uppercase font-semibold ${isSel ? "text-blue-100" : isPast ? "text-slate-300" : "text-slate-400"}`}>{d.dayName}</p>
                           <p className="text-xs font-bold mt-0.5">{d.dateNum}</p>
-                          <p className={`text-[9px] ${isSel ? "text-blue-100" : "text-slate-400"}`}>{d.monthName}</p>
+                          <p className={`text-[9px] ${isSel ? "text-blue-100" : isPast ? "text-slate-300" : "text-slate-400"}`}>{d.monthName}</p>
                         </button>
                       );
                     })}
+
+                    {/* More Dates Button */}
+                    <button
+                      onClick={() => {
+                        const picker = document.getElementById("hidden-date-picker");
+                        if (picker) picker.showPicker ? picker.showPicker() : picker.click();
+                      }}
+                      className="flex-shrink-0 w-14 py-2 px-1 rounded-xl border border-dashed border-blue-300 bg-blue-50 text-blue-600 text-center hover:bg-blue-100 transition-all snap-start relative"
+                    >
+                      <p className="text-[9px] font-bold leading-tight">More</p>
+                      <p className="text-[9px] font-bold">Dates</p>
+                      <p className="text-[10px] mt-0.5">📅</p>
+                      <input
+                        id="hidden-date-picker"
+                        type="date"
+                        min={new Date().toISOString().split("T")[0]}
+                        value={selectedDate && !getUpcomingDates(5).some(d => d.dateStr === selectedDate) ? selectedDate : ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) fetchDateAvailabilityAndSlots(val, selectedDoctor, selectedClinic);
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </button>
                   </div>
+
+                  {/* Show selected date if it's beyond first 5 */}
+                  {selectedDate && !getUpcomingDates(5).some(d => d.dateStr === selectedDate) && (
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <span className="text-[10px] text-slate-500">Selected:</span>
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                        {new Date(selectedDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
+                      </span>
+                      <button onClick={() => { setSelectedDate(""); setSelectedTimeSlot(""); setAvailableSlots([]); }} className="text-[10px] text-red-400 hover:text-red-600">✕</button>
+                    </div>
+                  )}
                 </div>
 
                 {/* AVAILABLE SLOTS */}
