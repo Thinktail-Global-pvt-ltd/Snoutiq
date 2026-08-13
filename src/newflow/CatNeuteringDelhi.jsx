@@ -13,7 +13,7 @@ export default function CatNeuteringDelhi() {
     "Expert cat neutering and spaying surgery in Delhi NCR. Includes pre-op blood test, surgery, and post-op consultation. Starting ₹4,999.";
   const keywords =
     "cat neutering Delhi, cat spaying Delhi NCR, cat neutering cost Delhi, safe cat neutering";
-  const canonical = "https://snoutiq.com/services/cat-neutering-delhi";
+  const canonical = "https://snoutiq.com/cat-neutering-delhi";
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">

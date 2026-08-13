@@ -13,7 +13,7 @@ export default function PuppyVaccinationDelhi() {
     "Complete puppy vaccination package in Delhi NCR. DHPPi, Rabies, Deworming included. Experienced vets at 50+ verified clinics. Book online. Starting ₹2,499.";
   const keywords =
     "puppy vaccination Delhi, puppy vaccine package Delhi NCR, puppy shots Delhi, puppy vaccination cost Delhi";
-  const canonical = "https://snoutiq.com/services/puppy-vaccination-delhi";
+  const canonical = "https://snoutiq.com/puppy-vaccination-delhi";
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">

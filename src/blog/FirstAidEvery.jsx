@@ -89,7 +89,7 @@ const PetFirstAidGuide = () => {
         <meta name="twitter:image" content="https://snoutiq.com/images/pet-first-aid-guide.jpg" />
         
         {/* Canonical link */}
-        <link rel="canonical" href="https://snoutiq.com/first-aid-tips-every-pet-parent-should-know" />
+        <link rel="canonical" href="https://snoutiq.com/blog/first-aid-tips-every-pet-parent-should-know" />
         
         {/* Structured data (JSON-LD) */}
         <script type="application/ld+json">

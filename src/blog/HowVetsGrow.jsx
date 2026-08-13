@@ -83,7 +83,7 @@ const HowVetsGrow = () => {
             />
             <link
               rel="canonical"
-              href="https://snoutiq.com/blog/vet-online-consultation-guide"
+              href="https://snoutiq.com/blog/how-vets-grow-with-online-consultations"
             />
 
             {/* Schema.org Markup */}

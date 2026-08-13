@@ -29,11 +29,18 @@ export default function MainLayout({ children }) {
       document.title = DEFAULT_TITLE;
     }
 
+    const currentPath = window.location.pathname;
+    const cleanPath =
+      currentPath.length > 1 && currentPath.endsWith("/")
+        ? currentPath.slice(0, -1)
+        : currentPath;
+    const pageCanonicalUrl = `https://snoutiq.com${cleanPath}`;
+
     upsertMetaTag("name", "description", DEFAULT_DESCRIPTION);
     upsertMetaTag("name", "keywords", DEFAULT_KEYWORDS);
     upsertMetaTag("property", "og:type", "website");
     upsertMetaTag("property", "og:locale", "en_IN");
-    upsertMetaTag("property", "og:url", DEFAULT_URL);
+    upsertMetaTag("property", "og:url", pageCanonicalUrl);
     upsertMetaTag("property", "og:site_name", "SnoutiQ");
     upsertMetaTag("name", "twitter:card", "summary_large_image");
     upsertMetaTag("name", "google-site-verification", GOOGLE_VERIFICATION);
@@ -44,7 +51,7 @@ export default function MainLayout({ children }) {
       canonical.setAttribute("rel", "canonical");
       document.head.appendChild(canonical);
     }
-    canonical.setAttribute("href", DEFAULT_URL);
+    canonical.setAttribute("href", pageCanonicalUrl);
   }, []);
 
   useEffect(() => {

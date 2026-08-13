@@ -27,7 +27,7 @@ const OnlineVetConsultation = () => {
             />
             <link
               rel="canonical"
-              href="https://snoutiq.com/blog/online-vet-consultation-india-guide"
+              href="https://snoutiq.com/blog/online-vet-consultation"
             />
 
             {/* Open Graph Meta Tags */}

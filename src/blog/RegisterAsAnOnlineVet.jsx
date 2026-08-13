@@ -66,7 +66,7 @@ const RegisterAsOnlineVet = () => {
           />
           <link
             rel="canonical"
-            href="https://snoutiq.com/blog/how-to-register-as-online-vet-consultations-india"
+            href="https://snoutiq.com/blog/register-as-an-online-vet"
           />
 
           {/* Open Graph Meta Tags */}

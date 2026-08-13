@@ -13,7 +13,7 @@ export default function DogNeuteringDelhi() {
     "Expert dog neutering surgery in Delhi NCR. Includes pre-op blood test, surgery, and post-op consultation. Experienced surgeons. Starting ₹4,999.";
   const keywords =
     "dog neutering Delhi, dog castration Delhi NCR, dog neutering cost Delhi, safe dog neutering";
-  const canonical = "https://snoutiq.com/services/dog-neutering-delhi";
+  const canonical = "https://snoutiq.com/dog-neutering-delhi";
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">

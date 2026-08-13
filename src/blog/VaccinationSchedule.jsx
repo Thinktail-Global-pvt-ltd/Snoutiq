@@ -86,7 +86,7 @@ const VaccinationScheduleForPets = () => {
             />
             <link
               rel="canonical"
-              href="https://snoutiq.com/vaccination-schedule-pets-india"
+              href="https://snoutiq.com/blog/vaccination-schedule-for-pets-in-india"
             />
 
             {/* Schema.org Markup */}
