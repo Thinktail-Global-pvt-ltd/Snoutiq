@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { LPNavbar } from "./LPNavbar";
 import { apiBaseUrl } from "../lib/api";
@@ -524,7 +524,7 @@ export default function OnlineVetConsultationApp() {
       <Helmet>
         <title>{TITLE}</title>
         <meta name="description" content={DESCRIPTION} />
-        <meta name="robots" content="noindex, nofollow" />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href={CANONICAL} />
       </Helmet>
 

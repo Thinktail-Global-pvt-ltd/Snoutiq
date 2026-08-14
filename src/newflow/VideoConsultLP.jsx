@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LPNavbar } from "../newflow/LPNavbar";
@@ -891,7 +891,7 @@ const consultFormRef = useRef(null);
         <title>{TITLE}</title>
         <meta name="description" content={DESCRIPTION} />
         <meta name="keywords" content={KEYWORDS} />
-        <meta name="robots" content="noindex, follow" />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href={CANONICAL} />
         <meta property="og:type" content="website" />
         <meta property="og:title" content={TITLE} />

@@ -346,8 +346,7 @@ export default function Invester() {
   return (
     <div className="min-h-screen font-sans selection:bg-slate-900 selection:text-white">
       <Helmet>
-        <meta name="robots" content="noindex, nofollow" />
-        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="robots" content="index, follow" />
       </Helmet>
 
       {/* Slide 1: Title */}

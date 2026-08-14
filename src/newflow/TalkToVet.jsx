@@ -1082,7 +1082,7 @@ export default function TalkToVet() {
         <title>{TITLE}</title>
         <meta name="description" content={DESCRIPTION} />
         <meta name="keywords" content={KEYWORDS} />
-        <meta name="robots" content="noindex, follow" />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href={CANONICAL} />
         <meta property="og:type" content="website" />
         <meta property="og:title" content={TITLE} />

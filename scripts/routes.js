@@ -176,6 +176,12 @@ export const PUBLIC_ROUTES = [
     description: "Discover SnoutIQ's veterinary practice software designed to streamline clinics in India. Benefit from efficient care, better consultations, and organized pet health records for your beloved pets.",
     priority: '0.7'
   },
+  {
+    path: '/investor-relations',
+    title: "Investor Relations | SnoutIQ - Pet Healthcare Platform",
+    description: "Learn about SnoutIQ's mission, investor relations, and business updates empowering pet healthcare technology in India.",
+    priority: '0.5'
+  },
   // 26
   {
     path: '/blog/',
