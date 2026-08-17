@@ -781,7 +781,7 @@ class PrescriptionController extends Controller
             $data['temperature_unit'] = strtoupper($data['temperature_unit']);
         }
         if (array_key_exists('temperature', $data) && $data['temperature'] !== null && empty($data['temperature_unit'])) {
-            $data['temperature_unit'] = 'C';
+            $data['temperature_unit'] = 'F';
         }
 
         // Handle file upload (optional) -> save directly under public/prescriptions

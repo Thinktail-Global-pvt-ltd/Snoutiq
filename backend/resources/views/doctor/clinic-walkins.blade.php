@@ -826,8 +826,8 @@
           <div class="pv-field pv-vital">
             <label class="pv-label" for="temperature">Temperature</label>
             <div class="pv-inputWrap">
-              <input id="temperature" name="temperature" type="number" step="0.1" class="pv-input" placeholder="38.5">
-              <span class="pv-unit">°C</span>
+              <input id="temperature" name="temperature" type="number" step="0.1" class="pv-input" placeholder="101.5">
+              <span class="pv-unit">°F</span>
             </div>
           </div>
           <div class="pv-field pv-vital">

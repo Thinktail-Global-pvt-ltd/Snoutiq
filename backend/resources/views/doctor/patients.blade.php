@@ -554,8 +554,8 @@
         <div class="record-sectionTitle">Clinical Observations</div>
         <div class="record-grid narrow">
           <div class="record-field">
-            <label class="record-label" for="temperature">Temperature (°C)</label>
-            <input id="temperature" name="temperature" type="text" class="record-input" placeholder="Temperature (°C)">
+            <label class="record-label" for="temperature">Temperature (°F)</label>
+            <input id="temperature" name="temperature" type="text" class="record-input" placeholder="Temperature (°F)">
           </div>
           <div class="record-field">
             <label class="record-label" for="weight">Weight (kg)</label>
