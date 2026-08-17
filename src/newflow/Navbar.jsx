@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Smartphone, Download } from "lucide-react";
 import { Button } from "./NewButton";
 import logo from "../assets/images/logo.webp";
 
@@ -8,6 +8,23 @@ export function Navbar({ consultPath = "/app-links" }) {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleAppDownload = (e) => {
+    if (e) e.stopPropagation();
+    const userAgent =
+      navigator.userAgent || navigator.vendor || window.opera || "";
+    const isIOS =
+      /iPad|iPhone|iPod/i.test(userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    const appStoreUrl =
+      "https://apps.apple.com/in/app/snoutiq-pet-parent/id6761260254";
+    const playStoreUrl =
+      "https://play.google.com/store/apps/details?id=com.petai.snoutiq&hl=en_IN";
+
+    const targetUrl = isIOS ? appStoreUrl : playStoreUrl;
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  };
 
   const navLinks = [
     { name: "AI Symptom Checker", href: "/", isNew: true },
@@ -175,6 +192,31 @@ export function Navbar({ consultPath = "/app-links" }) {
           </div>
         </div>
       )}
+
+      {/* App Download Banner Bar */}
+      <div
+        onClick={handleAppDownload}
+        className="cursor-pointer border-t border-slate-200/80 bg-slate-900 text-white transition-all hover:bg-slate-800"
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 text-xs sm:px-6 sm:py-2.5 sm:text-sm lg:px-8">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+              <Smartphone className="h-3.5 w-3.5" />
+            </span>
+            <p className="truncate font-medium text-slate-200">
+              <span className="font-bold text-white">Download SnoutIQ App:</span> 24/7 Expert Vet Guidance & Instant Pet Care on your phone
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleAppDownload}
+            className="group ml-3 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-slate-950 shadow-sm transition-all hover:bg-emerald-400 hover:shadow-md"
+          >
+            <span>Download App</span>
+            <Download className="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
+          </button>
+        </div>
+      </div>
     </nav>
   );
 }

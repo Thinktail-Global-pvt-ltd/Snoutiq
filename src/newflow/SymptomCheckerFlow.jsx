@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Send, ImagePlus, X, Loader2 } from "lucide-react";
+import { Send, ImagePlus, X, Loader2, Smartphone, Download } from "lucide-react";
 import { Dialog } from "@headlessui/react";
 import { apiBaseUrl } from "../lib/api";
 import { readAiAuthState, clearAiAuthState } from "../ai/AiAuth";
@@ -95,6 +95,22 @@ export default function SymptomCheckerFlow({
   isDesktopSidebarOpen = true,
 }) {
   const navigate = useNavigate();
+  const handleAppDownload = (e) => {
+    if (e) e.stopPropagation();
+    const userAgent =
+      navigator.userAgent || navigator.vendor || window.opera || "";
+    const isIOS =
+      /iPad|iPhone|iPod/i.test(userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    const appStoreUrl =
+      "https://apps.apple.com/in/app/snoutiq-pet-parent/id6761260254";
+    const playStoreUrl =
+      "https://play.google.com/store/apps/details?id=com.petai.snoutiq&hl=en_IN";
+
+    const targetUrl = isIOS ? appStoreUrl : playStoreUrl;
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  };
   const [messages, setMessages] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -714,126 +730,150 @@ export default function SymptomCheckerFlow({
 
   return (
     <>
-      <div className="flex h-full min-h-[100vh] flex-col bg-white">
+      <div className="flex min-h-full flex-col bg-white">
         {messages.length === 0 && !historyLoading ? (
-          <div className="flex-1 flex flex-col items-center justify-center px-5 py-8 text-center sm:px-6">
-            <h3 className="mb-3 text-[13px] font-semibold text-[#aaa89f] sm:text-sm">
-              Trusted by 300+ pet parents
-            </h3>
+          <div className="flex-1 flex flex-col items-center justify-between px-4 py-4 sm:px-6 h-[calc(100vh-3.5rem)] overflow-hidden">
+            <div className="my-auto flex flex-col items-center justify-center text-center w-full max-w-3xl">
+              <h3 className="mb-2 text-[13px] font-semibold text-[#aaa89f] sm:text-sm">
+                Trusted by 300+ pet parents
+              </h3>
 
-            <h1 className="mb-4 max-w-2xl text-[32px] leading-[1.15] font-medium tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
-              Smarter care for your pet's health.
-            </h1>
+              <h1 className="mb-3 max-w-2xl text-[28px] leading-[1.15] font-medium tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
+                Smarter care for your pet's health.
+              </h1>
 
-            <p className="mb-7 max-w-xl text-[16px] leading-7 text-[#77756d] sm:text-lg">
-              Describe a symptom or upload a photo to get instant guidance from
-              AI trained on vet insights.
-            </p>
-
-            <div className="mb-6 w-full max-w-xl rounded-xl border border-[#eeece5] bg-[#f5f4ee] px-4 py-3 text-center">
-              <p className="text-[13px] leading-5 text-[#77756d] sm:text-sm">
-                Guidance to support your vet, not replace one.
+              <p className="mb-5 max-w-xl text-[15px] leading-6 text-[#77756d] sm:text-lg">
+                Describe a symptom or upload a photo to get instant guidance from
+                AI trained on vet insights.
               </p>
-            </div>
-            <div className="w-full max-w-3xl">
-              {attachedImage && (
-                <div className="relative inline-block group mb-3">
-                  <div
-                    onClick={() =>
-                      setPreviewImageSrc(
-                        attachedImage.uri || attachedImage.base64,
-                      )
-                    }
-                    className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group hover:opacity-90 transition-all bg-slate-100"
-                    title="Click to view full photo"
-                  >
-                    <img
-                      src={attachedImage.uri || attachedImage.base64}
-                      alt="attached preview"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">
-                        View
-                      </span>
+
+              <div className="w-full max-w-3xl">
+                {attachedImage && (
+                  <div className="relative inline-block group mb-3">
+                    <div
+                      onClick={() =>
+                        setPreviewImageSrc(
+                          attachedImage.uri || attachedImage.base64,
+                        )
+                      }
+                      className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group hover:opacity-90 transition-all bg-slate-100"
+                      title="Click to view full photo"
+                    >
+                      <img
+                        src={attachedImage.uri || attachedImage.base64}
+                        alt="attached preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">
+                          View
+                        </span>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setAttachedImage(null)}
+                      className="absolute -top-2 -right-2 bg-slate-900 hover:bg-red-600 text-white rounded-full p-1 shadow-md transition-colors z-10"
+                      title="Remove photo"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+                <form
+                  onSubmit={handleSubmit}
+                  className={`relative flex w-full items-center rounded-full bg-white p-1.5 transition-all duration-200 ${
+                    isInputFocused
+                      ? "border-2 border-slate-900 shadow-[0_0_0_4px_rgba(15,23,42,0.08),0_8px_25px_rgba(15,23,42,0.12)]"
+                      : "border border-slate-200 shadow-md hover:border-slate-300"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setShowImageModal(true)}
+                    className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 sm:ml-2"
+                  >
+                    <ImagePlus size={19} />
+                  </button>
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => setIsInputFocused(false)}
+                    placeholder={
+                      attachedImage
+                        ? "Describe what is in the photo..."
+                        : "Describe your pet's symptoms..."
+                    }
+                    className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 sm:px-4 sm:text-base"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!inputValue.trim() || loading}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-md transition-all duration-200 hover:scale-105 hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Send size={19} />
+                  </button>
+                </form>
+                <div className="flex w-full flex-wrap justify-center gap-2.5 sm:gap-3 mt-2.5">
+                  <button
+                    onClick={() =>
+                      handleSubmit(null, "Vomiting or stomach upset")
+                    }
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                  >
+                    Vomiting or stomach upset
+                  </button>
+
+                  <button
+                    onClick={() => handleSubmit(null, "Lethargic and not eating")}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                  >
+                    Lethargic and not eating
+                  </button>
+
+                  <button
+                    onClick={() => handleSubmit(null, "Diarrhea")}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                  >
+                    Diarrhea
+                  </button>
+
+                  <button
+                    onClick={() => handleSubmit(null, "Limping or skin issue")}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                  >
+                    Limping or skin issue
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* App Download Banner Bar at bottom of initial landing screen */}
+            <div className="w-full max-w-4xl shrink-0 pt-2 pb-1">
+              <div
+                onClick={handleAppDownload}
+                className="mx-auto cursor-pointer rounded-xl bg-slate-900 px-3 py-1.5 text-white shadow-sm transition-all hover:bg-slate-800"
+              >
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 sm:h-6 sm:w-6">
+                      <Smartphone className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    </span>
+                    <p className="truncate font-medium text-slate-200">
+                      <span className="font-bold text-white">Download SnoutIQ App:</span> 24/7 Expert Vet Guidance & Instant Pet Care on phone
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setAttachedImage(null)}
-                    className="absolute -top-2 -right-2 bg-slate-900 hover:bg-red-600 text-white rounded-full p-1 shadow-md transition-colors z-10"
-                    title="Remove photo"
+                    onClick={handleAppDownload}
+                    className="group ml-2 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-slate-950 shadow-sm transition-all hover:bg-emerald-400"
                   >
-                    <X size={12} />
+                    <span>Download App</span>
+                    <Download className="h-3 w-3 transition-transform group-hover:translate-y-0.5" />
                   </button>
                 </div>
-              )}
-              <form
-                onSubmit={handleSubmit}
-                className={`relative flex w-full items-center rounded-full bg-white p-1.5 transition-all duration-200 ${
-                  isInputFocused
-                    ? "border-2 border-slate-900 shadow-[0_0_0_4px_rgba(15,23,42,0.08),0_8px_25px_rgba(15,23,42,0.12)]"
-                    : "border border-slate-200 shadow-md hover:border-slate-300"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowImageModal(true)}
-                  className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 sm:ml-2"
-                >
-                  <ImagePlus size={19} />
-                </button>
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  placeholder={
-                    attachedImage
-                      ? "Describe what is in the photo..."
-                      : "Describe your pet's symptoms..."
-                  }
-                  className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 sm:px-4 sm:text-base"
-                />
-                <button
-                  type="submit"
-                  disabled={!inputValue.trim() || loading}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-md transition-all duration-200 hover:scale-105 hover:bg-slate-800 hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Send size={19} />
-                </button>
-              </form>
-              <div className="flex w-full flex-wrap justify-center gap-2.5 sm:gap-3 mt-2">
-                <button
-                  onClick={() =>
-                    handleSubmit(null, "Vomiting or stomach upset")
-                  }
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
-                >
-                  Vomiting or stomach upset
-                </button>
-
-                <button
-                  onClick={() => handleSubmit(null, "Lethargic and not eating")}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
-                >
-                  Lethargic and not eating
-                </button>
-
-                <button
-                  onClick={() => handleSubmit(null, "Diarrhea")}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
-                >
-                  Diarrhea
-                </button>
-
-                <button
-                  onClick={() => handleSubmit(null, "Limping or skin issue")}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
-                >
-                  Limping or skin issue
-                </button>
               </div>
             </div>
           </div>
@@ -850,7 +890,7 @@ export default function SymptomCheckerFlow({
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto space-y-6 pb-24">
+            <div className="flex-1 overflow-y-auto space-y-6 pb-36">
               {historyLoading && (
                 <div className="flex items-center justify-center py-10">
                   <div className="flex items-center gap-2 text-slate-400 text-sm">
@@ -1019,75 +1059,104 @@ export default function SymptomCheckerFlow({
             </div>
 
             <div
-              className={`fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 transition-all duration-300 ${
+              className={`fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-2.5 sm:p-3.5 transition-all duration-300 z-30 ${
                 isDesktopSidebarOpen ? "md:left-64" : "md:left-16"
               }`}
             >
-              {attachedImage && (
-                <div className="mb-2 flex items-center justify-start">
-                  <div className="relative inline-block group">
-                    <div
-                      onClick={() =>
-                        setPreviewImageSrc(
-                          attachedImage.uri || attachedImage.base64,
-                        )
-                      }
-                      className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group hover:opacity-90 transition-all bg-slate-100"
-                      title="Click to view full photo"
-                    >
-                      <img
-                        src={attachedImage.uri || attachedImage.base64}
-                        alt="attached preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">
-                          View
-                        </span>
+              {messages.length > 0 && (
+                <>
+                  {attachedImage && (
+                    <div className="mb-2 flex items-center justify-start">
+                      <div className="relative inline-block group">
+                        <div
+                          onClick={() =>
+                            setPreviewImageSrc(
+                              attachedImage.uri || attachedImage.base64,
+                            )
+                          }
+                          className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer group hover:opacity-90 transition-all bg-slate-100"
+                          title="Click to view full photo"
+                        >
+                          <img
+                            src={attachedImage.uri || attachedImage.base64}
+                            alt="attached preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                            <span className="text-[9px] text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full">
+                              View
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAttachedImage(null)}
+                          className="absolute -top-2 -right-2 bg-slate-900 hover:bg-red-600 text-white rounded-full p-1 shadow-md transition-colors z-10"
+                          title="Remove photo"
+                        >
+                          <X size={12} />
+                        </button>
                       </div>
                     </div>
+                  )}
+                  <form
+                    onSubmit={handleSubmit}
+                    className="mx-auto max-w-4xl relative flex items-center border border-slate-200 rounded-full bg-white p-1.5 shadow-sm focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400 mb-2.5"
+                  >
                     <button
                       type="button"
-                      onClick={() => setAttachedImage(null)}
-                      className="absolute -top-2 -right-2 bg-slate-900 hover:bg-red-600 text-white rounded-full p-1 shadow-md transition-colors z-10"
-                      title="Remove photo"
+                      onClick={() => setShowImageModal(true)}
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors ml-1 mr-1 shrink-0"
                     >
-                      <X size={12} />
+                      <ImagePlus size={20} />
                     </button>
-                  </div>
-                </div>
+                    <input
+                      type="text"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      placeholder={
+                        attachedImage
+                          ? "Describe what is in the photo..."
+                          : "Describe your pet's symptoms..."
+                      }
+                      disabled={loading}
+                      className="flex-1 bg-transparent px-4 py-2 outline-none disabled:opacity-50 text-slate-900 min-w-0"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!inputValue.trim() || loading}
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 transition-colors shrink-0"
+                    >
+                      <Send size={18} />
+                    </button>
+                  </form>
+                </>
               )}
-              <form
-                onSubmit={handleSubmit}
-                className="mx-auto max-w-4xl relative flex items-center border border-slate-200 rounded-full bg-white p-1.5 shadow-sm focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400"
+
+              {/* App Download Banner Bar - BELOW input field & ALWAYS at bottom */}
+              <div
+                onClick={handleAppDownload}
+                className="mx-auto max-w-4xl cursor-pointer rounded-xl bg-slate-900 px-3 py-1.5 text-white shadow-sm transition-all hover:bg-slate-800"
               >
-                <button
-                  type="button"
-                  onClick={() => setShowImageModal(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors ml-1 mr-1 shrink-0"
-                >
-                  <ImagePlus size={20} />
-                </button>
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={
-                    attachedImage
-                      ? "Describe what is in the photo..."
-                      : "Describe your pet's symptoms..."
-                  }
-                  disabled={loading}
-                  className="flex-1 bg-transparent px-4 py-2 outline-none disabled:opacity-50 text-slate-900 min-w-0"
-                />
-                <button
-                  type="submit"
-                  disabled={!inputValue.trim() || loading}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 transition-colors shrink-0"
-                >
-                  <Send size={18} />
-                </button>
-              </form>
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 sm:h-6 sm:w-6">
+                      <Smartphone className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    </span>
+                    <p className="truncate font-medium text-slate-200">
+                      <span className="font-bold text-white">Download SnoutIQ App:</span> 24/7 Expert Vet Guidance & Instant Pet Care on phone
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAppDownload}
+                    className="group ml-2 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-slate-950 shadow-sm transition-all hover:bg-emerald-400"
+                  >
+                    <span>Download App</span>
+                    <Download className="h-3 w-3 transition-transform group-hover:translate-y-0.5" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

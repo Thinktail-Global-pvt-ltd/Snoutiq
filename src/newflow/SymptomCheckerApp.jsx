@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import SymptomCheckerSidebar from "./SymptomCheckerSidebar";
 import SymptomCheckerFlow from "./SymptomCheckerFlow";
-import { Menu, PanelLeft } from "lucide-react";
+import { Menu, PanelLeft, Smartphone, Download } from "lucide-react";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 import snoutiq_app_icon1 from "../assets/images/logo.png";
 
@@ -16,6 +16,23 @@ export default function SymptomCheckerApp() {
     () => sessionStorage.getItem("snoutiq_active_chat_token") || null
   );
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+
+  const handleAppDownload = (e) => {
+    if (e) e.stopPropagation();
+    const userAgent =
+      navigator.userAgent || navigator.vendor || window.opera || "";
+    const isIOS =
+      /iPad|iPhone|iPod/i.test(userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    const appStoreUrl =
+      "https://apps.apple.com/in/app/snoutiq-pet-parent/id6761260254";
+    const playStoreUrl =
+      "https://play.google.com/store/apps/details?id=com.petai.snoutiq&hl=en_IN";
+
+    const targetUrl = isIOS ? appStoreUrl : playStoreUrl;
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  };
 
   // Persist active chat token across refreshes
   const handleSetActiveChatRoomToken = (token) => {
