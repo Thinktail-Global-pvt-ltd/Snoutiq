@@ -814,10 +814,6 @@
       <div class="pv-card" id="pv-notes-card">
         <div class="pv-cardTitle">Visit Notes</div>
         <textarea id="record-notes" name="notes" class="pv-input pv-textarea" placeholder="Reason for visit / brief notes"></textarea>
-        <div class="pv-field" style="margin-top:10px">
-          <label class="pv-label" for="doctor-treatment">Doctor Treatment</label>
-          <textarea id="doctor-treatment" name="doctor_treatment" class="pv-input pv-textarea" placeholder="Doctor treatment details"></textarea>
-        </div>
       </div>
 
       <div class="pv-card pv-critical" data-critical id="pv-clinical-card">
@@ -1713,7 +1709,13 @@ window.PatientStore = (() => {
         ${buildRecordPreview(rec)}
         <div class="pm-record-actions">
           <button type="button" class="pm-btn pm-primary" data-role="edit-record" data-id="${rec.id}" style="padding:6px 12px">Edit</button>
-          <a href="${rec.url}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a>
+          ${(() => {
+            let downloadUrl = rec.url;
+            if (!downloadUrl && rx.id) {
+              downloadUrl = `${API_BASE}/consultation/prescription/pdf?prescription_id=${rx.id}`;
+            }
+            return downloadUrl ? `<a href="${downloadUrl}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a>` : '';
+          })()}
         </div>`;
       wrap.querySelector('[data-role="edit-record"]')?.addEventListener('click', () => { selectPatient(rec.user_id); openUploadModal(); fillRecordFormFromRecord(rec); });
       els.recordList.appendChild(wrap);

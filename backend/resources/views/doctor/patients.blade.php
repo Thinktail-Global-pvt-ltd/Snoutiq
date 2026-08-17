@@ -1199,7 +1199,13 @@
         ${previewHtml}
         <div class="pm-record-actions">
           <button type="button" class="pm-btn pm-primary" data-role="edit-record" data-id="${rec.id}" style="padding:6px 12px">Edit</button>
-          <a href="${rec.url}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a>
+          ${(() => {
+            let downloadUrl = rec.url;
+            if (!downloadUrl && prescription.id) {
+              downloadUrl = `${API_BASE}/consultation/prescription/pdf?prescription_id=${prescription.id}`;
+            }
+            return downloadUrl ? `<a href="${downloadUrl}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a>` : '';
+          })()}
         </div>
       `;
       const editBtn = wrap.querySelector('[data-role="edit-record"]');
