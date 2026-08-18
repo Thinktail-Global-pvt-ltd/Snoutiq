@@ -5937,6 +5937,57 @@ class AdminPanelController extends Controller
             ->limit($limit)
             ->get();
 
+        if ($userIdFilter && $transactions->isEmpty()) {
+            $user = User::query()->with(['pets'])->find($userIdFilter);
+            if ($user) {
+                $virtualTx = new Transaction();
+                $virtualTx->id = 0;
+                $virtualTx->user_id = $user->id;
+                $virtualTx->created_at = $user->created_at;
+                $virtualTx->type = 'video_consult';
+                $virtualTx->status = 'pending';
+                $virtualTx->amount_paise = 0;
+                $virtualTx->setRelation('user', $user);
+                $virtualTx->setRelation('pet', $user->pets->first());
+                $virtualTx->setRelation('clinic', null);
+                $virtualTx->setRelation('doctor', null);
+                $transactions = collect([$virtualTx]);
+            }
+        } elseif (!$userIdFilter) {
+            $usersWithNoTransactions = User::query()
+                ->whereNotExists(function ($innerQuery) {
+                    $innerQuery->select(DB::raw(1))
+                        ->from('transactions')
+                        ->whereRaw('transactions.user_id = users.id');
+                })
+                ->with(['pets'])
+                ->orderByDesc('users.created_at')
+                ->limit(50)
+                ->get();
+
+            $virtualTxns = $usersWithNoTransactions->map(function (User $user) {
+                $virtualTx = new Transaction();
+                $virtualTx->id = 0;
+                $virtualTx->user_id = $user->id;
+                $virtualTx->created_at = $user->created_at;
+                $virtualTx->type = 'video_consult';
+                $virtualTx->status = 'pending';
+                $virtualTx->amount_paise = 0;
+                $virtualTx->setRelation('user', $user);
+                $virtualTx->setRelation('pet', $user->pets->first());
+                $virtualTx->setRelation('clinic', null);
+                $virtualTx->setRelation('doctor', null);
+                return $virtualTx;
+            });
+
+            if ($virtualTxns->isNotEmpty()) {
+                $transactions = $transactions->concat($virtualTxns)
+                    ->sortByDesc('created_at')
+                    ->take($limit)
+                    ->values();
+            }
+        }
+
         $latestAssignmentLogs = $this->latestTransactionDoctorAssignmentLogs($transactions);
         $notificationLookup = $this->notificationLookupsForTransactions($transactions);
         $feedbackLookup = $this->feedbackSubmissionLookupForTransactions($transactions);
@@ -6193,6 +6244,46 @@ class AdminPanelController extends Controller
                 'joined_prescription_details',
                 $this->joinedAttributesForPrefix($transaction, 'joined_prescription_')
             );
+
+            if ($transaction->id === 0) {
+                $transaction->setAttribute('event_consultation_created_at', null);
+                $transaction->setAttribute('event_consultation_created_captured', false);
+                $transaction->setAttribute('event_consultation_created_secure', false);
+
+                $transaction->setAttribute('event_consultation_assigned_to_vet_at', null);
+                $transaction->setAttribute('event_consultation_assigned_to_vet_captured', false);
+                $transaction->setAttribute('event_consultation_assigned_to_vet_secure', false);
+
+                $transaction->setAttribute('event_call_started_at', null);
+                $transaction->setAttribute('event_call_started_captured', false);
+                $transaction->setAttribute('event_call_started_secure', false);
+
+                $transaction->setAttribute('event_call_completed_at', null);
+                $transaction->setAttribute('event_call_completed_captured', false);
+                $transaction->setAttribute('event_call_completed_secure', false);
+
+                $transaction->setAttribute('event_prescription_uploaded_at', null);
+                $transaction->setAttribute('event_prescription_uploaded_captured', false);
+                $transaction->setAttribute('event_prescription_uploaded_secure', false);
+
+                $transaction->setAttribute('event_notification_sent_at', null);
+                $transaction->setAttribute('event_notification_sent_source', null);
+                $transaction->setAttribute('event_notification_sent_captured', false);
+                $transaction->setAttribute('event_notification_sent_secure', false);
+                $transaction->setAttribute('whatsapp_notifications_for_channel', []);
+                $transaction->setAttribute('whatsapp_notification_status_summary', []);
+                $transaction->setAttribute('whatsapp_notification_last_status', null);
+                $transaction->setAttribute('whatsapp_notification_last_attempt_at', null);
+                $transaction->setAttribute('whatsapp_notification_sent_at', null);
+
+                $transaction->setAttribute('event_review_requested_at', null);
+                $transaction->setAttribute('event_review_requested_captured', false);
+                $transaction->setAttribute('event_review_requested_secure', false);
+
+                $transaction->setAttribute('event_review_submitted_at', null);
+                $transaction->setAttribute('event_review_submitted_captured', false);
+                $transaction->setAttribute('event_review_submitted_secure', false);
+            }
 
             return $transaction;
         });

@@ -789,4 +789,24 @@ class LeadManagementTimelineTest extends TestCase
         $response->assertSee('Lifecycle User One');
         $response->assertDontSee('Lifecycle User Two');
     }
+
+    public function test_lifecycle_analytics_shows_users_without_transactions_as_virtual_rows(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Zero Transaction User',
+            'email' => 'zerotx@example.com',
+            'phone' => '919999999903',
+            'password' => 'secret',
+        ]);
+
+        $response = $this->withSession([
+            'is_admin' => true,
+            'admin_email' => 'admin@snoutiq.com',
+            'role' => 'admin',
+        ])->get(route('admin.analytics.consultation-lifecycle', ['user_id' => $user->id]));
+
+        $response->assertOk();
+        $response->assertSee('Zero Transaction User');
+        $response->assertSee('Virtual (No Transaction)');
+    }
 }

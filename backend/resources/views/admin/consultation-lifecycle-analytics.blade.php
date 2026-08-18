@@ -394,9 +394,15 @@
                                         @endphp
                                         <tr>
                                             <td data-label="Transaction">
-                                                <div class="fw-semibold">#{{ $txn->id }}</div>
+                                                <div class="fw-semibold">
+                                                    @if($txn->id === 0)
+                                                        Virtual (No Transaction)
+                                                    @else
+                                                        #{{ $txn->id }}
+                                                    @endif
+                                                </div>
                                                 <div class="text-muted small">
-                                                    <div>Created: {{ $formatTimestamp($txn->created_at) }}</div>
+                                                    <div>Created: {{ $txn->id === 0 ? '—' : $formatTimestamp($txn->created_at) }}</div>
                                                 </div>
                                             </td>
                                             <td data-label="User / Pet">
