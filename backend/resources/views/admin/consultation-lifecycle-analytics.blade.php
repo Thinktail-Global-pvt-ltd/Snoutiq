@@ -445,7 +445,6 @@
                                     <tr>
                                         <th>Transaction</th>
                                         <th>User / Pet / Clinic</th>
-                                        <th>Consultation Assigned To Vet</th>
                                         <th>Lifecycle Events Timeline</th>
                                     </tr>
                                 </thead>
@@ -500,26 +499,6 @@
                                                     @if($txn->doctor && $txn->doctor->doctor_name)
                                                         <div><strong>Assigned Doctor:</strong> {{ $txn->doctor->doctor_name }}</div>
                                                     @endif
-                                                </div>
-                                            </td>
-                                            <td data-label="Consultation Assigned To Vet">
-                                                @php
-                                                    $assignedAt = $txn->getAttribute('event_consultation_assigned_to_vet_at');
-                                                    $assignedCaptured = (bool) $txn->getAttribute('event_consultation_assigned_to_vet_captured');
-                                                    $assignedSecure = (bool) $txn->getAttribute('event_consultation_assigned_to_vet_secure');
-                                                    $assignedSource = (string) ($txn->getAttribute('event_consultation_assigned_to_vet_source') ?? '');
-                                                @endphp
-                                                <div class="d-flex flex-wrap gap-2 mb-1">
-                                                    <span class="status-badge {{ $assignedCaptured ? 'done' : 'pending' }}">
-                                                        {{ $assignedCaptured ? 'Captured' : 'Missing' }}
-                                                    </span>
-                                                    <span class="status-badge {{ $assignedSecure ? 'done' : 'pending' }}">
-                                                        {{ $assignedSecure ? 'Secure' : 'Not Secure' }}
-                                                    </span>
-                                                </div>
-                                                <div class="text-muted small">
-                                                    <div>Timestamp: {{ $formatTimestamp($assignedAt) }}</div>
-                                                    <div>Source: {{ $assignedSource !== '' ? $assignedSource : '—' }}</div>
                                                 </div>
                                             </td>
                                             <td data-label="Lifecycle Events Timeline">
