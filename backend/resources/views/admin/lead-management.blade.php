@@ -3214,6 +3214,7 @@
                 ? `<span class="crm-tag ${callState.completed ? 'crm-tag-mobile' : ''}">${escapeHtml(callState.completed ? 'Call completed' : 'Call now - 10d no payment')}</span>`
                 : '';
             const followTag = lead.follow_up_type_label ? `<span class="crm-tag">${escapeHtml(lead.follow_up_type_label)}</span>` : '';
+            const clinicTag = lead.connected_clinic_name ? `<span class="crm-tag" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><i class="bi bi-house-door" style="font-size: 0.8rem;"></i> ${escapeHtml(lead.connected_clinic_name)}</span>` : '';
             const revenueTag = lead.conversion_captured
                 ? `<span class="crm-rev">Converted</span>`
                 : `<span class="crm-rev">Open</span>`;
@@ -3245,6 +3246,7 @@
                         ${callTag}
                         ${notifsTag}
                         ${followTag}
+                        ${clinicTag}
                         ${revenueTag}
                     </div>
                     <div class="crm-next-line ${escapeHtml(next.state.css || 'none')}">${escapeHtml(nextPrefix + nextSuffix)}</div>
