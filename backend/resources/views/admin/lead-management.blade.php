@@ -1990,6 +1990,9 @@
                 'email' => $email,
                 'phone' => $phone,
                 'city' => $city,
+                'last_vet_id' => $leadUser['last_vet_id'] ?? null,
+                'connected_clinic_name' => $leadUser['connected_clinic_name'] ?? null,
+                'connected_clinic_doctors' => $leadUser['connected_clinic_doctors'] ?? [],
                 'created_at' => (string) ($leadUser['user_created_at'] ?? ''),
                 'created_at_label' => $formatDateTime($leadUser['user_created_at'] ?? null),
                 'created_short' => $formatDateShort($leadUser['user_created_at'] ?? null),
@@ -3588,6 +3591,7 @@
                     <button type="button" class="crm-btn" data-open-modal="profile">Full Profile</button>
                     ${canSendAiPush ? '<button type="button" class="crm-btn" data-ai-marketing-push>AI Push</button>' : ''}
                     <button type="button" class="crm-btn" data-open-modal="txn">+ Add Service</button>
+                    <a href="/backend/receptionist/clinic-walkins?user_id=${Number(lead.id)}" target="_blank" class="crm-btn" style="text-decoration:none; background:#10b981; color:#fff; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:4px;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
                     <button type="button" class="crm-btn" data-open-modal="next">Set Next Action</button>
                     <form method="POST" action="${escapeHtml(deleteActionUrl)}" class="d-inline-block" onsubmit="return confirm('Delete this user and related data? This action cannot be undone.')">
                         <input type="hidden" name="_token" value="${escapeHtml(csrfToken)}">
