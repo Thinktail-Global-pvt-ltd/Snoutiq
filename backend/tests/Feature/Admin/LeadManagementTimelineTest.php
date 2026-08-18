@@ -744,4 +744,49 @@ class LeadManagementTimelineTest extends TestCase
         $response->assertJsonPath('lead.connected_clinic_name', 'CRM Test Connected Clinic');
         $response->assertJsonFragment(['CRM Connected Doctor']);
     }
+
+    public function test_lifecycle_analytics_supports_user_id_filtering(): void
+    {
+        $user1 = User::query()->create([
+            'name' => 'Lifecycle User One',
+            'email' => 'user1@example.com',
+            'phone' => '919999999901',
+            'password' => 'secret',
+        ]);
+
+        $user2 = User::query()->create([
+            'name' => 'Lifecycle User Two',
+            'email' => 'user2@example.com',
+            'phone' => '919999999902',
+            'password' => 'secret',
+        ]);
+
+        // Create transaction for user 1
+        Transaction::query()->create([
+            'user_id' => $user1->id,
+            'amount_paise' => 10000,
+            'status' => 'captured',
+            'type' => 'video_consult',
+            'reference' => 'TX-LIFECYCLE-1',
+        ]);
+
+        // Create transaction for user 2
+        Transaction::query()->create([
+            'user_id' => $user2->id,
+            'amount_paise' => 20000,
+            'status' => 'captured',
+            'type' => 'video_consult',
+            'reference' => 'TX-LIFECYCLE-2',
+        ]);
+
+        $response = $this->withSession([
+            'is_admin' => true,
+            'admin_email' => 'admin@snoutiq.com',
+            'role' => 'admin',
+        ])->get(route('admin.analytics.consultation-lifecycle', ['user_id' => $user1->id]));
+
+        $response->assertOk();
+        $response->assertSee('Lifecycle User One');
+        $response->assertDontSee('Lifecycle User Two');
+    }
 }

@@ -3591,7 +3591,7 @@
                     <button type="button" class="crm-btn" data-open-modal="profile">Full Profile</button>
                     ${canSendAiPush ? '<button type="button" class="crm-btn" data-ai-marketing-push>AI Push</button>' : ''}
                     <button type="button" class="crm-btn" data-open-modal="txn">+ Add Service</button>
-                    <a href="/backend/receptionist/clinic-walkins?user_id=${Number(lead.id)}" target="_blank" class="crm-btn" style="text-decoration:none; background:#10b981; color:#fff; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:4px;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
+                    <a href="/backend/admin/analytics/consultation-lifecycle?user_id=${Number(lead.id)}" target="_blank" class="crm-btn" style="text-decoration:none; background:#10b981; color:#fff; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:4px;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
                     <button type="button" class="crm-btn" data-open-modal="next">Set Next Action</button>
                     <form method="POST" action="${escapeHtml(deleteActionUrl)}" class="d-inline-block" onsubmit="return confirm('Delete this user and related data? This action cannot be undone.')">
                         <input type="hidden" name="_token" value="${escapeHtml(csrfToken)}">
@@ -3750,7 +3750,7 @@
             <div class="crm-tab-content ${activeTab === 'services' ? 'active' : ''}" data-tab-content="services">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:10px;">
                     <div class="crm-add-service" data-open-modal="txn" style="margin-bottom:0; flex-grow:1; text-align:center;">+ Add a service transaction</div>
-                    <a href="/backend/receptionist/clinic-walkins?user_id=${Number(lead.id)}" target="_blank" class="crm-btn" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; height: 38px; padding: 0 16px; font-weight:600; background:#10b981; color:#fff; border-radius:var(--crm-radius-sm); white-space:nowrap; margin-bottom:0;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
+                    <a href="/backend/admin/analytics/consultation-lifecycle?user_id=${Number(lead.id)}" target="_blank" class="crm-btn" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; height: 38px; padding: 0 16px; font-weight:600; background:#10b981; color:#fff; border-radius:var(--crm-radius-sm); white-space:nowrap; margin-bottom:0;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
                 </div>
                 ${reassignableServiceCount === 0 ? `
                     <div class="crm-card" style="margin-bottom: 0.5rem;">

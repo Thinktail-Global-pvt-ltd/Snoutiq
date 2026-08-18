@@ -5739,10 +5739,12 @@ class AdminPanelController extends Controller
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
             'type' => ['nullable', 'string', 'in:all,video_consult,excell_export_campaign'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
         $limit = (int) ($filters['limit'] ?? 200);
         $typeFilter = strtolower((string) ($filters['type'] ?? 'all'));
+        $userIdFilter = isset($filters['user_id']) ? (int) $filters['user_id'] : null;
 
         $supportsTransactionChannel = Schema::hasTable('transactions')
             && Schema::hasColumn('transactions', 'channel_name');
@@ -5773,6 +5775,10 @@ class AdminPanelController extends Controller
                 'user:id,name,email,phone,city,created_at',
                 'pet:id,user_id,name,pet_type,breed,created_at',
             ]);
+
+        if ($userIdFilter) {
+            $query->where('transactions.user_id', $userIdFilter);
+        }
 
         if ($typeFilter !== 'all') {
             $query->where(function (Builder $builder) use ($typeFilter) {
@@ -6224,6 +6230,7 @@ class AdminPanelController extends Controller
             'filters' => [
                 'limit' => $limit,
                 'type' => $typeFilter,
+                'user_id' => $userIdFilter,
             ],
         ]);
     }

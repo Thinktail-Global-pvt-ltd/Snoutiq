@@ -247,12 +247,23 @@
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
                 <div>
                     <h2 class="h5 mb-1">Lifecycle Tracker</h2>
+                    @if(isset($filters['user_id']) && $transactions->isNotEmpty())
+                        @php $filteredUser = $transactions->first()->user; @endphp
+                        @if($filteredUser)
+                            <div class="badge bg-success p-2 mb-2" style="font-size: 0.85rem; color: #fff;">
+                                Filtering by User: {{ $filteredUser->name }} ({{ $filteredUser->phone }})
+                            </div>
+                        @endif
+                    @endif
                     <p class="text-muted small mb-0">
                         Includes onboarding milestones: <code>users.created_at</code> (User Created)
                         and <code>pets.created_at</code> (Pet Added).
                     </p>
                 </div>
                 <form class="d-flex align-items-center gap-2 flex-wrap" method="GET" action="{{ route('admin.analytics.consultation-lifecycle') }}">
+                    @if(isset($filters['user_id']))
+                        <input type="hidden" name="user_id" value="{{ (int) $filters['user_id'] }}">
+                    @endif
                     <div>
                         <label class="form-label small text-muted mb-1">Type</label>
                         <select name="type" class="form-select form-select-sm">
