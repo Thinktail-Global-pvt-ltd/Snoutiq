@@ -70,6 +70,83 @@
         background: #ecfdf3;
         border-color: #86efac;
     }
+    /* Stunning visual timeline styles */
+    .stunning-timeline {
+        position: relative;
+        padding-left: 1.25rem;
+        margin-top: 0.25rem;
+        border-left: 2px solid #e2e8f0;
+    }
+    .stunning-timeline-item {
+        position: relative;
+        margin-bottom: 0.75rem;
+    }
+    .stunning-timeline-item:last-child {
+        margin-bottom: 0;
+    }
+    .stunning-timeline-dot {
+        position: absolute;
+        left: calc(-1.25rem - 5px);
+        top: 6px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #cbd5e1;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px #cbd5e1;
+        transition: all 0.2s ease;
+    }
+    .stunning-timeline-item.done .stunning-timeline-dot {
+        background: #10b981;
+        box-shadow: 0 0 0 2px #10b981;
+    }
+    .stunning-timeline-content {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.4rem;
+        padding: 0.45rem 0.6rem;
+        transition: all 0.2s ease;
+    }
+    .stunning-timeline-item.done .stunning-timeline-content {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+    }
+    .stunning-timeline-title {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #475569;
+    }
+    .stunning-timeline-item.done .stunning-timeline-title {
+        color: #15803d;
+    }
+    .stunning-timeline-badges {
+        display: flex;
+        gap: 3px;
+    }
+    .stunning-badge {
+        font-size: 0.62rem;
+        padding: 0.08rem 0.3rem;
+        border-radius: 3px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .stunning-badge.captured.done {
+        background: #dcfce7;
+        color: #15803d;
+    }
+    .stunning-badge.captured.pending {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    .stunning-badge.secure.done {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+    .stunning-badge.secure.pending {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
     .status-badge {
         border: 1px solid #e5e7eb;
         border-radius: 999px;
@@ -367,10 +444,9 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Transaction</th>
-                                        <th>User / Pet</th>
+                                        <th>User / Pet / Clinic</th>
                                         <th>Consultation Assigned To Vet</th>
-                                        <th>Lifecycle Events</th>
-                                        <th>WhatsApp Notifications</th>
+                                        <th>Lifecycle Events Timeline</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -388,9 +464,6 @@
                                                 'review_requested',
                                                 'review_submitted',
                                             ];
-                                            $whatsAppRows = $txn->getAttribute('whatsapp_notifications_for_channel') ?? [];
-                                            $whatsAppStatusSummary = $txn->getAttribute('whatsapp_notification_status_summary') ?? [];
-                                            $whatsAppLastStatus = strtolower((string) ($txn->getAttribute('whatsapp_notification_last_status') ?? ''));
                                         @endphp
                                         <tr>
                                             <td data-label="Transaction">
@@ -405,14 +478,28 @@
                                                     <div>Created: {{ $txn->id === 0 ? '—' : $formatTimestamp($txn->created_at) }}</div>
                                                 </div>
                                             </td>
-                                            <td data-label="User / Pet">
+                                            <td data-label="User / Pet / Clinic">
                                                 <div class="fw-semibold">{{ $txn->user->name ?? '—' }}</div>
                                                 <div class="text-muted small">
-                                                    <div>Phone: {{ $txn->user->phone ?? '—' }}</div>
-                                                    <div>User Created: {{ $formatTimestamp(optional($txn->user)->created_at) }}</div>
-                                                    <div>Pet: {{ $txn->pet->name ?? '—' }}</div>
-                                                    <div>Pet Added: {{ $formatTimestamp(optional($txn->pet)->created_at) }}</div>
-                                                    <div>Doctor: {{ $txn->doctor->doctor_name ?? '—' }}</div>
+                                                    <div><strong>Phone:</strong> {{ $txn->user->phone ?? '—' }}</div>
+                                                    <div><strong>User Created:</strong> {{ $formatTimestamp(optional($txn->user)->created_at) }}</div>
+                                                    <div><strong>Pet:</strong> {{ $txn->pet->name ?? '—' }}</div>
+                                                    @if(optional($txn->pet)->reported_symptom)
+                                                        <div class="text-danger mt-1"><strong>Symptom:</strong> {{ optional($txn->pet)->reported_symptom }}</div>
+                                                    @endif
+                                                    <div><strong>Pet Added:</strong> {{ $formatTimestamp(optional($txn->pet)->created_at) }}</div>
+                                                    @if($txn->getAttribute('connected_clinic_name'))
+                                                        <div class="text-primary mt-1">
+                                                            <strong>Clinic:</strong> {{ $txn->getAttribute('connected_clinic_name') }}
+                                                            @php $docs = $txn->getAttribute('connected_clinic_doctors'); @endphp
+                                                            @if(!empty($docs))
+                                                                ({{ implode(', ', $docs) }})
+                                                            @endif
+                                                        </div>
+                                                    @endif
+                                                    @if($txn->doctor && $txn->doctor->doctor_name)
+                                                        <div><strong>Assigned Doctor:</strong> {{ $txn->doctor->doctor_name }}</div>
+                                                    @endif
                                                 </div>
                                             </td>
                                             <td data-label="Consultation Assigned To Vet">
@@ -435,89 +522,40 @@
                                                     <div>Source: {{ $assignedSource !== '' ? $assignedSource : '—' }}</div>
                                                 </div>
                                             </td>
-                                            <td data-label="Lifecycle Events">
-                                                @foreach($eventKeys as $eventKey)
-                                                    @php
-                                                        $eventLabel = data_get($eventDefinitions, $eventKey, $eventKey);
-                                                        $eventAt = $txn->getAttribute("event_{$eventKey}_at");
-                                                        $eventCaptured = (bool) $txn->getAttribute("event_{$eventKey}_captured");
-                                                        $eventSecure = (bool) $txn->getAttribute("event_{$eventKey}_secure");
-                                                        $eventSource = (string) ($txn->getAttribute("event_{$eventKey}_source") ?? '');
-                                                    @endphp
-                                                    <div class="event-block {{ $eventCaptured ? 'done' : '' }}">
-                                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                                            <span class="fw-semibold small">{{ $eventLabel }}</span>
-                                                            <span class="status-badge {{ $eventCaptured ? 'done' : 'pending' }}">
-                                                                {{ $eventCaptured ? 'Captured' : 'Missing' }}
-                                                            </span>
-                                                            <span class="status-badge {{ $eventSecure ? 'done' : 'pending' }}">
-                                                                {{ $eventSecure ? 'Secure' : 'Not Secure' }}
-                                                            </span>
-                                                        </div>
-                                                        <div class="text-muted small">
-                                                            <div>Timestamp: {{ $formatTimestamp($eventAt) }}</div>
-                                                            <div>Source: {{ $eventSource !== '' ? $eventSource : '—' }}</div>
-                                                        </div>
-                                                    </div>
-                                                @endforeach
-                                            </td>
-                                            <td data-label="WhatsApp Notifications">
-                                                <details>
-                                                    <summary class="fw-semibold">
-                                                        whatsapp_notifications
-                                                        <span class="text-muted small">(count: {{ count($whatsAppRows) }})</span>
-                                                    </summary>
-                                                    <div class="mt-1">
-                                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                                                            @foreach(collect($whatsAppStatusSummary)->sortKeys() as $statusKey => $statusCount)
-                                                                @php
-                                                                    $normalizedStatus = strtolower(trim((string) $statusKey));
-                                                                    $summaryBadgeClass = match ($normalizedStatus) {
-                                                                        'sent' => 'status-badge done',
-                                                                        default => 'status-badge pending',
-                                                                    };
-                                                                @endphp
-                                                                <span class="{{ $summaryBadgeClass }}">
-                                                                    {{ strtoupper($normalizedStatus !== '' ? $normalizedStatus : 'unknown') }}: {{ (int) $statusCount }}
-                                                                </span>
-                                                            @endforeach
-                                                            @if($whatsAppLastStatus !== '')
-                                                                <span class="status-badge {{ $whatsAppLastStatus === 'sent' ? 'done' : 'pending' }}">
-                                                                    Last status: {{ strtoupper($whatsAppLastStatus) }}
-                                                                </span>
-                                                            @endif
-                                                        </div>
-
-                                                        @if(!empty($whatsAppRows))
-                                                            @foreach($whatsAppRows as $whatsAppRow)
-                                                                @php
-                                                                    $rowStatus = strtolower((string) ($whatsAppRow['status'] ?? 'unknown'));
-                                                                    $rowStatusBadge = match ($rowStatus) {
-                                                                        'sent' => 'status-badge done',
-                                                                        default => 'status-badge pending',
-                                                                    };
-                                                                @endphp
-                                                                <div class="wa-attempt {{ $rowStatus === 'sent' ? 'done' : '' }}">
-                                                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                                                        <span class="{{ $rowStatusBadge }}">{{ strtoupper($rowStatus) }}</span>
-                                                                        <span class="small text-muted">Template: <code>{{ $whatsAppRow['template_name'] ?? '—' }}</code></span>
-                                                                        <span class="small text-muted">Type: <code>{{ $whatsAppRow['message_type'] ?? '—' }}</code></span>
-                                                                    </div>
-                                                                    <div class="small text-muted">
-                                                                        <div>Attempted: {{ $formatTimestamp($whatsAppRow['attempted_at'] ?? null) }}</div>
-                                                                        <div>Sent At: {{ $formatTimestamp($whatsAppRow['sent_at'] ?? null) }}</div>
-                                                                        <div>HTTP Status: <code>{{ $whatsAppRow['http_status'] ?? '—' }}</code></div>
-                                                                        @if(!empty($whatsAppRow['error_message']))
-                                                                            <div>Error: <code>{{ $whatsAppRow['error_message'] }}</code></div>
-                                                                        @endif
+                                            <td data-label="Lifecycle Events Timeline">
+                                                <div class="stunning-timeline">
+                                                    @foreach($eventKeys as $eventKey)
+                                                        @php
+                                                            $eventLabel = data_get($eventDefinitions, $eventKey, $eventKey);
+                                                            $eventAt = $txn->getAttribute("event_{$eventKey}_at");
+                                                            $eventCaptured = (bool) $txn->getAttribute("event_{$eventKey}_captured");
+                                                            $eventSecure = (bool) $txn->getAttribute("event_{$eventKey}_secure");
+                                                            $eventSource = (string) ($txn->getAttribute("event_{$eventKey}_source") ?? '');
+                                                        @endphp
+                                                        <div class="stunning-timeline-item {{ $eventCaptured ? 'done' : '' }}">
+                                                            <div class="stunning-timeline-dot"></div>
+                                                            <div class="stunning-timeline-content">
+                                                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                                                    <span class="stunning-timeline-title">{{ $eventLabel }}</span>
+                                                                    <div class="stunning-timeline-badges">
+                                                                        <span class="stunning-badge captured {{ $eventCaptured ? 'done' : 'pending' }}">
+                                                                            {{ $eventCaptured ? 'Captured' : 'Missing' }}
+                                                                        </span>
+                                                                        <span class="stunning-badge secure {{ $eventSecure ? 'done' : 'pending' }}">
+                                                                            {{ $eventSecure ? 'Secure' : 'Not Secure' }}
+                                                                        </span>
                                                                     </div>
                                                                 </div>
-                                                            @endforeach
-                                                        @else
-                                                            <div class="text-muted small">No WhatsApp notifications found for this channel.</div>
-                                                        @endif
-                                                    </div>
-                                                </details>
+                                                                @if($eventCaptured)
+                                                                    <div class="text-muted mt-1" style="font-size: 0.72rem; line-height: 1.35;">
+                                                                        <div><i class="bi bi-clock"></i> {{ $formatTimestamp($eventAt) }}</div>
+                                                                        <div class="text-secondary" style="font-size: 0.68rem; font-family: monospace;">Source: {{ $eventSource }}</div>
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach

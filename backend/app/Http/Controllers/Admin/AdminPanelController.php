@@ -5773,7 +5773,7 @@ class AdminPanelController extends Controller
                 'clinic:id,name',
                 'doctor:id,doctor_name,doctor_email,doctor_mobile',
                 'user:id,name,email,phone,city,created_at',
-                'pet:id,user_id,name,pet_type,breed,created_at',
+                'pet:id,user_id,name,pet_type,breed,reported_symptom,created_at',
             ]);
 
         if ($userIdFilter) {
@@ -5988,11 +5988,32 @@ class AdminPanelController extends Controller
             }
         }
 
+        $lastVetIds = $transactions->map(fn($t) => $t->user?->last_vet_id)->filter()->unique()->all();
+        $clinicNames = collect();
+        $clinicDoctors = collect();
+
+        if (!empty($lastVetIds)) {
+            $clinicNames = DB::table('vet_registerations_temp')
+                ->whereIn('id', $lastVetIds)
+                ->pluck('name', 'id');
+
+            $clinicDoctors = DB::table('doctors')
+                ->whereIn('vet_registeration_id', $lastVetIds)
+                ->select('doctor_name', 'vet_registeration_id')
+                ->get()
+                ->groupBy('vet_registeration_id')
+                ->map(fn ($rows) => $rows->pluck('doctor_name')->filter()->unique()->values()->all());
+        }
+
         $latestAssignmentLogs = $this->latestTransactionDoctorAssignmentLogs($transactions);
         $notificationLookup = $this->notificationLookupsForTransactions($transactions);
         $feedbackLookup = $this->feedbackSubmissionLookupForTransactions($transactions);
 
-        $enriched = $transactions->map(function (Transaction $transaction) use ($latestAssignmentLogs, $notificationLookup, $feedbackLookup) {
+        $enriched = $transactions->map(function (Transaction $transaction) use ($latestAssignmentLogs, $notificationLookup, $feedbackLookup, $clinicNames, $clinicDoctors) {
+            $vetId = $transaction->user?->last_vet_id ?? null;
+            $transaction->setAttribute('connected_clinic_name', $vetId ? ($clinicNames[$vetId] ?? null) : null);
+            $transaction->setAttribute('connected_clinic_doctors', $vetId ? ($clinicDoctors[$vetId] ?? []) : []);
+
             $createdAt = $this->normalizeLifecycleTimestamp($transaction->created_at);
             $assignmentLog = $latestAssignmentLogs->get($transaction->id);
             $assignmentLoggedAt = $assignmentLog?->created_at ?? null;
