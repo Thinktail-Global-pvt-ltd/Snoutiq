@@ -1044,7 +1044,7 @@ class AdminPanelController extends Controller
         $filters = $request->validate([
             'limit' => ['nullable', 'integer', 'min:25', 'max:1000'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:200'],
-            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,video_follow_up_video,video_follow_up_in_clinic,vaccination,both'],
+            'lead_filter' => ['nullable', 'string', 'in:all,neutering,video_follow_up,video_follow_up_video,video_follow_up_in_clinic,vaccination,both,ten_day_no_payment'],
             'q' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -3811,9 +3811,55 @@ class AdminPanelController extends Controller
             return $leadUser;
         });
 
+        $isTenDayNoPaymentUser = static function (array $leadUser): bool {
+            $createdAtStr = $leadUser['user_created_at'] ?? null;
+            if (!$createdAtStr) {
+                return false;
+            }
+
+            try {
+                $createdDate = \Illuminate\Support\Carbon::parse($createdAtStr);
+                $daysSinceCreated = max(0, (int) $createdDate->diffInDays(now()));
+            } catch (\Throwable $e) {
+                $daysSinceCreated = 0;
+            }
+
+            if ($daysSinceCreated < 10) {
+                return false;
+            }
+
+            $hasPayment = (bool) ($leadUser['conversion_captured'] ?? false)
+                || (bool) ($leadUser['has_captured_payment'] ?? false)
+                || !empty($leadUser['related_transactions']);
+
+            if ($hasPayment) {
+                return false;
+            }
+
+            $hasCompletedCall = false;
+            foreach (($leadUser['crm_activity_logs'] ?? []) as $activity) {
+                $action = strtolower((string) ($activity['action_type'] ?? ''));
+                $outcome = strtolower((string) ($activity['outcome'] ?? ''));
+                $notes = strtolower((string) ($activity['notes'] ?? ''));
+
+                $isCall = str_contains($action, 'call') || str_contains($notes, '10-day no-payment');
+                $isDone = str_contains($outcome, 'completed')
+                    || str_contains($outcome, 'spoke')
+                    || str_contains($notes, 'call completed manually');
+                $isNoAnswer = str_contains($outcome, 'no answer') || str_contains($notes, 'no answer');
+
+                if ($isCall && $isDone && !$isNoAnswer) {
+                    $hasCompletedCall = true;
+                    break;
+                }
+            }
+
+            return !$hasCompletedCall;
+        };
+
         $filteredTargetUsers = $targetUsers
             ->values()
-            ->filter(function (array $leadUser) use ($leadFilter): bool {
+            ->filter(function (array $leadUser) use ($leadFilter, $isTenDayNoPaymentUser): bool {
                 return match ($leadFilter) {
                     'all' => true,
                     'neutering' => (bool) $leadUser['has_neutering'],
@@ -3822,6 +3868,7 @@ class AdminPanelController extends Controller
                     'video_follow_up_in_clinic' => (bool) $leadUser['has_video_follow_up_in_clinic'],
                     'vaccination' => (bool) $leadUser['has_vaccination_reminder'],
                     'both' => (bool) $leadUser['has_neutering'] && (bool) $leadUser['has_video_follow_up'],
+                    'ten_day_no_payment' => $isTenDayNoPaymentUser($leadUser),
                     default => (bool) $leadUser['has_neutering']
                         || (bool) $leadUser['has_video_follow_up']
                         || (bool) $leadUser['has_vaccination_reminder'],

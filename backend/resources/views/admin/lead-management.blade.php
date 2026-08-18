@@ -1705,6 +1705,7 @@
         'video_follow_up_in_clinic' => 'In-clinic Follow-up Leads',
         'vaccination' => 'Vaccination Reminder Leads',
         'both' => 'Users In Both Categories',
+        'ten_day_no_payment' => 'Call now - 10d no payment',
     ];
 
     $activeFilterLabel = $filterLabels[$leadFilter] ?? $filterLabels['all'];
@@ -2223,6 +2224,7 @@
                 <option value="video_follow_up_in_clinic" @selected($leadFilter === 'video_follow_up_in_clinic')>In-clinic follow-up leads</option>
                 <option value="vaccination" @selected($leadFilter === 'vaccination')>Vaccination reminder leads</option>
                 <option value="both" @selected($leadFilter === 'both')>Users in both categories</option>
+                <option value="ten_day_no_payment" @selected($leadFilter === 'ten_day_no_payment')>Call now - 10d no payment</option>
             </select>
             <input type="hidden" id="crmSearchQueryField" name="q" value="{{ request('q', '') }}">
 

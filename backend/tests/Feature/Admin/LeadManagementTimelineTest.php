@@ -809,4 +809,32 @@ class LeadManagementTimelineTest extends TestCase
         $response->assertSee('Zero Transaction User');
         $response->assertSee('Virtual (No Transaction)');
     }
+
+    public function test_lead_management_supports_ten_day_no_payment_filter(): void
+    {
+        $oldUser = User::query()->create([
+            'name' => 'Ten Day Delinquent User',
+            'email' => 'old_no_pay@example.com',
+            'phone' => '919999999910',
+            'password' => 'secret',
+        ]);
+        DB::table('users')->where('id', $oldUser->id)->update(['created_at' => now()->subDays(12)->toDateTimeString()]);
+
+        $newUser = User::query()->create([
+            'name' => 'Fresh User No Payment',
+            'email' => 'new_no_pay@example.com',
+            'phone' => '919999999911',
+            'password' => 'secret',
+        ]);
+
+        $response = $this->withSession([
+            'is_admin' => true,
+            'admin_email' => 'admin@snoutiq.com',
+            'role' => 'admin',
+        ])->get(route('admin.lead-management', ['lead_filter' => 'ten_day_no_payment']));
+
+        $response->assertOk();
+        $response->assertSee('Ten Day Delinquent User');
+        $response->assertDontSee('Fresh User No Payment');
+    }
 }
