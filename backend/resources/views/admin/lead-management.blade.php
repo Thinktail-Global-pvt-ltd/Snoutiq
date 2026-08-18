@@ -31,6 +31,25 @@
         --crm-radius-sm: 6px;
     }
 
+    @keyframes crmPulse {
+        0% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+        }
+        70% {
+            transform: scale(1.03);
+            box-shadow: 0 0 0 5px rgba(16, 185, 129, 0);
+        }
+        100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+        }
+    }
+
+    .crm-pulse-animate {
+        animation: crmPulse 1.8s infinite ease-in-out;
+    }
+
     body {
         background: var(--crm-bg) !important;
     }
@@ -3214,7 +3233,7 @@
                 ? `<span class="crm-tag ${callState.completed ? 'crm-tag-mobile' : ''}">${escapeHtml(callState.completed ? 'Call completed' : 'Call now - 10d no payment')}</span>`
                 : '';
             const followTag = lead.follow_up_type_label ? `<span class="crm-tag">${escapeHtml(lead.follow_up_type_label)}</span>` : '';
-            const clinicTag = lead.connected_clinic_name ? `<span class="crm-tag" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><i class="bi bi-house-door" style="font-size: 0.8rem;"></i> ${escapeHtml(lead.connected_clinic_name)}</span>` : '';
+            const clinicTag = lead.connected_clinic_name ? `<span class="crm-tag crm-pulse-animate" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><i class="bi bi-house-door" style="font-size: 0.8rem;"></i> ${escapeHtml(lead.connected_clinic_name)}</span>` : '';
             const revenueTag = lead.conversion_captured
                 ? `<span class="crm-rev">Converted</span>`
                 : `<span class="crm-rev">Open</span>`;
@@ -3593,7 +3612,7 @@
                     <button type="button" class="crm-btn" data-open-modal="profile">Full Profile</button>
                     ${canSendAiPush ? '<button type="button" class="crm-btn" data-ai-marketing-push>AI Push</button>' : ''}
                     <button type="button" class="crm-btn" data-open-modal="txn">+ Add Service</button>
-                    <a href="/backend/admin/analytics/consultation-lifecycle?user_id=${Number(lead.id)}" target="_blank" class="crm-btn" style="text-decoration:none; background:#10b981; color:#fff; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:4px;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
+                    <a href="/backend/admin/analytics/consultation-lifecycle?user_id=${Number(lead.id)}" target="_blank" class="crm-btn crm-pulse-animate" style="text-decoration:none; background:#10b981; color:#fff; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:4px;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
                     <button type="button" class="crm-btn" data-open-modal="next">Set Next Action</button>
                     <form method="POST" action="${escapeHtml(deleteActionUrl)}" class="d-inline-block" onsubmit="return confirm('Delete this user and related data? This action cannot be undone.')">
                         <input type="hidden" name="_token" value="${escapeHtml(csrfToken)}">
@@ -3752,7 +3771,7 @@
             <div class="crm-tab-content ${activeTab === 'services' ? 'active' : ''}" data-tab-content="services">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:10px;">
                     <div class="crm-add-service" data-open-modal="txn" style="margin-bottom:0; flex-grow:1; text-align:center;">+ Add a service transaction</div>
-                    <a href="/backend/admin/analytics/consultation-lifecycle?user_id=${Number(lead.id)}" target="_blank" class="crm-btn" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; height: 38px; padding: 0 16px; font-weight:600; background:#10b981; color:#fff; border-radius:var(--crm-radius-sm); white-space:nowrap; margin-bottom:0;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
+                    <a href="/backend/admin/analytics/consultation-lifecycle?user_id=${Number(lead.id)}" target="_blank" class="crm-btn crm-pulse-animate" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; height: 38px; padding: 0 16px; font-weight:600; background:#10b981; color:#fff; border-radius:var(--crm-radius-sm); white-space:nowrap; margin-bottom:0;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
                 </div>
                 ${reassignableServiceCount === 0 ? `
                     <div class="crm-card" style="margin-bottom: 0.5rem;">
