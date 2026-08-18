@@ -1071,6 +1071,9 @@ class AdminPanelController extends Controller
         if ($hasUserCity) {
             $leadUserBaseColumns[] = 'city';
         }
+        if (Schema::hasColumn('users', 'last_vet_id')) {
+            $leadUserBaseColumns[] = 'last_vet_id';
+        }
         $leadUserColumnsWithCreatedAt = $leadUserBaseColumns;
         if ($hasUserCreatedAt) {
             $leadUserColumnsWithCreatedAt[] = 'created_at';
@@ -1364,6 +1367,7 @@ class AdminPanelController extends Controller
                 'email' => $user?->email,
                 'phone' => $user?->phone,
                 'city' => $user?->city,
+                'last_vet_id' => $user?->last_vet_id ? (int) $user->last_vet_id : null,
                 'user_created_at' => $user?->created_at ? (string) $user->created_at : null,
                 'prescription_follow_up_date' => null,
                 'prescription_follow_up_type' => null,
@@ -3783,6 +3787,30 @@ class AdminPanelController extends Controller
                 ->count();
         }
 
+        $lastVetIds = $targetUsers->pluck('last_vet_id')->filter()->unique()->all();
+        $clinicNames = collect();
+        $clinicDoctors = collect();
+
+        if (!empty($lastVetIds)) {
+            $clinicNames = DB::table('vet_registerations_temp')
+                ->whereIn('id', $lastVetIds)
+                ->pluck('name', 'id');
+
+            $clinicDoctors = DB::table('doctors')
+                ->whereIn('vet_registeration_id', $lastVetIds)
+                ->select('doctor_name', 'vet_registeration_id')
+                ->get()
+                ->groupBy('vet_registeration_id')
+                ->map(fn ($rows) => $rows->pluck('doctor_name')->filter()->unique()->values()->all());
+        }
+
+        $targetUsers = $targetUsers->map(function (array $leadUser) use ($clinicNames, $clinicDoctors): array {
+            $vetId = $leadUser['last_vet_id'] ?? null;
+            $leadUser['connected_clinic_name'] = $vetId ? ($clinicNames[$vetId] ?? null) : null;
+            $leadUser['connected_clinic_doctors'] = $vetId ? ($clinicDoctors[$vetId] ?? []) : [];
+            return $leadUser;
+        });
+
         $filteredTargetUsers = $targetUsers
             ->values()
             ->filter(function (array $leadUser) use ($leadFilter): bool {
@@ -4394,10 +4422,29 @@ class AdminPanelController extends Controller
 
         $clickedCount = $notifications->filter(fn (array $row): bool => ($row['clicked'] ?? null) === true)->count();
 
+        $connectedClinicName = null;
+        $connectedClinicDoctors = [];
+        if ($user->last_vet_id) {
+            $connectedClinicName = DB::table('vet_registerations_temp')
+                ->where('id', (int) $user->last_vet_id)
+                ->value('name');
+
+            $connectedClinicDoctors = DB::table('doctors')
+                ->where('vet_registeration_id', (int) $user->last_vet_id)
+                ->pluck('doctor_name')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
         $responseData = $this->sanitizeUtf8Strings([
             'status' => 'success',
             'lead' => [
                 'id' => $userId,
+                'last_vet_id' => $user->last_vet_id ? (int) $user->last_vet_id : null,
+                'connected_clinic_name' => $connectedClinicName,
+                'connected_clinic_doctors' => $connectedClinicDoctors,
                 'notifications' => $notifications->values()->all(),
                 'all_notifications_count' => $notifications->count(),
                 'clicked_notifications_count' => $clickedCount,

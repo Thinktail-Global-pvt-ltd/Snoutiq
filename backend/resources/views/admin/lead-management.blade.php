@@ -3661,6 +3661,12 @@
                         <div class="crm-field-row"><span class="crm-fr-label">Phone</span><span class="crm-fr-val">${escapeHtml(ownerPhone)}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Email</span><span class="crm-fr-val">${escapeHtml(ownerEmail)}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">City</span><span class="crm-fr-val">${escapeHtml(ownerCity)}</span></div>
+                        <div class="crm-field-row"><span class="crm-fr-label">Connected Clinic</span><span class="crm-fr-val">${(() => {
+                            const clinicName = lead.connected_clinic_name;
+                            const docs = Array.isArray(lead.connected_clinic_doctors) ? lead.connected_clinic_doctors : [];
+                            if (!clinicName) return '—';
+                            return escapeHtml(clinicName) + (docs.length ? ` (${docs.map(d => escapeHtml(d)).join(', ')})` : '');
+                        })()}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Created</span><span class="crm-fr-val">${escapeHtml(formatDateTime(lead.created_at))}</span></div>
                         <div class="crm-field-row"><span class="crm-fr-label">Current status</span><span class="crm-fr-val"><span class="crm-status-badge ${escapeHtml(statusMeta.className)}">${escapeHtml(statusMeta.label)}</span></span></div>
                     </div>
@@ -3738,7 +3744,10 @@
             </div>
 
             <div class="crm-tab-content ${activeTab === 'services' ? 'active' : ''}" data-tab-content="services">
-                <div class="crm-add-service" data-open-modal="txn">+ Add a service transaction</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:10px;">
+                    <div class="crm-add-service" data-open-modal="txn" style="margin-bottom:0; flex-grow:1; text-align:center;">+ Add a service transaction</div>
+                    <a href="/backend/receptionist/clinic-walkins?user_id=${Number(lead.id)}" target="_blank" class="crm-btn" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; height: 38px; padding: 0 16px; font-weight:600; background:#10b981; color:#fff; border-radius:var(--crm-radius-sm); white-space:nowrap; margin-bottom:0;"><i class="bi bi-box-arrow-up-right"></i> Go to Walk-ins</a>
+                </div>
                 ${reassignableServiceCount === 0 ? `
                     <div class="crm-card" style="margin-bottom: 0.5rem;">
                         <div class="crm-empty" style="padding: 1rem 0.8rem;">

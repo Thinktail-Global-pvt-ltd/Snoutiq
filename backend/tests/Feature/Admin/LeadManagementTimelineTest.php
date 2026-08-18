@@ -708,4 +708,40 @@ class LeadManagementTimelineTest extends TestCase
         $response->assertJsonPath('clinic.rating', 4.8);
         $response->assertJsonPath('clinic.user_ratings_total', 150);
     }
+
+    public function test_lead_details_returns_connected_clinic_and_doctors(): void
+    {
+        $clinicId = DB::table('vet_registerations_temp')->insertGetId([
+            'name' => 'CRM Test Connected Clinic',
+            'address' => 'Delhi Clinic Address',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'vet_registeration_id' => $clinicId,
+            'doctor_name' => 'CRM Connected Doctor',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $user = User::query()->create([
+            'name' => 'CRM User',
+            'email' => 'crmuser@example.com',
+            'phone' => '919010203040',
+            'password' => 'secret',
+            'last_vet_id' => $clinicId,
+        ]);
+
+        $response = $this->withSession([
+            'is_admin' => true,
+            'admin_email' => 'admin@snoutiq.com',
+            'role' => 'admin',
+        ])->get(route('admin.lead-management.users.details', ['user' => $user->id]));
+
+        $response->assertOk();
+        $response->assertJsonPath('status', 'success');
+        $response->assertJsonPath('lead.connected_clinic_name', 'CRM Test Connected Clinic');
+        $response->assertJsonFragment(['CRM Connected Doctor']);
+    }
 }

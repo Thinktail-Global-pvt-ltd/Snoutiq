@@ -2193,11 +2193,23 @@ window.PatientStore = (() => {
   }
 
   // Subscribe to PatientStore — keeps walk-in list in sync
+  let initialUserSelected = false;
   window.PatientStore.subscribe(({ patients, loading, error }) => {
     state.patients       = patients;
     state.loadingPatients = loading;
+    
+    const params = new URLSearchParams(window.location.search);
+    const urlUserId = params.get('user_id');
+    if (urlUserId && !initialUserSelected && patients.length) {
+      const found = patients.find(p => Number(p.id) === Number(urlUserId));
+      if (found) {
+        initialUserSelected = true;
+        selectPatient(found.id);
+      }
+    }
+    
     const exists = state.selectedId && patients.some(p => Number(p.id)===Number(state.selectedId));
-    if (!exists) state.selectedId = null;
+    if (!exists && !initialUserSelected) state.selectedId = null;
     renderPatientList();
     renderProfile();
   });
