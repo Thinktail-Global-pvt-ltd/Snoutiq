@@ -180,24 +180,24 @@ export default function AppRoutes() {
       <Routes>
         <Route path="/c/:publicId" element={<ConsultationShortLinkBridge />} />
            <Route path="/counsltflow/*" element={<NewDoctorRoute />} />
-<Route path="/doctor/*" element={<Navigate to="/counsltflow" replace />} />
+        <Route path="/doctor/*" element={<Navigate to="/counsltflow/" replace />} />
         <Route path="/video-call-pet-details" element={<VideoCallPetDetails />} />
         <Route path="/video-call-payment" element={<VideoCallPayment />} />
-       <Route path="/vet-near-me-pet-details" element={<VetNearMePetDetailsPage />} />
+        <Route path="/vet-near-me-pet-details" element={<VetNearMePetDetailsPage />} />
         <Route path="/vet-near-me-payment" element={<VetNearMePaymentPage />} />
         <Route path="/in-clinic-pet-details" element={<InClinicPetDetailsPage />} />
         <Route path="/in-clinic-payment" element={<InClinicPaymentPage />} />
         <Route path="/ai" element={<AiRoute />} />
         <Route path="/app-links" element={<AppLinks />} />
-     <Route path="/pet-lifeline/:petId" element={<PetLifelinePage />} />
-<Route path="/profile" element={<EditPetPage />} />
-<Route path="/video-counsult" element={<ProtectedBookingRoute><ConsultBookingFlow /></ProtectedBookingRoute>} />
-<Route path="/video-consult" element={<ProtectedBookingRoute><ConsultBookingFlow /></ProtectedBookingRoute>} />
-<Route path="/inclinic-fast-booking" element={<ProtectedBookingRoute><InClinicFastBookingFlow /></ProtectedBookingRoute>} />
-<Route path="/vet-at-home-booking" element={<ProtectedBookingRoute><HomeVetBookingFlow /></ProtectedBookingRoute>} />
-<Route path="/appointment-thank-you" element={<AppointmentThankYouPage />} />
-<Route path="/appointment-page" element={<AppointmentPage />} />
-<Route path="/followup-page" element={<FollowupPage />} />
+        <Route path="/pet-lifeline/:petId" element={<PetLifelinePage />} />
+        <Route path="/profile" element={<EditPetPage />} />
+        <Route path="/video-counsult" element={<ProtectedBookingRoute><ConsultBookingFlow /></ProtectedBookingRoute>} />
+        <Route path="/video-consult" element={<ProtectedBookingRoute><ConsultBookingFlow /></ProtectedBookingRoute>} />
+        <Route path="/inclinic-fast-booking" element={<ProtectedBookingRoute><InClinicFastBookingFlow /></ProtectedBookingRoute>} />
+        <Route path="/vet-at-home-booking" element={<ProtectedBookingRoute><HomeVetBookingFlow /></ProtectedBookingRoute>} />
+        <Route path="/appointment-thank-you" element={<AppointmentThankYouPage />} />
+        <Route path="/appointment-page" element={<AppointmentPage />} />
+        <Route path="/followup-page" element={<FollowupPage />} />
         <Route path="/symptom-checker" element={<Navigate to="/" replace />} />
         <Route path="/about" element={<NewAbout />} />
         <Route path="/parents" element={<NewCounsult />} />
@@ -214,7 +214,7 @@ export default function AppRoutes() {
         />
         <Route
           path="/online-vet-consultation/thank-you"
-          element={<Navigate to="/consultation-booked" replace />}
+          element={<Navigate to="/consultation-booked/" replace />}
         />
         <Route
           path="/online-vet-consultation/:view"

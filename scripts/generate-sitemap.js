@@ -23,7 +23,8 @@ async function fetchDynamicBlogPosts() {
       const posts = data?.data || data?.posts || (Array.isArray(data) ? data : []);
       posts.forEach((post) => {
         if (post?.slug) {
-          dynamicSlugs.add(`/blog/${post.slug}`);
+          const slugPath = post.slug.endsWith('/') ? `/blog/${post.slug}` : `/blog/${post.slug}/`;
+          dynamicSlugs.add(slugPath);
         }
       });
     }
@@ -50,11 +51,14 @@ async function generateSitemap() {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${allRoutes
   .map(
-    (r) => `  <url>
-    <loc>${DOMAIN}${r.path}</loc>
+    (r) => {
+      const formattedPath = r.path === '/' ? '/' : (r.path.endsWith('/') ? r.path : `${r.path}/`);
+      return `  <url>
+    <loc>${DOMAIN}${formattedPath}</loc>
     <lastmod>${TODAY}</lastmod>
     <priority>${r.priority}</priority>
-  </url>`
+  </url>`;
+    }
   )
   .join('\n')}
 </urlset>

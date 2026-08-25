@@ -190,7 +190,7 @@ const GurugramPage = () => {
         <title>SnoutIQ Gurugram: Trusted Pet Health & Vet Consultations</title>
         <meta name="description" content="Concerned about your pet's health in Gurugram? SnoutIQ provides expert online vet consultations and personalized guidance for Indian pet parents. Get professional advice for your furry friend's well-being today." />
         <meta name="robots" content="index,follow" />
-        <link rel="canonical" href="https://snoutiq.com/gurugram" />
+        <link rel="canonical" href="https://snoutiq.com/gurugram/" />
       </Helmet>
       <Header/>
       <Hero

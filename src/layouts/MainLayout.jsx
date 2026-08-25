@@ -31,9 +31,11 @@ export default function MainLayout({ children }) {
 
     const currentPath = window.location.pathname;
     const cleanPath =
-      currentPath.length > 1 && currentPath.endsWith("/")
-        ? currentPath.slice(0, -1)
-        : currentPath;
+      currentPath === "/"
+        ? "/"
+        : currentPath.endsWith("/")
+        ? currentPath
+        : `${currentPath}/`;
     const pageCanonicalUrl = `https://snoutiq.com${cleanPath}`;
 
     upsertMetaTag("name", "description", DEFAULT_DESCRIPTION);

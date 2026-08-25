@@ -27,7 +27,7 @@ const TITLE =
   "Pet Doctor Online India | 24/7 Online Vet Consultation";
 const DESCRIPTION =
   "Need urgent pet advice? Connect with a licensed pet doctor online via Video call. Fast response. Transparent pricing. Available across India.";
-const CANONICAL = "https://www.snoutiq.com/pet-doctor-online";
+const CANONICAL = "https://snoutiq.com/pet-doctor-online/";
 const KEYWORDS = [
   "online vet consultation",
   "talk to vet online",

@@ -85,7 +85,8 @@ const DynamicBlogPost = () => {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
   const siteBase = "https://snoutiq.com";
-  const canonicalUrl = `${siteBase}/blog/${post.slug}`;
+  const slugWithSlash = post.slug ? (post.slug.endsWith('/') ? post.slug : `${post.slug}/`) : "";
+  const canonicalUrl = `${siteBase}/blog/${slugWithSlash}`;
   const metaTitle = post.meta_title || post.title;
   const metaDesc = post.meta_description || post.excerpt || "";
   const ogImage = post.featured_image || `${siteBase}/favicon-512.png`;

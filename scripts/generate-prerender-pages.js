@@ -22,9 +22,11 @@ let createdCount = 0;
 
 PUBLIC_ROUTES.forEach(({ path: routePath, title, description }) => {
   const cleanPath =
-    routePath.length > 1 && routePath.endsWith('/')
-      ? routePath.slice(0, -1)
-      : routePath;
+    routePath === '/'
+      ? '/'
+      : routePath.endsWith('/')
+      ? routePath
+      : `${routePath}/`;
   const canonicalUrl = `${DOMAIN}${cleanPath}`;
 
   // Insert canonical link and og:url / twitter:url into <head>
@@ -57,8 +59,8 @@ PUBLIC_ROUTES.forEach(({ path: routePath, title, description }) => {
     fs.writeFileSync(baseIndexPath, pageHtml, 'utf-8');
     createdCount++;
   } else {
-    // Relative folder under distDir: e.g. /delhi -> delhi
-    const relativeSubDir = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+    // Relative folder under distDir: e.g. /delhi/ -> delhi
+    const relativeSubDir = cleanPath.replace(/^\/+|\/+$/g, '');
     const targetDir = path.join(distDir, relativeSubDir);
     fs.mkdirSync(targetDir, { recursive: true });
     const targetFilePath = path.join(targetDir, 'index.html');

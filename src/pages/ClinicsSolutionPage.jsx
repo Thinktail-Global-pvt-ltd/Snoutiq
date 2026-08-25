@@ -189,7 +189,7 @@ const ClinicsSolutionPage = () => {
         <title>Expert Pet Clinic Consultation & Guidance for Your Pet</title>
         <meta name="description" content="Seeking expert pet health advice? SnoutIQ connects Indian pet parents with trusted clinics for consultation and guidance, ensuring informed care for your furry friend." />
         <meta name="robots" content="index,follow" />
-        <link rel="canonical" href="https://snoutiq.com/clinics-solution" />
+        <link rel="canonical" href="https://snoutiq.com/clinics-solution/" />
       </Helmet>
       <Header/>
       <Hero

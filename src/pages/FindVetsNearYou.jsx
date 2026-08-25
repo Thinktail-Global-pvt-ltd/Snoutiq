@@ -999,7 +999,7 @@ export default function FindVetsNearYou() {
       <Helmet>
         <title>{PAGE_TITLE}</title>
         <meta name="description" content={PAGE_DESCRIPTION} />
-        <link rel="canonical" href="https://snoutiq.com/find-vets-near-you" />
+        <link rel="canonical" href="https://snoutiq.com/find-vets-near-you/" />
       </Helmet>
 
       <div className="min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fafc_20%,#f8fafc_100%)]">

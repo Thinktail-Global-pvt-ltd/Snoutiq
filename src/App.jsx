@@ -11,9 +11,11 @@ import {
 const GlobalCanonical = () => {
   const { pathname } = useLocation();
   const cleanPath =
-    pathname.length > 1 && pathname.endsWith("/")
-      ? pathname.slice(0, -1)
-      : pathname;
+    pathname === "/"
+      ? "/"
+      : pathname.endsWith("/")
+      ? pathname
+      : `${pathname}/`;
   const canonicalUrl = `https://snoutiq.com${cleanPath}`;
 
   return (

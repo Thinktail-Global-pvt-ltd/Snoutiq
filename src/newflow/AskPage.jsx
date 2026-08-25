@@ -19,7 +19,7 @@ import "./AskPage.css";
 const ASK_TITLE = "Snoutiq - Is My Pet Okay? Free AI Pet Health Check";
 const ASK_DESCRIPTION =
   "Free AI pet symptom checker for Indian pet parents. Get expert triage guidance in seconds. No signup needed.";
-const ASK_CANONICAL = "https://snoutiq.com/ask";
+const ASK_CANONICAL = "https://snoutiq.com/ask/";
 const ASK_STORAGE_KEY = "snoutiq-ask-state-v1";
 const ASK_UI_STORAGE_KEY = "snoutiq-ask-ui-v1";
 const ASK_DAILY_USAGE_KEY = "snoutiq-ask-daily-usage-v1";

@@ -27,7 +27,7 @@ const TITLE =
   "Talk to a Vet Online Now | Video Call in 15 Minutes";
 const DESCRIPTION =
   "Need urgent pet advice? Talk to a licensed vet online via video call. Connect in 15 minutes. Flat \u20B9399 pricing after \u20B9100 off on the standard \u20B9499 consultation fee.";
-const CANONICAL = "https://www.snoutiq.com/talk-to-vet-online";
+const CANONICAL = "https://snoutiq.com/talk-to-vet-online/";
 const KEYWORDS = [
   "online vet consultation",
   "talk to vet online",

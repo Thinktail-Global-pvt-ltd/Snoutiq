@@ -15,7 +15,7 @@ import {
 const TITLE = "Snoutiq | Online Vet Consultation App";
 const DESCRIPTION =
   "Talk to an online veterinarian in minutes. Video consultation for dogs, cats, birds, and exotic pets. First call free. Download Snoutiq today!";
-const CANONICAL = "https://www.snoutiq.com/online-vet-consultation-app";
+const CANONICAL = "https://snoutiq.com/online-vet-consultation-app/";
 const APP_DOWNLOAD_URL =
   "https://play.google.com/store/apps/details?id=com.petai.snoutiq";
 const DOCTOR_LIST_ENDPOINT = "/api/exported_from_excell_doctors";
