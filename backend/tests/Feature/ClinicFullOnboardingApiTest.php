@@ -47,6 +47,9 @@ class ClinicFullOnboardingApiTest extends TestCase
             $table->timestamp('claimed_at')->nullable();
             $table->decimal('clinic_day_fee', 10, 2)->nullable();
             $table->decimal('clinic_night_fee', 10, 2)->nullable();
+            $table->decimal('lat', 10, 7)->nullable();
+            $table->decimal('lng', 10, 7)->nullable();
+            $table->json('coordinates')->nullable();
             $table->timestamps();
         });
 
@@ -631,6 +634,52 @@ class ClinicFullOnboardingApiTest extends TestCase
         $response->assertJsonPath('success', true);
         $response->assertJsonPath('data.pet_parent_notification.sent', false);
         $response->assertJsonPath('data.pet_parent_notification.reason', 'Skipped notification because test parameter is set to 1.');
+    }
+
+    public function test_auto_resolves_coordinates_from_city_or_pincode_if_missing(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1,
+            'name' => 'Default Admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('geo_pincodes')->insert([
+            'pincode' => '110001',
+            'lat' => 28.6139,
+            'lon' => 77.2090,
+            'city' => 'New Delhi',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/vet-registerations/store-full', [
+            'name' => 'Auto Coordinates Clinic',
+            'email' => 'autocoords@example.com',
+            'mobile' => '9876543210',
+            'city' => 'New Delhi',
+            'pincode' => '110001',
+            'test' => 1,
+            'doctors' => [
+                [
+                    'doctor_name' => 'Dr. Auto Coords',
+                    'doctor_email' => 'autocoordsdoctor@example.com',
+                    'doctor_mobile' => '9876543211',
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('success', true);
+        $clinicId = $response->json('data.clinic.id');
+
+        $clinic = DB::table('vet_registerations_temp')->where('id', $clinicId)->first();
+        $this->assertNotNull($clinic);
+        $this->assertEquals(28.6139, (float) $clinic->lat);
+        $this->assertEquals(77.2090, (float) $clinic->lng);
+        $this->assertEquals(json_encode([28.6139, 77.2090]), $clinic->coordinates);
     }
 }
 

@@ -14,6 +14,7 @@ use App\Services\ClinicProfileCompletionService;
 use App\Services\Push\FcmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -334,7 +335,11 @@ class ClinicFullOnboardingController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'city' => ['required', 'string', 'max:255'],
             'pincode' => ['required', 'string', 'max:20'],
-            'coordinates' => ['nullable', 'array'],
+            'coordinates' => ['nullable'],
+            'lat' => ['nullable', 'numeric'],
+            'lng' => ['nullable', 'numeric'],
+            'latitude' => ['nullable', 'numeric'],
+            'longitude' => ['nullable', 'numeric'],
             'address' => ['nullable', 'string'],
             'bio' => ['nullable', 'string'],
             'password' => ['nullable', 'string', 'min:6'],
@@ -684,6 +689,8 @@ class ClinicFullOnboardingController extends Controller
             'city',
             'pincode',
             'coordinates',
+            'lat',
+            'lng',
             'address',
             'bio',
             'password',
@@ -700,9 +707,7 @@ class ClinicFullOnboardingController extends Controller
         $clinicData['draft_expires_at'] = null;
         $clinicData['claimed_at'] = now();
 
-        if (isset($clinicData['coordinates'])) {
-            $clinicData['coordinates'] = json_encode($clinicData['coordinates']);
-        }
+        $this->resolveClinicCoordinates($request, $clinicData);
 
         foreach (['clinic_image', 'clinic_video'] as $field) {
             if (! Schema::hasColumn('vet_registerations_temp', $field)) {
@@ -722,6 +727,116 @@ class ClinicFullOnboardingController extends Controller
         }
 
         return $clinic;
+    }
+
+    private function resolveClinicCoordinates(Request $request, array &$clinicData): void
+    {
+        $lat = null;
+        $lng = null;
+
+        // 1. Explicit lat/lng or latitude/longitude input
+        $inputLat = $request->input('lat') ?? $request->input('latitude') ?? ($clinicData['lat'] ?? null);
+        $inputLng = $request->input('lng') ?? $request->input('longitude') ?? ($clinicData['lng'] ?? null);
+        if (is_numeric($inputLat) && is_numeric($inputLng)) {
+            $lat = (float) $inputLat;
+            $lng = (float) $inputLng;
+        }
+
+        // 2. Explicit coordinates array/JSON input
+        if (($lat === null || $lng === null) && ! empty($clinicData['coordinates'])) {
+            $coords = $clinicData['coordinates'];
+            if (is_string($coords)) {
+                $decoded = json_decode($coords, true);
+                if (is_array($decoded)) {
+                    $coords = $decoded;
+                }
+            }
+            if (is_array($coords)) {
+                $cLat = $coords[0] ?? $coords['lat'] ?? $coords['latitude'] ?? null;
+                $cLng = $coords[1] ?? $coords['lng'] ?? $coords['longitude'] ?? null;
+                if (is_numeric($cLat) && is_numeric($cLng)) {
+                    $lat = (float) $cLat;
+                    $lng = (float) $cLng;
+                }
+            }
+        }
+
+        // 3. Fallback: Lookup lat/lng from geo_pincodes table using pincode or city
+        if (($lat === null || $lng === null) && Schema::hasTable('geo_pincodes')) {
+            $pincode = trim((string) ($clinicData['pincode'] ?? ''));
+            $city = trim((string) ($clinicData['city'] ?? ''));
+
+            $geoRow = null;
+            if ($pincode !== '') {
+                $geoRow = DB::table('geo_pincodes')
+                    ->where('pincode', $pincode)
+                    ->whereNotNull('lat')
+                    ->whereNotNull('lon')
+                    ->first(['lat', 'lon']);
+            }
+
+            if (! $geoRow && $city !== '') {
+                $geoRow = DB::table('geo_pincodes')
+                    ->where('city', $city)
+                    ->whereNotNull('lat')
+                    ->whereNotNull('lon')
+                    ->first(['lat', 'lon']);
+            }
+
+            if ($geoRow && is_numeric($geoRow->lat) && is_numeric($geoRow->lon)) {
+                $lat = (float) $geoRow->lat;
+                $lng = (float) $geoRow->lon;
+            }
+        }
+
+        // 4. Fallback: Google Geocoding API if API key is configured
+        if ($lat === null || $lng === null) {
+            $apiKey = env('GOOGLE_MAPS_API_KEY') ?: env('GOOGLE_API_KEY');
+            $addressStr = trim((string) ($clinicData['address'] ?? ''));
+            $cityStr = trim((string) ($clinicData['city'] ?? ''));
+            $pincodeStr = trim((string) ($clinicData['pincode'] ?? ''));
+            $queryLocation = implode(', ', array_filter([$addressStr, $cityStr, $pincodeStr, 'India']));
+
+            if ($apiKey && $queryLocation !== '') {
+                try {
+                    $response = Http::timeout(3)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                        'address' => $queryLocation,
+                        'key' => $apiKey,
+                    ]);
+                    if ($response->successful()) {
+                        $geoJson = $response->json();
+                        $location = $geoJson['results'][0]['geometry']['location'] ?? null;
+                        if ($location && is_numeric($location['lat']) && is_numeric($location['lng'])) {
+                            $lat = (float) $location['lat'];
+                            $lng = (float) $location['lng'];
+                        }
+                    }
+                } catch (Throwable $e) {
+                    // Ignore network errors gracefully
+                }
+            }
+        }
+
+        // Assign resolved lat, lng, and coordinates JSON string to clinicData
+        if ($lat !== null && $lng !== null) {
+            if (Schema::hasColumn('vet_registerations_temp', 'lat')) {
+                $clinicData['lat'] = $lat;
+            }
+            if (Schema::hasColumn('vet_registerations_temp', 'lng')) {
+                $clinicData['lng'] = $lng;
+            }
+            if (Schema::hasColumn('vet_registerations_temp', 'coordinates')) {
+                $clinicData['coordinates'] = json_encode([$lat, $lng]);
+            }
+        } elseif (isset($clinicData['coordinates'])) {
+            if (Schema::hasColumn('vet_registerations_temp', 'coordinates')) {
+                if (is_array($clinicData['coordinates'])) {
+                    $clinicData['coordinates'] = json_encode($clinicData['coordinates']);
+                }
+            } else {
+                unset($clinicData['coordinates']);
+            }
+        }
     }
 
     private function createDoctors(Request $request, VetRegisterationTemp $clinic, array $doctorRows)
