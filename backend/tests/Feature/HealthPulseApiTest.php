@@ -536,6 +536,149 @@ class HealthPulseApiTest extends TestCase
         ]);
     }
 
+    public function test_store_entry_with_quick_check_status_fine_sets_default_signals(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::sequence()
+                ->push($this->geminiJson([
+                    'short_summary' => 'Care update done for Sheriff.',
+                    'pattern_observation' => 'Today looks steady.',
+                    'flag_level' => 'None',
+                    'recommended_action' => 'Keep tracking changes.',
+                ])),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 1436,
+            'name' => 'Pet Parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1318,
+            'user_id' => 1436,
+            'name' => 'Sheriff',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v1/pulse/entry', [
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'entry_date' => '2026-06-01',
+            'quick_check_status' => 'fine',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.quick_check_status', 'fine')
+            ->assertJsonPath('data.food', 'good')
+            ->assertJsonPath('data.energy', 'normal')
+            ->assertJsonPath('data.water', 'normal')
+            ->assertJsonPath('data.digestion_issue', false)
+            ->assertJsonPath('data.symptoms', null)
+            ->assertJsonPath('data.is_complete', true);
+
+        $this->assertDatabaseHas('health_pulse_entries', [
+            'pet_id' => 1318,
+            'quick_check_status' => 'fine',
+            'food' => 'good',
+            'energy' => 'normal',
+            'water' => 'normal',
+        ]);
+    }
+
+    public function test_store_entry_with_quick_check_status_something_off_stores_symptoms(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::sequence()
+                ->push($this->geminiJson([
+                    'short_summary' => 'Care update done for Sheriff.',
+                    'pattern_observation' => 'Something off noticed by owner.',
+                    'flag_level' => 'Watch',
+                    'recommended_action' => 'Keep tracking changes.',
+                ])),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => 1436,
+            'name' => 'Pet Parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1318,
+            'user_id' => 1436,
+            'name' => 'Sheriff',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v1/pulse/entry', [
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'entry_date' => '2026-06-01',
+            'status' => 'something_off',
+            'symptoms' => 'User noticed something off',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.quick_check_status', 'something_off')
+            ->assertJsonPath('data.symptoms', 'User noticed something off')
+            ->assertJsonPath('data.is_complete', true);
+
+        $this->assertDatabaseHas('health_pulse_entries', [
+            'pet_id' => 1318,
+            'quick_check_status' => 'something_off',
+            'symptoms' => 'User noticed something off',
+        ]);
+    }
+
+    public function test_today_api_returns_quick_check_status_and_created_at(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1436,
+            'name' => 'Pet Parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 1318,
+            'user_id' => 1436,
+            'name' => 'Sheriff',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $today = \Carbon\Carbon::today()->toDateString();
+
+        DB::table('health_pulse_entries')->insert([
+            'id' => 50,
+            'user_id' => 1436,
+            'pet_id' => 1318,
+            'entry_date' => $today,
+            'quick_check_status' => 'fine',
+            'food' => 'good',
+            'energy' => 'normal',
+            'water' => 'normal',
+            'digestion_issue' => false,
+            'created_at' => '2026-06-01 12:34:56',
+            'updated_at' => '2026-06-01 12:34:56',
+        ]);
+
+        $response = $this->getJson('/api/v1/pulse/today/1318?user_id=1436');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.completed', true)
+            ->assertJsonPath('data.entry.quick_check_status', 'fine')
+            ->assertJsonPath('data.entry.created_at', '2026-06-01 12:34:56');
+    }
+
     private function geminiJson(array $payload): array
     {
         return [
@@ -551,6 +694,7 @@ class HealthPulseApiTest extends TestCase
 
     private function resetSchema(): void
     {
+        Schema::dropIfExists('device_tokens');
         Schema::dropIfExists('health_pulse_symptom_analyses');
         Schema::dropIfExists('health_pulse_entries');
         Schema::dropIfExists('pets');
@@ -562,6 +706,13 @@ class HealthPulseApiTest extends TestCase
         Schema::create('users', function (Blueprint $table) {
             $table->unsignedBigInteger('id')->primary();
             $table->string('name')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('device_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('token')->nullable();
             $table->timestamps();
         });
 
@@ -577,6 +728,7 @@ class HealthPulseApiTest extends TestCase
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('pet_id');
             $table->date('entry_date');
+            $table->string('quick_check_status', 40)->nullable();
             $table->string('food', 40)->nullable();
             $table->string('energy', 40)->nullable();
             $table->string('water', 40)->nullable();

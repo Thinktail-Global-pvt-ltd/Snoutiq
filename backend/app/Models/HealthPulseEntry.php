@@ -12,6 +12,7 @@ class HealthPulseEntry extends Model
         'user_id',
         'pet_id',
         'entry_date',
+        'quick_check_status',
         'food',
         'energy',
         'water',

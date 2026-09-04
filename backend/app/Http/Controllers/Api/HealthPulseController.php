@@ -28,15 +28,33 @@ class HealthPulseController extends Controller
         $pet = $this->resolvePet((int) $payload['pet_id'], isset($payload['user_id']) ? (int) $payload['user_id'] : null);
         $entryDate = $this->dateString($payload['entry_date'] ?? $payload['care_date'] ?? null);
 
+        $quickCheckStatus = $this->firstPayloadValue($payload, ['quick_check_status', 'status']);
+        $quickCheckStatus = $quickCheckStatus !== null ? trim((string) $quickCheckStatus) : null;
+
+        $foodVal = $this->firstPayloadValue($payload, ['food', 'appetite', 'food_intake']);
+        $energyVal = $this->firstPayloadValue($payload, ['energy', 'energy_level']);
+        $waterVal = $this->firstPayloadValue($payload, ['water', 'water_intake']);
+        $digestionVal = $this->firstPayloadValue($payload, ['digestion_issue', 'digestion', 'poop_issue']);
+
+        if ($quickCheckStatus === 'fine') {
+            $foodVal = $foodVal ?? 'good';
+            $energyVal = $energyVal ?? 'normal';
+            $waterVal = $waterVal ?? 'normal';
+            if ($digestionVal === null || $digestionVal === '') {
+                $digestionVal = false;
+            }
+        }
+
         $entry = HealthPulseEntry::query()->updateOrCreate(
             ['pet_id' => $pet->id, 'entry_date' => $entryDate],
             [
                 'user_id' => $pet->user_id,
-                'food' => $this->normalizeSignal($this->firstPayloadValue($payload, ['food', 'appetite', 'food_intake'])),
-                'energy' => $this->normalizeSignal($this->firstPayloadValue($payload, ['energy', 'energy_level'])),
-                'water' => $this->normalizeSignal($this->firstPayloadValue($payload, ['water', 'water_intake'])),
+                'quick_check_status' => $quickCheckStatus,
+                'food' => $this->normalizeSignal($foodVal),
+                'energy' => $this->normalizeSignal($energyVal),
+                'water' => $this->normalizeSignal($waterVal),
                 'symptoms' => $this->optionalText($payload['symptoms'] ?? null),
-                'digestion_issue' => $this->normalizeOptionalBool($this->firstPayloadValue($payload, ['digestion_issue', 'digestion', 'poop_issue'])),
+                'digestion_issue' => $this->normalizeOptionalBool($digestionVal),
                 'digestion_note' => $this->optionalText($payload['digestion_note'] ?? $payload['poop_note'] ?? null),
             ]
         );
@@ -208,6 +226,10 @@ class HealthPulseController extends Controller
     private function validatePulsePayload(Request $request): array
     {
         $payload = $request->all();
+        if (!isset($payload['quick_check_status']) && isset($payload['status'])) {
+            $payload['quick_check_status'] = $payload['status'];
+        }
+
         foreach (['food' => ['appetite', 'food_intake'], 'energy' => ['energy_level'], 'water' => ['water_intake']] as $target => $aliases) {
             if (!isset($payload[$target])) {
                 foreach ($aliases as $alias) {
@@ -224,6 +246,8 @@ class HealthPulseController extends Controller
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'entry_date' => ['nullable', 'date'],
             'care_date' => ['nullable', 'date'],
+            'quick_check_status' => ['nullable', 'string', 'max:40'],
+            'status' => ['nullable', 'string', 'max:40'],
             'food' => ['nullable', 'string', 'max:40'],
             'appetite' => ['nullable', 'string', 'max:40'],
             'food_intake' => ['nullable', 'string', 'max:40'],
@@ -361,6 +385,7 @@ class HealthPulseController extends Controller
             'user_id' => (int) $entry->user_id,
             'pet_id' => (int) $entry->pet_id,
             'entry_date' => $entry->entry_date?->toDateString(),
+            'quick_check_status' => $entry->quick_check_status,
             'food' => $entry->food,
             'energy' => $entry->energy,
             'water' => $entry->water,
@@ -368,6 +393,8 @@ class HealthPulseController extends Controller
             'digestion_issue' => $entry->digestion_issue,
             'digestion_note' => $entry->digestion_note,
             'is_complete' => $this->isCompleteEntry($entry),
+            'created_at' => $entry->created_at?->toDateTimeString(),
+            'updated_at' => $entry->updated_at?->toDateTimeString(),
             'ai' => [
                 'short_summary' => $entry->ai_short_summary,
                 'pattern_observation' => $entry->ai_pattern_observation,
@@ -476,6 +503,10 @@ class HealthPulseController extends Controller
 
     private function isCompleteEntry(HealthPulseEntry $entry): bool
     {
+        if ($entry->quick_check_status !== null && $entry->quick_check_status !== '') {
+            return true;
+        }
+
         return $this->hasSignal($entry->food)
             && $this->hasSignal($entry->energy)
             && $this->hasSignal($entry->water)
