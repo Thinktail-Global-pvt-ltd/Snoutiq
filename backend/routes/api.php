@@ -1167,8 +1167,17 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
     $nowIst = \Illuminate\Support\Carbon::now('Asia/Kolkata');
     $currentDayOfWeek = (int) $nowIst->dayOfWeek;
 
+    $userId = $request->query('user_id');
     $lat = $request->filled('lat') ? (float) $request->input('lat') : ($request->filled('latitude') ? (float) $request->input('latitude') : null);
     $lng = $request->filled('lng') ? (float) $request->input('lng') : ($request->filled('longitude') ? (float) $request->input('longitude') : null);
+
+    if ($lat === null && $lng === null && $userId) {
+        $user = DB::table('users')->select('latitude', 'longitude')->where('id', $userId)->first();
+        if ($user) {
+            $lat = $user->latitude !== null ? (float) $user->latitude : null;
+            $lng = $user->longitude !== null ? (float) $user->longitude : null;
+        }
+    }
 
     $availableDoctorIds = collect([$alwaysAvailableDoctorId]);
 
@@ -1224,6 +1233,10 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
         $item['clinic_address'] = null;
         $item['clinic_lat'] = null;
         $item['clinic_lng'] = null;
+        $item['clinic_coordinates'] = null;
+        $item['lat'] = null;
+        $item['lng'] = null;
+        $item['coordinates'] = null;
         $item['google_rating'] = null;
         $item['google_user_ratings_total'] = null;
         $item['distance_km'] = null;
@@ -1240,8 +1253,114 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
 
             $item['clinic_name'] = $clinic->name;
             $item['clinic_address'] = $clinic->address;
-            $item['clinic_lat'] = $clinic->lat !== null ? (float) $clinic->lat : null;
-            $item['clinic_lng'] = $clinic->lng !== null ? (float) $clinic->lng : null;
+
+            // Resolve clinic latitude & longitude dynamically if missing on clinic record
+            $clinicLat = $clinic->lat !== null ? (float) $clinic->lat : null;
+            $clinicLng = $clinic->lng !== null ? (float) $clinic->lng : null;
+
+            if (($clinicLat === null || $clinicLng === null) && ! empty($clinic->coordinates)) {
+                $coords = $clinic->coordinates;
+                if (is_string($coords)) {
+                    $decoded = json_decode($coords, true);
+                    if (is_array($decoded)) {
+                        $coords = $decoded;
+                    }
+                }
+                if (is_array($coords)) {
+                    $cLat = $coords[0] ?? $coords['lat'] ?? $coords['latitude'] ?? null;
+                    $cLng = $coords[1] ?? $coords['lng'] ?? $coords['longitude'] ?? null;
+                    if (is_numeric($cLat) && is_numeric($cLng)) {
+                        $clinicLat = (float) $cLat;
+                        $clinicLng = (float) $cLng;
+                    }
+                }
+            }
+
+            if ($clinicLat === null || $clinicLng === null) {
+                $pincode = trim((string) ($clinic->pincode ?? ''));
+                $city = trim((string) ($clinic->city ?? ''));
+
+                $geoRow = null;
+                if (Schema::hasTable('geo_pincodes')) {
+                    if ($pincode !== '') {
+                        $geoRow = DB::table('geo_pincodes')
+                            ->where('pincode', $pincode)
+                            ->whereNotNull('lat')
+                            ->whereNotNull('lon')
+                            ->first(['lat', 'lon']);
+                    }
+                    if (! $geoRow && $city !== '') {
+                        $geoRow = DB::table('geo_pincodes')
+                            ->where('city', $city)
+                            ->whereNotNull('lat')
+                            ->whereNotNull('lon')
+                            ->first(['lat', 'lon']);
+                    }
+                }
+
+                if ($geoRow && is_numeric($geoRow->lat ?? null) && is_numeric($geoRow->lon ?? null)) {
+                    $clinicLat = (float) $geoRow->lat;
+                    $clinicLng = (float) $geoRow->lon;
+                }
+            }
+
+            if ($clinicLat === null || $clinicLng === null) {
+                $apiKey = env('GOOGLE_MAPS_API_KEY') ?: env('GOOGLE_API_KEY');
+                $addressStr = trim((string) ($clinic->address ?? ''));
+                $cityStr = trim((string) ($clinic->city ?? ''));
+                $pincodeStr = trim((string) ($clinic->pincode ?? ''));
+                $queryLocation = implode(', ', array_filter([$addressStr, $cityStr, $pincodeStr, 'India']));
+
+                if ($apiKey && $queryLocation !== '') {
+                    try {
+                        $response = Http::timeout(3)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                            'address' => $queryLocation,
+                            'key' => $apiKey,
+                        ]);
+                        if ($response->successful()) {
+                            $geoJson = $response->json();
+                            $location = $geoJson['results'][0]['geometry']['location'] ?? null;
+                            if ($location && is_numeric($location['lat']) && is_numeric($location['lng'])) {
+                                $clinicLat = (float) $location['lat'];
+                                $clinicLng = (float) $location['lng'];
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        // Ignore network errors gracefully
+                    }
+                }
+            }
+
+            // Cache resolved coordinates to DB if missing
+            if ($clinicLat !== null && $clinicLng !== null) {
+                $shouldSave = false;
+                if (empty($clinic->lat) && Schema::hasColumn('vet_registerations_temp', 'lat')) {
+                    $clinic->lat = $clinicLat;
+                    $shouldSave = true;
+                }
+                if (empty($clinic->lng) && Schema::hasColumn('vet_registerations_temp', 'lng')) {
+                    $clinic->lng = $clinicLng;
+                    $shouldSave = true;
+                }
+                if (empty($clinic->coordinates) && Schema::hasColumn('vet_registerations_temp', 'coordinates')) {
+                    $clinic->coordinates = json_encode([$clinicLat, $clinicLng]);
+                    $shouldSave = true;
+                }
+                if ($shouldSave) {
+                    try {
+                        $clinic->save();
+                    } catch (\Throwable $e) {
+                        // Ignore save errors
+                    }
+                }
+            }
+
+            $item['clinic_lat'] = $clinicLat;
+            $item['clinic_lng'] = $clinicLng;
+            $item['clinic_coordinates'] = $clinicLat !== null && $clinicLng !== null ? [$clinicLat, $clinicLng] : null;
+            $item['lat'] = $clinicLat;
+            $item['lng'] = $clinicLng;
+            $item['coordinates'] = $clinicLat !== null && $clinicLng !== null ? [$clinicLat, $clinicLng] : null;
 
             $rating = $clinic->rating !== null ? (float) $clinic->rating : null;
             $ratingsCount = $clinic->user_ratings_total !== null ? (int) $clinic->user_ratings_total : null;
@@ -1262,10 +1381,12 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
                         if (empty($clinic->lat) && !empty($found['lat'])) {
                             $clinic->lat = $found['lat'];
                             $item['clinic_lat'] = (float) $found['lat'];
+                            $item['lat'] = (float) $found['lat'];
                         }
                         if (empty($clinic->lng) && !empty($found['lng'])) {
                             $clinic->lng = $found['lng'];
                             $item['clinic_lng'] = (float) $found['lng'];
+                            $item['lng'] = (float) $found['lng'];
                         }
                         $clinic->save();
                     }
@@ -1304,12 +1425,12 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
             $item['google_rating'] = $rating;
             $item['google_user_ratings_total'] = $ratingsCount;
 
-            if ($lat !== null && $lng !== null && $clinic->lat !== null && $clinic->lng !== null) {
+            if ($lat !== null && $lng !== null && $clinicLat !== null && $clinicLng !== null) {
                 $earthRadius = 6371.0;
-                $dLat = deg2rad((float)$clinic->lat - $lat);
-                $dLon = deg2rad((float)$clinic->lng - $lng);
+                $dLat = deg2rad($clinicLat - $lat);
+                $dLon = deg2rad($clinicLng - $lng);
                 $a = sin($dLat / 2) * sin($dLat / 2) +
-                     cos(deg2rad($lat)) * cos(deg2rad((float)$clinic->lat)) *
+                     cos(deg2rad($lat)) * cos(deg2rad($clinicLat)) *
                      sin($dLon / 2) * sin($dLon / 2);
                 $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
                 $item['distance_km'] = round($earthRadius * $c, 2);
