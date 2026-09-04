@@ -957,18 +957,6 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
                 if ($found) {
                     $rating = $found['rating'];
                     $ratingsCount = $found['user_ratings_total'];
-
-                    // Save cache to database
-                    $clinic->place_id = $found['place_id'];
-                    $clinic->rating = $rating;
-                    $clinic->user_ratings_total = $ratingsCount;
-                    if (empty($clinic->lat) && !empty($found['lat'])) {
-                        $clinic->lat = $found['lat'];
-                    }
-                    if (empty($clinic->lng) && !empty($found['lng'])) {
-                        $clinic->lng = $found['lng'];
-                    }
-                    $clinic->save();
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::error('google_places_text_search_failed_for_inclinic_lists_new', [
@@ -979,7 +967,7 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             }
         }
 
-        // If rating is missing but we have a place_id, query Google Places and cache in DB
+        // If rating is missing but we have a place_id, query Google Places
         if ($rating === null && !empty($clinic->place_id)) {
             try {
                 $placesService = app(\App\Services\GooglePlacesLookupService::class);
@@ -987,11 +975,6 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
                 if (!empty($details['success']) && isset($details['place']['rating'])) {
                     $rating = (float) $details['place']['rating'];
                     $ratingsCount = isset($details['place']['user_ratings_total']) ? (int) $details['place']['user_ratings_total'] : 0;
-
-                    // Save cache to database
-                    $clinic->rating = $rating;
-                    $clinic->user_ratings_total = $ratingsCount;
-                    $clinic->save();
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::error('google_rating_fetch_failed_for_inclinic_lists_new', [
@@ -1049,6 +1032,12 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
         ];
     });
     
+    if ($userLat !== null && $userLng !== null) {
+        $summary = $summary->sortBy(function ($item) {
+            return $item['distance_km'] === null ? INF : $item['distance_km'];
+        })->values();
+    }
+
     return response()->json([
         'success' => true,
         'from_date' => $fromDate,
@@ -1331,30 +1320,6 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
                 }
             }
 
-            // Cache resolved coordinates to DB if missing
-            if ($clinicLat !== null && $clinicLng !== null) {
-                $shouldSave = false;
-                if (empty($clinic->lat) && Schema::hasColumn('vet_registerations_temp', 'lat')) {
-                    $clinic->lat = $clinicLat;
-                    $shouldSave = true;
-                }
-                if (empty($clinic->lng) && Schema::hasColumn('vet_registerations_temp', 'lng')) {
-                    $clinic->lng = $clinicLng;
-                    $shouldSave = true;
-                }
-                if (empty($clinic->coordinates) && Schema::hasColumn('vet_registerations_temp', 'coordinates')) {
-                    $clinic->coordinates = json_encode([$clinicLat, $clinicLng]);
-                    $shouldSave = true;
-                }
-                if ($shouldSave) {
-                    try {
-                        $clinic->save();
-                    } catch (\Throwable $e) {
-                        // Ignore save errors
-                    }
-                }
-            }
-
             $item['clinic_lat'] = $clinicLat;
             $item['clinic_lng'] = $clinicLng;
             $item['clinic_coordinates'] = $clinicLat !== null && $clinicLng !== null ? [$clinicLat, $clinicLng] : null;
@@ -1373,22 +1338,16 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
                     if ($found) {
                         $rating = $found['rating'];
                         $ratingsCount = $found['user_ratings_total'];
-
-                        // Save cache to database
-                        $clinic->place_id = $found['place_id'];
-                        $clinic->rating = $rating;
-                        $clinic->user_ratings_total = $ratingsCount;
-                        if (empty($clinic->lat) && !empty($found['lat'])) {
-                            $clinic->lat = $found['lat'];
+                        if (empty($clinicLat) && !empty($found['lat'])) {
+                            $clinicLat = (float) $found['lat'];
                             $item['clinic_lat'] = (float) $found['lat'];
                             $item['lat'] = (float) $found['lat'];
                         }
-                        if (empty($clinic->lng) && !empty($found['lng'])) {
-                            $clinic->lng = $found['lng'];
+                        if (empty($clinicLng) && !empty($found['lng'])) {
+                            $clinicLng = (float) $found['lng'];
                             $item['clinic_lng'] = (float) $found['lng'];
                             $item['lng'] = (float) $found['lng'];
                         }
-                        $clinic->save();
                     }
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::error('google_places_text_search_failed_for_excell_doctor', [
@@ -1399,7 +1358,7 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
                 }
             }
 
-            // If rating is missing but we have a place_id, query Google Places and cache in DB
+            // If rating is missing but we have a place_id, query Google Places
             if ($rating === null && !empty($clinic->place_id)) {
                 try {
                     $placesService = app(\App\Services\GooglePlacesLookupService::class);
@@ -1407,11 +1366,6 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
                     if (!empty($details['success']) && isset($details['place']['rating'])) {
                         $rating = (float) $details['place']['rating'];
                         $ratingsCount = isset($details['place']['user_ratings_total']) ? (int) $details['place']['user_ratings_total'] : 0;
-
-                        // Save cache to database
-                        $clinic->rating = $rating;
-                        $clinic->user_ratings_total = $ratingsCount;
-                        $clinic->save();
                     }
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::error('google_rating_fetch_failed_for_excell_doctor', [
