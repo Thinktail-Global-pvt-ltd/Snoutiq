@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 // use App
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AiSearchController;
@@ -828,19 +829,121 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             ? route('clinics.media.video', ['clinic' => $clinic->id], true)
             : null;
 
-        $distance = null;
-        $pincode = $clinic->pincode;
-        if ($pincode && $geo = $geoPincodes->get($pincode)) {
-            if ($userLat !== null && $userLng !== null && $geo->lat !== null && $geo->lon !== null) {
-                $lat1 = deg2rad($userLat);
-                $lon1 = deg2rad($userLng);
-                $lat2 = deg2rad((float) $geo->lat);
-                $lon2 = deg2rad((float) $geo->lon);
-                
-                $val = cos($lat1) * cos($lat2) * cos($lon2 - $lon1) + sin($lat1) * sin($lat2);
-                $val = min(1.0, max(-1.0, $val));
-                $distance = round(6371 * acos($val), 2);
+        // Resolve clinic latitude & longitude dynamically if missing
+        $clinicLat = $clinic->lat !== null ? (float) $clinic->lat : null;
+        $clinicLng = $clinic->lng !== null ? (float) $clinic->lng : null;
+
+        if (($clinicLat === null || $clinicLng === null) && ! empty($clinic->coordinates)) {
+            $coords = $clinic->coordinates;
+            if (is_string($coords)) {
+                $decoded = json_decode($coords, true);
+                if (is_array($decoded)) {
+                    $coords = $decoded;
+                }
             }
+            if (is_array($coords)) {
+                $cLat = $coords[0] ?? $coords['lat'] ?? $coords['latitude'] ?? null;
+                $cLng = $coords[1] ?? $coords['lng'] ?? $coords['longitude'] ?? null;
+                if (is_numeric($cLat) && is_numeric($cLng)) {
+                    $clinicLat = (float) $cLat;
+                    $clinicLng = (float) $cLng;
+                }
+            }
+        }
+
+        if ($clinicLat === null || $clinicLng === null) {
+            $pincode = trim((string) ($clinic->pincode ?? ''));
+            $city = trim((string) ($clinic->city ?? ''));
+
+            $geoRow = null;
+            if ($pincode !== '' && $geoPincodes->has($pincode)) {
+                $geoRow = $geoPincodes->get($pincode);
+            }
+
+            if (! $geoRow && Schema::hasTable('geo_pincodes')) {
+                if ($pincode !== '') {
+                    $geoRow = DB::table('geo_pincodes')
+                        ->where('pincode', $pincode)
+                        ->whereNotNull('lat')
+                        ->whereNotNull('lon')
+                        ->first(['lat', 'lon']);
+                }
+                if (! $geoRow && $city !== '') {
+                    $geoRow = DB::table('geo_pincodes')
+                        ->where('city', $city)
+                        ->whereNotNull('lat')
+                        ->whereNotNull('lon')
+                        ->first(['lat', 'lon']);
+                }
+            }
+
+            if ($geoRow && is_numeric($geoRow->lat ?? null) && is_numeric($geoRow->lon ?? null)) {
+                $clinicLat = (float) $geoRow->lat;
+                $clinicLng = (float) $geoRow->lon;
+            }
+        }
+
+        if ($clinicLat === null || $clinicLng === null) {
+            $apiKey = env('GOOGLE_MAPS_API_KEY') ?: env('GOOGLE_API_KEY');
+            $addressStr = trim((string) ($clinic->address ?? ''));
+            $cityStr = trim((string) ($clinic->city ?? ''));
+            $pincodeStr = trim((string) ($clinic->pincode ?? ''));
+            $queryLocation = implode(', ', array_filter([$addressStr, $cityStr, $pincodeStr, 'India']));
+
+            if ($apiKey && $queryLocation !== '') {
+                try {
+                    $response = Http::timeout(3)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                        'address' => $queryLocation,
+                        'key' => $apiKey,
+                    ]);
+                    if ($response->successful()) {
+                        $geoJson = $response->json();
+                        $location = $geoJson['results'][0]['geometry']['location'] ?? null;
+                        if ($location && is_numeric($location['lat']) && is_numeric($location['lng'])) {
+                            $clinicLat = (float) $location['lat'];
+                            $clinicLng = (float) $location['lng'];
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore network errors gracefully
+                }
+            }
+        }
+
+        // Cache resolved coordinates to DB if missing
+        if ($clinicLat !== null && $clinicLng !== null) {
+            $shouldSave = false;
+            if (empty($clinic->lat) && Schema::hasColumn('vet_registerations_temp', 'lat')) {
+                $clinic->lat = $clinicLat;
+                $shouldSave = true;
+            }
+            if (empty($clinic->lng) && Schema::hasColumn('vet_registerations_temp', 'lng')) {
+                $clinic->lng = $clinicLng;
+                $shouldSave = true;
+            }
+            if (empty($clinic->coordinates) && Schema::hasColumn('vet_registerations_temp', 'coordinates')) {
+                $clinic->coordinates = json_encode([$clinicLat, $clinicLng]);
+                $shouldSave = true;
+            }
+            if ($shouldSave) {
+                try {
+                    $clinic->save();
+                } catch (\Throwable $e) {
+                    // Ignore save errors
+                }
+            }
+        }
+
+        $distance = null;
+        if ($userLat !== null && $userLng !== null && $clinicLat !== null && $clinicLng !== null) {
+            $lat1 = deg2rad($userLat);
+            $lon1 = deg2rad($userLng);
+            $lat2 = deg2rad($clinicLat);
+            $lon2 = deg2rad($clinicLng);
+
+            $val = cos($lat1) * cos($lat2) * cos($lon2 - $lon1) + sin($lat1) * sin($lat2);
+            $val = min(1.0, max(-1.0, $val));
+            $distance = round(6371 * acos($val), 2);
         }
 
         $rating = $clinic->rating !== null ? (float) $clinic->rating : null;
@@ -904,6 +1007,9 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
             'name' => $clinic->name ?? 'Unnamed Clinic',
             'city' => $clinic->city ?? '—',
             'pincode' => $clinic->pincode ?? null,
+            'lat' => $clinicLat,
+            'lng' => $clinicLng,
+            'coordinates' => $clinicLat !== null && $clinicLng !== null ? [$clinicLat, $clinicLng] : null,
             'distance_km' => $distance,
             'google_rating' => $rating,
             'google_user_ratings_total' => $ratingsCount,
