@@ -3271,7 +3271,7 @@ Route::get('/users/last-vet-details', function (Request $request) {
         'user_id' => ['required', 'integer'],
     ]);
 
-    $user = User::query()->select('id', 'last_vet_id')->find($payload['user_id']);
+    $user = User::query()->find($payload['user_id']);
     if (!$user) {
         return response()->json([
             'success' => false,
@@ -3305,6 +3305,119 @@ Route::get('/users/last-vet-details', function (Request $request) {
         ]);
     }
 
+    $userLat = isset($user->latitude) && is_numeric($user->latitude) ? (float) $user->latitude : null;
+    $userLng = isset($user->longitude) && is_numeric($user->longitude) ? (float) $user->longitude : null;
+
+    $clinicLat = $clinic->lat !== null ? (float) $clinic->lat : null;
+    $clinicLng = $clinic->lng !== null ? (float) $clinic->lng : null;
+
+    if (($clinicLat === null || $clinicLng === null) && !empty($clinic->coordinates)) {
+        $coords = $clinic->coordinates;
+        if (is_string($coords)) {
+            $decoded = json_decode($coords, true);
+            if (is_array($decoded)) {
+                $coords = $decoded;
+            }
+        }
+        if (is_array($coords)) {
+            $cLat = $coords[0] ?? $coords['lat'] ?? $coords['latitude'] ?? null;
+            $cLng = $coords[1] ?? $coords['lng'] ?? $coords['longitude'] ?? null;
+            if (is_numeric($cLat) && is_numeric($cLng)) {
+                $clinicLat = (float) $cLat;
+                $clinicLng = (float) $cLng;
+            }
+        }
+    }
+
+    if ($clinicLat === null || $clinicLng === null) {
+        $pincode = trim((string) ($clinic->pincode ?? ''));
+        $city = trim((string) ($clinic->city ?? ''));
+
+        if (Schema::hasTable('geo_pincodes')) {
+            $geoRow = null;
+            if ($pincode !== '') {
+                $geoRow = DB::table('geo_pincodes')
+                    ->where('pincode', $pincode)
+                    ->whereNotNull('lat')
+                    ->whereNotNull('lon')
+                    ->first(['lat', 'lon']);
+            }
+            if (!$geoRow && $city !== '') {
+                $geoRow = DB::table('geo_pincodes')
+                    ->where('city', $city)
+                    ->whereNotNull('lat')
+                    ->whereNotNull('lon')
+                    ->first(['lat', 'lon']);
+            }
+            if ($geoRow && is_numeric($geoRow->lat ?? null) && is_numeric($geoRow->lon ?? null)) {
+                $clinicLat = (float) $geoRow->lat;
+                $clinicLng = (float) $geoRow->lon;
+            }
+        }
+    }
+
+    if ($clinicLat === null || $clinicLng === null) {
+        $apiKey = env('GOOGLE_MAPS_API_KEY') ?: env('GOOGLE_API_KEY');
+        $addressStr = trim((string) ($clinic->address ?? ''));
+        $cityStr = trim((string) ($clinic->city ?? ''));
+        $pincodeStr = trim((string) ($clinic->pincode ?? ''));
+        $queryLocation = implode(', ', array_filter([$addressStr, $cityStr, $pincodeStr, 'India']));
+
+        if ($apiKey && $queryLocation !== '') {
+            try {
+                $response = \Illuminate\Support\Facades\Http::timeout(3)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                    'address' => $queryLocation,
+                    'key' => $apiKey,
+                ]);
+                if ($response->successful()) {
+                    $geoJson = $response->json();
+                    $location = $geoJson['results'][0]['geometry']['location'] ?? null;
+                    if ($location && is_numeric($location['lat']) && is_numeric($location['lng'])) {
+                        $clinicLat = (float) $location['lat'];
+                        $clinicLng = (float) $location['lng'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Ignore network errors gracefully
+            }
+        }
+    }
+
+    if ($clinicLat !== null && $clinicLng !== null) {
+        $shouldSave = false;
+        if (empty($clinic->lat) && Schema::hasColumn('vet_registerations_temp', 'lat')) {
+            $clinic->lat = $clinicLat;
+            $shouldSave = true;
+        }
+        if (empty($clinic->lng) && Schema::hasColumn('vet_registerations_temp', 'lng')) {
+            $clinic->lng = $clinicLng;
+            $shouldSave = true;
+        }
+        if (empty($clinic->coordinates) && Schema::hasColumn('vet_registerations_temp', 'coordinates')) {
+            $clinic->coordinates = json_encode([$clinicLat, $clinicLng]);
+            $shouldSave = true;
+        }
+        if ($shouldSave) {
+            try {
+                $clinic->save();
+            } catch (\Throwable $e) {
+                // Ignore save errors
+            }
+        }
+    }
+
+    $distance = null;
+    if ($userLat !== null && $userLng !== null && $clinicLat !== null && $clinicLng !== null) {
+        $lat1 = deg2rad($userLat);
+        $lon1 = deg2rad($userLng);
+        $lat2 = deg2rad($clinicLat);
+        $lon2 = deg2rad($clinicLng);
+
+        $val = cos($lat1) * cos($lat2) * cos($lon2 - $lon1) + sin($lat1) * sin($lat2);
+        $val = min(1.0, max(-1.0, $val));
+        $distance = round(6371 * acos($val), 2);
+    }
+
     $nowIst = \Illuminate\Support\Carbon::now('Asia/Kolkata');
     $currentDayOfWeek = (int) $nowIst->dayOfWeek;
     $currentTime = $nowIst->format('H:i:s');
@@ -3330,7 +3443,7 @@ Route::get('/users/last-vet-details', function (Request $request) {
     $doctors = Doctor::query()
         ->where('vet_registeration_id', $clinic->id)
         ->get()
-        ->map(function (Doctor $doctor) use ($availableDoctorIds) {
+        ->map(function (Doctor $doctor) use ($availableDoctorIds, $distance) {
             $item = $doctor->toArray();
             $imageUrl = empty($doctor->doctor_image_blob)
                 ? null
@@ -3339,6 +3452,8 @@ Route::get('/users/last-vet-details', function (Request $request) {
             $item['doctor_image_blob'] = $imageUrl;
             $item['doctor_image_blob_url'] = $imageUrl;
             $item['is_available'] = $availableDoctorIds->contains((int) $doctor->id);
+            $item['distance'] = $distance;
+            $item['distance_km'] = $distance;
 
             return $item;
         })
@@ -3417,6 +3532,11 @@ Route::get('/users/last-vet-details', function (Request $request) {
     $clinicData['clinic_video_url'] = $clinicData['clinic_video'];
     $clinicData['google_rating'] = $rating;
     $clinicData['google_user_ratings_total'] = $ratingsCount;
+    $clinicData['lat'] = $clinicLat;
+    $clinicData['lng'] = $clinicLng;
+    $clinicData['coordinates'] = $clinicLat !== null && $clinicLng !== null ? [$clinicLat, $clinicLng] : null;
+    $clinicData['distance'] = $distance;
+    $clinicData['distance_km'] = $distance;
     $clinicData['clinic_services'] = $clinicServices->map(function ($service) {
         $serviceData = (array) $service;
         unset($serviceData['machinery_image_blob']);

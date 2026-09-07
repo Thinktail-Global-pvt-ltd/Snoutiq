@@ -171,6 +171,8 @@ class LastVetDetailsApiTest extends TestCase
             $table->unsignedBigInteger('id')->primary();
             $table->string('name')->nullable();
             $table->unsignedBigInteger('last_vet_id')->nullable();
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
             $table->timestamps();
         });
 
@@ -179,6 +181,12 @@ class LastVetDetailsApiTest extends TestCase
             $table->string('name')->nullable();
             $table->binary('clinic_image')->nullable();
             $table->binary('clinic_video')->nullable();
+            $table->decimal('lat', 10, 7)->nullable();
+            $table->decimal('lng', 10, 7)->nullable();
+            $table->json('coordinates')->nullable();
+            $table->string('pincode')->nullable();
+            $table->string('city')->nullable();
+            $table->text('address')->nullable();
             $table->timestamps();
         });
 
@@ -201,5 +209,46 @@ class LastVetDetailsApiTest extends TestCase
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+    }
+
+    public function test_last_vet_details_calculates_and_returns_distance_when_coordinates_are_available(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1479,
+            'name' => 'Test User',
+            'last_vet_id' => 20,
+            'latitude' => 28.6139,
+            'longitude' => 77.2090,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('vet_registerations_temp')->insert([
+            'id' => 20,
+            'name' => 'Connaught Place Vet Clinic',
+            'lat' => 28.6315,
+            'lng' => 77.2167,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 201,
+            'vet_registeration_id' => 20,
+            'doctor_name' => 'Dr. CP Vet',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/users/last-vet-details?user_id=1479');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.clinic.lat', 28.6315)
+            ->assertJsonPath('data.clinic.lng', 77.2167)
+            ->assertJsonPath('data.clinic.distance_km', 2.1)
+            ->assertJsonPath('data.clinic.distance', 2.1)
+            ->assertJsonPath('data.doctors.0.distance_km', 2.1)
+            ->assertJsonPath('data.doctors.0.distance', 2.1);
     }
 }
