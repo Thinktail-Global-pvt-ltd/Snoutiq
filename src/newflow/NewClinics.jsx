@@ -31,6 +31,8 @@ const valueOrDash = (value) => {
   return text || "-";
 };
 
+const hasValue = (value) => String(value ?? "").trim() !== "";
+
 const plural = (count, label) => `${count} ${label}${count === 1 ? "" : "s"}`;
 
 const formatMoney = (value) => {
@@ -56,7 +58,7 @@ const getClinicSummary = (clinic) =>
   clinic?.hospital_profile ||
   clinic?.bio ||
   clinic?.address ||
-  "Clinic profile details are being completed.";
+  "";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -132,13 +134,7 @@ function DetailSection({ title, children }) {
   );
 }
 
-function EmptyState({ children }) {
-  return <p className="text-sm text-slate-600">{children}</p>;
-}
-
 function SlotList({ slots }) {
-  if (!slots.length) return <EmptyState>No slots saved.</EmptyState>;
-
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {slots.map((slot) => (
@@ -419,22 +415,20 @@ function ClinicDirectory() {
                   entry?.services || [],
                   entry?.machinery || []
                 );
-                const completion =
-                  entry?.profile_completion_percentage ??
-                  entry?.profile_completion?.percentage ??
-                  0;
                 const doctors = entry?.doctors?.length || 0;
                 const packages = entry?.specialized_packages?.length || 0;
                 const videoSchedules = entry?.video_schedules?.length || 0;
                 const dayFee = formatMoney(clinic.clinic_day_fee);
                 const nightFee = formatMoney(clinic.clinic_night_fee);
+                const summary = getClinicSummary(clinic);
                 const quickStats = [
-                  [plural(doctors, "doctor"), Stethoscope],
-                  [plural(serviceRows.length, "service"), Check],
-                  [plural(machineRows.length, "machine"), Wrench],
-                  [plural(packages, "package"), IndianRupee],
-                  [plural(videoSchedules, "video slot"), Video],
-                ];
+                  [doctors, plural(doctors, "doctor"), Stethoscope],
+                  [serviceRows.length, plural(serviceRows.length, "service"), Check],
+                  [machineRows.length, plural(machineRows.length, "machine"), Wrench],
+                  [packages, plural(packages, "package"), IndianRupee],
+                  [videoSchedules, plural(videoSchedules, "video slot"), Video],
+                ].filter(([count]) => count > 0);
+                const hasFees = dayFee || nightFee;
 
                 return (
                   <Link
@@ -453,9 +447,11 @@ function ClinicDirectory() {
                           event.currentTarget.src = clinicFallbackImage;
                         }}
                       />
-                      <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-sm font-bold text-blue-700 shadow-sm">
-                        {completion}% complete
-                      </span>
+                      {clinic.city ? (
+                        <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-sm font-bold text-blue-700 shadow-sm">
+                          {clinic.city}
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="flex min-h-[300px] flex-col p-5 sm:p-6">
@@ -474,23 +470,34 @@ function ClinicDirectory() {
                         </span>
                       </div>
 
-                      <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">
-                        {getClinicSummary(clinic)}
-                      </p>
+                      {summary ? (
+                        <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">
+                          {summary}
+                        </p>
+                      ) : null}
 
-                      <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                        <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
-                          <Phone className="h-4 w-4 text-blue-600" />
-                          {valueOrDash(clinic.mobile)}
-                        </span>
-                        <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
-                          <CalendarDays className="h-4 w-4 text-blue-600" />
-                          Day {dayFee || "-"} · Night {nightFee || "-"}
-                        </span>
-                      </div>
+                      {clinic.mobile || hasFees ? (
+                        <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                          {clinic.mobile ? (
+                            <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                              <Phone className="h-4 w-4 text-blue-600" />
+                              {clinic.mobile}
+                            </span>
+                          ) : null}
+                          {hasFees ? (
+                            <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                              <CalendarDays className="h-4 w-4 text-blue-600" />
+                              {dayFee ? `Day ${dayFee}` : ""}
+                              {dayFee && nightFee ? " · " : ""}
+                              {nightFee ? `Night ${nightFee}` : ""}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
 
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {quickStats.map(([item, Icon]) => (
+                      {quickStats.length ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {quickStats.map(([, item, Icon]) => (
                           <span
                             key={item}
                             className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600"
@@ -498,8 +505,9 @@ function ClinicDirectory() {
                             <Icon className="h-3.5 w-3.5 text-blue-600" />
                             {item}
                           </span>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      ) : null}
 
                       <span className="mt-auto inline-flex items-center gap-2 pt-5 font-bold text-blue-700">
                         View clinic
@@ -593,8 +601,6 @@ function ClinicDetail() {
   const vetAtHomeServices = entry.vet_at_home_services || [];
   const clinicAvailability = entry.clinic_availability || [];
   const videoSchedules = entry.video_schedules || [];
-  const profile = entry.profile_completion || {};
-  const missingFields = profile.missing_fields || [];
   const dayFee = formatMoney(clinic.clinic_day_fee);
   const nightFee = formatMoney(clinic.clinic_night_fee);
   const daySlots = clinicAvailability.filter((slot) => !isNightSlot(slot));
@@ -602,6 +608,24 @@ function ClinicDetail() {
   const locationUrl = mapUrlForClinic(clinic);
   const fullAddress =
     clinic.formatted_address || clinic.address || [clinic.city, clinic.pincode].filter(Boolean).join(" ");
+  const hasClinicImage = Boolean(clinic.clinic_image_url || clinic.image);
+  const hasClinicVideo = Boolean(clinic.clinic_video_url);
+  const detailSummary = getClinicSummary(clinic);
+  const displayPackages = packages
+    .map((pack) => ({
+      ...pack,
+      packagePrices: Object.entries(pack).filter(
+        ([key, value]) => key.endsWith("_price") && formatMoney(value)
+      ),
+    }))
+    .filter((pack) => pack.packagePrices.length > 0);
+  const summaryCards = [
+    [doctors.length, plural(doctors.length, "doctor"), Stethoscope],
+    [serviceRows.length, plural(serviceRows.length, "service"), Check],
+    [machineRows.length, plural(machineRows.length, "machine"), Wrench],
+    [displayPackages.length, plural(displayPackages.length, "package"), IndianRupee],
+    [videoSchedules.length, plural(videoSchedules.length, "video schedule"), Video],
+  ].filter(([count]) => count > 0);
 
   return (
     <>
@@ -624,65 +648,83 @@ function ClinicDetail() {
                 {valueOrDash(clinic.name)}
               </h1>
               <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600">
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" />
-                  {valueOrDash([clinic.city, clinic.pincode].filter(Boolean).join(" - "))}
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Phone className="h-4 w-4" />
-                  {valueOrDash(clinic.mobile)}
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <IndianRupee className="h-4 w-4" />
-                  Day {dayFee || "-"} · Night {nightFee || "-"}
-                </span>
+                {clinic.city || clinic.pincode ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4" />
+                    {valueOrDash([clinic.city, clinic.pincode].filter(Boolean).join(" - "))}
+                  </span>
+                ) : null}
+                {clinic.mobile ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Phone className="h-4 w-4" />
+                    {clinic.mobile}
+                  </span>
+                ) : null}
+                {dayFee || nightFee ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <IndianRupee className="h-4 w-4" />
+                    {dayFee ? `Day ${dayFee}` : ""}
+                    {dayFee && nightFee ? " · " : ""}
+                    {nightFee ? `Night ${nightFee}` : ""}
+                  </span>
+                ) : null}
               </div>
               {fullAddress ? (
                 <p className="mt-3 max-w-3xl text-sm text-slate-500">
                   {fullAddress}
                 </p>
               ) : null}
-              <p className="mt-5 max-w-3xl text-lg text-slate-600">
-                {clinic.clinic_profile ||
-                  clinic.hospital_profile ||
-                  clinic.bio ||
-                  clinic.address ||
-                  "This clinic profile is connected to SnoutIQ onboarding data."}
-              </p>
+              {detailSummary ? (
+                <p className="mt-5 max-w-3xl text-lg text-slate-600">
+                  {detailSummary}
+                </p>
+              ) : null}
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-              {clinic.clinic_video_url ? (
-                <video
-                  src={clinic.clinic_video_url}
-                  className="aspect-[16/10] h-full w-full object-cover"
-                  poster={getClinicImage(clinic)}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  controls
-                />
-              ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              {hasClinicImage ? (
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                  <img
+                    src={getClinicImage(clinic)}
+                    alt={clinic.name || "Veterinary clinic"}
+                    className="aspect-[16/10] h-full w-full object-cover"
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = clinicFallbackImage;
+                    }}
+                  />
+                </div>
+              ) : null}
+              {hasClinicVideo ? (
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                  <video
+                    src={clinic.clinic_video_url}
+                    className="aspect-[16/10] h-full w-full object-cover"
+                    poster={getClinicImage(clinic)}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    controls
+                  />
+                </div>
+              ) : null}
+              {!hasClinicImage && !hasClinicVideo ? (
                 <img
                   src={getClinicImage(clinic)}
                   alt={clinic.name || "Veterinary clinic"}
-                  className="aspect-[16/10] h-full w-full object-cover"
+                  className="aspect-[16/10] rounded-2xl border border-slate-200 object-cover"
                 />
-              )}
+              ) : null}
             </div>
           </div>
         </div>
       </section>
 
       <section className="bg-slate-50 py-10 sm:py-12">
+        {summaryCards.length ? (
         <div className="mx-auto grid max-w-7xl gap-5 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
-          {[
-            [plural(doctors.length, "doctor"), Stethoscope],
-            [plural(serviceRows.length, "service"), Check],
-            [plural(machineRows.length, "machine"), Wrench],
-            [plural(videoSchedules.length, "video schedule"), Video],
-          ].map(([label, Icon]) => (
+          {summaryCards.map(([, label, Icon]) => (
             <div
               key={label}
               className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -692,78 +734,110 @@ function ClinicDetail() {
             </div>
           ))}
         </div>
+        ) : null}
 
         <div className="mx-auto mt-6 grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[1.25fr_0.75fr] lg:px-8">
           <div className="space-y-6">
+            {dayFee || nightFee ? (
             <DetailSection title="Clinic Fees">
               <div className="grid gap-3 sm:grid-cols-2">
+                {dayFee ? (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-500">Day fee</p>
                   <p className="mt-2 text-2xl font-bold text-slate-950">
-                    {dayFee || "-"}
+                    {dayFee}
                   </p>
                 </div>
+                ) : null}
+                {nightFee ? (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-500">Night fee</p>
                   <p className="mt-2 text-2xl font-bold text-slate-950">
-                    {nightFee || "-"}
+                    {nightFee}
                   </p>
                 </div>
+                ) : null}
               </div>
             </DetailSection>
+            ) : null}
 
+            {daySlots.length ? (
             <DetailSection title="Clinic Day Slots">
               <SlotList slots={daySlots} />
             </DetailSection>
+            ) : null}
 
+            {nightSlots.length ? (
             <DetailSection title="Clinic Night Slots">
               <SlotList slots={nightSlots} />
             </DetailSection>
+            ) : null}
 
+            {doctors.length ? (
             <DetailSection title="Doctors">
               <div className="divide-y divide-slate-100">
-                {doctors.length ? (
-                  doctors.map((doctor) => (
+                {doctors.map((doctor) => {
+                    const specializations = parseList(
+                      doctor.specialization_select_all_that_apply
+                    );
+                    const languages = parseList(doctor.languages_spoken);
+                    const doctorFees = [
+                      ["Clinic", formatMoney(doctor.doctors_price)],
+                      ["Video day", formatMoney(doctor.video_day_rate)],
+                      ["Video night", formatMoney(doctor.video_night_rate)],
+                    ].filter(([, value]) => value);
+
+                    return (
                     <div key={doctor.id} className="py-4 first:pt-0 last:pb-0">
                       <h3 className="text-lg font-semibold text-slate-950">
                         {valueOrDash(doctor.doctor_name)}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {valueOrDash(doctor.degree)} ·{" "}
-                        {valueOrDash(doctor.years_of_experience)} yrs
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {parseList(doctor.specialization_select_all_that_apply).map((item) => (
+                      {doctor.degree || doctor.years_of_experience ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          {doctor.degree || ""}
+                          {doctor.degree && doctor.years_of_experience ? " · " : ""}
+                          {doctor.years_of_experience
+                            ? `${doctor.years_of_experience} yrs`
+                            : ""}
+                        </p>
+                      ) : null}
+                      {specializations.length ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {specializations.map((item) => (
                           <span
                             key={item}
                             className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
                           >
                             {item}
                           </span>
-                        ))}
-                      </div>
-                      <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
-                        <span>Clinic: {formatMoney(doctor.doctors_price) || "-"}</span>
-                        <span>Video day: {formatMoney(doctor.video_day_rate) || "-"}</span>
-                        <span>Video night: {formatMoney(doctor.video_night_rate) || "-"}</span>
-                      </div>
-                      {parseList(doctor.languages_spoken).length ? (
+                          ))}
+                        </div>
+                      ) : null}
+                      {doctorFees.length ? (
+                        <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
+                          {doctorFees.map(([label, value]) => (
+                            <span key={label}>
+                              {label}: {value}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {languages.length ? (
                         <p className="mt-2 text-sm text-slate-500">
-                          Languages: {parseList(doctor.languages_spoken).join(", ")}
+                          Languages: {languages.join(", ")}
                         </p>
                       ) : null}
                     </div>
-                  ))
-                ) : (
-                  <EmptyState>No doctors saved.</EmptyState>
-                )}
+                    );
+                  })}
               </div>
             </DetailSection>
+            ) : null}
 
+            {serviceRows.length ? (
             <DetailSection title="Services">
               <div className="grid gap-3 sm:grid-cols-2">
-                {serviceRows.length ? (
-                  serviceRows.map((service) => (
+                {serviceRows.map((service) => (
                     <div
                       key={service.id}
                       className="rounded-lg border border-slate-200 bg-slate-50 p-4"
@@ -771,29 +845,31 @@ function ClinicDetail() {
                       <h3 className="font-semibold text-slate-950">
                         {valueOrDash(service.name)}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {service.description || service.pet_type || "Service details pending."}
-                      </p>
-                      <p className="mt-3 text-sm font-semibold text-blue-700">
-                        {formatMoney(service.price) || "Price on request"}
-                      </p>
+                      {service.description || service.pet_type ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          {service.description || service.pet_type}
+                        </p>
+                      ) : null}
+                      {formatMoney(service.price) ? (
+                        <p className="mt-3 text-sm font-semibold text-blue-700">
+                          {formatMoney(service.price)}
+                        </p>
+                      ) : null}
                       {service.duration ? (
                         <p className="mt-1 text-xs text-slate-500">
                           Duration: {service.duration} mins
                         </p>
                       ) : null}
                     </div>
-                  ))
-                ) : (
-                  <EmptyState>No services saved.</EmptyState>
-                )}
+                  ))}
               </div>
             </DetailSection>
+            ) : null}
 
+            {machineRows.length ? (
             <DetailSection title="Machinery">
               <div className="grid gap-3 sm:grid-cols-2">
-                {machineRows.length ? (
-                  machineRows.map((machine) => (
+                {machineRows.map((machine) => (
                     <div
                       key={machine.id}
                       className="rounded-lg border border-slate-200 bg-slate-50 p-4"
@@ -801,24 +877,26 @@ function ClinicDetail() {
                       <h3 className="font-semibold text-slate-950">
                         {valueOrDash(machine.name)}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {machine.description || machine.pet_type || "Machine details pending."}
-                      </p>
-                      <p className="mt-3 text-sm font-semibold text-blue-700">
-                        {formatMoney(machine.price) || "Price on request"}
-                      </p>
+                      {machine.description || machine.pet_type ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          {machine.description || machine.pet_type}
+                        </p>
+                      ) : null}
+                      {formatMoney(machine.price) ? (
+                        <p className="mt-3 text-sm font-semibold text-blue-700">
+                          {formatMoney(machine.price)}
+                        </p>
+                      ) : null}
                     </div>
-                  ))
-                ) : (
-                  <EmptyState>No machinery saved.</EmptyState>
-                )}
+                  ))}
               </div>
             </DetailSection>
+            ) : null}
 
+            {displayPackages.length ? (
             <DetailSection title="Packages">
               <div className="grid gap-3 sm:grid-cols-2">
-                {packages.length ? (
-                  packages.map((pack) => (
+                {displayPackages.map((pack) => (
                     <div
                       key={pack.id}
                       className="rounded-lg border border-slate-200 bg-slate-50 p-4"
@@ -827,9 +905,7 @@ function ClinicDetail() {
                         {pack.doctor_name || "Specialized package"}
                       </p>
                       <div className="mt-3 space-y-1 text-sm text-slate-600">
-                        {Object.entries(pack)
-                          .filter(([key, value]) => key.endsWith("_price") && formatMoney(value))
-                          .map(([key, value]) => (
+                        {pack.packagePrices.map(([key, value]) => (
                             <p key={key}>
                               {formatLabel(key.replace("_price", ""))}:{" "}
                               <span className="font-semibold text-slate-800">
@@ -839,48 +915,22 @@ function ClinicDetail() {
                           ))}
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <EmptyState>No packages saved.</EmptyState>
-                )}
+                  ))}
               </div>
             </DetailSection>
+            ) : null}
           </div>
 
           <aside className="space-y-6">
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <h2 className="text-xl font-bold text-slate-950">
-                Profile completion
-              </h2>
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-blue-600"
-                  style={{ width: `${profile.percentage || 0}%` }}
-                />
-              </div>
-              <p className="mt-3 text-sm font-semibold text-slate-700">
-                {profile.completed_fields || 0} / {profile.total_fields || 0} fields
-                completed
-              </p>
-              {missingFields.length ? (
-                <p className="mt-2 text-sm text-slate-600">
-                  Missing:{" "}
-                  {missingFields
-                    .slice(0, 5)
-                    .map((field) => field.label || field)
-                    .join(", ")}
-                </p>
-              ) : null}
-            </section>
-
+            {fullAddress || clinic.city || clinic.pincode || clinic.lat || clinic.rating ? (
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-xl font-bold text-slate-950">Location</h2>
-              <p className="mt-3 text-sm text-slate-600">
-                {fullAddress || "Location details pending."}
-              </p>
+              {fullAddress ? (
+                <p className="mt-3 text-sm text-slate-600">{fullAddress}</p>
+              ) : null}
               <div className="mt-4 space-y-2 text-sm text-slate-600">
-                <p>City: {valueOrDash(clinic.city)}</p>
-                <p>Pincode: {valueOrDash(clinic.pincode)}</p>
+                {clinic.city ? <p>City: {clinic.city}</p> : null}
+                {clinic.pincode ? <p>Pincode: {clinic.pincode}</p> : null}
                 {clinic.lat && clinic.lng ? (
                   <p>
                     Coordinates: {clinic.lat}, {clinic.lng}
@@ -907,12 +957,13 @@ function ClinicDetail() {
                 </a>
               ) : null}
             </section>
+            ) : null}
 
+            {vetAtHomeServices.length ? (
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-xl font-bold text-slate-950">Vet at home</h2>
               <div className="mt-4 space-y-3">
-                {vetAtHomeServices.length ? (
-                  vetAtHomeServices.map((service) => (
+                {vetAtHomeServices.map((service) => (
                     <div
                       key={service.id}
                       className="rounded-lg border border-slate-200 bg-slate-50 p-4"
@@ -921,25 +972,32 @@ function ClinicDetail() {
                         {service.doctor_name || "Home visit"}
                       </p>
                       <div className="mt-2 space-y-1 text-sm text-slate-600">
-                        <p>Status: {service.is_enabled ? "Available" : "Not available"}</p>
-                        <p>Hours: {valueOrDash(service.service_hours)}</p>
-                        <p>Response: {valueOrDash(service.response_time)}</p>
-                        <p>Base payout: {formatMoney(service.base_payout) || "-"}</p>
-                        <p>Protocol: {valueOrDash(service.protocol_label)}</p>
+                        {service.is_enabled !== null ? (
+                          <p>Status: {service.is_enabled ? "Available" : "Not available"}</p>
+                        ) : null}
+                        {service.service_hours ? <p>Hours: {service.service_hours}</p> : null}
+                        {service.response_time ? <p>Response: {service.response_time}</p> : null}
+                        {formatMoney(service.base_payout) ? (
+                          <p>Base payout: {formatMoney(service.base_payout)}</p>
+                        ) : null}
+                        {service.protocol_label ? <p>Protocol: {service.protocol_label}</p> : null}
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <EmptyState>No vet-at-home details saved.</EmptyState>
-                )}
+                  ))}
               </div>
             </section>
+            ) : null}
 
+            {videoSchedules.length ? (
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-xl font-bold text-slate-950">Video hours</h2>
               <div className="mt-4 space-y-3">
-                {videoSchedules.length ? (
-                  videoSchedules.map((schedule) => (
+                {videoSchedules.map((schedule) => {
+                    const availability = schedule.availability || [];
+                    const hasVideoRates =
+                      formatMoney(schedule.day_rate) || formatMoney(schedule.night_rate);
+
+                    return (
                     <div
                       key={schedule.doctor_id}
                       className="rounded-lg border border-slate-200 bg-slate-50 p-4"
@@ -947,17 +1005,23 @@ function ClinicDetail() {
                       <p className="font-semibold text-slate-950">
                         {valueOrDash(schedule.doctor_name)}
                       </p>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-blue-700">
-                        <span className="rounded-full bg-blue-50 px-2.5 py-1">
-                          Day {formatMoney(schedule.day_rate) || "-"}
-                        </span>
-                        <span className="rounded-full bg-blue-50 px-2.5 py-1">
-                          Night {formatMoney(schedule.night_rate) || "-"}
-                        </span>
-                      </div>
-                      <div className="mt-3 space-y-1 text-sm text-slate-600">
-                        {(schedule.availability || []).length ? (
-                          schedule.availability.map((slot) => (
+                      {hasVideoRates ? (
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-blue-700">
+                          {formatMoney(schedule.day_rate) ? (
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1">
+                              Day {formatMoney(schedule.day_rate)}
+                            </span>
+                          ) : null}
+                          {formatMoney(schedule.night_rate) ? (
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1">
+                              Night {formatMoney(schedule.night_rate)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {availability.length ? (
+                        <div className="mt-3 space-y-1 text-sm text-slate-600">
+                          {availability.map((slot) => (
                             <p
                               key={`${schedule.doctor_id}-${slot.day_of_week}-${slot.start_time}-${slot.end_time}`}
                               className="flex items-center gap-1.5"
@@ -965,18 +1029,15 @@ function ClinicDetail() {
                               <Clock className="h-4 w-4 text-slate-400" />
                               {formatSlot(slot)}
                             </p>
-                          ))
-                        ) : (
-                          <EmptyState>No video slots saved.</EmptyState>
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                  ))
-                ) : (
-                  <EmptyState>No video hours saved.</EmptyState>
-                )}
+                    );
+                  })}
               </div>
             </section>
+            ) : null}
           </aside>
         </div>
       </section>
