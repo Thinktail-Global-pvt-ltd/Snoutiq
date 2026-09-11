@@ -76,15 +76,190 @@ const getClinicSummary = (clinic) =>
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const formatTime = (value) => {
+const formatTime12h = (value) => {
   if (!value) return "-";
   const text = String(value);
-  const [hour = "", minute = ""] = text.split(":");
-  return hour && minute ? `${hour.padStart(2, "0")}:${minute}` : text;
+  const [hourStr = "", minuteStr = "00"] = text.split(":");
+  const hour = parseInt(hourStr, 10);
+  if (isNaN(hour)) return text;
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minuteStr.padStart(2, "0")} ${ampm}`;
 };
 
+const formatTime = (value) => formatTime12h(value);
+
 const formatSlot = (slot) =>
-  `${DAYS[Number(slot?.day_of_week)] || "Day"} ${formatTime(slot?.start_time)}-${formatTime(slot?.end_time)}`;
+  `${DAYS[Number(slot?.day_of_week)] || "Day"} ${formatTime12h(slot?.start_time)} – ${formatTime12h(slot?.end_time)}`;
+
+const formatDoctorName = (name) => {
+  const clean = String(name ?? "").trim();
+  if (!clean || clean === "-") return "Doctor";
+  if (/^dr\.?\s+/i.test(clean)) return clean;
+  return `Dr. ${clean}`;
+};
+
+const getDoctorInitials = (name) => {
+  const clean = String(name ?? "")
+    .replace(/^dr\.?\s+/i, "")
+    .trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (!parts.length) return "DR";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const PACKAGE_DETAILS = {
+  puppy_vaccination_package: {
+    title: "Puppy Complete Vaccination Pack",
+    category: "Vaccination",
+    petType: "Dog",
+    badge: "Most Popular",
+    description: "Essential primary immunization shots against canine distemper, parvovirus & rabies with health card.",
+    inclusions: [
+      "DHPPiL Polyvalent Core Vaccine",
+      "Anti-Rabies Primary Immunization",
+      "Complete Physical & Vitals Check",
+      "Deworming Protocol & Pet Record Card",
+    ],
+  },
+  adult_dog_vaccination_package: {
+    title: "Adult Dog Annual Health & Booster",
+    category: "Vaccination",
+    petType: "Dog",
+    badge: "Annual Protection",
+    description: "Yearly polyvalent booster and anti-rabies defense to ensure uninterrupted canine immunity.",
+    inclusions: [
+      "Annual DHPPiL 9-in-1 Booster",
+      "Anti-Rabies Annual Shot",
+      "Full Clinical Body & Dental Exam",
+      "Preventive Health & Diet Consultation",
+    ],
+  },
+  kitten_vaccination_package: {
+    title: "Kitten Starter Vaccination Pack",
+    category: "Vaccination",
+    petType: "Cat",
+    badge: "Kitten Starter",
+    description: "Core Tricat (FVRCP) protection against feline panleukopenia, herpes & calici viruses plus rabies.",
+    inclusions: [
+      "FVRCP Tricat Core Vaccine",
+      "Feline Anti-Rabies Shot",
+      "Pediatric Vitals & Growth Check",
+      "Deworming Dose & Kitten Booklet",
+    ],
+  },
+  adult_cat_vaccination_package: {
+    title: "Adult Cat Annual Booster Pack",
+    category: "Vaccination",
+    petType: "Cat",
+    badge: "Annual Protection",
+    description: "Yearly feline booster maintaining immunity against common infectious respiratory and viral pathogens.",
+    inclusions: [
+      "Annual FVRCP Booster Shot",
+      "Anti-Rabies Booster",
+      "Coat, Weight & Dental Checkup",
+      "Nutrition & Wellness Guidance",
+    ],
+  },
+  dog_neutering_female: {
+    title: "Female Dog Spaying (Sterilization)",
+    category: "Surgery & Neutering",
+    petType: "Dog",
+    badge: "Safe Surgery",
+    description: "Advanced surgical ovariohysterectomy preventing heat cycles, pyometra (uterine infection) & mammary tumors.",
+    inclusions: [
+      "Pre-Surgical Clinical Evaluation",
+      "Safe Anesthesia & Vitals Monitoring",
+      "Sterile Surgical Procedure by Senior Vet",
+      "Post-Op Pain Relief & Recovery Dressing",
+    ],
+  },
+  dog_neutering_male: {
+    title: "Male Dog Castration / Neutering",
+    category: "Surgery & Neutering",
+    petType: "Dog",
+    badge: "Sterilization",
+    description: "Safe surgical castration reducing testicular cancer risks, territorial marking & roaming tendencies.",
+    inclusions: [
+      "Pre-Operative Vitals Screening",
+      "Surgical Castration by Experienced Surgeon",
+      "Post-Operative Antibiotics & Pain Control",
+      "Wound Care & Suture Removal Guidance",
+    ],
+  },
+  cat_neutering_female: {
+    title: "Female Cat Spaying (Sterilization)",
+    category: "Surgery & Neutering",
+    petType: "Cat",
+    badge: "Safe Surgery",
+    description: "Minimally invasive spaying procedure eliminating loud heat calling, uterine infections & pregnancy.",
+    inclusions: [
+      "Pre-Op Clinical Health Check",
+      "Safe Feline Anesthesia Protocol",
+      "Precision Sterile Spaying Surgery",
+      "Post-Op Antibiotics & Recovery Kit",
+    ],
+  },
+  cat_neutering_male: {
+    title: "Male Cat Castration / Neutering",
+    category: "Surgery & Neutering",
+    petType: "Cat",
+    badge: "Sterilization",
+    description: "Gentle sterilization for tomcats that stops pungent urine spraying, fighting, and wanderlust.",
+    inclusions: [
+      "Pre-Procedure Health Screening",
+      "Quick & Gentle Castration Procedure",
+      "Pain Relief & Recovery Injections",
+      "Post-Surgical Care Instructions",
+    ],
+  },
+};
+
+const extractPackageItems = (packages = []) => {
+  const items = [];
+
+  packages.forEach((pack, packIndex) => {
+    Object.entries(pack).forEach(([key, value]) => {
+      if (!key.endsWith("_price")) return;
+      const formatted = formatMoney(value);
+      if (!formatted) return;
+
+      const baseKey = key.replace("_price", "");
+      const meta = PACKAGE_DETAILS[baseKey] || {
+        title: formatLabel(baseKey),
+        category: baseKey.includes("vaccination")
+          ? "Vaccination"
+          : baseKey.includes("neutering") || baseKey.includes("surgery")
+          ? "Surgery & Neutering"
+          : "Health Care",
+        petType: baseKey.includes("dog") || baseKey.includes("puppy")
+          ? "Dog"
+          : baseKey.includes("cat") || baseKey.includes("kitten")
+          ? "Cat"
+          : "Pet",
+        badge: "Specialized Plan",
+        description: "Comprehensive veterinary care package designed for optimum pet wellness.",
+        inclusions: [
+          "Complete Physical Examination",
+          "Dedicated Doctor Consultation",
+          "Health Records Update",
+        ],
+      };
+
+      items.push({
+        id: `${pack.id || packIndex}-${key}`,
+        key: baseKey,
+        rawPrice: value,
+        formattedPrice: formatted,
+        doctorName: pack.doctor_name,
+        ...meta,
+      });
+    });
+  });
+
+  return items;
+};
 
 const formatLabel = (value) =>
   String(value || "")
@@ -195,7 +370,7 @@ function SlotList({ slots }) {
             <p className="mt-1.5 text-xs font-medium text-slate-600 flex items-center gap-1.5">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
               {formatLabel(slot.service_type || "in_clinic")}
-              {slot.doctor_name ? ` · Dr. ${slot.doctor_name}` : ""}
+              {slot.doctor_name ? ` · ${formatDoctorName(slot.doctor_name)}` : ""}
             </p>
             {slot.break_start && slot.break_end ? (
               <p className="mt-1 text-[11px] text-slate-400">
@@ -735,14 +910,20 @@ function ClinicDetail() {
   const hasClinicImage = Boolean(clinic.clinic_image_url || clinic.image);
   const hasClinicVideo = Boolean(clinic.clinic_video_url);
   const detailSummary = getClinicSummary(clinic);
-  const displayPackages = packages
-    .map((pack) => ({
-      ...pack,
-      packagePrices: Object.entries(pack).filter(
-        ([key, value]) => key.endsWith("_price") && formatMoney(value)
-      ),
-    }))
-    .filter((pack) => pack.packagePrices.length > 0);
+  const [packageCategory, setPackageCategory] = useState("all");
+  const [packagePet, setPackagePet] = useState("all");
+  const packageItems = useMemo(() => extractPackageItems(packages), [packages]);
+  const packageCategories = useMemo(() => {
+    const cats = new Set(packageItems.map((p) => p.category));
+    return Array.from(cats);
+  }, [packageItems]);
+  const filteredPackages = useMemo(() => {
+    return packageItems.filter((item) => {
+      if (packageCategory !== "all" && item.category !== packageCategory) return false;
+      if (packagePet !== "all" && item.petType !== packagePet) return false;
+      return true;
+    });
+  }, [packageItems, packageCategory, packagePet]);
 
   return (
     <>
@@ -1133,13 +1314,7 @@ function ClinicDetail() {
                       ["Night Video", formatMoney(doctor.video_night_rate)],
                     ].filter(([, value]) => value);
 
-                    const doctorInitials = (doctor.doctor_name || "Doctor")
-                      .split(" ")
-                      .map((n) => n[0])
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase();
+                    const doctorInitials = getDoctorInitials(doctor.doctor_name);
 
                     return (
                       <div
@@ -1160,7 +1335,7 @@ function ClinicDetail() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <h3 className="text-lg font-bold text-slate-950">
-                                  Dr. {valueOrDash(doctor.doctor_name)}
+                                  {formatDoctorName(doctor.doctor_name)}
                                 </h3>
                                 <BadgeCheck className="h-4 w-4 text-blue-600" />
                               </div>
@@ -1356,32 +1531,144 @@ function ClinicDetail() {
             ) : null}
 
             {/* Specialized Health Packages */}
-            {displayPackages.length ? (
+            {packageItems.length ? (
               <DetailSection
                 title="Specialized Health Packages"
-                subtitle="Comprehensive wellness & preventive health plans for pets"
+                subtitle="Complete preventive health, immunization & surgical care plans"
                 icon={Sparkles}
-                badge={`${displayPackages.length} Packages`}
+                badge={`${packageItems.length} Packages Available`}
               >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {displayPackages.map((pack) => (
-                    <div
-                      key={pack.id}
-                      className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs transition-all hover:border-blue-200 hover:shadow-xs"
+                {/* Category & Pet Filter Tabs */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-100 pb-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPackageCategory("all")}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                        packageCategory === "all"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
                     >
-                      <p className="font-bold text-slate-900 text-base">
-                        {pack.doctor_name || "Pet Wellness Package"}
-                      </p>
-                      <div className="mt-3 divide-y divide-slate-100 text-xs text-slate-600">
-                        {pack.packagePrices.map(([key, value]) => (
-                          <div key={key} className="flex items-center justify-between py-1.5">
-                            <span className="text-slate-500">{formatLabel(key.replace("_price", ""))}:</span>
-                            <span className="font-bold text-slate-900">{formatMoney(value)}</span>
+                      All Packages ({packageItems.length})
+                    </button>
+                    {packageCategories.map((cat) => {
+                      const count = packageItems.filter((p) => p.category === cat).length;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setPackageCategory(cat)}
+                          className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                            packageCategory === cat
+                              ? "bg-blue-600 text-white shadow-xs"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                        >
+                          {cat === "Vaccination" ? "💉 " : "⚕️ "}
+                          {cat} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {["all", "Dog", "Cat"].map((pet) => (
+                      <button
+                        key={pet}
+                        type="button"
+                        onClick={() => setPackagePet(pet)}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                          packagePet === pet
+                            ? "bg-slate-900 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                        }`}
+                      >
+                        {pet === "all" ? "All Pets" : pet === "Dog" ? "🐶 Dogs" : "🐱 Cats"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Package Cards Grid */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {filteredPackages.map((pkg) => (
+                    <div
+                      key={pkg.id}
+                      className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs transition-all hover:border-blue-300 hover:shadow-md"
+                    >
+                      <div>
+                        {/* Tags Header */}
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                            {pkg.petType === "Dog" ? "🐶 Dog Care" : pkg.petType === "Cat" ? "🐱 Cat Care" : "🐾 Pet Care"}
+                          </span>
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              pkg.category === "Vaccination"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                                : "bg-purple-50 text-purple-700 border border-purple-200/60"
+                            }`}
+                          >
+                            {pkg.badge || pkg.category}
+                          </span>
+                        </div>
+
+                        {/* Title & Description */}
+                        <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {pkg.title}
+                        </h3>
+                        <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-normal">
+                          {pkg.description}
+                        </p>
+
+                        {/* Inclusions list */}
+                        {pkg.inclusions && pkg.inclusions.length > 0 && (
+                          <div className="mt-3.5 space-y-1.5 rounded-xl bg-slate-50/80 p-3 text-xs text-slate-600">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              Package Inclusions
+                            </p>
+                            {pkg.inclusions.map((item, idx) => (
+                              <div key={idx} className="flex items-start gap-2">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                <span className="text-[11px] leading-tight text-slate-600">{item}</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
+                      </div>
+
+                      {/* Pricing & CTA */}
+                      <div className="mt-5 border-t border-slate-100 pt-4 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xl font-black text-slate-900">{pkg.formattedPrice}</p>
+                          <p className="text-[10px] font-medium text-slate-400">All-Inclusive Fee</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openBookingModal({
+                              orderType: "appointment",
+                              doctor: doctors.length > 0 ? doctors[0] : null,
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all"
+                        >
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          <span>Book Package</span>
+                        </button>
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Sterile Clinic Guarantee */}
+                <div className="mt-5 flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 text-xs text-slate-600">
+                  <ShieldCheck className="h-5 w-5 text-blue-600 shrink-0" />
+                  <p>
+                    <span className="font-semibold text-slate-800">SnoutIQ Quality Assurance: </span>
+                    All packages and procedures are administered by verified veterinary doctors using medical-grade sterilization and cold-chain vaccines.
+                  </p>
                 </div>
               </DetailSection>
             ) : null}
@@ -1472,49 +1759,164 @@ function ClinicDetail() {
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-3.5">
+                <div className="mt-4 space-y-4">
                   {videoSchedules.map((schedule) => {
                     const availability = schedule.availability || [];
+                    const daysMap = {};
+                    availability.forEach((s) => {
+                      daysMap[Number(s.day_of_week)] = s;
+                    });
+
+                    const firstSlot = availability[0];
+                    const allSameHours =
+                      availability.length === 7 &&
+                      availability.every(
+                        (s) =>
+                          s.start_time === firstSlot?.start_time &&
+                          s.end_time === firstSlot?.end_time
+                      );
+
+                    const todayIndex = new Date().getDay();
+                    const todaySlot = daysMap[todayIndex];
+
+                    const now = new Date();
+                    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                    let isLiveNow = false;
+                    if (todaySlot) {
+                      const [sh = 0, sm = 0] = (todaySlot.start_time || "").split(":").map(Number);
+                      const [eh = 0, em = 0] = (todaySlot.end_time || "").split(":").map(Number);
+                      const startMin = sh * 60 + sm;
+                      const endMin = eh * 60 + em;
+                      isLiveNow = currentMinutes >= startMin && currentMinutes <= endMin;
+                    }
+
                     const hasVideoRates =
                       formatMoney(schedule.day_rate) || formatMoney(schedule.night_rate);
 
                     return (
                       <div
                         key={schedule.doctor_id}
-                        className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5"
+                        className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 transition-all"
                       >
-                        <p className="font-bold text-slate-950 text-sm">
-                          Dr. {valueOrDash(schedule.doctor_name)}
-                        </p>
+                        {/* Doctor Name & Online Status */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-bold text-slate-950 text-base">
+                              {formatDoctorName(schedule.doctor_name)}
+                            </p>
+                            <p className="text-xs text-blue-700 font-medium">
+                              Tele-Consultation Specialist
+                            </p>
+                          </div>
+
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                              isLiveNow
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                isLiveNow ? "bg-emerald-500 animate-pulse" : "bg-blue-500"
+                              }`}
+                            />
+                            {isLiveNow ? "Online Now" : "Available Today"}
+                          </span>
+                        </div>
+
+                        {/* Rates display */}
                         {hasVideoRates ? (
-                          <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold text-blue-700">
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                             {formatMoney(schedule.day_rate) ? (
-                              <span className="rounded-md bg-white border border-blue-200 px-2 py-0.5">
-                                Day {formatMoney(schedule.day_rate)}
+                              <span className="inline-flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-slate-800 shadow-2xs">
+                                ☀️ Day: <span className="font-bold text-blue-700">{formatMoney(schedule.day_rate)}</span>
                               </span>
                             ) : null}
                             {formatMoney(schedule.night_rate) ? (
-                              <span className="rounded-md bg-white border border-blue-200 px-2 py-0.5">
-                                Night {formatMoney(schedule.night_rate)}
+                              <span className="inline-flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-slate-800 shadow-2xs">
+                                🌙 Night: <span className="font-bold text-indigo-700">{formatMoney(schedule.night_rate)}</span>
                               </span>
                             ) : null}
                           </div>
                         ) : null}
 
-                        {availability.length ? (
-                          <div className="mt-2.5 space-y-1 text-xs text-slate-600">
-                            {availability.map((slot) => (
-                              <p
-                                key={`${schedule.doctor_id}-${slot.day_of_week}-${slot.start_time}-${slot.end_time}`}
-                                className="flex items-center gap-1.5"
-                              >
-                                <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                <span>{formatSlot(slot)}</span>
+                        {/* Operating Hours Box */}
+                        {allSameHours ? (
+                          <div className="mt-3.5 space-y-2.5">
+                            <div className="rounded-xl border border-blue-200/60 bg-white p-3 shadow-2xs">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                                  <Clock className="h-4 w-4 text-blue-600" />
+                                  Daily Consultation Hours
+                                </span>
+                                <span className="font-bold text-blue-700">
+                                  {formatTime12h(firstSlot.start_time)} – {formatTime12h(firstSlot.end_time)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                Doctor is available for video call every day (Monday to Sunday)
                               </p>
-                            ))}
+                            </div>
+
+                            {/* Weekly Day Pill Bar */}
+                            <div className="grid grid-cols-7 gap-1 text-center">
+                              {DAYS.map((dayName, idx) => {
+                                const isToday = idx === todayIndex;
+                                return (
+                                  <div
+                                    key={dayName}
+                                    className={`rounded-lg py-1.5 text-[11px] font-bold transition-all ${
+                                      isToday
+                                        ? "bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/30"
+                                        : "bg-white text-slate-700 border border-slate-200/80"
+                                    }`}
+                                  >
+                                    <div>{dayName}</div>
+                                    <div
+                                      className={`text-[9px] font-normal ${
+                                        isToday ? "text-blue-100" : "text-emerald-600"
+                                      }`}
+                                    >
+                                      {isToday ? "Today" : "Open"}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : availability.length ? (
+                          <div className="mt-3.5 space-y-1.5">
+                            {availability.map((slot) => {
+                              const isToday = Number(slot.day_of_week) === todayIndex;
+                              return (
+                                <div
+                                  key={`${schedule.doctor_id}-${slot.day_of_week}-${slot.start_time}-${slot.end_time}`}
+                                  className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-all ${
+                                    isToday
+                                      ? "bg-blue-50 text-blue-900 font-bold border border-blue-200"
+                                      : "bg-white text-slate-700 border border-slate-100"
+                                  }`}
+                                >
+                                  <span className="flex items-center gap-1.5">
+                                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>{DAYS[Number(slot.day_of_week)] || "Day"}</span>
+                                    {isToday && (
+                                      <span className="rounded bg-blue-600 px-1.5 py-0.2 text-[9px] text-white">
+                                        Today
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="font-semibold">
+                                    {formatTime12h(slot.start_time)} – {formatTime12h(slot.end_time)}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : null}
 
+                        {/* CTA Button */}
                         <button
                           type="button"
                           onClick={() => {
@@ -1528,11 +1930,14 @@ function ClinicDetail() {
                             };
                             openBookingModal({ orderType: "video_consult", doctor: docMatch });
                           }}
-                          className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-all active:scale-95"
+                          className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-blue-700 transition-all active:scale-95"
                         >
-                          <Video className="h-3.5 w-3.5" />
+                          <Video className="h-4 w-4" />
                           <span>Book Video Calling</span>
                         </button>
+                        <p className="mt-2 text-center text-[11px] text-slate-400">
+                          Instant connect in 15 mins · Digital prescription on WhatsApp
+                        </p>
                       </div>
                     );
                   })}
@@ -1559,7 +1964,7 @@ function ClinicDetail() {
                       className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5"
                     >
                       <p className="font-bold text-slate-950 text-sm">
-                        {service.doctor_name || "Home Visit Consultation"}
+                        {service.doctor_name ? formatDoctorName(service.doctor_name) : "Home Visit Consultation"}
                       </p>
                       <div className="mt-2 space-y-1 text-xs text-slate-600">
                         {service.is_enabled !== null ? (
