@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { 
   Stethoscope, 
   MapPin, 
@@ -11,19 +11,14 @@ import {
   X,
   LogOut,
   Trash2,
-  ChevronLeft
+  ChevronLeft,
+  Video,
+  Calendar
 } from "lucide-react";
 import { apiBaseUrl } from "../lib/api";
 import { readAiAuthState } from "../ai/AiAuth";
 // import snoutiq_app_icon from "../assets/images/logo.png";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
-
-const PAGES = [
-  { name: "Register for Vet", path: "/vets", icon: Stethoscope },
-  { name: "Register for Clinics", path: "/clinics", icon: MapPin },
-  { name: "Pet Care Guides", path: "/blog", icon: BookOpen },
-  { name: "About Us", path: "/about", icon: Info },
-];
 
 export default function SymptomCheckerSidebar({
   isOpen,
@@ -35,12 +30,62 @@ export default function SymptomCheckerSidebar({
   onNewChat,
   historyRefreshKey,
 }) {
+  const navigate = useNavigate();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   
-  const authState = readAiAuthState();
+  const [authState, setAuthState] = useState(() => readAiAuthState());
   const userId = authState?.user?.id || authState?.user?.user_id;
   const token = authState?.token;
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setAuthState(readAiAuthState());
+    };
+    window.addEventListener("snoutiq_pet_changed", handleAuthChange);
+    window.addEventListener("snoutiq_auth_changed", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      window.removeEventListener("snoutiq_pet_changed", handleAuthChange);
+      window.removeEventListener("snoutiq_auth_changed", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
+
+  const handleOpenBookingFlow = (orderType) => {
+    sessionStorage.setItem("snoutiq_modal_order_type", orderType);
+    sessionStorage.setItem("snoutiq_modal_open", "1");
+    if (window.location.pathname !== "/") {
+      navigate("/");
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("snoutiq_open_booking_modal", { detail: { orderType } })
+      );
+    }
+    if (setIsOpen) setIsOpen(false);
+  };
+
+  const pages = userId
+    ? [
+        {
+          name: "Talk to Vet",
+          icon: Video,
+          onClick: () => handleOpenBookingFlow("video_consult"),
+        },
+        {
+          name: "Book Visit",
+          icon: Calendar,
+          onClick: () => handleOpenBookingFlow("appointment"),
+        },
+        { name: "Pet Care Guides", path: "/blog", icon: BookOpen },
+        { name: "About Us", path: "/about", icon: Info },
+      ]
+    : [
+        { name: "Register for Vet", path: "/vets", icon: Stethoscope },
+        { name: "Register for Clinics", path: "/clinics", icon: MapPin },
+        { name: "Pet Care Guides", path: "/blog", icon: BookOpen },
+        { name: "About Us", path: "/about", icon: Info },
+      ];
 
   useEffect(() => {
     if (!userId) return;
@@ -144,8 +189,20 @@ export default function SymptomCheckerSidebar({
         {/* Desktop icon-rail: quick access to Pages when collapsed */}
         {!isDesktopOpen && (
           <div className="hidden md:flex flex-col items-center gap-1 px-2 pb-3">
-            {PAGES.map((page) => {
+            {pages.map((page) => {
               const Icon = page.icon;
+              if (page.onClick) {
+                return (
+                  <button
+                    key={page.name}
+                    onClick={page.onClick}
+                    title={page.name}
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                  >
+                    <Icon size={18} />
+                  </button>
+                );
+              }
               return (
                 <NavLink
                   key={page.name}
@@ -212,8 +269,20 @@ export default function SymptomCheckerSidebar({
         <div className={`p-3 border-t border-slate-100 shrink-0 ${!isDesktopOpen ? "md:hidden" : ""}`}>
           <p className="px-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Pages</p>
           <div className="space-y-0.5">
-            {PAGES.map((page) => {
+            {pages.map((page) => {
               const Icon = page.icon;
+              if (page.onClick) {
+                return (
+                  <button
+                    key={page.name}
+                    onClick={page.onClick}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors text-left"
+                  >
+                    <Icon size={18} />
+                    {page.name}
+                  </button>
+                );
+              }
               return (
                 <NavLink
                   key={page.name}

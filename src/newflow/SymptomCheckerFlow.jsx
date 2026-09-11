@@ -148,13 +148,22 @@ export default function SymptomCheckerFlow({
       setPetFormPart(1);
       setShowPetModal(true);
     };
+    const handleOpenBooking = (e) => {
+      const orderType = e?.detail?.orderType || "video_consult";
+      setBookingOrderType(orderType);
+      sessionStorage.setItem("snoutiq_modal_order_type", orderType);
+      sessionStorage.setItem("snoutiq_modal_open", "1");
+      setShowDoctorsModal(true);
+    };
     window.addEventListener("snoutiq_pet_changed", handlePetChange);
     window.addEventListener("storage", handlePetChange);
     window.addEventListener("snoutiq_open_pet_modal", handleOpenModal);
+    window.addEventListener("snoutiq_open_booking_modal", handleOpenBooking);
     return () => {
       window.removeEventListener("snoutiq_pet_changed", handlePetChange);
       window.removeEventListener("storage", handlePetChange);
       window.removeEventListener("snoutiq_open_pet_modal", handleOpenModal);
+      window.removeEventListener("snoutiq_open_booking_modal", handleOpenBooking);
     };
   }, []);
 

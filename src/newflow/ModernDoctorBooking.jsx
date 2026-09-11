@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, 
 import { readAiAuthState } from "../ai/AiAuth";
 import UserDetailsOtpModal from "./UserDetailsOtpModal";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
+import clinicDefaultImg from "../assets/images/clinic.png";
 
 const API_BASE = "https://snoutiq.com/backend/api";
 
@@ -30,11 +31,53 @@ function formatCurrency(amount) {
 }
 
 function normalizeImage(value) {
-  const text = (value || "").trim();
-  if (!text) return "";
-  if (/^https?:\/\//i.test(text)) return text;
+  if (!value) return "";
+  const text = String(value).trim();
+  if (!text || text === "null" || text === "undefined") return "";
+  if (/^https?:\/\//i.test(text)) {
+    return text.replace("https://snoutiq.com/https://snoutiq.com", "https://snoutiq.com");
+  }
   const cleanPath = text.startsWith("/") ? text.slice(1) : text;
+  if (cleanPath.startsWith("backend/")) {
+    return `https://snoutiq.com/${cleanPath}`;
+  }
   return `https://snoutiq.com/backend/${cleanPath}`;
+}
+
+const DEFAULT_CLINIC_FALLBACK = "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=400&q=80";
+
+function resolveClinicImage(clinic) {
+  if (!clinic) return DEFAULT_CLINIC_FALLBACK;
+
+  const candidate = clinic.clinic_image_url || 
+                    clinic.clinic_image || 
+                    clinic.image || 
+                    clinic.clinic_image_blob ||
+                    clinic.photo || 
+                    clinic.banner || 
+                    clinic.clinic_photo ||
+                    (Array.isArray(clinic.clinic_photos) && clinic.clinic_photos[0]) ||
+                    (clinic.media && (clinic.media.image_url || clinic.media.image)) ||
+                    (Array.isArray(clinic.clinic_services) && clinic.clinic_services[0]?.service_pic) ||
+                    null;
+
+  if (candidate && typeof candidate === "string" && candidate.trim() !== "" && candidate !== "null" && candidate !== "undefined") {
+    const norm = normalizeImage(candidate);
+    if (norm) return norm;
+  }
+
+  if (Array.isArray(clinic.doctors) && clinic.doctors.length > 0) {
+    const docImg = clinic.doctors[0]?.doctor_image_blob_url || 
+                   clinic.doctors[0]?.doctor_image_url || 
+                   clinic.doctors[0]?.doctor_image || 
+                   clinic.doctors[0]?.image;
+    if (docImg && typeof docImg === "string" && docImg.trim() !== "" && docImg !== "null" && docImg !== "undefined") {
+      const norm = normalizeImage(docImg);
+      if (norm) return norm;
+    }
+  }
+
+  return DEFAULT_CLINIC_FALLBACK;
 }
 
 const formatSpecialization = (val) => {
@@ -104,6 +147,11 @@ function enrichDoctorObject(doc, clinicMap = new Map()) {
 
   const imgUrl = doc.doctor_image_blob_url || normalizeImage(doc.doctor_image || doc.doctor_blob_url || doc.doctor_image_url || doc.image);
 
+  const rawDistance = doc.distance_km ?? doc.clinic?.distance_km ?? clinic?.distance_km ?? doc.distance;
+  const parsedDistance = (rawDistance !== null && rawDistance !== undefined && rawDistance !== "" && !isNaN(Number(rawDistance)))
+    ? Number(rawDistance)
+    : null;
+
   return {
     ...doc,
     id: doc.id || doc.doctor_id,
@@ -123,12 +171,49 @@ function enrichDoctorObject(doc, clinicMap = new Map()) {
     followUpPolicy: doc.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta || "",
     googleRating: parsedRating,
     googleReviewCount: Number(reviewCount),
+    distance_km: parsedDistance,
     clinicCity: doc.clinic?.city || doc.clinic_address || clinic?.city || "",
     clinicName: doc.clinic_name || doc.clinic?.name || clinic?.name || "",
     vet_registeration_id: regId
   };
 }
 
+function extractClinicsList(clinicRes) {
+  if (!clinicRes) return [];
+  const raw = Array.isArray(clinicRes?.data?.data)
+    ? clinicRes.data.data
+    : (Array.isArray(clinicRes?.data) ? clinicRes.data : (Array.isArray(clinicRes?.clinics) ? clinicRes.clinics : (Array.isArray(clinicRes) ? clinicRes : [])));
+  return raw.filter(Boolean);
+}
+
+function extractDoctorsList(docRes, clinicMap = new Map()) {
+  if (!docRes) return [];
+  const entries = docRes?.doctors || docRes?.data?.doctors || docRes?.data || docRes || [];
+  if (!Array.isArray(entries)) return [];
+
+  const rawDocs = [];
+  entries.forEach(item => {
+    if (!item) return;
+    if (Array.isArray(item.doctors) && item.doctors.length > 0) {
+      item.doctors.forEach(d => {
+        if (d) {
+          rawDocs.push({
+            ...d,
+            clinic_id: d.clinic_id || item.id || item.clinic_id,
+            clinic_name: d.clinic_name || item.name || item.clinic_name,
+            clinic_city: d.clinic_city || item.city || item.clinic_city,
+            clinic_address: d.clinic_address || item.address || item.clinic_address,
+            distance_km: d.distance_km ?? item.distance_km ?? d.distance ?? item.distance
+          });
+        }
+      });
+    } else if (item.doctor_name || item.name || item.doctor_id || item.years_of_experience || item.specialization) {
+      rawDocs.push(item);
+    }
+  });
+
+  return rawDocs.map(doc => enrichDoctorObject(doc, clinicMap)).filter(Boolean);
+}
 
 function isSlotAfterCurrentTime(slotTimeStr, selectedDateStr) {
   if (!slotTimeStr) return false;
@@ -317,31 +402,22 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
 
     try {
       const [docRes, clinicRes] = await Promise.all([
-        fetch(`${API_BASE}/exported_from_excell_doctors`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        fetch(`${API_BASE}/exported_from_excell_doctors${userId ? `?user_id=${userId}` : ''}`, {
+          headers: { Accept: "application/json" }
         }).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations${userId ? `?user_id=${userId}` : ''}`, {
+          headers: { Accept: "application/json" }
         }).then(r => r.ok ? r.json() : null).catch(() => null)
       ]);
 
-      const rawDocs = Array.isArray(docRes?.doctors) 
-        ? docRes.doctors 
-        : (Array.isArray(docRes?.data?.doctors) 
-          ? docRes.data.doctors 
-          : (Array.isArray(docRes?.data) ? docRes.data : (Array.isArray(docRes) ? docRes : [])));
-
-      const rawClinics = Array.isArray(clinicRes?.data?.data) 
-        ? clinicRes.data.data 
-        : (Array.isArray(clinicRes?.data) ? clinicRes.data : []);
-
+      const rawClinics = extractClinicsList(clinicRes);
       const clinicMap = new Map();
       rawClinics.forEach(c => {
         const key = String(c.id || c.clinic_id || "");
         if (key) clinicMap.set(key, c);
       });
 
-      const enrichedDoctors = rawDocs.map(doc => enrichDoctorObject(doc, clinicMap)).filter(Boolean);
+      const enrichedDoctors = extractDoctorsList(docRes, clinicMap);
       setOtherDoctors(enrichedDoctors);
       setAllVetsLoaded(true);
     } catch (err) {
@@ -350,25 +426,23 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
       setAllVetsLoading(false);
       setLoading(false);
     }
-  }, [token, userId]);
+  }, [userId]);
 
   // Helper to fetch all clinics (Book Visit Flow)
   const fetchAllClinics = useCallback(async () => {
     setAllClinicsLoading(true);
     try {
-      let inclinicRes;
-      try {
-        inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        if (!inclinicRes.ok) throw new Error("Inclinic auth fetch failed");
-      } catch (e) {
-        inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations?user_id=${userId}`);
+      let inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations${userId ? `?user_id=${userId}` : ''}`, {
+        headers: { Accept: "application/json" }
+      }).then(r => r.ok ? r.json() : null).catch(() => null);
+
+      if (!inclinicRes) {
+        inclinicRes = await fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations`, {
+          headers: { Accept: "application/json" }
+        }).then(r => r.ok ? r.json() : null).catch(() => null);
       }
-      const inclinicData = await inclinicRes.json();
-      const rawClinicsData = Array.isArray(inclinicData?.data?.data) 
-        ? inclinicData.data.data 
-        : (Array.isArray(inclinicData?.data) ? inclinicData.data : (Array.isArray(inclinicData?.clinics) ? inclinicData.clinics : []));
+
+      const rawClinicsData = extractClinicsList(inclinicRes);
       setOtherClinics(rawClinicsData);
       setAllClinicsLoaded(true);
     } catch (e) {
@@ -377,29 +451,70 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
       setAllClinicsLoading(false);
       setLoading(false);
     }
-  }, [token, userId]);
+  }, [userId]);
 
   // STEP 1 — Initial Data Fetching for both Talk to Vet & Book Visit
   useEffect(() => {
     async function loadInitialData() {
       setLoading(true);
 
-      if (orderType === "appointment") {
-        // Book Visit Flow: STEP 1 Check last-vet-details FIRST
+      const fetchLastVetData = async () => {
+        if (!userId) return null;
         try {
-          const res = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`, {
+          const r = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           });
-          const data = await res.json();
-          
-          const rawLastClinics = data?.data?.clinics || data?.clinics || (Array.isArray(data?.data) ? data.data.filter(x => x.clinic_name || x.name || x.clinic) : []);
-          const docs = data?.data?.doctors || data?.doctors || [];
-          let extractedClinics = [...rawLastClinics];
+          if (r.ok) return await r.json();
+        } catch (e) {
+          // ignore
+        }
+        try {
+          const r = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`);
+          if (r.ok) return await r.json();
+        } catch (e) {
+          // ignore
+        }
+        return null;
+      };
 
+      if (orderType === "appointment") {
+        // Book Visit Flow: Check last-vet-details and inclinic-lists in parallel for distance
+        try {
+          const [res, inclinicRes] = await Promise.all([
+            fetchLastVetData(),
+            fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations${userId ? `?user_id=${userId}` : ''}`, {
+              headers: { Accept: "application/json" }
+            }).then(r => r.ok ? r.json() : null).catch(() => null)
+          ]);
+
+          const rawClinicsData = extractClinicsList(inclinicRes);
+
+          if (rawClinicsData.length > 0) {
+            setOtherClinics(rawClinicsData);
+            setAllClinicsLoaded(true);
+          }
+          
+          let extractedClinics = [];
+          if (res?.data?.clinic && typeof res.data.clinic === 'object' && res.data.clinic.name) {
+            extractedClinics.push(res.data.clinic);
+          } else if (res?.clinic && typeof res.clinic === 'object' && res.clinic.name) {
+            extractedClinics.push(res.clinic);
+          } else if (Array.isArray(res?.data?.clinics)) {
+            extractedClinics.push(...res.data.clinics);
+          } else if (Array.isArray(res?.clinics)) {
+            extractedClinics.push(...res.clinics);
+          } else if (Array.isArray(res?.data)) {
+            extractedClinics.push(...res.data.filter(x => x && (x.clinic_name || x.name || x.clinic)));
+          }
+
+          const docs = res?.data?.doctors || res?.doctors || [];
           if (extractedClinics.length === 0 && docs.length > 0) {
             docs.forEach(d => {
               if (d.clinic) {
-                extractedClinics.push(d.clinic);
+                extractedClinics.push({
+                  ...d.clinic,
+                  distance_km: d.clinic.distance_km ?? d.distance_km ?? d.distance
+                });
               } else if (d.clinic_name || d.clinic_id) {
                 extractedClinics.push({
                   id: d.clinic_id || d.id,
@@ -408,6 +523,7 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
                   address: d.clinic_address || "",
                   google_rating: d.google_rating || 5.0,
                   google_user_ratings_total: d.google_user_ratings_total || 50,
+                  distance_km: d.distance_km ?? d.distance,
                   doctors: [d]
                 });
               }
@@ -420,11 +536,24 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
             const cId = String(c.id || c.clinic_id || c.name);
             if (cId && !seenIds.has(cId)) {
               seenIds.add(cId);
-              uniqueLastClinics.push(c);
+
+              // If distance_km is missing in last-vet-details response, retrieve from inclinic API list
+              let dist = c.distance_km ?? c.distance;
+              if (dist == null && rawClinicsData.length > 0) {
+                const match = rawClinicsData.find(rc => 
+                  String(rc.id) === String(c.id || c.clinic_id) ||
+                  (rc.name && c.name && rc.name.toLowerCase().trim() === c.name.toLowerCase().trim())
+                );
+                if (match && match.distance_km != null) {
+                  dist = match.distance_km;
+                }
+              }
+
+              uniqueLastClinics.push({ ...c, distance_km: dist });
             }
           });
 
-          const hasClinics = data?.success === true && uniqueLastClinics.length > 0;
+          const hasClinics = res?.success === true && uniqueLastClinics.length > 0;
 
           if (hasClinics) {
             setLastVetClinics(uniqueLastClinics);
@@ -432,7 +561,11 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
             setLoading(false);
           } else {
             setHasLastClinic(false);
-            await fetchAllClinics();
+            if (!rawClinicsData.length) {
+              await fetchAllClinics();
+            } else {
+              setLoading(false);
+            }
           }
         } catch (err) {
           console.warn("last-vet-details clinic check failed, loading all clinics as fallback:", err);
@@ -442,24 +575,63 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
         return;
       }
 
-      // Talk to Vet Flow: STEP 1 Check last-vet-details FIRST
+      // Talk to Vet Flow: Check last-vet-details and exported_from_excell_doctors in parallel
       try {
-        const res = await fetch(`${API_BASE}/users/last-vet-details?user_id=${userId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        const data = await res.json();
-        const docs = data?.data?.doctors || data?.doctors || (Array.isArray(data?.data) ? data.data : []);
+        const [res, docRes, clinicRes] = await Promise.all([
+          fetchLastVetData(),
+          fetch(`${API_BASE}/exported_from_excell_doctors${userId ? `?user_id=${userId}` : ''}`, {
+            headers: { Accept: "application/json" }
+          }).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`${API_BASE}/inclinic-lists-new-after-10th-may-registerations${userId ? `?user_id=${userId}` : ''}`, {
+            headers: { Accept: "application/json" }
+          }).then(r => r.ok ? r.json() : null).catch(() => null)
+        ]);
 
-        const hasVet = data?.success === true && Array.isArray(docs) && docs.length > 0;
+        const rawClinics = extractClinicsList(clinicRes);
+        const clinicMap = new Map();
+        rawClinics.forEach(c => {
+          const key = String(c.id || c.clinic_id || "");
+          if (key) clinicMap.set(key, c);
+        });
+
+        const allDocs = extractDoctorsList(docRes, clinicMap);
+
+        if (allDocs.length > 0) {
+          setOtherDoctors(allDocs);
+          setAllVetsLoaded(true);
+        }
+
+        const lastDocs = res?.data?.doctors || res?.doctors || (Array.isArray(res?.data) ? res.data : []);
+        const hasVet = res?.success === true && Array.isArray(lastDocs) && lastDocs.length > 0;
 
         if (hasVet) {
-          const enrichedLastVet = docs.map(d => enrichDoctorObject(d)).filter(Boolean);
+          const enrichedLastVet = lastDocs.map(d => {
+            // If distance_km is missing in last-vet-details, match from allDocs
+            let dist = d.distance_km ?? d.distance;
+            if (dist == null && allDocs.length > 0) {
+              const match = allDocs.find(rd => 
+                String(rd.id || rd.doctor_id) === String(d.id || d.doctor_id) || 
+                (rd.name && d.doctor_name && rd.name.toLowerCase().trim() === d.doctor_name.toLowerCase().trim()) ||
+                (rd.doctor_name && d.doctor_name && rd.doctor_name.toLowerCase().trim() === d.doctor_name.toLowerCase().trim()) ||
+                (rd.doctor_mobile && d.doctor_mobile && rd.doctor_mobile === d.doctor_mobile)
+              );
+              if (match && match.distance_km != null) {
+                dist = match.distance_km;
+              }
+            }
+            return enrichDoctorObject({ ...d, distance_km: dist }, clinicMap);
+          }).filter(Boolean);
+
           setLastVetDoctors(enrichedLastVet);
           setHasLastVet(true);
           setLoading(false);
         } else {
           setHasLastVet(false);
-          await fetchAllDoctors();
+          if (!allDocs.length) {
+            await fetchAllDoctors();
+          } else {
+            setLoading(false);
+          }
         }
       } catch (err) {
         console.warn("last-vet-details check failed, loading all doctors as fallback:", err);
@@ -847,10 +1019,17 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
                   )}
                 </div>
                 
-                {/* Experience Badge */}
-                <p className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
-                  {doc.degree || "BVSc"} · {doc.experience || 5} yrs exp
-                </p>
+                {/* Experience & Distance Badges */}
+                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                  <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md inline-block">
+                    {doc.degree || "BVSc"} · {doc.experience || 5} yrs exp
+                  </span>
+                  {doc.distance_km != null && !isNaN(Number(doc.distance_km)) && (
+                    <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1">
+                      <span>📍 {Number(doc.distance_km).toFixed(1)} km</span>
+                    </span>
+                  )}
+                </div>
               </div>
               
               {/* Amber Google Rating Badge */}
@@ -990,59 +1169,79 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
               (() => {
                 const renderClinicCard = (clinic, isTrustedClinic = false) => {
                   const feeVal = getClinicCurrentPrice(clinic);
-                  const imgUrl = clinic.clinic_image_url || clinic.clinic_image || "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=600&q=80";
+                  const imgUrl = resolveClinicImage(clinic);
                   const doctorsCount = clinic.doctors_count || (Array.isArray(clinic.doctors) ? clinic.doctors.length : 1);
                   const isTrusted = isTrustedClinic || (clinic.google_rating || 5.0) >= 4.5;
 
                   return (
-                    <div key={clinic.id || clinic.name} className={`bg-white border rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${isTrustedClinic ? 'border-emerald-300 ring-1 ring-emerald-400/40' : 'border-slate-200/90'}`}>
-                      <div className="relative h-32 w-full bg-slate-800">
-                        <img src={imgUrl} alt={clinic.name} className="w-full h-full object-cover" />
-                        {isTrusted && (
-                          <span className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-bold text-slate-800 shadow-sm flex items-center gap-1">
-                            ★ Trust
-                          </span>
-                        )}
-                        {isTrustedClinic && (
-                          <span className="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full shadow-sm">
-                            Your Clinic
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
-                        <div>
-                          <div className="flex items-start justify-between gap-1.5">
-                            <div>
-                              <h3 className="font-bold text-slate-900 text-xs leading-snug line-clamp-1">{clinic.name}</h3>
-                              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                    <div key={clinic.id || clinic.name} className={`bg-white border rounded-2xl p-3 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-2 relative ${isTrustedClinic ? 'border-emerald-300 ring-1 ring-emerald-400/40 bg-emerald-50/10' : 'border-slate-200/90'}`}>
+                      <div className="flex items-start gap-2.5">
+                        {/* Left Clinic Image / Thumbnail */}
+                        <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-100 flex-shrink-0 border border-slate-200/80 overflow-hidden">
+                          <img 
+                            src={imgUrl} 
+                            alt={clinic.name} 
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = DEFAULT_CLINIC_FALLBACK;
+                            }}
+                            className="w-full h-full object-cover rounded-2xl" 
+                          />
+                          {isTrusted && (
+                            <span className="absolute bottom-1 right-1 bg-emerald-500 text-white text-[8px] font-extrabold px-1 rounded shadow-xs">
+                              ★
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Right Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1 flex-wrap">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="font-bold text-slate-900 text-xs leading-tight line-clamp-1">{clinic.name}</h3>
+                                {isTrustedClinic && (
+                                  <span className="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border border-emerald-200 shrink-0">
+                                    Your Clinic
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">
                                 📍 {clinic.address || clinic.city || "Gurugram"}{clinic.pincode ? `, ${clinic.pincode}` : ""}
                               </p>
+
+                              {/* Badges: Rating, Vets, Distance */}
+                              <div className="flex items-center gap-1 mt-1 text-[10px] flex-wrap">
+                                <span className="bg-amber-50 text-amber-900 border border-amber-200/80 font-bold px-1.5 py-0.2 rounded-md flex items-center gap-0.5 shrink-0">
+                                  ⭐ {clinic.google_rating || 5.0} <span className="text-amber-700 font-medium">({clinic.google_user_ratings_total || 50})</span>
+                                </span>
+                                <span className="bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.2 rounded-md shrink-0">
+                                  👤 {doctorsCount} Vet{doctorsCount > 1 ? "s" : ""}
+                                </span>
+                                {clinic.distance_km != null && !isNaN(Number(clinic.distance_km)) && (
+                                  <span className="bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.2 rounded-md border border-slate-200/80 inline-flex items-center gap-0.5 shrink-0">
+                                    <span>📍 {Number(clinic.distance_km).toFixed(1)} km</span>
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0">
-                              ₹{feeVal}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 mt-2 text-[10px] flex-wrap">
-                            <span className="bg-amber-50 text-amber-900 border border-amber-200/80 font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
-                              ⭐ {clinic.google_rating || 5.0} <span className="text-amber-700 font-medium">({clinic.google_user_ratings_total || 50})</span>
-                            </span>
-                            <span className="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md">
-                              👤 {doctorsCount} Vet{doctorsCount > 1 ? "s" : ""}
-                            </span>
                           </div>
                         </div>
+                      </div>
 
-                        <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-medium">In-clinic visit</span>
-                          <button 
-                            onClick={() => handleSelectClinic(clinic)}
-                            className="bg-[#0052FF] hover:bg-[#0046DB] text-white font-bold text-[11px] px-3.5 py-1.5 rounded-full transition-all shadow-xs flex items-center gap-1"
-                          >
-                            Book Visit →
-                          </button>
+                      {/* Bottom Row */}
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                        <div className="text-slate-900 font-extrabold text-xs">
+                          ₹{feeVal}<span className="text-[10px] font-normal text-slate-400">/In-Clinic Visit</span>
                         </div>
+
+                        <button 
+                          onClick={() => handleSelectClinic(clinic)}
+                          className="bg-[#0052FF] hover:bg-[#0046DB] text-white font-bold text-[11px] px-4 py-1.5 rounded-full transition-all shadow-xs flex items-center gap-1 shrink-0"
+                        >
+                          Book Visit →
+                        </button>
                       </div>
                     </div>
                   );
@@ -1211,15 +1410,33 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
             
             {/* Header info */}
             {orderType === "appointment" ? (
-              <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-xs">
-                <div>
-                  <h3 className="font-bold text-slate-900 text-xs">{selectedClinic?.name || selectedDoctor?.clinicName || "Clinic"}</h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{selectedClinic?.city || "Gurugram"}{selectedClinic?.pincode ? `, ${selectedClinic.pincode}` : ""}</p>
-                  <span className="inline-block mt-1 bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px] px-2 py-0.5 rounded-md">
-                    ★ {selectedClinic?.google_rating || 5.0} ({selectedClinic?.google_user_ratings_total || 78})
-                  </span>
+              <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-xs gap-3">
+                <div className="flex items-center gap-3">
+                  <img 
+                    src={resolveClinicImage(selectedClinic)} 
+                    alt={selectedClinic?.name} 
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = clinicDefaultImg;
+                    }}
+                    className="w-12 h-12 rounded-xl object-cover border border-slate-200 flex-shrink-0" 
+                  />
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-xs">{selectedClinic?.name || selectedDoctor?.clinicName || "Clinic"}</h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{selectedClinic?.city || "Gurugram"}{selectedClinic?.pincode ? `, ${selectedClinic.pincode}` : ""}</p>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      <span className="bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px] px-2 py-0.5 rounded-md">
+                        ★ {selectedClinic?.google_rating || 5.0} ({selectedClinic?.google_user_ratings_total || 78})
+                      </span>
+                      {selectedClinic?.distance_km != null && !isNaN(Number(selectedClinic.distance_km)) && (
+                        <span className="bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px] px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                          <span>📍 {Number(selectedClinic.distance_km).toFixed(1)} km</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 text-lg font-bold flex-shrink-0">
+                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 text-base font-bold flex-shrink-0">
                   🏥
                 </div>
               </div>
@@ -1234,7 +1451,14 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
                 )}
                 <div>
                   <h3 className="font-bold text-slate-900 text-xs">{selectedDoctor?.name}</h3>
-                  <p className="text-[11px] font-semibold text-blue-600 mt-0.5">{selectedDoctor?.degree} · {selectedDoctor?.experience} Yrs Exp</p>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <p className="text-[11px] font-semibold text-blue-600">{selectedDoctor?.degree} · {selectedDoctor?.experience} Yrs Exp</p>
+                    {selectedDoctor?.distance_km != null && !isNaN(Number(selectedDoctor.distance_km)) && (
+                      <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1">
+                        <span>📍 {Number(selectedDoctor.distance_km).toFixed(1)} km</span>
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[10px] text-slate-500 mt-0.5">{selectedDoctor?.specialization}</p>
                 </div>
               </div>
@@ -1748,11 +1972,18 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
                       <Check size={8} /> Verified
                     </span>
                   </div>
-                  <p className="text-[11px] font-semibold text-blue-600 mt-0.5">
-                    {viewProfileDoctor.degree} · {viewProfileDoctor.experience} Yrs Exp
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <p className="text-[11px] font-semibold text-blue-600">
+                      {viewProfileDoctor.degree} · {viewProfileDoctor.experience} Yrs Exp
+                    </p>
+                    {viewProfileDoctor.distance_km != null && !isNaN(Number(viewProfileDoctor.distance_km)) && (
+                      <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1">
+                        <span>📍 {Number(viewProfileDoctor.distance_km).toFixed(1)} km away</span>
+                      </span>
+                    )}
+                  </div>
                   {viewProfileDoctor.googleRating !== null && (
-                    <span className="inline-flex items-center gap-1 mt-0.5 bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded-md text-[10px] font-bold">
+                    <span className="inline-flex items-center gap-1 mt-1 bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded-md text-[10px] font-bold">
                       ⭐ {viewProfileDoctor.googleRating} ({viewProfileDoctor.googleReviewCount})
                     </span>
                   )}
