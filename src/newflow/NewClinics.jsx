@@ -22,6 +22,7 @@ import clinicFallbackImage from "../assets/images/clinic.png";
 import { Navbar } from "../newflow/Navbar";
 import { Footer } from "../newflow/NewFooter";
 import { Button } from "../newflow/NewButton";
+import ModernDoctorBooking from "./ModernDoctorBooking";
 
 const CLINIC_FORM_API_URL = "https://snoutiq.com/backend/api/demo-website-form";
 const DIRECT_CONSULT_PATH = "/20+vetsonline?start=details";
@@ -308,6 +309,12 @@ function ClinicDirectory() {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [bookingModal, setBookingModal] = useState({
+    isOpen: false,
+    orderType: "appointment",
+    clinic: null,
+    doctor: null,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -509,10 +516,29 @@ function ClinicDirectory() {
                         </div>
                       ) : null}
 
-                      <span className="mt-auto inline-flex items-center gap-2 pt-5 font-bold text-blue-700">
-                        View clinic
-                        <ArrowRight className="h-4 w-4" />
-                      </span>
+                      <div className="mt-auto flex items-center justify-between gap-3 pt-5">
+                        <span className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-700 group-hover:text-blue-800 transition-colors">
+                          View clinic
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setBookingModal({
+                              isOpen: true,
+                              orderType: "appointment",
+                              clinic: { ...clinic, doctors: entry.doctors || [] },
+                              doctor: Array.isArray(entry.doctors) && entry.doctors[0] ? entry.doctors[0] : null,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all"
+                        >
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          Book Visit
+                        </button>
+                      </div>
                     </div>
                   </Link>
                 );
@@ -523,6 +549,15 @@ function ClinicDirectory() {
       </section>
 
       <ClinicLeadForm />
+
+      {bookingModal.isOpen && (
+        <ModernDoctorBooking
+          onClose={() => setBookingModal({ isOpen: false, orderType: "appointment", clinic: null, doctor: null })}
+          orderType={bookingModal.orderType}
+          initialClinic={bookingModal.clinic}
+          initialDoctor={bookingModal.doctor}
+        />
+      )}
     </>
   );
 }
@@ -532,6 +567,24 @@ function ClinicDetail() {
   const [entry, setEntry] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [bookingModal, setBookingModal] = useState({
+    isOpen: false,
+    orderType: "appointment",
+    clinic: null,
+    doctor: null,
+  });
+
+  const openBookingModal = ({ orderType, doctor = null, clinic: targetClinic = null }) => {
+    const currentClinic = entry?.clinic || {};
+    const currentDoctors = entry?.doctors || [];
+    const fullClinic = targetClinic || { ...currentClinic, doctors: currentDoctors };
+    setBookingModal({
+      isOpen: true,
+      orderType: orderType || "appointment",
+      clinic: fullClinic,
+      doctor: doctor || (currentDoctors.length > 0 ? currentDoctors[0] : null),
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -679,6 +732,27 @@ function ClinicDetail() {
                   {detailSummary}
                 </p>
               ) : null}
+
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => openBookingModal({ orderType: "appointment" })}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 active:scale-98 transition-all"
+                >
+                  <CalendarDays className="h-4.5 w-4.5" />
+                  Book In-Clinic Appointment
+                </button>
+                {doctors.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => openBookingModal({ orderType: "video_consult", doctor: doctors[0] })}
+                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3.5 text-sm font-bold text-blue-700 hover:bg-blue-100 active:scale-98 transition-all"
+                  >
+                    <Video className="h-4.5 w-4.5" />
+                    Book Video Calling
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -764,6 +838,20 @@ function ClinicDetail() {
             {daySlots.length ? (
             <DetailSection title="Clinic Day Slots">
               <SlotList slots={daySlots} />
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                <div>
+                  <p className="text-sm font-bold text-blue-950">Reserve Your Visit Today</p>
+                  <p className="text-xs text-blue-700">Select date & available consultation slot at this clinic</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openBookingModal({ orderType: "appointment" })}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-all active:scale-95"
+                >
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Book In-Clinic Appointment
+                </button>
+              </div>
             </DetailSection>
             ) : null}
 
@@ -827,6 +915,24 @@ function ClinicDetail() {
                           Languages: {languages.join(", ")}
                         </p>
                       ) : null}
+                      <div className="mt-4 flex flex-wrap items-center gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => openBookingModal({ orderType: "video_consult", doctor })}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all"
+                        >
+                          <Video className="h-3.5 w-3.5" />
+                          Book Video Calling
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openBookingModal({ orderType: "appointment", doctor })}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:border-blue-600 hover:text-blue-600 active:scale-95 transition-all"
+                        >
+                          <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+                          Book In-Clinic Appointment
+                        </button>
+                      </div>
                     </div>
                     );
                   })}
@@ -1032,6 +1138,22 @@ function ClinicDetail() {
                           ))}
                         </div>
                       ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const docMatch = doctors.find(d => String(d.id) === String(schedule.doctor_id)) || {
+                            id: schedule.doctor_id,
+                            doctor_name: schedule.doctor_name,
+                            video_day_rate: schedule.day_rate,
+                            video_night_rate: schedule.night_rate,
+                          };
+                          openBookingModal({ orderType: "video_consult", doctor: docMatch });
+                        }}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-all active:scale-95"
+                      >
+                        <Video className="h-3.5 w-3.5" />
+                        Book Video Calling
+                      </button>
                     </div>
                     );
                   })}
@@ -1041,6 +1163,15 @@ function ClinicDetail() {
           </aside>
         </div>
       </section>
+
+      {bookingModal.isOpen && (
+        <ModernDoctorBooking
+          onClose={() => setBookingModal({ isOpen: false, orderType: "appointment", clinic: null, doctor: null })}
+          orderType={bookingModal.orderType}
+          initialClinic={bookingModal.clinic}
+          initialDoctor={bookingModal.doctor}
+        />
+      )}
     </>
   );
 }

@@ -128,8 +128,54 @@ function getClinicCurrentPrice(clinic) {
     return String(Math.round(Number(servicePrice)));
   }
 
+  if (clinic.clinic_day_fee && !isNaN(Number(clinic.clinic_day_fee)) && Number(clinic.clinic_day_fee) > 0) {
+    return String(Math.round(Number(clinic.clinic_day_fee)));
+  }
+
   // Fallback to static 499 if empty/null
   return "499";
+}
+
+function formatInitialDoctor(doc, clinic = null) {
+  if (!doc) return null;
+  const dayRate = Number(doc.video_day_rate || doc.feeDay || doc.doctors_price || 499);
+  const nightRate = Number(doc.video_night_rate || doc.feeNight || doc.video_day_rate || 650);
+
+  return {
+    id: doc.id || doc.doctor_id,
+    name: doc.doctor_name || doc.name || "Doctor",
+    doctor_name: doc.doctor_name || doc.name || "Doctor",
+    degree: doc.degree || "BVSc",
+    experience: Number(doc.years_of_experience || doc.experience || 5),
+    specialization: formatSpecialization(doc.specialization_select_all_that_apply || doc.specialization),
+    feeDay: dayRate,
+    feeNight: nightRate,
+    image: normalizeImage(doc.doctor_blob_url || doc.doctor_image_blob_url || doc.doctor_image_url || doc.doctor_image || doc.image),
+    status: doc.doctor_status || doc.status || "available",
+    available: true,
+    responseTimeDay: "0 To 15 Mins",
+    clinicId: doc.vet_registeration_id || clinic?.id || clinic?.clinic_id || doc.clinicId,
+    clinicName: clinic?.name || doc.clinicName || "",
+    clinicAddress: clinic?.address || clinic?.formatted_address || doc.clinicAddress || "",
+    clinicCity: clinic?.city || doc.clinicCity || "Gurugram",
+    googleRating: clinic?.rating ?? clinic?.google_rating ?? doc.googleRating ?? 5.0,
+    googleReviewCount: clinic?.user_ratings_total ?? clinic?.google_user_ratings_total ?? doc.googleReviewCount ?? 50,
+  };
+}
+
+function formatInitialClinic(c) {
+  if (!c) return null;
+  return {
+    ...c,
+    id: c.id || c.clinic_id,
+    name: c.name || "Veterinary Clinic",
+    city: c.city || "Gurugram",
+    address: c.address || c.formatted_address || "",
+    google_rating: c.rating ?? c.google_rating ?? 5.0,
+    google_user_ratings_total: c.user_ratings_total ?? c.google_user_ratings_total ?? 50,
+    clinic_day_fee: c.clinic_day_fee,
+    clinic_night_fee: c.clinic_night_fee,
+  };
 }
 
 function enrichDoctorObject(doc, clinicMap = new Map()) {
@@ -269,7 +315,14 @@ function getUpcomingDates(count = 7) {
   return dates;
 }
 
-export default function ModernDoctorBooking({ onClose, symptomText, preSelectedPet, orderType = "video_consult" }) {
+export default function ModernDoctorBooking({ 
+  onClose, 
+  symptomText, 
+  preSelectedPet, 
+  orderType = "video_consult",
+  initialDoctor = null,
+  initialClinic = null,
+}) {
   // Doctor States
   const [lastVetDoctors, setLastVetDoctors] = useState([]);
   const [hasLastVet, setHasLastVet] = useState(false);
@@ -286,16 +339,16 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
   const [allClinicsLoaded, setAllClinicsLoaded] = useState(false);
   const [otherClinics, setOtherClinics] = useState([]);
 
-  const [selectedClinic, setSelectedClinic] = useState(null);
+  const [selectedClinic, setSelectedClinic] = useState(() => formatInitialClinic(initialClinic));
   const [loading, setLoading] = useState(true);
-  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [selectedDoctor, setSelectedDoctor] = useState(() => formatInitialDoctor(initialDoctor, initialClinic));
   const [searchQuery, setSearchQuery] = useState("");
   
   const [selectedExpFilter, setSelectedExpFilter] = useState("any"); // "any" | "1" | "3" | "5" | "10"
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [viewProfileDoctor, setViewProfileDoctor] = useState(null);
 
-  const [flowStep, setFlowStep] = useState("list"); // "list" | "describe" | "checkout"
+  const [flowStep, setFlowStep] = useState(() => (initialDoctor || initialClinic) ? "describe" : "list");
   const [issueText, setIssueText] = useState(() => symptomText || localStorage.getItem("symptom_description") || "");
   const [attachedImages, setAttachedImages] = useState([]);
   const [consentGiven, setConsentGiven] = useState(true);
@@ -839,6 +892,27 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
     setFlowStep("describe");
   };
 
+  // Handle initialClinic / initialDoctor props passed from external pages (like clinic slug pages)
+  useEffect(() => {
+    if (orderType === "appointment" && initialClinic) {
+      const c = formatInitialClinic(initialClinic);
+      setSelectedClinic(c);
+      if (initialDoctor) {
+        const d = formatInitialDoctor(initialDoctor, c);
+        setSelectedDoctor(d);
+        const todayStr = getUpcomingDates(7)[0].dateStr;
+        fetchDateAvailabilityAndSlots(todayStr, d, c);
+        setFlowStep("describe");
+      } else {
+        handleSelectClinic(c);
+      }
+    } else if (orderType === "video_consult" && initialDoctor) {
+      const d = formatInitialDoctor(initialDoctor, initialClinic);
+      setSelectedDoctor(d);
+      setFlowStep("describe");
+    }
+  }, [initialClinic, initialDoctor, orderType]);
+
   const handleLockSlotAndCheckout = async () => {
     const docIdToUse = resolvedDoctorId || selectedDoctor?.id;
     if (orderType === "appointment" && (!selectedDate || !selectedTimeSlot || !docIdToUse)) return;
@@ -950,7 +1024,7 @@ export default function ModernDoctorBooking({ onClose, symptomText, preSelectedP
           amount: liveTotal * 100,
           currency: "INR",
           name: "SnoutIQ",
-          description: `${orderType === "appointment" ? "Clinic Visit" : "Video Consult"} with ${selectedDoctor.name}`,
+          description: `${orderType === "appointment" ? "Clinic Visit" : "Video Consult"} with ${selectedDoctor?.name || selectedClinic?.name || "Doctor"}`,
           order_id: orderId,
           prefill: { name: user.name || user.owner_name, contact: user.mobile || user.phone },
           theme: { color: "#0052FF" },
