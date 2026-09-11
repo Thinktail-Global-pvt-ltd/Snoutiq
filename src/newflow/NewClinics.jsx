@@ -29,6 +29,7 @@ import {
   HeartHandshake,
   Activity,
   BadgeCheck,
+  Camera,
 } from "lucide-react";
 
 import axiosClient from "../axios";
@@ -1149,26 +1150,59 @@ function ClinicDetail() {
               </div>
             </div>
 
-            {/* Right Column: Bento Media Showcase */}
+            {/* Right Column: Bento Media Showcase (Both Video & Image) */}
             <div className="relative">
-              <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-slate-950 shadow-xl transition-all">
-                {hasClinicVideo ? (
-                  <div className="relative aspect-[16/11] w-full bg-black">
-                    <video
-                      src={clinic.clinic_video_url}
-                      poster={getClinicImage(clinic)}
-                      className="h-full w-full object-cover"
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
-                      controls
-                    />
-                    <div className="absolute top-3 left-3 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white border border-white/20">
-                      Facility Video Tour
+              {hasClinicVideo ? (
+                <div className="space-y-3.5">
+                  {/* Clinic Facility Video Tour */}
+                  <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-slate-950 shadow-xl transition-all">
+                    <div className="relative aspect-[16/10] w-full bg-black">
+                      <video
+                        src={clinic.clinic_video_url}
+                        poster={getClinicImage(clinic)}
+                        className="h-full w-full object-cover"
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        controls
+                      />
+                      <div className="absolute top-3 left-3 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white border border-white/20 flex items-center gap-1.5 shadow-sm">
+                        <Video className="h-3.5 w-3.5 text-blue-400" />
+                        <span>Facility Video Tour</span>
+                      </div>
                     </div>
                   </div>
-                ) : (
+
+                  {/* Clinic Facility Image Card */}
+                  <div className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-950 shadow-lg transition-all hover:shadow-xl">
+                    <div className="relative aspect-[16/7] w-full overflow-hidden">
+                      <img
+                        src={getClinicImage(clinic)}
+                        alt={clinic.name || "Veterinary clinic"}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        onError={(event) => {
+                          event.currentTarget.onerror = null;
+                          event.currentTarget.src = clinicFallbackImage;
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between text-white">
+                        <div className="flex items-center gap-2">
+                          <Camera className="h-4 w-4 text-blue-300" />
+                          <span className="text-xs sm:text-sm font-bold drop-shadow-sm">
+                            Clinic Facility & Campus
+                          </span>
+                        </div>
+                        <span className="rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-white">
+                          Verified Photo
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-slate-950 shadow-xl transition-all">
                   <div className="relative aspect-[16/11] w-full overflow-hidden group">
                     <img
                       src={getClinicImage(clinic)}
@@ -1190,8 +1224,8 @@ function ClinicDetail() {
                       </span>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
