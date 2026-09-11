@@ -382,6 +382,14 @@ class ClinicFullOnboardingController extends Controller
     {
         $payload = $this->fullPayloadForClinic($clinic);
         $clinicData = $payload['clinic'] ?? [];
+        $doctorNames = collect($payload['doctors'] ?? [])
+            ->mapWithKeys(function ($doctor) {
+                $doctorData = is_array($doctor)
+                    ? $doctor
+                    : (method_exists($doctor, 'toArray') ? $doctor->toArray() : (array) $doctor);
+
+                return [(int) ($doctorData['id'] ?? 0) => $doctorData['doctor_name'] ?? null];
+            });
 
         $payload['clinic'] = collect($clinicData)->only([
             'id',
@@ -432,6 +440,85 @@ class ClinicFullOnboardingController extends Controller
                     'video_day_rate',
                     'video_night_rate',
                 ])->all();
+            })
+            ->values()
+            ->all();
+
+        $serviceRows = collect($payload['services'] ?? [])
+            ->map(function ($service) {
+                $serviceData = is_array($service)
+                    ? $service
+                    : (method_exists($service, 'toArray') ? $service->toArray() : (array) $service);
+
+                return collect($serviceData)->only([
+                    'id',
+                    'user_id',
+                    'name',
+                    'description',
+                    'pet_type',
+                    'price',
+                    'price_min',
+                    'price_max',
+                    'price_after_service',
+                    'duration',
+                    'main_service',
+                    'status',
+                    'created_at',
+                    'updated_at',
+                ])->all();
+            })
+            ->values();
+
+        $payload['machinery'] = $serviceRows
+            ->filter(fn ($service) => ($service['main_service'] ?? null) === 'machinery')
+            ->values()
+            ->all();
+
+        $payload['services'] = $serviceRows
+            ->reject(fn ($service) => ($service['main_service'] ?? null) === 'machinery')
+            ->values()
+            ->all();
+
+        $payload['clinic_availability'] = collect($payload['clinic_availability'] ?? [])
+            ->map(function ($slot) use ($doctorNames) {
+                $slotData = is_array($slot) ? $slot : (array) $slot;
+                $doctorId = (int) ($slotData['doctor_id'] ?? 0);
+
+                return [
+                    'id' => $slotData['id'] ?? null,
+                    'doctor_id' => $doctorId,
+                    'doctor_name' => $doctorNames->get($doctorId),
+                    'service_type' => $slotData['service_type'] ?? null,
+                    'day_of_week' => $slotData['day_of_week'] ?? null,
+                    'start_time' => $slotData['start_time'] ?? null,
+                    'end_time' => $slotData['end_time'] ?? null,
+                    'break_start' => $slotData['break_start'] ?? null,
+                    'break_end' => $slotData['break_end'] ?? null,
+                    'avg_consultation_mins' => $slotData['avg_consultation_mins'] ?? null,
+                    'max_bookings_per_hour' => $slotData['max_bookings_per_hour'] ?? null,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $payload['vet_at_home_services'] = collect($payload['vet_at_home_services'] ?? [])
+            ->map(function ($service) use ($doctorNames) {
+                $serviceData = is_array($service)
+                    ? $service
+                    : (method_exists($service, 'toArray') ? $service->toArray() : (array) $service);
+                $doctorId = (int) ($serviceData['doctor_id'] ?? 0);
+
+                return [
+                    'id' => $serviceData['id'] ?? null,
+                    'clinic_id' => $serviceData['clinic_id'] ?? null,
+                    'doctor_id' => $doctorId,
+                    'doctor_name' => $doctorNames->get($doctorId),
+                    'is_enabled' => $serviceData['is_enabled'] ?? null,
+                    'service_hours' => $serviceData['service_hours'] ?? null,
+                    'response_time' => $serviceData['response_time'] ?? null,
+                    'base_payout' => $serviceData['base_payout'] ?? null,
+                    'protocol_label' => $serviceData['protocol_label'] ?? null,
+                ];
             })
             ->values()
             ->all();
