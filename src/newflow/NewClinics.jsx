@@ -1586,163 +1586,6 @@ function ClinicDetail() {
                 </div>
               </DetailSection>
             ) : null}
-
-            {/* Specialized Health Packages */}
-            {packageItems.length ? (
-              <DetailSection
-                title="Specialized Health Packages"
-                subtitle="Complete preventive health, immunization & surgical care plans"
-                icon={Sparkles}
-                badge={`${packageItems.length} Packages Available`}
-              >
-                {/* Category & Pet Filter Tabs */}
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-100 pb-4">
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setPackageCategory("all")}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                        packageCategory === "all"
-                          ? "bg-blue-600 text-white shadow-xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                    >
-                      All Packages ({packageItems.length})
-                    </button>
-                    {packageCategories.map((cat) => {
-                      const count = packageItems.filter((p) => p.category === cat).length;
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setPackageCategory(cat)}
-                          className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                            packageCategory === cat
-                              ? "bg-blue-600 text-white shadow-xs"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          }`}
-                        >
-                          {cat === "Vaccination" ? "💉 " : "⚕️ "}
-                          {cat} ({count})
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {["all", "Dog", "Cat"].map((pet) => (
-                      <button
-                        key={pet}
-                        type="button"
-                        onClick={() => setPackagePet(pet)}
-                        className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                          packagePet === pet
-                            ? "bg-slate-900 text-white shadow-xs"
-                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                        }`}
-                      >
-                        {pet === "all" ? "All Pets" : pet === "Dog" ? "🐶 Dogs" : "🐱 Cats"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Continuous Auto-Scrolling Sideways Cards Track */}
-                <div className="w-full min-w-0 overflow-hidden">
-                  <div
-                    ref={packageScrollRef}
-                    className="flex gap-4 overflow-x-auto pb-4 pt-1 focus:outline-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing"
-                  >
-                    {displayPackages.map((pkg, idx) => (
-                      <div
-                        key={`${pkg.id}-${idx}`}
-                        className="group relative flex w-[280px] sm:w-[320px] shrink-0 flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs transition-all hover:border-blue-300 hover:shadow-md"
-                      >
-                        <div>
-                          {/* Tags Header */}
-                          <div className="flex items-center justify-between gap-2 mb-3">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-                              {pkg.petType === "Dog" ? "🐶 Dog Care" : pkg.petType === "Cat" ? "🐱 Cat Care" : "🐾 Pet Care"}
-                            </span>
-                            <span
-                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                                pkg.category === "Vaccination"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                                  : "bg-purple-50 text-purple-700 border border-purple-200/60"
-                              }`}
-                            >
-                              {pkg.badge || pkg.category}
-                            </span>
-                          </div>
-
-                          {/* Title & Description */}
-                          <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                            {pkg.title}
-                          </h3>
-                          <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-normal line-clamp-2">
-                            {pkg.description}
-                          </p>
-
-                          {/* Inclusions list */}
-                          {pkg.inclusions && pkg.inclusions.length > 0 && (
-                            <div className="mt-3.5 space-y-1.5 rounded-xl bg-slate-50/80 p-3 text-xs text-slate-600">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                Package Inclusions
-                              </p>
-                              {pkg.inclusions.map((item, i) => (
-                                <div key={i} className="flex items-start gap-2">
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                  <span className="text-[11px] leading-tight text-slate-600">{item}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Pricing & CTA */}
-                        <div className="mt-5 border-t border-slate-100 pt-4 flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-xl font-black text-slate-900">{pkg.formattedPrice}</p>
-                            <p className="text-[10px] font-medium text-slate-400">All-Inclusive Fee</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openBookingModal({
-                                orderType: "appointment",
-                                doctor: doctors.length > 0 ? doctors[0] : null,
-                              })
-                            }
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all shrink-0"
-                          >
-                            <CalendarDays className="h-3.5 w-3.5" />
-                            <span>Book Package</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Horizontal Scroll Navigation Hint */}
-                <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                    Auto-scrolling sideways · Hover or tap to pause
-                  </span>
-                  <span className="hidden sm:inline">Swipe or scroll anytime</span>
-                </div>
-
-                {/* Sterile Clinic Guarantee */}
-                <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 text-xs text-slate-600">
-                  <ShieldCheck className="h-5 w-5 text-blue-600 shrink-0" />
-                  <p>
-                    <span className="font-semibold text-slate-800">SnoutIQ Quality Assurance: </span>
-                    All packages and procedures are administered by verified veterinary doctors using medical-grade sterilization and cold-chain vaccines.
-                  </p>
-                </div>
-              </DetailSection>
-            ) : null}
           </div>
 
           {/* Right Sidebar */}
@@ -2083,6 +1926,165 @@ function ClinicDetail() {
             </section>
           </aside>
         </div>
+
+        {/* Specialized Health Packages - Full Horizontal Width Showcase */}
+        {packageItems.length ? (
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-10">
+            <DetailSection
+              title="Specialized Health Packages"
+              subtitle="Complete preventive health, immunization & surgical care plans"
+              icon={Sparkles}
+              badge={`${packageItems.length} Packages Available`}
+            >
+              {/* Category & Pet Filter Tabs */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-100 pb-4">
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPackageCategory("all")}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                      packageCategory === "all"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    All Packages ({packageItems.length})
+                  </button>
+                  {packageCategories.map((cat) => {
+                    const count = packageItems.filter((p) => p.category === cat).length;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setPackageCategory(cat)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                          packageCategory === cat
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {cat === "Vaccination" ? "💉 " : "⚕️ "}
+                        {cat} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {["all", "Dog", "Cat"].map((pet) => (
+                    <button
+                      key={pet}
+                      type="button"
+                      onClick={() => setPackagePet(pet)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                        packagePet === pet
+                          ? "bg-slate-900 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      }`}
+                    >
+                      {pet === "all" ? "All Pets" : pet === "Dog" ? "🐶 Dogs" : "🐱 Cats"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Continuous Auto-Scrolling Sideways Cards Track */}
+              <div className="w-full min-w-0 overflow-hidden">
+                <div
+                  ref={packageScrollRef}
+                  className="flex gap-4 overflow-x-auto pb-4 pt-1 focus:outline-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing"
+                >
+                  {displayPackages.map((pkg, idx) => (
+                    <div
+                      key={`${pkg.id}-${idx}`}
+                      className="group relative flex w-[285px] sm:w-[320px] shrink-0 flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs transition-all hover:border-blue-300 hover:shadow-md"
+                    >
+                      <div>
+                        {/* Tags Header */}
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                            {pkg.petType === "Dog" ? "🐶 Dog Care" : pkg.petType === "Cat" ? "🐱 Cat Care" : "🐾 Pet Care"}
+                          </span>
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              pkg.category === "Vaccination"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                                : "bg-purple-50 text-purple-700 border border-purple-200/60"
+                            }`}
+                          >
+                            {pkg.badge || pkg.category}
+                          </span>
+                        </div>
+
+                        {/* Title & Description */}
+                        <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {pkg.title}
+                        </h3>
+                        <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-normal line-clamp-2">
+                          {pkg.description}
+                        </p>
+
+                        {/* Inclusions list */}
+                        {pkg.inclusions && pkg.inclusions.length > 0 && (
+                          <div className="mt-3.5 space-y-1.5 rounded-xl bg-slate-50/80 p-3 text-xs text-slate-600">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              Package Inclusions
+                            </p>
+                            {pkg.inclusions.map((item, i) => (
+                              <div key={i} className="flex items-start gap-2">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                <span className="text-[11px] leading-tight text-slate-600">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pricing & CTA */}
+                      <div className="mt-5 border-t border-slate-100 pt-4 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xl font-black text-slate-900">{pkg.formattedPrice}</p>
+                          <p className="text-[10px] font-medium text-slate-400">All-Inclusive Fee</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openBookingModal({
+                              orderType: "appointment",
+                              doctor: doctors.length > 0 ? doctors[0] : null,
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all shrink-0"
+                        >
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          <span>Book Package</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Horizontal Scroll Navigation Hint */}
+              <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                  Auto-scrolling sideways · Hover or tap to pause
+                </span>
+                <span className="hidden sm:inline">Swipe or scroll anytime</span>
+              </div>
+
+              {/* Sterile Clinic Guarantee */}
+              <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 text-xs text-slate-600">
+                <ShieldCheck className="h-5 w-5 text-blue-600 shrink-0" />
+                <p>
+                  <span className="font-semibold text-slate-800">SnoutIQ Quality Assurance: </span>
+                  All packages and procedures are administered by verified veterinary doctors using medical-grade sterilization and cold-chain vaccines.
+                </p>
+              </div>
+            </DetailSection>
+          </div>
+        ) : null}
       </section>
 
       {/* Sticky Mobile Bottom Booking Bar */}
