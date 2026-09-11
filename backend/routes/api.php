@@ -3876,6 +3876,8 @@ Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
 
 Route::post('/vet-registerations/store', [VetRegisterationTempController::class, 'store']);
 Route::post('/vet-registerations/store-full', [ClinicFullOnboardingController::class, 'store']);
+Route::get('/clinic-pages', [ClinicFullOnboardingController::class, 'publicIndex']);
+Route::get('/clinic-pages/{slug}', [ClinicFullOnboardingController::class, 'publicShow']);
 Route::get('/vet-registerations/full', [ClinicFullOnboardingController::class, 'index']);
 Route::get('/vet-registerations/{clinicId}/full', [ClinicFullOnboardingController::class, 'show'])->whereNumber('clinicId');
 Route::post('/vet-registerations/{clinicId}/profile-completion-notification', [ClinicFullOnboardingController::class, 'sendProfileCompletionNotification'])->whereNumber('clinicId');

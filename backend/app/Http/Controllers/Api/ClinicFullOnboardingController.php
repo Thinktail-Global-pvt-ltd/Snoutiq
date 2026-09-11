@@ -35,6 +35,8 @@ class ClinicFullOnboardingController extends Controller
             'from_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
+        $this->ensureSlugsForNamedClinics();
+
         $perPage = (int) $request->query('per_page', 25);
         $perPage = max(1, min($perPage, 100));
         $fromDate = $filters['from_date'] ?? '2026-05-10';
@@ -52,8 +54,74 @@ class ClinicFullOnboardingController extends Controller
         ]);
     }
 
+    public function publicIndex(Request $request)
+    {
+        $this->ensureSlugsForNamedClinics();
+
+        $perPage = (int) $request->query('per_page', 48);
+        $perPage = max(1, min($perPage, 100));
+
+        $query = VetRegisterationTemp::query()
+            ->whereNotNull('slug')
+            ->where('slug', '!=', '')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+
+        if (Schema::hasColumn('vet_registerations_temp', 'name')) {
+            $query->whereNotNull('name')->where('name', '!=', '');
+        }
+
+        if ($city = trim((string) $request->query('city', ''))) {
+            $query->where('city', 'like', '%'.$city.'%');
+        }
+
+        if ($search = trim((string) $request->query('q', ''))) {
+            $query->where(function ($searchQuery) use ($search) {
+                $searchQuery
+                    ->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('city', 'like', '%'.$search.'%')
+                    ->orWhere('address', 'like', '%'.$search.'%');
+            });
+        }
+
+        $clinics = $query->paginate($perPage);
+        $clinics->getCollection()->transform(fn (VetRegisterationTemp $clinic) => $this->publicPayloadForClinic($clinic));
+
+        return response()->json([
+            'success' => true,
+            'data' => $clinics,
+        ]);
+    }
+
+    public function publicShow(Request $request, string $slug)
+    {
+        $this->ensureSlugsForNamedClinics();
+
+        $clinic = VetRegisterationTemp::query()
+            ->whereRaw('LOWER(slug) = ?', [Str::lower($slug)])
+            ->first();
+
+        if (! $clinic && ctype_digit($slug)) {
+            $clinic = VetRegisterationTemp::query()->find((int) $slug);
+        }
+
+        if (! $clinic) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Clinic not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->publicPayloadForClinic($clinic),
+        ]);
+    }
+
     public function show(Request $request, string $clinicId)
     {
+        $this->ensureSlugsForNamedClinics();
+
         $clinic = VetRegisterationTemp::query()->find((int) $clinicId);
         if (! $clinic) {
             return response()->json([
@@ -310,6 +378,67 @@ class ClinicFullOnboardingController extends Controller
         ];
     }
 
+    private function publicPayloadForClinic(VetRegisterationTemp $clinic): array
+    {
+        $payload = $this->fullPayloadForClinic($clinic);
+        $clinicData = $payload['clinic'] ?? [];
+
+        $payload['clinic'] = collect($clinicData)->only([
+            'id',
+            'name',
+            'slug',
+            'city',
+            'pincode',
+            'address',
+            'formatted_address',
+            'lat',
+            'lng',
+            'rating',
+            'user_ratings_total',
+            'mobile',
+            'bio',
+            'hospital_profile',
+            'clinic_profile',
+            'website_title',
+            'website_subtitle',
+            'website_about',
+            'website_gallery',
+            'google_review_url',
+            'clinic_day_fee',
+            'clinic_night_fee',
+            'clinic_image_url',
+            'clinic_video_url',
+            'created_at',
+            'updated_at',
+        ])->all();
+
+        $payload['doctors'] = collect($payload['doctors'] ?? [])
+            ->map(function ($doctor) {
+                $doctorData = is_array($doctor)
+                    ? $doctor
+                    : (method_exists($doctor, 'toArray') ? $doctor->toArray() : (array) $doctor);
+
+                return collect($doctorData)->only([
+                    'id',
+                    'vet_registeration_id',
+                    'doctor_name',
+                    'doctor_mobile',
+                    'doctors_price',
+                    'doctor_status',
+                    'degree',
+                    'years_of_experience',
+                    'specialization_select_all_that_apply',
+                    'languages_spoken',
+                    'video_day_rate',
+                    'video_night_rate',
+                ])->all();
+            })
+            ->values()
+            ->all();
+
+        return $payload;
+    }
+
     private function clinicPayloadWithMediaUrls(VetRegisterationTemp $clinic): array
     {
         $payload = $clinic->toArray();
@@ -322,6 +451,31 @@ class ClinicFullOnboardingController extends Controller
             : null;
 
         return $payload;
+    }
+
+    private function ensureSlugsForNamedClinics(): void
+    {
+        if (
+            ! Schema::hasTable('vet_registerations_temp')
+            || ! Schema::hasColumn('vet_registerations_temp', 'name')
+            || ! Schema::hasColumn('vet_registerations_temp', 'slug')
+        ) {
+            return;
+        }
+
+        VetRegisterationTemp::query()
+            ->where(function ($query) {
+                $query->whereNull('slug')->orWhere('slug', '');
+            })
+            ->whereNotNull('name')
+            ->where('name', '!=', '')
+            ->orderBy('id')
+            ->chunkById(100, function ($clinics) {
+                foreach ($clinics as $clinic) {
+                    $clinic->slug = $this->makeUniqueSlug((string) $clinic->name, (int) $clinic->id);
+                    $clinic->save();
+                }
+            });
     }
 
     public function store(Request $request)
@@ -1365,13 +1519,17 @@ class ClinicFullOnboardingController extends Controller
         )->id;
     }
 
-    private function makeUniqueSlug(string $name): string
+    private function makeUniqueSlug(string $name, ?int $ignoreId = null): string
     {
         $base = Str::slug($name) ?: Str::random(6);
         $slug = $base;
         $i = 1;
 
-        while (VetRegisterationTemp::where('slug', $slug)->exists()) {
+        while (
+            VetRegisterationTemp::where('slug', $slug)
+                ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+                ->exists()
+        ) {
             $slug = "{$base}-{$i}";
             $i++;
         }

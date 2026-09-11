@@ -1,23 +1,68 @@
-import React, { useState } from "react";
-import clinicImage from "../assets/images/clinic.png";
-
-import { Navbar } from "../newflow/Navbar";
-import { Footer } from "../newflow/NewFooter"; // ensure: export const Footer = NewFooter
-import { Button } from "../newflow/NewButton"; // ensure: export const Button = NewButton (or export Button)
-
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
-  Smartphone,
-  Bell,
-  MessageSquare,
-  Video,
-  Users,
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
   Check,
+  Clock,
+  IndianRupee,
+  Loader2,
+  MapPin,
+  Phone,
+  Search,
+  Stethoscope,
+  Video,
 } from "lucide-react";
+
+import axiosClient from "../axios";
+import clinicFallbackImage from "../assets/images/clinic.png";
+import { Navbar } from "../newflow/Navbar";
+import { Footer } from "../newflow/NewFooter";
+import { Button } from "../newflow/NewButton";
 
 const CLINIC_FORM_API_URL = "https://snoutiq.com/backend/api/demo-website-form";
 const DIRECT_CONSULT_PATH = "/20+vetsonline?start=details";
 
-export default function NewClinics() {
+const valueOrDash = (value) => {
+  const text = String(value ?? "").trim();
+  return text || "-";
+};
+
+const plural = (count, label) => `${count} ${label}${count === 1 ? "" : "s"}`;
+
+const formatMoney = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return `Rs. ${amount.toLocaleString("en-IN")}`;
+};
+
+const extractClinics = (payload) => {
+  const page = payload?.data?.data || payload?.data || payload;
+  if (Array.isArray(page)) return page;
+  if (Array.isArray(page?.data)) return page.data;
+  return [];
+};
+
+const buildClinicStats = (entry) => {
+  const doctors = entry?.doctors?.length || 0;
+  const services = entry?.services?.length || 0;
+  const packages = entry?.specialized_packages?.length || 0;
+  const videoSchedules = entry?.video_schedules?.length || 0;
+
+  return [
+    plural(doctors, "doctor"),
+    plural(services, "service"),
+    plural(packages, "package"),
+    plural(videoSchedules, "video schedule"),
+  ];
+};
+
+const getClinicImage = (clinic) =>
+  clinic?.clinic_image_url || clinic?.image || clinicFallbackImage;
+
+function ClinicLeadForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -39,7 +84,6 @@ export default function NewClinics() {
     setIsSubmitting(true);
 
     const payload = {
-      // Keeping `name` for backend compatibility as requested
       name: formData.contactName.trim(),
       clinic_name: formData.clinicName.trim(),
       contact_name: formData.contactName.trim(),
@@ -75,12 +119,7 @@ export default function NewClinics() {
       }
 
       setIsSubmitted(true);
-      setFormData({
-        clinicName: "",
-        contactName: "",
-        mobile: "",
-        city: "",
-      });
+      setFormData({ clinicName: "", contactName: "", mobile: "", city: "" });
     } catch (error) {
       setSubmitError(
         error?.message || "Unable to submit request right now. Please try again."
@@ -91,315 +130,528 @@ export default function NewClinics() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Navbar consultPath={DIRECT_CONSULT_PATH} />
+    <section id="clinic-onboarding-form" className="bg-slate-50 py-14 sm:py-16">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+            For clinics
+          </p>
+          <h2 className="mt-3 text-3xl font-bold text-slate-950 sm:text-4xl">
+            Bring your clinic into SnoutIQ.
+          </h2>
+          <p className="mt-4 text-lg text-slate-600">
+            Add verified doctors, services, appointment hours, and video consult
+            availability from the onboarding panel.
+          </p>
+        </div>
 
-      <main className="flex-1">
-        <section className="relative overflow-hidden border-b border-sky-200/70 bg-slate-50/40 py-14 sm:py-16 lg:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid items-center gap-8 lg:grid-cols-[1.08fr_0.92fr] lg:gap-10">
-              <div className="text-center lg:text-left">
-                <span className="mb-6 inline-block rounded-full border border-sky-200 bg-sky-500/10 px-4 py-1.5 text-sm font-semibold text-sky-700">
-                  For Pet Clinics
-                </span>
-
-                <h1 className="font-display text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl mb-6">
-                  Give your clinic a
-                  <br />
-                  <span className="text-blue-600">digital backbone.</span>
-                </h1>
-
-                <p className="mx-auto max-w-2xl text-lg text-slate-600 mb-8 lg:mx-0">
-                  A complete B2B app to manage your clinic, connect with pet
-                  parents, and grow your practice digitally.
-                </p>
-
-                <div className="mb-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-                  <span className="rounded-full border border-sky-200 bg-white/95 px-4 py-1.5 text-sm font-medium text-slate-700 shadow-sm">
-                    Clinic Workflow Automation
-                  </span>
-                  <span className="rounded-full border border-sky-200 bg-white/95 px-4 py-1.5 text-sm font-medium text-slate-700 shadow-sm">
-                    Better Client Retention
-                  </span>
-                  <span className="rounded-full border border-sky-200 bg-white/95 px-4 py-1.5 text-sm font-medium text-slate-700 shadow-sm">
-                    Recurring Revenue Model
-                  </span>
-                </div>
-
-                <a href="#clinic-onboarding-form">
-                  <Button
-                    size="lg"
-                    className="bg-blue-600 text-white shadow-lg shadow-blue-600/25 hover:bg-blue-700"
-                    type="button"
-                  >
-                    Schedule Platform Consultation
-                  </Button>
-                </a>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          {isSubmitted ? (
+            <div className="py-8 text-center">
+              <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                <Check className="h-7 w-7" />
               </div>
-
-              <div className="relative">
-                <div className="pointer-events-none absolute -top-12 -right-10 h-48 w-48 rounded-full bg-sky-400/25 blur-3xl" />
-                <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-pink-400/15 blur-3xl" />
-                <div className="relative overflow-hidden rounded-[2rem] border-4 border-sky-300/80 bg-white ring-1 ring-blue-200/80 shadow-[0_24px_60px_-26px_rgba(30,64,175,0.5)]">
-                  <img
-                    src={clinicImage}
-                    alt="Veterinary clinic using SnoutIQ platform"
-                    className="h-[280px] w-full object-cover object-center sm:h-[360px] lg:h-[430px]"
-                    width={1024}
-                    height={1024}
-                    sizes="(min-width: 1024px) 45vw, 100vw"
-                    loading="eager"
-                    decoding="async"
-                    fetchpriority="high"
+              <h3 className="text-xl font-bold text-slate-950">
+                Thank you. We will reach out shortly.
+              </h3>
+              <p className="mt-2 text-slate-600">
+                Our team will contact you to discuss onboarding for your clinic.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {[
+                ["clinicName", "Clinic Name", "e.g. City Pet Care Clinic"],
+                ["contactName", "Contact Person", "e.g. Dr. Aditi Sharma"],
+                ["mobile", "Mobile Number", "+91 98765 43210"],
+                ["city", "City", "e.g. Bengaluru"],
+              ].map(([id, label, placeholder]) => (
+                <div key={id}>
+                  <label
+                    htmlFor={id}
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    {label}
+                  </label>
+                  <input
+                    id={id}
+                    required
+                    type={id === "mobile" ? "tel" : "text"}
+                    value={formData[id]}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder={placeholder}
                   />
                 </div>
-              </div>
-            </div>
-          </div>
-        </section>
+              ))}
 
-        <section
-          className="bg-slate-50 py-16 sm:py-20"
-          style={{ contentVisibility: "auto", containIntrinsicSize: "1px 760px" }}
-        >
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mb-12 text-center">
-              <h2 className="font-display text-3xl font-bold text-slate-900 sm:text-4xl mb-4">
-                App Features
-              </h2>
-              <p className="text-slate-600 max-w-2xl mx-auto">
-                Everything you need to run a modern veterinary clinic.
+              {submitError ? (
+                <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {submitError}
+                </p>
+              ) : null}
+
+              <Button
+                type="submit"
+                size="lg"
+                disabled={isSubmitting}
+                className="w-full bg-blue-600 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Request"}
+              </Button>
+            </form>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ClinicDirectory() {
+  const [clinics, setClinics] = useState([]);
+  const [query, setQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadClinics = async () => {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const { data } = await axiosClient.get("/clinic-pages", {
+          params: { per_page: 100 },
+        });
+
+        if (!cancelled) {
+          setClinics(extractClinics(data));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err?.response?.data?.message ||
+              "Unable to load clinics right now."
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadClinics();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filteredClinics = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return clinics;
+
+    return clinics.filter((entry) => {
+      const clinic = entry?.clinic || {};
+      return [clinic.name, clinic.city, clinic.address, clinic.slug]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term));
+    });
+  }, [clinics, query]);
+
+  return (
+    <>
+      <section className="border-b border-slate-200 bg-white py-10 sm:py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-8 lg:grid-cols-[0.9fr_0.55fr] lg:items-end">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+                SnoutIQ Clinics
+              </p>
+              <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+                Verified clinic directory
+              </h1>
+              <p className="mt-4 max-w-3xl text-lg text-slate-600">
+                Explore clinics added through the SnoutIQ onboarding workflow,
+                with profile pages generated for each clinic.
               </p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
-                <Bell className="h-10 w-10 text-blue-400 mb-6" />
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  Autonomous Push Notifications
-                </h3>
-                <p className="text-slate-600">
-                  Send automated reminders for vaccinations, appointments, and follow-ups
-                  directly to pet parents&apos; phones.
-                </p>
-              </div>
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                placeholder="Search clinic, city, or slug"
+              />
+            </label>
+          </div>
+        </div>
+      </section>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
-                <MessageSquare className="h-10 w-10 text-blue-400 mb-6" />
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  WhatsApp Integration
-                </h3>
-                <p className="text-slate-600">
-                  Communicate seamlessly with clients via WhatsApp without sharing your
-                  personal mobile number.
-                </p>
-              </div>
+      <section className="bg-slate-50 py-10 sm:py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          {isLoading ? (
+            <div className="flex min-h-72 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+          ) : error ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
+              <AlertCircle className="h-5 w-5" />
+              <p>{error}</p>
+            </div>
+          ) : filteredClinics.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+              <h2 className="text-xl font-semibold text-slate-950">
+                No clinics found
+              </h2>
+              <p className="mt-2 text-slate-600">
+                Add a clinic name in full onboarding and the API will generate
+                its slug.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {filteredClinics.map((entry) => {
+                const clinic = entry?.clinic || {};
+                const stats = buildClinicStats(entry);
+                const completion =
+                  entry?.profile_completion_percentage ??
+                  entry?.profile_completion?.percentage ??
+                  0;
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
-                <Users className="h-10 w-10 text-blue-400 mb-6" />
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  1-on-1 Pet Parent Connection
-                </h3>
-                <p className="text-slate-600">
-                  Build stronger relationships with a dedicated app interface for your
-                  registered pet parents.
-                </p>
-              </div>
+                return (
+                  <Link
+                    key={clinic.id || clinic.slug}
+                    to={`/clinics/${clinic.slug || clinic.id}`}
+                    className="group flex min-h-[340px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+                  >
+                    <div className="aspect-[16/9] overflow-hidden bg-slate-100">
+                      <img
+                        src={getClinicImage(clinic)}
+                        alt={clinic.name || "Veterinary clinic"}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                        loading="lazy"
+                      />
+                    </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
-                <Video className="h-10 w-10 text-blue-400 mb-6" />
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  Video Consultation
-                </h3>
-                <p className="text-slate-600">
-                  Conduct secure video follow-ups and consultations directly through the
-                  app.
-                </p>
-              </div>
+                    <div className="flex flex-1 flex-col p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h2 className="text-xl font-bold text-slate-950">
+                            {valueOrDash(clinic.name)}
+                          </h2>
+                          <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+                            <MapPin className="h-4 w-4" />
+                            {valueOrDash(clinic.city)}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+                          {completion}%
+                        </span>
+                      </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7 lg:col-span-2">
-                <Smartphone className="h-10 w-10 text-blue-400 mb-6" />
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  Monthly Subscription Model
-                </h3>
-                <p className="text-slate-600">
-                  Enjoy predictable, recurring revenue for your clinic while providing
-                  premium digital services to your clients. Keep your existing clients
-                  engaged and easily onboard new ones.
-                </p>
+                      <p className="mt-4 line-clamp-2 text-sm text-slate-600">
+                        {clinic.clinic_profile ||
+                          clinic.hospital_profile ||
+                          clinic.bio ||
+                          clinic.address ||
+                          "Clinic profile details are being completed."}
+                      </p>
+
+                      <div className="mt-5 grid grid-cols-2 gap-2 text-sm text-slate-600">
+                        {stats.map((item) => (
+                          <span
+                            key={item}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+
+                      <span className="mt-auto inline-flex items-center gap-2 pt-5 font-semibold text-blue-700">
+                        View clinic
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <ClinicLeadForm />
+    </>
+  );
+}
+
+function ClinicDetail() {
+  const { clinicSlug } = useParams();
+  const [entry, setEntry] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadClinic = async () => {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const { data } = await axiosClient.get(
+          `/clinic-pages/${encodeURIComponent(clinicSlug)}`
+        );
+
+        if (!cancelled) setEntry(data?.data || null);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err?.response?.data?.message ||
+              "Unable to load this clinic right now."
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadClinic();
+    return () => {
+      cancelled = true;
+    };
+  }, [clinicSlug]);
+
+  if (isLoading) {
+    return (
+      <section className="flex min-h-[70vh] items-center justify-center bg-slate-50">
+        <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
+      </section>
+    );
+  }
+
+  if (error || !entry) {
+    return (
+      <section className="bg-slate-50 py-16">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <Link
+            to="/clinics"
+            className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-blue-700"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to clinics
+          </Link>
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+            {error || "Clinic not found."}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const clinic = entry.clinic || {};
+  const doctors = entry.doctors || [];
+  const services = entry.services || [];
+  const packages = entry.specialized_packages || [];
+  const videoSchedules = entry.video_schedules || [];
+  const profile = entry.profile_completion || {};
+  const missingFields = profile.missing_fields || [];
+  const dayFee = formatMoney(clinic.clinic_day_fee);
+  const nightFee = formatMoney(clinic.clinic_night_fee);
+
+  return (
+    <>
+      <section className="border-b border-slate-200 bg-white py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Link
+            to="/clinics"
+            className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-blue-700"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to clinics
+          </Link>
+
+          <div className="grid gap-8 lg:grid-cols-[1fr_0.82fr] lg:items-center">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
+                /clinics/{clinic.slug}
+              </p>
+              <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+                {valueOrDash(clinic.name)}
+              </h1>
+              <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4" />
+                  {valueOrDash(clinic.city)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Phone className="h-4 w-4" />
+                  {valueOrDash(clinic.mobile)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <IndianRupee className="h-4 w-4" />
+                  Day {dayFee || "-"} · Night {nightFee || "-"}
+                </span>
               </div>
+              <p className="mt-5 max-w-3xl text-lg text-slate-600">
+                {clinic.clinic_profile ||
+                  clinic.hospital_profile ||
+                  clinic.bio ||
+                  clinic.address ||
+                  "This clinic profile is connected to SnoutIQ onboarding data."}
+              </p>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+              <img
+                src={getClinicImage(clinic)}
+                alt={clinic.name || "Veterinary clinic"}
+                className="aspect-[16/10] h-full w-full object-cover"
+              />
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section
-          className="py-16 sm:py-20"
-          style={{ contentVisibility: "auto", containIntrinsicSize: "1px 840px" }}
-        >
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid items-center gap-8 md:grid-cols-2 lg:gap-10">
-              <div>
-                <h2 className="font-display text-3xl font-bold text-slate-900 sm:text-4xl mb-6">
-                  Who is this for?
-                </h2>
+      <section className="bg-slate-50 py-10 sm:py-12">
+        <div className="mx-auto grid max-w-7xl gap-5 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
+          {[
+            [plural(doctors.length, "doctor"), Stethoscope],
+            [plural(services.length, "service"), Check],
+            [plural(packages.length, "package"), IndianRupee],
+            [plural(videoSchedules.length, "video schedule"), Video],
+          ].map(([label, Icon]) => (
+            <div
+              key={label}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <Icon className="mb-4 h-6 w-6 text-blue-600" />
+              <p className="text-2xl font-bold text-slate-950">{label}</p>
+            </div>
+          ))}
+        </div>
 
-                <p className="mb-6 text-lg text-slate-600">
-                  Designed specifically for established veterinary clinics in India
-                  looking to modernize their operations, improve client retention, and
-                  add new revenue streams without the hassle of building custom software.
-                </p>
-
-                <ul className="space-y-4">
-                  <li className="flex items-start gap-3">
-                    <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-500">
-                      <Check className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="text-slate-700">
-                      Clinics managing 50+ active pet parents
-                    </span>
-                  </li>
-
-                  <li className="flex items-start gap-3">
-                    <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-500">
-                      <Check className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="text-slate-700">
-                      Vets tired of using personal WhatsApp for work
-                    </span>
-                  </li>
-
-                  <li className="flex items-start gap-3">
-                    <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-500">
-                      <Check className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="text-slate-700">
-                      Practices looking to offer premium digital memberships
-                    </span>
-                  </li>
-                </ul>
-              </div>
-
-              <div
-                id="clinic-onboarding-form"
-                className="rounded-3xl border border-slate-200 bg-slate-50 p-6 md:p-8"
-              >
-                <div className="mb-6 text-center">
-                  <h3 className="font-display text-2xl font-bold text-slate-900 mb-2">
-                    Talk to the Product Team
-                  </h3>
-                  <p className="text-slate-600">
-                    Share your details to get pricing, implementation plan, and a tailored platform walkthrough.
-                  </p>
-                </div>
-
-                {isSubmitted ? (
-                  <div className="text-center py-8">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/20 text-blue-500 mb-6">
-                      <Check className="h-7 w-7" />
-                    </div>
-                    <h4 className="text-xl font-bold text-slate-900 mb-2">
-                      Thank You! We&apos;ll Reach Out Shortly.
-                    </h4>
-                    <p className="text-slate-600">
-                      Our team will contact you shortly to discuss onboarding for your clinic.
-                    </p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    <div>
-                      <label
-                        htmlFor="clinicName"
-                        className="block text-sm font-medium text-slate-700 mb-2"
-                      >
-                        Clinic Name
-                      </label>
-                      <input
-                        type="text"
-                        id="clinicName"
-                        required
-                        value={formData.clinicName}
-                        onChange={handleChange}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="e.g. City Pet Care Clinic"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="contactName"
-                        className="block text-sm font-medium text-slate-700 mb-2"
-                      >
-                        Contact Person
-                      </label>
-                      <input
-                        type="text"
-                        id="contactName"
-                        required
-                        value={formData.contactName}
-                        onChange={handleChange}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="e.g. Dr. Aditi Sharma"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="mobile"
-                        className="block text-sm font-medium text-slate-700 mb-2"
-                      >
-                        Mobile Number
-                      </label>
-                      <input
-                        type="tel"
-                        id="mobile"
-                        required
-                        value={formData.mobile}
-                        onChange={handleChange}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="+91 98765 43210"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="city"
-                        className="block text-sm font-medium text-slate-700 mb-2"
-                      >
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        id="city"
-                        required
-                        value={formData.city}
-                        onChange={handleChange}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="e.g. Bengaluru"
-                      />
-                    </div>
-
-                    {submitError ? (
-                      <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {submitError}
+        <div className="mx-auto mt-6 grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[1.25fr_0.75fr] lg:px-8">
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-2xl font-bold text-slate-950">Doctors</h2>
+              <div className="mt-5 divide-y divide-slate-100">
+                {doctors.length ? (
+                  doctors.map((doctor) => (
+                    <div key={doctor.id} className="py-4 first:pt-0 last:pb-0">
+                      <h3 className="text-lg font-semibold text-slate-950">
+                        {valueOrDash(doctor.doctor_name)}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {valueOrDash(doctor.degree)} ·{" "}
+                        {valueOrDash(doctor.years_of_experience)} yrs
                       </p>
-                    ) : null}
-
-                    <Button
-                      type="submit"
-                      size="lg"
-                      disabled={isSubmitting}
-                      className="w-full mt-6 bg-blue-600 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700"
-                    >
-                      {isSubmitting ? "Submitting..." : "Submit Request"}
-                    </Button>
-                  </form>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {valueOrDash(doctor.specialization_select_all_that_apply)}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-600">No doctors saved.</p>
                 )}
               </div>
-            </div>
-          </div>
-        </section>
-      </main>
+            </section>
 
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-2xl font-bold text-slate-950">Services</h2>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {services.length ? (
+                  services.map((service) => (
+                    <div
+                      key={service.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <h3 className="font-semibold text-slate-950">
+                        {valueOrDash(service.name)}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {service.description || service.pet_type || "Service details pending."}
+                      </p>
+                      <p className="mt-3 text-sm font-semibold text-blue-700">
+                        {formatMoney(service.price) || "Price on request"}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-600">No services saved.</p>
+                )}
+              </div>
+            </section>
+          </div>
+
+          <aside className="space-y-6">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-xl font-bold text-slate-950">
+                Profile completion
+              </h2>
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-blue-600"
+                  style={{ width: `${profile.percentage || 0}%` }}
+                />
+              </div>
+              <p className="mt-3 text-sm font-semibold text-slate-700">
+                {profile.completed_fields || 0} / {profile.total_fields || 0} fields
+                completed
+              </p>
+              {missingFields.length ? (
+                <p className="mt-2 text-sm text-slate-600">
+                  Missing:{" "}
+                  {missingFields
+                    .slice(0, 5)
+                    .map((field) => field.label || field)
+                    .join(", ")}
+                </p>
+              ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-xl font-bold text-slate-950">Video hours</h2>
+              <div className="mt-4 space-y-3">
+                {videoSchedules.length ? (
+                  videoSchedules.map((schedule) => (
+                    <div
+                      key={schedule.doctor_id}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <p className="font-semibold text-slate-950">
+                        {valueOrDash(schedule.doctor_name)}
+                      </p>
+                      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
+                        <Clock className="h-4 w-4" />
+                        {(schedule.availability || []).length} slots configured
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-600">No video hours saved.</p>
+                )}
+              </div>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </>
+  );
+}
+
+export default function NewClinics() {
+  const { clinicSlug } = useParams();
+
+  return (
+    <div className="flex min-h-screen flex-col bg-white">
+      <Navbar consultPath={DIRECT_CONSULT_PATH} />
+      <main className="flex-1">
+        {clinicSlug ? <ClinicDetail /> : <ClinicDirectory />}
+      </main>
       <Footer />
     </div>
   );

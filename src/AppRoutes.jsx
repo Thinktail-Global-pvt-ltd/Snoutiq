@@ -202,6 +202,7 @@ export default function AppRoutes() {
         <Route path="/about" element={<NewAbout />} />
         <Route path="/parents" element={<NewCounsult />} />
         <Route path="/clinics" element={<NewClinics />} />
+        <Route path="/clinics/:clinicSlug" element={<NewClinics />} />
         <Route path="/vets" element={<NewVets />} />
         <Route path="/find-vets-near-you" element={<FindVetsNearYou />} />
         <Route
