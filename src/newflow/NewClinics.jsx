@@ -579,17 +579,32 @@ function ClinicDirectory() {
     };
   }, []);
 
+  const [selectedCity, setSelectedCity] = useState("all");
+
+  const availableCities = useMemo(() => {
+    const set = new Set();
+    clinics.forEach((entry) => {
+      const c = entry?.clinic?.city?.trim();
+      if (c) set.add(c);
+    });
+    return Array.from(set).sort();
+  }, [clinics]);
+
   const filteredClinics = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return clinics;
-
     return clinics.filter((entry) => {
       const clinic = entry?.clinic || {};
+      const matchesCity =
+        selectedCity === "all" ||
+        clinic.city?.trim().toLowerCase() === selectedCity.toLowerCase();
+      if (!matchesCity) return false;
+
+      if (!term) return true;
       return [clinic.name, clinic.city, clinic.address, clinic.slug]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [clinics, query]);
+  }, [clinics, query, selectedCity]);
 
   return (
     <>
@@ -620,6 +635,39 @@ function ClinicDirectory() {
               />
             </label>
           </div>
+
+          {availableCities.length > 0 && (
+            <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 mr-1">
+                Filter by City:
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedCity("all")}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  selectedCity === "all"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                All Cities ({clinics.length})
+              </button>
+              {availableCities.map((city) => (
+                <button
+                  key={city}
+                  type="button"
+                  onClick={() => setSelectedCity(city)}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                    selectedCity.toLowerCase() === city.toLowerCase()
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {city}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -645,7 +693,7 @@ function ClinicDirectory() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-5 lg:grid-cols-2">
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredClinics.map((entry) => {
                 const clinic = entry?.clinic || {};
                 const { serviceRows, machineRows } = splitByMainService(
@@ -654,108 +702,133 @@ function ClinicDirectory() {
                 );
                 const doctors = entry?.doctors?.length || 0;
                 const packages = entry?.specialized_packages?.length || 0;
-                const videoSchedules = entry?.video_schedules?.length || 0;
                 const dayFee = formatMoney(clinic.clinic_day_fee);
                 const nightFee = formatMoney(clinic.clinic_night_fee);
                 const summary = getClinicSummary(clinic);
                 const quickStats = [
                   [doctors, plural(doctors, "doctor"), Stethoscope],
-                  [serviceRows.length, plural(serviceRows.length, "service"), Check],
+                  [serviceRows.length, plural(serviceRows.length, "service"), CheckCircle2],
                   [machineRows.length, plural(machineRows.length, "machine"), Wrench],
-                  [packages, plural(packages, "package"), IndianRupee],
-                  [videoSchedules, plural(videoSchedules, "video slot"), Video],
+                  [packages, plural(packages, "package"), Sparkles],
                 ].filter(([count]) => count > 0);
                 const hasFees = dayFee || nightFee;
 
                 return (
-                  <Link
+                  <div
                     key={clinic.id || clinic.slug}
-                    to={`/clinics/${clinic.slug || clinic.id}`}
-                    className="group grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md sm:grid-cols-[240px_1fr]"
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-xl"
                   >
-                    <div className="relative min-h-[220px] overflow-hidden bg-slate-100 sm:min-h-full">
+                    {/* Top Image Banner - Fixed 16:10 Aspect Ratio prevents any tall stretching */}
+                    <Link
+                      to={`/clinics/${clinic.slug || clinic.id}`}
+                      className="relative block aspect-[16/10] w-full overflow-hidden bg-slate-100"
+                    >
                       <img
                         src={getClinicImage(clinic)}
                         alt={clinic.name || "Veterinary clinic"}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                        className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                         loading="lazy"
                         onError={(event) => {
                           event.currentTarget.onerror = null;
                           event.currentTarget.src = clinicFallbackImage;
                         }}
                       />
-                      {clinic.city ? (
-                        <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-sm font-bold text-blue-700 shadow-sm">
-                          {clinic.city}
-                        </span>
-                      ) : null}
-                    </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
 
-                    <div className="flex min-h-[300px] flex-col p-5 sm:p-6">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <h2 className="text-2xl font-bold leading-tight text-slate-950">
-                            {valueOrDash(clinic.name)}
-                          </h2>
-                          <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-slate-500">
-                            <MapPin className="h-4 w-4" />
-                            {valueOrDash([clinic.city, clinic.pincode].filter(Boolean).join(" - "))}
-                          </p>
-                        </div>
-                        <span className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                      {/* Top floating badges */}
+                      <div className="absolute inset-x-3.5 top-3.5 flex items-center justify-between gap-2 pointer-events-none">
+                        {clinic.city ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-md px-2.5 py-1 text-xs font-bold text-slate-800 shadow-sm">
+                            <MapPin className="h-3 w-3 text-blue-600" />
+                            {clinic.city}
+                          </span>
+                        ) : <span />}
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/90 backdrop-blur-md px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                          <ShieldCheck className="h-3.5 w-3.5" />
                           Verified
                         </span>
                       </div>
 
+                      {/* Clinic name and location preview overlaid at bottom */}
+                      <div className="absolute inset-x-3.5 bottom-3 text-white pointer-events-none">
+                        <h2 className="text-lg sm:text-xl font-bold leading-tight drop-shadow-sm line-clamp-1 group-hover:text-blue-200 transition-colors">
+                          {valueOrDash(clinic.name)}
+                        </h2>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-white/90 drop-shadow-xs line-clamp-1">
+                          <MapPin className="h-3 w-3 shrink-0 text-blue-300" />
+                          {[clinic.address, clinic.city, clinic.pincode].filter(Boolean).join(", ") || "View location details"}
+                        </p>
+                      </div>
+                    </Link>
+
+                    {/* Card Body */}
+                    <div className="flex flex-1 flex-col p-4 sm:p-5">
+                      {/* Fees & Contact strip */}
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        {hasFees ? (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 font-semibold text-blue-700">
+                            <IndianRupee className="h-3.5 w-3.5 text-blue-600" />
+                            {dayFee ? `Day ${dayFee}` : ""}
+                            {dayFee && nightFee ? " · " : ""}
+                            {nightFee ? `Night ${nightFee}` : ""}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 font-medium text-slate-600">
+                            Consultation available
+                          </span>
+                        )}
+
+                        {clinic.mobile ? (
+                          <a
+                            href={`tel:${clinic.mobile}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 font-medium text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors"
+                          >
+                            <Phone className="h-3 w-3 text-blue-600" />
+                            {clinic.mobile}
+                          </a>
+                        ) : null}
+                      </div>
+
+                      {/* Summary */}
                       {summary ? (
-                        <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">
+                        <p className="mt-3 line-clamp-2 text-xs sm:text-sm leading-relaxed text-slate-600">
                           {summary}
                         </p>
-                      ) : null}
+                      ) : (
+                        <p className="mt-3 line-clamp-2 text-xs text-slate-400 italic">
+                          Verified veterinary clinic providing comprehensive pet healthcare and specialized diagnostics.
+                        </p>
+                      )}
 
-                      {clinic.mobile || hasFees ? (
-                        <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                          {clinic.mobile ? (
-                            <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
-                              <Phone className="h-4 w-4 text-blue-600" />
-                              {clinic.mobile}
-                            </span>
-                          ) : null}
-                          {hasFees ? (
-                            <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
-                              <CalendarDays className="h-4 w-4 text-blue-600" />
-                              {dayFee ? `Day ${dayFee}` : ""}
-                              {dayFee && nightFee ? " · " : ""}
-                              {nightFee ? `Night ${nightFee}` : ""}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-
+                      {/* Feature Pills (NO VIDEO SLOT) */}
                       {quickStats.length ? (
-                        <div className="mt-4 flex flex-wrap gap-2">
+                        <div className="mt-3.5 flex flex-wrap gap-1.5">
                           {quickStats.map(([, item, Icon]) => (
-                          <span
-                            key={item}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600"
-                          >
-                            <Icon className="h-3.5 w-3.5 text-blue-600" />
-                            {item}
-                          </span>
+                            <span
+                              key={item}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600"
+                            >
+                              <Icon className="h-3 w-3 text-blue-600 shrink-0" />
+                              {item}
+                            </span>
                           ))}
                         </div>
                       ) : null}
 
-                      <div className="mt-auto flex items-center justify-between gap-3 pt-5">
-                        <span className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-700 group-hover:text-blue-800 transition-colors">
-                          View clinic
-                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                        </span>
+                      {/* Action Footer */}
+                      <div className="mt-auto flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                        <Link
+                          to={`/clinics/${clinic.slug || clinic.id}`}
+                          className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-blue-700 hover:text-blue-800 transition-colors"
+                        >
+                          View Details
+                          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                        </Link>
+
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
+                          onClick={() => {
                             setBookingModal({
                               isOpen: true,
                               orderType: "appointment",
@@ -763,14 +836,14 @@ function ClinicDirectory() {
                               doctor: Array.isArray(entry.doctors) && entry.doctors[0] ? entry.doctors[0] : null,
                             });
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all cursor-pointer"
                         >
                           <CalendarDays className="h-3.5 w-3.5" />
                           Book Visit
                         </button>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
