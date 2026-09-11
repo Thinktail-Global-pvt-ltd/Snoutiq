@@ -872,9 +872,9 @@ function ClinicDirectory() {
                       {/* Feature Pills (NO VIDEO SLOT) */}
                       {quickStats.length ? (
                         <div className="mt-3.5 flex flex-wrap gap-1.5">
-                          {quickStats.map(([, item, Icon]) => (
+                          {quickStats.map(([count, label, Icon]) => (
                             <span
-                              key={item}
+                              key={label}
                               className="inline-flex items-center gap-1 rounded-md border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-all duration-200 hover:bg-blue-50/70 hover:border-blue-200 hover:text-blue-700"
                             >
                               <Icon className="h-3 w-3 text-blue-600 shrink-0" />
