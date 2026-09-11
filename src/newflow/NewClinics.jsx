@@ -806,6 +806,7 @@ function ClinicDetail() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [packageCategory, setPackageCategory] = useState("all");
   const [packagePet, setPackagePet] = useState("all");
+  const [heroMediaType, setHeroMediaType] = useState("image");
 
   const rawPackages = entry?.specialized_packages || [];
   const packageItems = useMemo(() => extractPackageItems(rawPackages), [rawPackages]);
@@ -1150,59 +1151,59 @@ function ClinicDetail() {
               </div>
             </div>
 
-            {/* Right Column: Bento Media Showcase (Both Video & Image) */}
+            {/* Right Column: Interactive Media Showcase (Photo & Video Switcher) */}
             <div className="relative">
-              {hasClinicVideo ? (
-                <div className="space-y-3.5">
-                  {/* Clinic Facility Video Tour */}
-                  <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-slate-950 shadow-xl transition-all">
-                    <div className="relative aspect-[16/10] w-full bg-black">
-                      <video
-                        src={clinic.clinic_video_url}
-                        poster={getClinicImage(clinic)}
-                        className="h-full w-full object-cover"
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        controls
-                      />
-                      <div className="absolute top-3 left-3 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white border border-white/20 flex items-center gap-1.5 shadow-sm">
-                        <Video className="h-3.5 w-3.5 text-blue-400" />
-                        <span>Facility Video Tour</span>
-                      </div>
-                    </div>
+              <div className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-slate-950 shadow-xl transition-all">
+                {/* Floating Media Switcher Tabs (Only if video exists) */}
+                {hasClinicVideo && (
+                  <div className="absolute top-3.5 right-3.5 z-20 flex items-center rounded-full bg-black/65 p-1 backdrop-blur-md border border-white/20 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => setHeroMediaType("image")}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                        heroMediaType === "image"
+                          ? "bg-white text-slate-950 shadow-sm"
+                          : "text-white/80 hover:text-white"
+                      }`}
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                      <span>Photo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHeroMediaType("video")}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                        heroMediaType === "video"
+                          ? "bg-white text-slate-950 shadow-sm"
+                          : "text-white/80 hover:text-white"
+                      }`}
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      <span>Video Tour</span>
+                    </button>
                   </div>
+                )}
 
-                  {/* Clinic Facility Image Card */}
-                  <div className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-950 shadow-lg transition-all hover:shadow-xl">
-                    <div className="relative aspect-[16/7] w-full overflow-hidden">
-                      <img
-                        src={getClinicImage(clinic)}
-                        alt={clinic.name || "Veterinary clinic"}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        onError={(event) => {
-                          event.currentTarget.onerror = null;
-                          event.currentTarget.src = clinicFallbackImage;
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                      <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between text-white">
-                        <div className="flex items-center gap-2">
-                          <Camera className="h-4 w-4 text-blue-300" />
-                          <span className="text-xs sm:text-sm font-bold drop-shadow-sm">
-                            Clinic Facility & Campus
-                          </span>
-                        </div>
-                        <span className="rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-white">
-                          Verified Photo
-                        </span>
-                      </div>
+                {/* Video Tour View */}
+                {hasClinicVideo && heroMediaType === "video" ? (
+                  <div className="relative aspect-[16/11] w-full bg-black">
+                    <video
+                      src={clinic.clinic_video_url}
+                      poster={getClinicImage(clinic)}
+                      className="h-full w-full object-cover"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      controls
+                    />
+                    <div className="absolute top-3.5 left-3.5 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white border border-white/20 flex items-center gap-1.5">
+                      <Video className="h-3.5 w-3.5 text-blue-400" />
+                      <span>Facility Video Tour</span>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-slate-950 shadow-xl transition-all">
+                ) : (
+                  /* Photo View */
                   <div className="relative aspect-[16/11] w-full overflow-hidden group">
                     <img
                       src={getClinicImage(clinic)}
@@ -1214,18 +1215,38 @@ function ClinicDetail() {
                       }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+
+                    {/* Top Left Badge */}
+                    <div className="absolute top-3.5 left-3.5 rounded-full bg-black/60 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white border border-white/20 flex items-center gap-1.5">
+                      <Camera className="h-3.5 w-3.5 text-blue-300" />
+                      <span>Clinic Facility</span>
+                    </div>
+
+                    {/* Bottom Caption & Quick Watch Video CTA */}
                     <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between text-white">
                       <div>
                         <p className="text-base font-bold drop-shadow-sm">{clinic.name}</p>
                         <p className="text-xs text-white/80 drop-shadow-sm">{clinic.city || "Verified Pet Clinic"}</p>
                       </div>
-                      <span className="rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1 text-xs font-semibold text-white">
-                        Verified Facility
-                      </span>
+
+                      {hasClinicVideo ? (
+                        <button
+                          type="button"
+                          onClick={() => setHeroMediaType("video")}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white/25 backdrop-blur-md border border-white/35 px-3 py-1.5 text-xs font-bold text-white hover:bg-white hover:text-slate-950 transition-all shadow-sm active:scale-95"
+                        >
+                          <Video className="h-3.5 w-3.5 text-blue-300" />
+                          <span>Watch Video Tour</span>
+                        </button>
+                      ) : (
+                        <span className="rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1 text-xs font-semibold text-white">
+                          Verified Facility
+                        </span>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
