@@ -317,7 +317,7 @@ const mapUrlForClinic = (clinic) => {
 
 function DetailSection({ title, subtitle, icon: Icon, badge, action, children }) {
   return (
-    <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs sm:p-6 transition-all hover:border-slate-300">
+    <section className="min-w-0 max-w-full rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs sm:p-6 transition-all hover:border-slate-300">
       <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5 gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {Icon && (
@@ -820,14 +820,75 @@ function ClinicDetail() {
     });
   }, [packageItems, packageCategory, packagePet]);
 
+  const displayPackages = useMemo(() => {
+    if (!filteredPackages.length) return [];
+    if (filteredPackages.length < 4) {
+      return [
+        ...filteredPackages,
+        ...filteredPackages,
+        ...filteredPackages,
+        ...filteredPackages,
+      ];
+    }
+    return [...filteredPackages, ...filteredPackages];
+  }, [filteredPackages]);
+
   const packageScrollRef = useRef(null);
 
-  const scrollPackages = (direction) => {
-    if (packageScrollRef.current) {
-      const scrollAmount = direction === "left" ? -360 : 360;
-      packageScrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
-    }
-  };
+  useEffect(() => {
+    const el = packageScrollRef.current;
+    if (!el || !filteredPackages.length) return;
+
+    let animationFrameId;
+    let isPaused = false;
+
+    const onEnter = () => {
+      isPaused = true;
+    };
+    const onLeave = () => {
+      isPaused = false;
+    };
+    const onTouchStart = () => {
+      isPaused = true;
+    };
+    const onTouchEnd = () => {
+      isPaused = false;
+    };
+
+    el.addEventListener("mouseenter", onEnter);
+    el.addEventListener("mouseleave", onLeave);
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+
+    let lastTime = null;
+    const pixelsPerSecond = 35; // gentle, readable auto-drift speed
+
+    const step = (timestamp) => {
+      if (!lastTime) lastTime = timestamp;
+      const delta = (timestamp - lastTime) / 1000;
+      lastTime = timestamp;
+
+      if (!isPaused && el) {
+        const halfWidth = el.scrollWidth / 2;
+        if (halfWidth > 0 && el.scrollLeft >= halfWidth) {
+          el.scrollLeft -= halfWidth;
+        } else {
+          el.scrollLeft += pixelsPerSecond * Math.min(delta, 0.1);
+        }
+      }
+      animationFrameId = requestAnimationFrame(step);
+    };
+
+    animationFrameId = requestAnimationFrame(step);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      el.removeEventListener("mouseenter", onEnter);
+      el.removeEventListener("mouseleave", onLeave);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [filteredPackages]);
 
   const handleShare = () => {
     if (navigator.share) {
@@ -1195,7 +1256,7 @@ function ClinicDetail() {
       <section className="bg-slate-50/70 py-10 sm:py-12">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1.25fr_0.75fr] lg:px-8">
           {/* Main Left Content */}
-          <div className="space-y-8">
+          <div className="min-w-0 space-y-8">
             {/* Consultation Modes Comparison (In-Clinic vs Video Consult) */}
             <DetailSection
               title="Consultation Options & Fees"
@@ -1552,28 +1613,6 @@ function ClinicDetail() {
                 subtitle="Complete preventive health, immunization & surgical care plans"
                 icon={Sparkles}
                 badge={`${packageItems.length} Packages Available`}
-                action={
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => scrollPackages("left")}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs transition-all active:scale-90"
-                      aria-label="Previous packages"
-                      title="Previous packages"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => scrollPackages("right")}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs transition-all active:scale-90"
-                      aria-label="Next packages"
-                      title="Next packages"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                }
               >
                 {/* Category & Pet Filter Tabs */}
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-100 pb-4">
@@ -1627,85 +1666,90 @@ function ClinicDetail() {
                   </div>
                 </div>
 
-                {/* Horizontal Sideways Scroll Package Cards Track */}
-                <div
-                  ref={packageScrollRef}
-                  className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth focus:outline-none [-ms-overflow-style:none] [scrollbar-width:thin]"
-                >
-                  {filteredPackages.map((pkg) => (
-                    <div
-                      key={pkg.id}
-                      className="group relative flex w-[290px] sm:w-[330px] md:w-[350px] shrink-0 snap-start flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs transition-all hover:border-blue-300 hover:shadow-md"
-                    >
-                      <div>
-                        {/* Tags Header */}
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-                            {pkg.petType === "Dog" ? "🐶 Dog Care" : pkg.petType === "Cat" ? "🐱 Cat Care" : "🐾 Pet Care"}
-                          </span>
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                              pkg.category === "Vaccination"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                                : "bg-purple-50 text-purple-700 border border-purple-200/60"
-                            }`}
-                          >
-                            {pkg.badge || pkg.category}
-                          </span>
-                        </div>
-
-                        {/* Title & Description */}
-                        <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                          {pkg.title}
-                        </h3>
-                        <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-normal line-clamp-2">
-                          {pkg.description}
-                        </p>
-
-                        {/* Inclusions list */}
-                        {pkg.inclusions && pkg.inclusions.length > 0 && (
-                          <div className="mt-3.5 space-y-1.5 rounded-xl bg-slate-50/80 p-3 text-xs text-slate-600">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                              Package Inclusions
-                            </p>
-                            {pkg.inclusions.map((item, idx) => (
-                              <div key={idx} className="flex items-start gap-2">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                <span className="text-[11px] leading-tight text-slate-600">{item}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Pricing & CTA */}
-                      <div className="mt-5 border-t border-slate-100 pt-4 flex items-center justify-between gap-3">
+                {/* Continuous Auto-Scrolling Sideways Cards Track */}
+                <div className="w-full min-w-0 overflow-hidden">
+                  <div
+                    ref={packageScrollRef}
+                    className="flex gap-4 overflow-x-auto pb-4 pt-1 focus:outline-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing"
+                  >
+                    {displayPackages.map((pkg, idx) => (
+                      <div
+                        key={`${pkg.id}-${idx}`}
+                        className="group relative flex w-[280px] sm:w-[320px] shrink-0 flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs transition-all hover:border-blue-300 hover:shadow-md"
+                      >
                         <div>
-                          <p className="text-xl font-black text-slate-900">{pkg.formattedPrice}</p>
-                          <p className="text-[10px] font-medium text-slate-400">All-Inclusive Fee</p>
+                          {/* Tags Header */}
+                          <div className="flex items-center justify-between gap-2 mb-3">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                              {pkg.petType === "Dog" ? "🐶 Dog Care" : pkg.petType === "Cat" ? "🐱 Cat Care" : "🐾 Pet Care"}
+                            </span>
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                pkg.category === "Vaccination"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                                  : "bg-purple-50 text-purple-700 border border-purple-200/60"
+                              }`}
+                            >
+                              {pkg.badge || pkg.category}
+                            </span>
+                          </div>
+
+                          {/* Title & Description */}
+                          <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            {pkg.title}
+                          </h3>
+                          <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-normal line-clamp-2">
+                            {pkg.description}
+                          </p>
+
+                          {/* Inclusions list */}
+                          {pkg.inclusions && pkg.inclusions.length > 0 && (
+                            <div className="mt-3.5 space-y-1.5 rounded-xl bg-slate-50/80 p-3 text-xs text-slate-600">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Package Inclusions
+                              </p>
+                              {pkg.inclusions.map((item, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                  <span className="text-[11px] leading-tight text-slate-600">{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openBookingModal({
-                              orderType: "appointment",
-                              doctor: doctors.length > 0 ? doctors[0] : null,
-                            })
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all shrink-0"
-                        >
-                          <CalendarDays className="h-3.5 w-3.5" />
-                          <span>Book Package</span>
-                        </button>
+
+                        {/* Pricing & CTA */}
+                        <div className="mt-5 border-t border-slate-100 pt-4 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xl font-black text-slate-900">{pkg.formattedPrice}</p>
+                            <p className="text-[10px] font-medium text-slate-400">All-Inclusive Fee</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openBookingModal({
+                                orderType: "appointment",
+                                doctor: doctors.length > 0 ? doctors[0] : null,
+                              })
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all shrink-0"
+                          >
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            <span>Book Package</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
 
                 {/* Horizontal Scroll Navigation Hint */}
-                <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
-                  <span>← Scroll sideways to see all {filteredPackages.length} packages →</span>
-                  <span className="hidden sm:inline">Use arrows or swipe</span>
+                <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                    Auto-scrolling sideways · Hover or tap to pause
+                  </span>
+                  <span className="hidden sm:inline">Swipe or scroll anytime</span>
                 </div>
 
                 {/* Sterile Clinic Guarantee */}
