@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
   ArrowLeft,
@@ -30,6 +31,7 @@ import {
   Activity,
   BadgeCheck,
   Camera,
+  X,
 } from "lucide-react";
 
 import axiosClient from "../axios";
@@ -579,121 +581,182 @@ function ClinicDirectory() {
     };
   }, []);
 
-  const [selectedCity, setSelectedCity] = useState("all");
-
-  const availableCities = useMemo(() => {
-    const set = new Set();
-    clinics.forEach((entry) => {
-      const c = entry?.clinic?.city?.trim();
-      if (c) set.add(c);
-    });
-    return Array.from(set).sort();
-  }, [clinics]);
-
   const filteredClinics = useMemo(() => {
     const term = query.trim().toLowerCase();
+    if (!term) return clinics;
+
     return clinics.filter((entry) => {
       const clinic = entry?.clinic || {};
-      const matchesCity =
-        selectedCity === "all" ||
-        clinic.city?.trim().toLowerCase() === selectedCity.toLowerCase();
-      if (!matchesCity) return false;
-
-      if (!term) return true;
       return [clinic.name, clinic.city, clinic.address, clinic.slug]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [clinics, query, selectedCity]);
+  }, [clinics, query]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+        delayChildren: 0.05,
+      },
+    },
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 28, scale: 0.98 },
+    show: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.45,
+        ease: [0.16, 1, 0.3, 1],
+      },
+    },
+  };
 
   return (
     <>
-      <section className="border-b border-slate-200 bg-white py-8 sm:py-10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-6 lg:grid-cols-[0.95fr_0.5fr] lg:items-end">
-            <div>
-              <p className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
-                {plural(clinics.length, "clinic")} listed
-              </p>
-              <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+      <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-b from-blue-50/40 via-white to-white py-10 sm:py-14">
+        {/* Ambient background decoration */}
+        <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-blue-200/30 blur-3xl" />
+        <div className="pointer-events-none absolute right-0 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-sky-100/40 blur-3xl" />
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-6 lg:grid-cols-[1fr_0.45fr] lg:items-end">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="inline-flex items-center gap-2 rounded-full border border-blue-200/80 bg-blue-50/90 px-3.5 py-1 text-xs font-bold text-blue-700 shadow-xs"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-600"></span>
+                </span>
+                {plural(clinics.length, "clinic")} listed across India
+              </motion.div>
+
+              <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-5xl">
                 Find a SnoutIQ clinic near you
               </h1>
-              <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-                Browse clinics with doctors, consultation fees, services,
-                machinery, location, and appointment hours from verified
-                onboarding data.
+              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+                Browse verified veterinary hospitals with on-site doctors, consultation
+                fees, facilities, diagnostics, and direct appointment booking.
               </p>
-            </div>
+            </motion.div>
 
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
-                placeholder="Search clinic, city, or slug"
-              />
-            </label>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+              className="relative"
+            >
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="h-13 w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-10 text-sm font-medium text-slate-900 shadow-xs outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  placeholder="Search clinic, city, or slug..."
+                />
+                <AnimatePresence>
+                  {query && (
+                    <motion.button
+                      type="button"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      onClick={() => setQuery("")}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+              </label>
+            </motion.div>
           </div>
-
-          {availableCities.length > 0 && (
-            <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-5">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 mr-1">
-                Filter by City:
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedCity("all")}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                  selectedCity === "all"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                All Cities ({clinics.length})
-              </button>
-              {availableCities.map((city) => (
-                <button
-                  key={city}
-                  type="button"
-                  onClick={() => setSelectedCity(city)}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                    selectedCity.toLowerCase() === city.toLowerCase()
-                      ? "bg-blue-600 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {city}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
-      <section className="bg-slate-50 py-8 sm:py-10">
+      <section className="bg-slate-50/70 py-10 sm:py-14 min-h-[500px]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {isLoading ? (
-            <div className="flex min-h-72 items-center justify-center rounded-2xl border border-slate-200 bg-white">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            /* Animated Loading Skeletons */
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((idx) => (
+                <div
+                  key={idx}
+                  className="animate-pulse overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs"
+                >
+                  <div className="aspect-[16/10] w-full bg-slate-200" />
+                  <div className="p-5 space-y-3">
+                    <div className="h-4 w-1/3 rounded bg-slate-200" />
+                    <div className="h-3 w-4/5 rounded bg-slate-200" />
+                    <div className="h-3 w-3/5 rounded bg-slate-200" />
+                    <div className="flex gap-2 pt-2">
+                      <div className="h-6 w-16 rounded-md bg-slate-200" />
+                      <div className="h-6 w-20 rounded-md bg-slate-200" />
+                    </div>
+                    <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                      <div className="h-4 w-20 rounded bg-slate-200" />
+                      <div className="h-8 w-24 rounded-xl bg-slate-200" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : error ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
-              <AlertCircle className="h-5 w-5" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700"
+            >
+              <AlertCircle className="h-5 w-5 shrink-0" />
               <p>{error}</p>
-            </div>
+            </motion.div>
           ) : filteredClinics.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-              <h2 className="text-xl font-semibold text-slate-950">
-                No clinics found
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-xs"
+            >
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                <Search className="h-8 w-8" />
+              </div>
+              <h2 className="mt-4 text-xl font-bold text-slate-950">
+                No clinics matching "{query}"
               </h2>
-              <p className="mt-2 text-slate-600">
-                Add a clinic name in full onboarding and the API will generate
-                its slug.
+              <p className="mt-2 text-sm text-slate-500">
+                Try searching for another city, clinic name, or clear the search query.
               </p>
-            </div>
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 cursor-pointer transition-all active:scale-95"
+                >
+                  Clear search
+                </button>
+              )}
+            </motion.div>
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            >
               {filteredClinics.map((entry) => {
                 const clinic = entry?.clinic || {};
                 const { serviceRows, machineRows } = splitByMainService(
@@ -714,11 +777,13 @@ function ClinicDirectory() {
                 const hasFees = dayFee || nightFee;
 
                 return (
-                  <div
+                  <motion.div
                     key={clinic.id || clinic.slug}
-                    className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-xl"
+                    variants={cardVariants}
+                    whileHover={{ y: -6, transition: { duration: 0.25, ease: "easeOut" } }}
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition-shadow duration-300 hover:border-blue-300/80 hover:shadow-2xl"
                   >
-                    {/* Top Image Banner - Fixed 16:10 Aspect Ratio prevents any tall stretching */}
+                    {/* Top Image Banner - Fixed 16:10 Aspect Ratio with smooth zoom */}
                     <Link
                       to={`/clinics/${clinic.slug || clinic.id}`}
                       className="relative block aspect-[16/10] w-full overflow-hidden bg-slate-100"
@@ -726,32 +791,35 @@ function ClinicDirectory() {
                       <img
                         src={getClinicImage(clinic)}
                         alt={clinic.name || "Veterinary clinic"}
-                        className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                        className="h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-108"
                         loading="lazy"
                         onError={(event) => {
                           event.currentTarget.onerror = null;
                           event.currentTarget.src = clinicFallbackImage;
                         }}
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent pointer-events-none" />
 
                       {/* Top floating badges */}
                       <div className="absolute inset-x-3.5 top-3.5 flex items-center justify-between gap-2 pointer-events-none">
                         {clinic.city ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-md px-2.5 py-1 text-xs font-bold text-slate-800 shadow-sm">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-md px-2.5 py-1 text-xs font-bold text-slate-800 shadow-sm transition-transform duration-300 group-hover:-translate-y-0.5">
                             <MapPin className="h-3 w-3 text-blue-600" />
                             {clinic.city}
                           </span>
                         ) : <span />}
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/90 backdrop-blur-md px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
-                          <ShieldCheck className="h-3.5 w-3.5" />
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600/95 backdrop-blur-md px-2.5 py-1 text-[11px] font-bold text-white shadow-sm transition-transform duration-300 group-hover:-translate-y-0.5">
+                          <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-200 opacity-75"></span>
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
+                          </span>
                           Verified
                         </span>
                       </div>
 
                       {/* Clinic name and location preview overlaid at bottom */}
                       <div className="absolute inset-x-3.5 bottom-3 text-white pointer-events-none">
-                        <h2 className="text-lg sm:text-xl font-bold leading-tight drop-shadow-sm line-clamp-1 group-hover:text-blue-200 transition-colors">
+                        <h2 className="text-lg sm:text-xl font-bold leading-tight drop-shadow-sm line-clamp-1 transition-colors group-hover:text-blue-200">
                           {valueOrDash(clinic.name)}
                         </h2>
                         <p className="mt-1 flex items-center gap-1 text-xs text-white/90 drop-shadow-xs line-clamp-1">
@@ -766,7 +834,7 @@ function ClinicDirectory() {
                       {/* Fees & Contact strip */}
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         {hasFees ? (
-                          <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 font-semibold text-blue-700">
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 font-semibold text-blue-700 transition-colors group-hover:bg-blue-100/70">
                             <IndianRupee className="h-3.5 w-3.5 text-blue-600" />
                             {dayFee ? `Day ${dayFee}` : ""}
                             {dayFee && nightFee ? " · " : ""}
@@ -782,7 +850,7 @@ function ClinicDirectory() {
                           <a
                             href={`tel:${clinic.mobile}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 font-medium text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors"
+                            className="inline-flex items-center gap-1 rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-blue-600"
                           >
                             <Phone className="h-3 w-3 text-blue-600" />
                             {clinic.mobile}
@@ -807,10 +875,10 @@ function ClinicDirectory() {
                           {quickStats.map(([, item, Icon]) => (
                             <span
                               key={item}
-                              className="inline-flex items-center gap-1.5 rounded-md border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600"
+                              className="inline-flex items-center gap-1 rounded-md border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-all duration-200 hover:bg-blue-50/70 hover:border-blue-200 hover:text-blue-700"
                             >
                               <Icon className="h-3 w-3 text-blue-600 shrink-0" />
-                              {item}
+                              <span className="font-bold text-slate-900">{count}</span> {label.replace(/^\d+\s*/, '')}
                             </span>
                           ))}
                         </div>
@@ -820,14 +888,16 @@ function ClinicDirectory() {
                       <div className="mt-auto flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
                         <Link
                           to={`/clinics/${clinic.slug || clinic.id}`}
-                          className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-blue-700 hover:text-blue-800 transition-colors"
+                          className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-blue-700 transition-colors hover:text-blue-800"
                         >
                           View Details
-                          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1.5" />
                         </Link>
 
-                        <button
+                        <motion.button
                           type="button"
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => {
                             setBookingModal({
                               isOpen: true,
@@ -836,17 +906,17 @@ function ClinicDirectory() {
                               doctor: Array.isArray(entry.doctors) && entry.doctors[0] ? entry.doctors[0] : null,
                             });
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:from-blue-700 hover:to-blue-800 cursor-pointer"
                         >
                           <CalendarDays className="h-3.5 w-3.5" />
                           Book Visit
-                        </button>
+                        </motion.button>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
-            </div>
+            </motion.div>
           )}
         </div>
       </section>
