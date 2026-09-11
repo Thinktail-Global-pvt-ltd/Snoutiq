@@ -1197,60 +1197,7 @@ function ClinicDetail() {
         </div>
       </section>
 
-      {/* Sleek Key Highlights Strip (Replaces giant clunky boxes) */}
-      <section className="border-b border-slate-200/70 bg-white py-6">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-4">
-            <div className="flex items-center gap-3.5 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 transition-all hover:bg-slate-50 hover:border-slate-200 shadow-2xs">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-                <Stethoscope className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-lg font-black text-slate-900">
-                  {doctors.length} {plural(doctors.length, "Doctor")}
-                </p>
-                <p className="text-xs text-slate-500 font-medium">Licensed Practitioners</p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-3.5 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 transition-all hover:bg-slate-50 hover:border-slate-200 shadow-2xs">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                <Check className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-lg font-black text-slate-900">
-                  {serviceRows.length} Clinical {plural(serviceRows.length, "Service")}
-                </p>
-                <p className="text-xs text-slate-500 font-medium">OPD, Surgery & Care</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3.5 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 transition-all hover:bg-slate-50 hover:border-slate-200 shadow-2xs">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-                <Wrench className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-lg font-black text-slate-900">
-                  {machineRows.length > 0 ? `${machineRows.length} Diagnostics` : "Modern Labs"}
-                </p>
-                <p className="text-xs text-slate-500 font-medium">Diagnostics & Machinery</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3.5 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 transition-all hover:bg-slate-50 hover:border-slate-200 shadow-2xs">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-                <Video className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-lg font-black text-slate-900">
-                  {videoSchedules.length > 0 ? "Video Consults" : "Instant Connect"}
-                </p>
-                <p className="text-xs text-slate-500 font-medium">15 Mins Connect Time</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Main Details Section */}
       <section className="bg-slate-50/70 py-10 sm:py-12">
