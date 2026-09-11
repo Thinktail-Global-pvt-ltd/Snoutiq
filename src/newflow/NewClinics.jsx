@@ -799,6 +799,22 @@ function ClinicDetail() {
     doctor: null,
   });
   const [copiedLink, setCopiedLink] = useState(false);
+  const [packageCategory, setPackageCategory] = useState("all");
+  const [packagePet, setPackagePet] = useState("all");
+
+  const rawPackages = entry?.specialized_packages || [];
+  const packageItems = useMemo(() => extractPackageItems(rawPackages), [rawPackages]);
+  const packageCategories = useMemo(() => {
+    const cats = new Set(packageItems.map((p) => p.category));
+    return Array.from(cats);
+  }, [packageItems]);
+  const filteredPackages = useMemo(() => {
+    return packageItems.filter((item) => {
+      if (packageCategory !== "all" && item.category !== packageCategory) return false;
+      if (packagePet !== "all" && item.petType !== packagePet) return false;
+      return true;
+    });
+  }, [packageItems, packageCategory, packagePet]);
 
   const handleShare = () => {
     if (navigator.share) {
@@ -910,20 +926,6 @@ function ClinicDetail() {
   const hasClinicImage = Boolean(clinic.clinic_image_url || clinic.image);
   const hasClinicVideo = Boolean(clinic.clinic_video_url);
   const detailSummary = getClinicSummary(clinic);
-  const [packageCategory, setPackageCategory] = useState("all");
-  const [packagePet, setPackagePet] = useState("all");
-  const packageItems = useMemo(() => extractPackageItems(packages), [packages]);
-  const packageCategories = useMemo(() => {
-    const cats = new Set(packageItems.map((p) => p.category));
-    return Array.from(cats);
-  }, [packageItems]);
-  const filteredPackages = useMemo(() => {
-    return packageItems.filter((item) => {
-      if (packageCategory !== "all" && item.category !== packageCategory) return false;
-      if (packagePet !== "all" && item.petType !== packagePet) return false;
-      return true;
-    });
-  }, [packageItems, packageCategory, packagePet]);
 
   return (
     <>
