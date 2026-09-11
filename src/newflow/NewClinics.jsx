@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Check,
   Clock,
+  CalendarDays,
   IndianRupee,
   Loader2,
   MapPin,
@@ -46,22 +47,16 @@ const extractClinics = (payload) => {
   return [];
 };
 
-const buildClinicStats = (entry) => {
-  const doctors = entry?.doctors?.length || 0;
-  const services = entry?.services?.length || 0;
-  const packages = entry?.specialized_packages?.length || 0;
-  const videoSchedules = entry?.video_schedules?.length || 0;
-
-  return [
-    plural(doctors, "doctor"),
-    plural(services, "service"),
-    plural(packages, "package"),
-    plural(videoSchedules, "video schedule"),
-  ];
-};
-
 const getClinicImage = (clinic) =>
   clinic?.clinic_image_url || clinic?.image || clinicFallbackImage;
+
+const getClinicSummary = (clinic) =>
+  clinic?.website_subtitle ||
+  clinic?.clinic_profile ||
+  clinic?.hospital_profile ||
+  clinic?.bio ||
+  clinic?.address ||
+  "Clinic profile details are being completed.";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -365,19 +360,20 @@ function ClinicDirectory() {
 
   return (
     <>
-      <section className="border-b border-slate-200 bg-white py-10 sm:py-12">
+      <section className="border-b border-slate-200 bg-white py-8 sm:py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[0.9fr_0.55fr] lg:items-end">
+          <div className="grid gap-6 lg:grid-cols-[0.95fr_0.5fr] lg:items-end">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-                SnoutIQ Clinics
+              <p className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+                {plural(clinics.length, "clinic")} listed
               </p>
-              <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
-                Verified clinic directory
+              <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+                Find a SnoutIQ clinic near you
               </h1>
-              <p className="mt-4 max-w-3xl text-lg text-slate-600">
-                Explore clinics added through the SnoutIQ onboarding workflow,
-                with profile pages generated for each clinic.
+              <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
+                Browse clinics with doctors, consultation fees, services,
+                machinery, location, and appointment hours from verified
+                onboarding data.
               </p>
             </div>
 
@@ -394,7 +390,7 @@ function ClinicDirectory() {
         </div>
       </section>
 
-      <section className="bg-slate-50 py-10 sm:py-12">
+      <section className="bg-slate-50 py-8 sm:py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {isLoading ? (
             <div className="flex min-h-72 items-center justify-center rounded-2xl border border-slate-200 bg-white">
@@ -416,66 +412,96 @@ function ClinicDirectory() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-5 lg:grid-cols-2">
               {filteredClinics.map((entry) => {
                 const clinic = entry?.clinic || {};
-                const stats = buildClinicStats(entry);
+                const { serviceRows, machineRows } = splitByMainService(
+                  entry?.services || [],
+                  entry?.machinery || []
+                );
                 const completion =
                   entry?.profile_completion_percentage ??
                   entry?.profile_completion?.percentage ??
                   0;
+                const doctors = entry?.doctors?.length || 0;
+                const packages = entry?.specialized_packages?.length || 0;
+                const videoSchedules = entry?.video_schedules?.length || 0;
+                const dayFee = formatMoney(clinic.clinic_day_fee);
+                const nightFee = formatMoney(clinic.clinic_night_fee);
+                const quickStats = [
+                  [plural(doctors, "doctor"), Stethoscope],
+                  [plural(serviceRows.length, "service"), Check],
+                  [plural(machineRows.length, "machine"), Wrench],
+                  [plural(packages, "package"), IndianRupee],
+                  [plural(videoSchedules, "video slot"), Video],
+                ];
 
                 return (
                   <Link
                     key={clinic.id || clinic.slug}
                     to={`/clinics/${clinic.slug || clinic.id}`}
-                    className="group flex min-h-[340px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+                    className="group grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md sm:grid-cols-[240px_1fr]"
                   >
-                    <div className="aspect-[16/9] overflow-hidden bg-slate-100">
+                    <div className="relative min-h-[220px] overflow-hidden bg-slate-100 sm:min-h-full">
                       <img
                         src={getClinicImage(clinic)}
                         alt={clinic.name || "Veterinary clinic"}
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                         loading="lazy"
+                        onError={(event) => {
+                          event.currentTarget.onerror = null;
+                          event.currentTarget.src = clinicFallbackImage;
+                        }}
                       />
+                      <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-sm font-bold text-blue-700 shadow-sm">
+                        {completion}% complete
+                      </span>
                     </div>
 
-                    <div className="flex flex-1 flex-col p-5">
+                    <div className="flex min-h-[300px] flex-col p-5 sm:p-6">
                       <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h2 className="text-xl font-bold text-slate-950">
+                        <div className="min-w-0">
+                          <h2 className="text-2xl font-bold leading-tight text-slate-950">
                             {valueOrDash(clinic.name)}
                           </h2>
-                          <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+                          <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-slate-500">
                             <MapPin className="h-4 w-4" />
-                            {valueOrDash(clinic.city)}
+                            {valueOrDash([clinic.city, clinic.pincode].filter(Boolean).join(" - "))}
                           </p>
                         </div>
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
-                          {completion}%
+                        <span className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                          Verified
                         </span>
                       </div>
 
-                      <p className="mt-4 line-clamp-2 text-sm text-slate-600">
-                        {clinic.clinic_profile ||
-                          clinic.hospital_profile ||
-                          clinic.bio ||
-                          clinic.address ||
-                          "Clinic profile details are being completed."}
+                      <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">
+                        {getClinicSummary(clinic)}
                       </p>
 
-                      <div className="mt-5 grid grid-cols-2 gap-2 text-sm text-slate-600">
-                        {stats.map((item) => (
+                      <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                        <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                          <Phone className="h-4 w-4 text-blue-600" />
+                          {valueOrDash(clinic.mobile)}
+                        </span>
+                        <span className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                          <CalendarDays className="h-4 w-4 text-blue-600" />
+                          Day {dayFee || "-"} · Night {nightFee || "-"}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {quickStats.map(([item, Icon]) => (
                           <span
                             key={item}
-                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600"
                           >
+                            <Icon className="h-3.5 w-3.5 text-blue-600" />
                             {item}
                           </span>
                         ))}
                       </div>
 
-                      <span className="mt-auto inline-flex items-center gap-2 pt-5 font-semibold text-blue-700">
+                      <span className="mt-auto inline-flex items-center gap-2 pt-5 font-bold text-blue-700">
                         View clinic
                         <ArrowRight className="h-4 w-4" />
                       </span>
