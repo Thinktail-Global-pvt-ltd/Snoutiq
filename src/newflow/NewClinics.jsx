@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -17,6 +17,7 @@ import {
   Wrench,
   Star,
   ShieldCheck,
+  ChevronLeft,
   ChevronRight,
   Navigation,
   Building2,
@@ -314,26 +315,29 @@ const mapUrlForClinic = (clinic) => {
     : null;
 };
 
-function DetailSection({ title, subtitle, icon: Icon, badge, children }) {
+function DetailSection({ title, subtitle, icon: Icon, badge, action, children }) {
   return (
     <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs sm:p-6 transition-all hover:border-slate-300">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5 gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {Icon && (
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100/60 shadow-xs shrink-0">
               <Icon className="h-5 w-5" />
             </div>
           )}
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">{title}</h2>
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 truncate">{title}</h2>
             {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
           </div>
         </div>
-        {badge && (
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 shrink-0">
-            {badge}
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {action}
+          {badge && (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 shrink-0">
+              {badge}
+            </span>
+          )}
+        </div>
       </div>
       <div>{children}</div>
     </section>
@@ -815,6 +819,15 @@ function ClinicDetail() {
       return true;
     });
   }, [packageItems, packageCategory, packagePet]);
+
+  const packageScrollRef = useRef(null);
+
+  const scrollPackages = (direction) => {
+    if (packageScrollRef.current) {
+      const scrollAmount = direction === "left" ? -360 : 360;
+      packageScrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
 
   const handleShare = () => {
     if (navigator.share) {
@@ -1539,6 +1552,28 @@ function ClinicDetail() {
                 subtitle="Complete preventive health, immunization & surgical care plans"
                 icon={Sparkles}
                 badge={`${packageItems.length} Packages Available`}
+                action={
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => scrollPackages("left")}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs transition-all active:scale-90"
+                      aria-label="Previous packages"
+                      title="Previous packages"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollPackages("right")}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs transition-all active:scale-90"
+                      aria-label="Next packages"
+                      title="Next packages"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                }
               >
                 {/* Category & Pet Filter Tabs */}
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-100 pb-4">
@@ -1592,12 +1627,15 @@ function ClinicDetail() {
                   </div>
                 </div>
 
-                {/* Package Cards Grid */}
-                <div className="grid gap-4 sm:grid-cols-2">
+                {/* Horizontal Sideways Scroll Package Cards Track */}
+                <div
+                  ref={packageScrollRef}
+                  className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth focus:outline-none [-ms-overflow-style:none] [scrollbar-width:thin]"
+                >
                   {filteredPackages.map((pkg) => (
                     <div
                       key={pkg.id}
-                      className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs transition-all hover:border-blue-300 hover:shadow-md"
+                      className="group relative flex w-[290px] sm:w-[330px] md:w-[350px] shrink-0 snap-start flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs transition-all hover:border-blue-300 hover:shadow-md"
                     >
                       <div>
                         {/* Tags Header */}
@@ -1620,7 +1658,7 @@ function ClinicDetail() {
                         <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                           {pkg.title}
                         </h3>
-                        <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-normal">
+                        <p className="mt-1.5 text-xs text-slate-500 leading-relaxed font-normal line-clamp-2">
                           {pkg.description}
                         </p>
 
@@ -1654,7 +1692,7 @@ function ClinicDetail() {
                               doctor: doctors.length > 0 ? doctors[0] : null,
                             })
                           }
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all shrink-0"
                         >
                           <CalendarDays className="h-3.5 w-3.5" />
                           <span>Book Package</span>
@@ -1664,8 +1702,14 @@ function ClinicDetail() {
                   ))}
                 </div>
 
+                {/* Horizontal Scroll Navigation Hint */}
+                <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
+                  <span>← Scroll sideways to see all {filteredPackages.length} packages →</span>
+                  <span className="hidden sm:inline">Use arrows or swipe</span>
+                </div>
+
                 {/* Sterile Clinic Guarantee */}
-                <div className="mt-5 flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 text-xs text-slate-600">
+                <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 text-xs text-slate-600">
                   <ShieldCheck className="h-5 w-5 text-blue-600 shrink-0" />
                   <p>
                     <span className="font-semibold text-slate-800">SnoutIQ Quality Assurance: </span>
