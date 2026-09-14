@@ -160,7 +160,53 @@ function hasEnoughSymptomDetail(text) {
   return hasSymptom && contextCount >= 2;
 }
 
-function buildIntakePrompt(petName = "your pet") {
+function buildIntakePrompt(petName = "your pet", symptomText = "") {
+  const normalizedSymptom = normalizeInputText(symptomText).toLowerCase();
+  const isVomiting = normalizedSymptom.includes("vomit") || normalizedSymptom.includes("stomach");
+  const isDiarrhea = normalizedSymptom.includes("diarrhea") || normalizedSymptom.includes("loose motion");
+  const isLimping = normalizedSymptom.includes("limp") || normalizedSymptom.includes("skin");
+  const isLethargic = normalizedSymptom.includes("letharg") || normalizedSymptom.includes("not eating");
+
+  if (isVomiting) {
+    return `I can help assess vomiting or stomach upset for ${petName}, but I need clinical context before showing a risk score. Please answer:
+
+1. When did it start?
+2. How many times has ${petName} vomited?
+3. Is ${petName} eating and drinking?
+4. Any diarrhea, blood, bloated belly, pain, or weakness?
+5. Age, breed, and any recent food change or medicine?`;
+  }
+
+  if (isDiarrhea) {
+    return `I can help assess diarrhea for ${petName}, but I need clinical context before showing a risk score. Please answer:
+
+1. When did it start?
+2. How many times today?
+3. Is there blood, black stool, vomiting, or fever?
+4. Is ${petName} active and drinking water?
+5. Age, breed, and any recent food change or medicine?`;
+  }
+
+  if (isLimping) {
+    return `I can help assess the limping or skin issue for ${petName}, but I need clinical context before showing a risk score. Please answer:
+
+1. When did it start?
+2. Can ${petName} put weight on the leg?
+3. Any swelling, wound, bleeding, crying, or visible pain?
+4. Is ${petName} eating, drinking, and behaving normally?
+5. Age, breed, and any injury/fall you noticed?`;
+  }
+
+  if (isLethargic) {
+    return `I can help assess low energy or not eating for ${petName}, but I need clinical context before showing a risk score. Please answer:
+
+1. When did it start?
+2. Has ${petName} eaten or drunk anything today?
+3. Any vomiting, diarrhea, fever, coughing, pain, or breathing issue?
+4. Is ${petName} responsive and able to walk normally?
+5. Age, breed, and any known medical history or medicine?`;
+  }
+
   return `I need a little more detail before I can calculate a meaningful risk score for ${petName}. Please share:
 
 1. What symptom are you noticing?
@@ -244,7 +290,6 @@ export default function SymptomCheckerFlow({
   activeChatRoomToken,
   setActiveChatRoomToken,
   onMessageSent,
-  isDesktopSidebarOpen = true,
 }) {
   const navigate = useNavigate();
   const handleAppDownload = (e) => {
@@ -658,16 +703,21 @@ export default function SymptomCheckerFlow({
       !hasEnoughSymptomDetail(textToSubmit);
 
     if (shouldAskForMoreDetail) {
+      const hasOpenIntakePrompt = messages.some(
+        (msg) => msg.role === "assistant" && msg.isIntakePrompt,
+      );
       pushMessage({
         role: "user",
         text: textToSubmit,
         isIntakePrompt: true,
       });
-      pushMessage({
-        role: "assistant",
-        text: buildIntakePrompt(pet.name || pet.pet_name || "your pet"),
-        isIntakePrompt: true,
-      });
+        if (!hasOpenIntakePrompt) {
+        pushMessage({
+          role: "assistant",
+          text: buildIntakePrompt(pet.name || pet.pet_name || "your pet", textToSubmit),
+          isIntakePrompt: true,
+        });
+      }
       setInputValue("");
       return;
     }
@@ -915,7 +965,7 @@ export default function SymptomCheckerFlow({
 
   return (
     <>
-      <div className="flex min-h-full flex-col bg-white">
+      <div className="flex h-full min-h-0 flex-col bg-white">
         {messages.length === 0 && !historyLoading ? (
           <div className="flex-1 flex flex-col items-center justify-between px-4 py-4 sm:px-6 h-[calc(100vh-3.5rem)] overflow-hidden">
             <div className="my-auto flex flex-col items-center justify-center text-center w-full max-w-3xl">
@@ -1063,7 +1113,7 @@ export default function SymptomCheckerFlow({
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4">
+          <div className="flex min-h-0 flex-1 flex-col w-full max-w-4xl mx-auto px-3 py-3 sm:px-4">
             {pet?.name && (
               <div className="mx-auto mb-6 flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
                 <div className="text-xl">🐾</div>
@@ -1075,7 +1125,7 @@ export default function SymptomCheckerFlow({
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto space-y-6 pb-36">
+            <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pb-4 sm:space-y-6">
               {historyLoading && (
                 <div className="flex items-center justify-center py-10">
                   <div className="flex items-center gap-2 text-slate-400 text-sm">
@@ -1091,7 +1141,7 @@ export default function SymptomCheckerFlow({
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {!msg.role.includes("user") && (
-                    <div className="mt-1 mr-3 flex h-8 w-8 items-center justify-center">
+                    <div className="mt-1 mr-2 flex h-7 w-7 shrink-0 items-center justify-center sm:mr-3 sm:h-8 sm:w-8">
                       <img
                         src={snoutiq_app_icon}
                         alt="AI"
@@ -1101,7 +1151,7 @@ export default function SymptomCheckerFlow({
                   )}
 
                   <div
-                    className={`max-w-[85%] ${msg.role === "user" ? "rounded-2xl bg-slate-900 text-white rounded-tr-none px-5 py-4" : "w-full"}`}
+                    className={`min-w-0 ${msg.role === "user" ? "max-w-[82%] rounded-2xl bg-slate-900 text-white rounded-tr-none px-4 py-3 text-sm sm:max-w-[85%] sm:px-5 sm:py-4 sm:text-base" : "w-full max-w-[calc(100%-2.25rem)] sm:max-w-[calc(100%-2.75rem)]"}`}
                   >
                     {msg.role === "user" && msg.image && (
                       <div
@@ -1135,8 +1185,8 @@ export default function SymptomCheckerFlow({
                           />
                         )}
 
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mb-6">
-                          <p className="whitespace-pre-wrap text-slate-800 leading-relaxed mb-4">
+                        <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
+                          <p className="whitespace-pre-wrap text-sm leading-7 text-slate-800 sm:text-base sm:leading-relaxed mb-4">
                             {msg.raw_response?.response
                               ?.what_we_think_is_happening || msg.text}
                           </p>
@@ -1243,11 +1293,7 @@ export default function SymptomCheckerFlow({
               <div ref={messagesEndRef} />
             </div>
 
-            <div
-              className={`fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-2.5 sm:p-3.5 transition-all duration-300 z-30 ${
-                isDesktopSidebarOpen ? "md:left-64" : "md:left-16"
-              }`}
-            >
+            <div className="shrink-0 border-t border-slate-200 bg-white/95 p-2.5 backdrop-blur-md sm:p-3.5">
               {messages.length > 0 && (
                 <>
                   {attachedImage && (
@@ -1286,7 +1332,7 @@ export default function SymptomCheckerFlow({
                   )}
                   <form
                     onSubmit={handleSubmit}
-                    className="mx-auto max-w-4xl relative flex items-center border border-slate-200 rounded-full bg-white p-1.5 shadow-sm focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400 mb-2.5"
+                    className="mx-auto max-w-4xl relative flex items-center border border-slate-200 rounded-full bg-white p-1.5 shadow-sm focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400 mb-2"
                   >
                     <button
                       type="button"
@@ -1305,7 +1351,7 @@ export default function SymptomCheckerFlow({
                           : "Describe your pet's symptoms..."
                       }
                       disabled={loading}
-                      className="flex-1 bg-transparent px-4 py-2 outline-none disabled:opacity-50 text-slate-900 min-w-0"
+                      className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-slate-900 outline-none disabled:opacity-50 sm:px-4 sm:text-base"
                     />
                     <button
                       type="submit"
@@ -1323,7 +1369,7 @@ export default function SymptomCheckerFlow({
                 onClick={handleAppDownload}
                 className="mx-auto max-w-4xl cursor-pointer rounded-xl bg-slate-900 px-3 py-1.5 text-white shadow-sm transition-all hover:bg-slate-800"
               >
-                <div className="flex items-center justify-between text-xs sm:text-sm">
+                <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
                   <div className="flex items-center gap-2 overflow-hidden">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 sm:h-6 sm:w-6">
                       <Smartphone className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -1335,7 +1381,7 @@ export default function SymptomCheckerFlow({
                   <button
                     type="button"
                     onClick={handleAppDownload}
-                    className="group ml-2 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-slate-950 shadow-sm transition-all hover:bg-emerald-400"
+                    className="group ml-1 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-slate-950 shadow-sm transition-all hover:bg-emerald-400 sm:ml-2 sm:px-3 sm:text-xs"
                   >
                     <span>Download App</span>
                     <Download className="h-3 w-3 transition-transform group-hover:translate-y-0.5" />

@@ -147,14 +147,14 @@ export default function SymptomCheckerSidebar({
 
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-all duration-300 md:relative md:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-all duration-300 lg:relative lg:translate-x-0 ${
         isOpen ? "translate-x-0" : "-translate-x-full"
-      } ${isDesktopOpen ? "md:w-64" : "md:w-16"}`}
+      } ${isDesktopOpen ? "lg:w-64" : "lg:w-16"}`}
     >
       {/* Inner fixed-width wrapper so content doesn't squish while width animates */}
-      <div className={`flex h-full w-64 flex-col ${isDesktopOpen ? "md:w-64" : "md:w-16"}`}>
+      <div className={`flex h-full w-64 flex-col ${isDesktopOpen ? "lg:w-64" : "lg:w-16"}`}>
         {/* Header */}
-        <div className={`flex h-14 items-center border-b border-slate-100 ${isDesktopOpen ? "justify-between px-4" : "md:justify-center md:px-0 justify-between px-4"}`}>
+        <div className={`flex h-14 items-center border-b border-slate-100 ${isDesktopOpen ? "justify-between px-4" : "lg:justify-center lg:px-0 justify-between px-4"}`}>
           <div className="flex items-center gap-2">
             <img src={snoutiq_app_icon} alt="Snoutiq" className="h-8 w-8 rounded-full" />
           </div>
@@ -162,13 +162,13 @@ export default function SymptomCheckerSidebar({
             {/* Desktop collapse/expand toggle */}
             <button
               onClick={() => setIsDesktopOpen && setIsDesktopOpen(!isDesktopOpen)}
-              className={`hidden md:inline-flex text-slate-400 hover:text-slate-800 p-1.5 rounded-md hover:bg-slate-100 transition-colors ${!isDesktopOpen ? "md:hidden" : ""}`}
+              className={`hidden lg:inline-flex text-slate-400 hover:text-slate-800 p-1.5 rounded-md hover:bg-slate-100 transition-colors ${!isDesktopOpen ? "lg:hidden" : ""}`}
               title="Collapse sidebar"
             >
               <ChevronLeft size={18} />
             </button>
             {/* Mobile close button */}
-            <button onClick={() => setIsOpen(false)} className="md:hidden text-slate-500 hover:text-slate-800">
+            <button onClick={() => setIsOpen(false)} className="lg:hidden text-slate-500 hover:text-slate-800">
               <X size={20} />
             </button>
           </div>
@@ -179,16 +179,16 @@ export default function SymptomCheckerSidebar({
           <button 
             onClick={onNewChat}
             title="New chat"
-            className={`flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-all ${isDesktopOpen ? "px-3" : "md:justify-center md:px-0 px-3"}`}
+            className={`flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-all ${isDesktopOpen ? "px-3" : "lg:justify-center lg:px-0 px-3"}`}
           >
             <Plus size={16} />
-            <span className={!isDesktopOpen ? "md:hidden" : ""}>New chat</span>
+            <span className={!isDesktopOpen ? "lg:hidden" : ""}>New chat</span>
           </button>
         </div>
 
         {/* Desktop icon-rail: quick access to Pages when collapsed */}
         {!isDesktopOpen && (
-          <div className="hidden md:flex flex-col items-center gap-1 px-2 pb-3">
+          <div className="hidden lg:flex flex-col items-center gap-1 px-2 pb-3">
             {pages.map((page) => {
               const Icon = page.icon;
               if (page.onClick) {
@@ -221,7 +221,7 @@ export default function SymptomCheckerSidebar({
           </div>
         )}
 
-        <div className={`flex-1 overflow-y-auto px-3 pb-3 ${!isDesktopOpen ? "md:hidden" : ""}`}>
+        <div className={`flex-1 overflow-y-auto px-3 pb-3 ${!isDesktopOpen ? "lg:hidden" : ""}`}>
           {/* History Section */}
           {userId && (
             <div>
@@ -266,7 +266,7 @@ export default function SymptomCheckerSidebar({
         </div>
 
         {/* Pages Section (Fixed at bottom) */}
-        <div className={`p-3 border-t border-slate-100 shrink-0 ${!isDesktopOpen ? "md:hidden" : ""}`}>
+        <div className={`p-3 border-t border-slate-100 shrink-0 ${!isDesktopOpen ? "lg:hidden" : ""}`}>
           <p className="px-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Pages</p>
           <div className="space-y-0.5">
             {pages.map((page) => {
@@ -305,17 +305,17 @@ export default function SymptomCheckerSidebar({
 
         {/* User / Guest Session */}
         <div className="border-t border-slate-100 p-4 mt-auto">
-          <div className={`flex items-center ${isDesktopOpen ? "justify-between" : "md:justify-center justify-between"}`}>
+          <div className={`flex items-center ${isDesktopOpen ? "justify-between" : "lg:justify-center justify-between"}`}>
             <div className="flex items-center gap-3 text-sm font-medium text-slate-700">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100">
                 {userId ? <User size={20} className="text-slate-600" /> : <span className="text-xs">TR</span>}
               </div>
-              <span className={`truncate ${!isDesktopOpen ? "md:hidden" : ""}`}>{userId ? (authState?.user?.name || "User") : "Guest User"}</span>
+              <span className={`truncate ${!isDesktopOpen ? "lg:hidden" : ""}`}>{userId ? (authState?.user?.name || "User") : "Guest User"}</span>
             </div>
             {userId && (
               <button 
                 onClick={() => { localStorage.clear(); window.location.reload(); }} 
-                className={`text-slate-400 hover:text-slate-700 transition-colors p-2 ${!isDesktopOpen ? "md:hidden" : ""}`}
+                className={`text-slate-400 hover:text-slate-700 transition-colors p-2 ${!isDesktopOpen ? "lg:hidden" : ""}`}
                 title="Logout"
               >
                 <LogOut size={18} />

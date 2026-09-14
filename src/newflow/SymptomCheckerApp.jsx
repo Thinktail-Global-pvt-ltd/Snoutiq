@@ -79,7 +79,7 @@ export default function SymptomCheckerApp() {
       
       <div className="flex flex-1 flex-col relative w-full h-full min-w-0">
         {/* Mobile Header */}
-        <div className="md:hidden flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4">
+        <div className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 lg:hidden">
           <div className="flex items-center">
             <button 
               onClick={() => setIsSidebarOpen(true)}
@@ -95,7 +95,7 @@ export default function SymptomCheckerApp() {
         </div>
 
         {/* Desktop Header */}
-        <div className="hidden md:flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
+        <div className="hidden h-14 items-center justify-between border-b border-slate-200 bg-white px-6 lg:flex">
           <div className="flex items-center gap-2">
             {/* Expand button — only visible when the desktop sidebar is collapsed */}
             {!isDesktopSidebarOpen && (
@@ -114,12 +114,11 @@ export default function SymptomCheckerApp() {
           <PetSelectorDropdown onAddNewPet={handleOpenPetModal} />
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50">
+        <div className="flex-1 overflow-hidden bg-slate-50">
           <SymptomCheckerFlow 
             activeChatRoomToken={activeChatRoomToken}
             setActiveChatRoomToken={handleSetActiveChatRoomToken}
             onMessageSent={() => setHistoryRefreshKey(prev => prev + 1)}
-            isDesktopSidebarOpen={isDesktopSidebarOpen}
           />
         </div>
       </div>
@@ -127,7 +126,7 @@ export default function SymptomCheckerApp() {
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-sm lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
