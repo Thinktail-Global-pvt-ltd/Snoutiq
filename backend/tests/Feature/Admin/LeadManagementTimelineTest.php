@@ -837,4 +837,49 @@ class LeadManagementTimelineTest extends TestCase
         $response->assertSee('Ten Day Delinquent User');
         $response->assertDontSee('Fresh User No Payment');
     }
+
+    public function test_paid_video_consult_leads_are_prioritized_at_top(): void
+    {
+        $paidUser = User::query()->create([
+            'name' => 'Paid Video Parent',
+            'email' => 'paid-video@example.com',
+            'phone' => '919999999920',
+            'password' => 'secret',
+        ]);
+        DB::table('users')->where('id', $paidUser->id)->update([
+            'created_at' => now()->subDays(8)->toDateTimeString(),
+            'updated_at' => now()->subDays(8)->toDateTimeString(),
+        ]);
+
+        $freshUnpaidUser = User::query()->create([
+            'name' => 'Fresh Unpaid Parent',
+            'email' => 'fresh-unpaid@example.com',
+            'phone' => '919999999921',
+            'password' => 'secret',
+        ]);
+
+        Transaction::query()->create([
+            'user_id' => $paidUser->id,
+            'amount_paise' => 59900,
+            'status' => 'captured',
+            'type' => 'video_consult',
+            'reference' => 'rzp_paid_video_test',
+            'metadata' => ['order_type' => 'video_consult'],
+            'created_at' => now()->subMinutes(5),
+            'updated_at' => now()->subMinutes(5),
+        ]);
+
+        $response = $this->withSession([
+            'is_admin' => true,
+            'admin_email' => 'admin@snoutiq.com',
+            'role' => 'admin',
+        ])->get(route('admin.lead-management'));
+
+        $response->assertOk();
+        $response->assertSee('Paid video consult');
+        $response->assertSeeInOrder([
+            'Paid Video Parent',
+            'Fresh Unpaid Parent',
+        ]);
+    }
 }

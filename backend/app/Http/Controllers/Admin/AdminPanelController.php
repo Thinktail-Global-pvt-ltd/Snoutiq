@@ -1375,6 +1375,9 @@ class AdminPanelController extends Controller
                 'has_video_follow_up' => false,
                 'has_video_follow_up_video' => false,
                 'has_video_follow_up_in_clinic' => false,
+                'has_paid_video_consult' => false,
+                'paid_video_consult_at' => null,
+                'paid_video_consult_transaction_id' => null,
                 'has_vaccination_reminder' => false,
                 'is_mobile_app_user' => false,
                 'has_captured_payment' => false,
@@ -3173,6 +3176,19 @@ class AdminPanelController extends Controller
                         ->all();
 
                     $userTransactions = $transactionsByUser[$userId] ?? [];
+                    $latestPaidVideoConsultTransaction = collect($userTransactions)
+                        ->filter(function (array $transaction): bool {
+                            $type = strtolower(trim((string) ($transaction['type'] ?? '')));
+                            return in_array($type, ['video_consult', 'excell_export_campaign'], true);
+                        })
+                        ->sortByDesc('created_at')
+                        ->first();
+                    if ($latestPaidVideoConsultTransaction) {
+                        $leadUser['has_paid_video_consult'] = true;
+                        $leadUser['paid_video_consult_at'] = (string) ($latestPaidVideoConsultTransaction['created_at'] ?? '');
+                        $leadUser['paid_video_consult_transaction_id'] = (int) ($latestPaidVideoConsultTransaction['id'] ?? 0);
+                    }
+
                     if (empty($userTransactions)) {
                         return $leadUser;
                     }
@@ -3876,6 +3892,15 @@ class AdminPanelController extends Controller
             })
             ->filter(fn (array $leadUser): bool => $matchesLeadSearch($leadUser, $searchTerm))
             ->sort(function (array $left, array $right): int {
+                $leftPaidVideoAt = trim((string) ($left['paid_video_consult_at'] ?? ''));
+                $rightPaidVideoAt = trim((string) ($right['paid_video_consult_at'] ?? ''));
+                if (($leftPaidVideoAt !== '') !== ($rightPaidVideoAt !== '')) {
+                    return $rightPaidVideoAt !== '' ? 1 : -1;
+                }
+                if ($leftPaidVideoAt !== '' && $leftPaidVideoAt !== $rightPaidVideoAt) {
+                    return strcmp($rightPaidVideoAt, $leftPaidVideoAt);
+                }
+
                 $leftCreatedAt = trim((string) ($left['user_created_at'] ?? ''));
                 $rightCreatedAt = trim((string) ($right['user_created_at'] ?? ''));
                 if ($leftCreatedAt !== $rightCreatedAt) {

@@ -1903,6 +1903,9 @@
             if (!empty($leadUser['has_video_follow_up_in_clinic'])) {
                 $categoryTags[] = 'In-clinic Follow-up';
             }
+            if (!empty($leadUser['has_paid_video_consult'])) {
+                $categoryTags[] = 'Paid video consult';
+            }
             if (
                 !empty($leadUser['has_video_follow_up'])
                 && empty($leadUser['has_video_follow_up_video'])
@@ -2048,6 +2051,9 @@
                 'has_video_follow_up' => (bool) ($leadUser['has_video_follow_up'] ?? false),
                 'has_video_follow_up_video' => (bool) ($leadUser['has_video_follow_up_video'] ?? false),
                 'has_video_follow_up_in_clinic' => (bool) ($leadUser['has_video_follow_up_in_clinic'] ?? false),
+                'has_paid_video_consult' => (bool) ($leadUser['has_paid_video_consult'] ?? false),
+                'paid_video_consult_at' => (string) ($leadUser['paid_video_consult_at'] ?? ''),
+                'paid_video_consult_transaction_id' => (int) ($leadUser['paid_video_consult_transaction_id'] ?? 0),
                 'has_vaccination_reminder' => (bool) ($leadUser['has_vaccination_reminder'] ?? false),
                 'is_mobile_app_user' => (bool) ($leadUser['is_mobile_app_user'] ?? false),
                 'has_captured_payment' => (bool) ($leadUser['has_captured_payment'] ?? false),
@@ -3230,6 +3236,9 @@
             const cityTag = lead.city ? `<span class="crm-tag">${escapeHtml(lead.city)}</span>` : '';
             const mobileTag = lead.is_mobile_app_user ? '<span class="crm-tag crm-tag-mobile">Mobile app user</span>' : '';
             const pendingPaymentTag = lead.has_pending_payment ? '<span class="crm-tag crm-tag-payment-pending">Pending payment</span>' : '';
+            const paidVideoConsultTag = lead.has_paid_video_consult
+                ? `<span class="crm-tag crm-tag-mobile">Paid video consult</span>`
+                : '';
             const notifsTag = `<span class="crm-tag">${Number(lead.all_notifications_count || 0)} notifs</span>`;
             const callTag = callState.required
                 ? `<span class="crm-tag ${callState.completed ? 'crm-tag-mobile' : ''}">${escapeHtml(callState.completed ? 'Call completed' : 'Call now - 10d no payment')}</span>`
@@ -3264,6 +3273,7 @@
                         ${cityTag}
                         ${mobileTag}
                         ${pendingPaymentTag}
+                        ${paidVideoConsultTag}
                         ${callTag}
                         ${notifsTag}
                         ${followTag}
