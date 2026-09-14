@@ -18,6 +18,75 @@ import {
   FollowUpQuestion,
 } from "./AssessmentUI";
 
+const MIN_ASSESSMENT_WORDS = 4;
+const LOW_SIGNAL_INPUTS = new Set([
+  "hi",
+  "hello",
+  "hey",
+  "hii",
+  "hiii",
+  "help",
+  "urgent",
+  "vet",
+  "doctor",
+  "problem",
+  "issue",
+  "sick",
+]);
+
+function normalizeInputText(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function hasEnoughSymptomDetail(text) {
+  const cleaned = normalizeInputText(text).toLowerCase();
+  if (!cleaned) return false;
+  if (LOW_SIGNAL_INPUTS.has(cleaned)) return false;
+
+  const words = cleaned.match(/[a-z0-9]+/gi) || [];
+  if (words.length < MIN_ASSESSMENT_WORDS) return false;
+
+  const symptomSignals = [
+    "vomit",
+    "diarrhea",
+    "loose motion",
+    "not eating",
+    "letharg",
+    "limp",
+    "skin",
+    "itch",
+    "cough",
+    "breath",
+    "fever",
+    "pain",
+    "bleed",
+    "wound",
+    "eye",
+    "ear",
+    "seizure",
+    "urine",
+    "poop",
+    "stool",
+    "appetite",
+    "swelling",
+    "injury",
+    "rash",
+    "allergy",
+  ];
+
+  return symptomSignals.some((signal) => cleaned.includes(signal));
+}
+
+function buildIntakePrompt(petName = "your pet") {
+  return `I need a little more detail before I can assess risk or recommend the next step for ${petName}. Please share:
+
+1. What symptom are you noticing?
+2. When did it start and is it getting worse?
+3. Is ${petName} eating, drinking, and behaving normally?
+4. Any vomiting, diarrhea, coughing, limping, bleeding, breathing difficulty, or pain?
+5. Age, breed, and any known medical history or medicines?`;
+}
+
 function ModalShell({ children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px] animate-[fadeIn_0.2s_ease-out]">
@@ -490,11 +559,35 @@ export default function SymptomCheckerFlow({
 
   const handleSubmit = async (e, forcedQuestion = null) => {
     if (e) e.preventDefault();
-    let textToSubmit = forcedQuestion || inputValue.trim();
+    let textToSubmit = normalizeInputText(forcedQuestion || inputValue);
     if (!textToSubmit && attachedImage) {
       textToSubmit = "Please examine this attached photo of my pet.";
     }
     if (!textToSubmit) return;
+
+    const assessmentMessageCount = messages.filter(
+      (msg) => !msg.isIntakePrompt,
+    ).length;
+    const isFirstAssessmentMessage = assessmentMessageCount === 0;
+    const shouldAskForMoreDetail =
+      isFirstAssessmentMessage &&
+      !attachedImage &&
+      !hasEnoughSymptomDetail(textToSubmit);
+
+    if (shouldAskForMoreDetail) {
+      pushMessage({
+        role: "user",
+        text: textToSubmit,
+        isIntakePrompt: true,
+      });
+      pushMessage({
+        role: "assistant",
+        text: buildIntakePrompt(pet.name || pet.pet_name || "your pet"),
+        isIntakePrompt: true,
+      });
+      setInputValue("");
+      return;
+    }
 
     if (!token) {
       setShowAuthGate(true);
@@ -508,7 +601,7 @@ export default function SymptomCheckerFlow({
 
     const healthDone = isHealthProfileDoneForPet(pet);
     // Part 2 Modal (Vaccine, Deworming, Neutering) triggers on 2nd chat message (messages.length >= 1)
-    if (messages.length >= 1 && !healthDone) {
+    if (assessmentMessageCount >= 1 && !healthDone) {
       console.log(
         "➡️ 2nd Chat Message detected. Opening Part 2 Modal (Vaccine, Deworming, Neutering)...",
       );
@@ -546,7 +639,7 @@ export default function SymptomCheckerFlow({
           : dataUrl;
       }
 
-      const isFirstMessage = messages.length === 0;
+      const isFirstMessage = assessmentMessageCount === 0;
       const endpoint = isFirstMessage ? "/symptom-check" : "/symptom-followup";
 
       const payload = {
