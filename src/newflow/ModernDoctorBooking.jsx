@@ -493,7 +493,7 @@ export default function ModernDoctorBooking({
   const [dateAvailError, setDateAvailError] = useState("");
   const [lockId, setLockId] = useState(null);
 
-  const [paymentPreference, setPaymentPreference] = useState("pay_online"); // "pay_online" | "pay_at_clinic"
+  const [paymentPreference, setPaymentPreference] = useState("pay_at_clinic"); // "pay_at_clinic"
   const [gstInvoiceChecked, setGstInvoiceChecked] = useState(false);
   const [gstNumber, setGstNumber] = useState("");
 
@@ -1127,7 +1127,7 @@ export default function ModernDoctorBooking({
     setProcessing(true);
     setError("");
 
-    if (orderType === "appointment" && paymentPreference === "pay_at_clinic") {
+    if (orderType === "appointment") {
       try {
         await fetch(`${API_BASE}/appointments/submit`, {
           method: "POST",
@@ -1136,7 +1136,7 @@ export default function ModernDoctorBooking({
         });
         if (lockId) unlockCurrentSlot(lockId);
         setSuccess(true);
-        alert(`Visit Confirmed! You can pay ₹${liveTotal} ${selectedPackage ? `for ${selectedPackage.title} ` : ""}at the clinic reception.`);
+        alert("Visit Confirmed! Please pay directly at the clinic reception upon arrival.");
         onClose?.();
       } catch (err) {
         setError("Booking failed");
@@ -1485,13 +1485,14 @@ export default function ModernDoctorBooking({
 
                       {/* Bottom Row */}
                       <div className="flex items-center justify-between border-t border-slate-100 pt-2">
-                        <div className="text-slate-900 font-extrabold text-xs">
-                          ₹{feeVal}<span className="text-[10px] font-normal text-slate-400">/In-Clinic Visit</span>
+                        <div className="text-emerald-700 font-bold text-xs flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                          <span>Pay at Clinic</span>
                         </div>
 
                         <button 
                           onClick={() => handleSelectClinic(clinic)}
-                          className="bg-[#0052FF] hover:bg-[#0046DB] text-white font-bold text-[11px] px-4 py-1.5 rounded-full transition-all shadow-xs flex items-center gap-1 shrink-0"
+                          className="bg-[#0052FF] hover:bg-[#0046DB] text-white font-bold text-[11px] px-4 py-1.5 rounded-full transition-all shadow-xs flex items-center gap-1 shrink-0 cursor-pointer"
                         >
                           Book Visit →
                         </button>
@@ -1857,8 +1858,8 @@ export default function ModernDoctorBooking({
                         <p className="text-[10px] text-slate-500 mt-0.5">Doctor physical examination & prescription</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-black text-slate-900">₹{consultationBaseFee}</p>
-                        <p className="text-[9px] text-slate-400">+ 18% GST</p>
+                        <p className="text-xs font-bold text-emerald-700">Pay at Clinic</p>
+                        <p className="text-[9px] text-slate-400">At Reception</p>
                       </div>
                     </div>
                   </button>
@@ -2167,85 +2168,77 @@ export default function ModernDoctorBooking({
               ) : null}
             </div>
 
-            {/* SECURE CHECKOUT */}
-            <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 shadow-xs text-xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">SECURE CHECKOUT</span>
-              <div className="flex justify-between py-0.5 text-slate-700">
-                <span>{selectedPackage ? `${selectedPackage.title} (All-Inclusive Package)` : `Consultation Fee (${isDayTimeNow() ? "Day Rate" : "Night Rate"})`}</span>
-                <span className="font-bold text-slate-900">₹{currentFee}</span>
-              </div>
-              <div className="flex justify-between py-0.5 text-slate-700">
-                <span>Taxes & GST (18%)</span>
-                <span className="font-bold text-slate-900">{isPackageSelected ? "₹0 (Included)" : `₹${gstAmount}`}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-t border-slate-100 font-extrabold text-xs text-slate-900">
-                <span>Total payable</span>
-                <span className="text-blue-700 text-sm">₹{totalAmount}</span>
-              </div>
-            </div>
-
-            {/* GST Invoice */}
-            <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={gstInvoiceChecked}
-                  onChange={(e) => setGstInvoiceChecked(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-0.5" 
-                />
-                <div>
-                  <p className="text-xs font-bold text-slate-800">GST Invoice</p>
-                  <p className="text-[10px] text-slate-400">Need GST invoice - Add GST details for business billing</p>
+            {/* CHECKOUT / PAYMENT SUMMARY */}
+            {orderType === "appointment" ? (
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 space-y-1.5 shadow-xs text-xs">
+                <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-xs">
+                  <span className="text-sm">🏥</span>
+                  <span>In-Clinic Visit Confirmation</span>
                 </div>
-              </label>
-              {gstInvoiceChecked && (
-                <input
-                  type="text"
-                  maxLength={15}
-                  value={gstNumber}
-                  onChange={(e) => setGstNumber(e.target.value.toUpperCase().replace(/\s+/g, ""))}
-                  placeholder="Enter 15-digit GST number"
-                  className="mt-2 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs uppercase focus:border-blue-500 outline-none"
-                />
-              )}
-            </div>
+                <p className="text-[11px] text-emerald-900/85 leading-relaxed font-medium">
+                  No advance online payment required. Pay consultation fees directly at the clinic reception upon arrival.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 shadow-xs text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">SECURE CHECKOUT</span>
+                <div className="flex justify-between py-0.5 text-slate-700">
+                  <span>{selectedPackage ? `${selectedPackage.title} (All-Inclusive Package)` : `Consultation Fee (${isDayTimeNow() ? "Day Rate" : "Night Rate"})`}</span>
+                  <span className="font-bold text-slate-900">₹{currentFee}</span>
+                </div>
+                <div className="flex justify-between py-0.5 text-slate-700">
+                  <span>Taxes & GST (18%)</span>
+                  <span className="font-bold text-slate-900">{isPackageSelected ? "₹0 (Included)" : `₹${gstAmount}`}</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-t border-slate-100 font-extrabold text-xs text-slate-900">
+                  <span>Total payable</span>
+                  <span className="text-blue-700 text-sm">₹{totalAmount}</span>
+                </div>
+              </div>
+            )}
+
+            {/* GST Invoice (Only for Video Consult / Online Payment) */}
+            {orderType !== "appointment" && (
+              <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={gstInvoiceChecked}
+                    onChange={(e) => setGstInvoiceChecked(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-0.5" 
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">GST Invoice</p>
+                    <p className="text-[10px] text-slate-400">Need GST invoice - Add GST details for business billing</p>
+                  </div>
+                </label>
+                {gstInvoiceChecked && (
+                  <input
+                    type="text"
+                    maxLength={15}
+                    value={gstNumber}
+                    onChange={(e) => setGstNumber(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                    placeholder="Enter 15-digit GST number"
+                    className="mt-2 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs uppercase focus:border-blue-500 outline-none"
+                  />
+                )}
+              </div>
+            )}
 
             {/* PAYMENT PREFERENCE (Only for In-Clinic Flow) */}
             {orderType === "appointment" && (
               <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">PAYMENT PREFERENCE</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">PAYMENT MODE</span>
                 
-                <label className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
-                  paymentPreference === "pay_online" ? "border-blue-600 bg-blue-50/50" : "border-slate-200 hover:border-slate-300"
-                }`}>
-                  <input 
-                    type="radio" 
-                    name="pay_pref" 
-                    checked={paymentPreference === "pay_online"}
-                    onChange={() => setPaymentPreference("pay_online")}
-                    className="mt-0.5 text-blue-600 focus:ring-blue-500" 
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Pay Online</p>
-                    <p className="text-[10px] text-slate-500">Secure UPI, card or netbanking. Instant booking confirmation.</p>
+                <div className="flex items-start gap-2.5 p-2.5 rounded-lg border border-emerald-300 bg-emerald-50/50">
+                  <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold mt-0.5 shrink-0">
+                    ✓
                   </div>
-                </label>
-
-                <label className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
-                  paymentPreference === "pay_at_clinic" ? "border-blue-600 bg-blue-50/50" : "border-slate-200 hover:border-slate-300"
-                }`}>
-                  <input 
-                    type="radio" 
-                    name="pay_pref" 
-                    checked={paymentPreference === "pay_at_clinic"}
-                    onChange={() => setPaymentPreference("pay_at_clinic")}
-                    className="mt-0.5 text-blue-600 focus:ring-blue-500" 
-                  />
                   <div>
                     <p className="text-xs font-bold text-slate-900">Pay at Clinic</p>
-                    <p className="text-[10px] text-slate-500">Confirm your visit now and pay directly at the clinic reception.</p>
+                    <p className="text-[10px] text-slate-500">Confirm your visit now and pay directly at the clinic reception upon arrival.</p>
                   </div>
-                </label>
+                </div>
               </div>
             )}
 
@@ -2259,12 +2252,12 @@ export default function ModernDoctorBooking({
             <button
               disabled={processing}
               onClick={handlePayment}
-              className="w-full py-3 bg-gradient-to-r from-sky-600 to-cyan-500 text-white font-extrabold text-xs rounded-xl shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-1.5"
+              className="w-full py-3 bg-gradient-to-r from-sky-600 to-cyan-500 text-white font-extrabold text-xs rounded-xl shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               {processing ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (orderType === "appointment" && paymentPreference === "pay_at_clinic") ? (
-                `Confirm Visit ₹${totalAmount} →`
+              ) : orderType === "appointment" ? (
+                "Confirm Clinic Visit →"
               ) : (
                 `Pay ₹${totalAmount} & Book →`
               )}
