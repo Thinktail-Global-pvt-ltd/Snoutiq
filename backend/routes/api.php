@@ -1029,6 +1029,7 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
                 
                 return $doctorData;
             })->values()->all(),
+            'specialized_packages' => $packagesByClinic->get($clinic->id, collect())->values()->all(),
         ];
     });
     
@@ -4372,6 +4373,7 @@ Route::get('/clinics', [\App\Http\Controllers\Api\ClinicsController::class, 'ind
 Route::get('/clinics/services', [ClinicsController::class, 'servicesByClinicId']);
 Route::get('/clinics/patients', [ClinicsController::class, 'patientsByClinicId']);
 Route::get('/clinics/{id}/services', [ClinicsController::class, 'services']);
+Route::get('/clinics/{id}/packages', [ClinicsController::class, 'packages']);
 Route::get('/clinics/{id}/doctors', [ClinicsController::class, 'doctors']);
 Route::get('/clinics/{id}/patients', [ClinicsController::class, 'patients']);
 Route::post('/clinics/{id}/doctors', [ClinicsController::class, 'storeDoctor']);

@@ -40,6 +40,7 @@ import { Navbar } from "../newflow/Navbar";
 import { Footer } from "../newflow/NewFooter";
 import { Button } from "../newflow/NewButton";
 import ModernDoctorBooking from "./ModernDoctorBooking";
+import { extractPackageItems, PACKAGE_DETAILS } from "./packageHelpers";
 
 const CLINIC_FORM_API_URL = "https://snoutiq.com/backend/api/demo-website-form";
 const DIRECT_CONSULT_PATH = "/20+vetsonline?start=details";
@@ -197,158 +198,6 @@ const getDoctorInitials = (name) => {
   if (!parts.length) return "DR";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
-
-const PACKAGE_DETAILS = {
-  puppy_vaccination_package: {
-    title: "Puppy Complete Vaccination Pack",
-    category: "Vaccination",
-    petType: "Dog",
-    badge: "Most Popular",
-    description: "Essential primary immunization shots against canine distemper, parvovirus & rabies with health card.",
-    inclusions: [
-      "DHPPiL Polyvalent Core Vaccine",
-      "Anti-Rabies Primary Immunization",
-      "Complete Physical & Vitals Check",
-      "Deworming Protocol & Pet Record Card",
-    ],
-  },
-  adult_dog_vaccination_package: {
-    title: "Adult Dog Annual Health & Booster",
-    category: "Vaccination",
-    petType: "Dog",
-    badge: "Annual Protection",
-    description: "Yearly polyvalent booster and anti-rabies defense to ensure uninterrupted canine immunity.",
-    inclusions: [
-      "Annual DHPPiL 9-in-1 Booster",
-      "Anti-Rabies Annual Shot",
-      "Full Clinical Body & Dental Exam",
-      "Preventive Health & Diet Consultation",
-    ],
-  },
-  kitten_vaccination_package: {
-    title: "Kitten Starter Vaccination Pack",
-    category: "Vaccination",
-    petType: "Cat",
-    badge: "Kitten Starter",
-    description: "Core Tricat (FVRCP) protection against feline panleukopenia, herpes & calici viruses plus rabies.",
-    inclusions: [
-      "FVRCP Tricat Core Vaccine",
-      "Feline Anti-Rabies Shot",
-      "Pediatric Vitals & Growth Check",
-      "Deworming Dose & Kitten Booklet",
-    ],
-  },
-  adult_cat_vaccination_package: {
-    title: "Adult Cat Annual Booster Pack",
-    category: "Vaccination",
-    petType: "Cat",
-    badge: "Annual Protection",
-    description: "Yearly feline booster maintaining immunity against common infectious respiratory and viral pathogens.",
-    inclusions: [
-      "Annual FVRCP Booster Shot",
-      "Anti-Rabies Booster",
-      "Coat, Weight & Dental Checkup",
-      "Nutrition & Wellness Guidance",
-    ],
-  },
-  dog_neutering_female: {
-    title: "Female Dog Spaying (Sterilization)",
-    category: "Surgery & Neutering",
-    petType: "Dog",
-    badge: "Safe Surgery",
-    description: "Advanced surgical ovariohysterectomy preventing heat cycles, pyometra (uterine infection) & mammary tumors.",
-    inclusions: [
-      "Pre-Surgical Clinical Evaluation",
-      "Safe Anesthesia & Vitals Monitoring",
-      "Sterile Surgical Procedure by Senior Vet",
-      "Post-Op Pain Relief & Recovery Dressing",
-    ],
-  },
-  dog_neutering_male: {
-    title: "Male Dog Castration / Neutering",
-    category: "Surgery & Neutering",
-    petType: "Dog",
-    badge: "Sterilization",
-    description: "Safe surgical castration reducing testicular cancer risks, territorial marking & roaming tendencies.",
-    inclusions: [
-      "Pre-Operative Vitals Screening",
-      "Surgical Castration by Experienced Surgeon",
-      "Post-Operative Antibiotics & Pain Control",
-      "Wound Care & Suture Removal Guidance",
-    ],
-  },
-  cat_neutering_female: {
-    title: "Female Cat Spaying (Sterilization)",
-    category: "Surgery & Neutering",
-    petType: "Cat",
-    badge: "Safe Surgery",
-    description: "Minimally invasive spaying procedure eliminating loud heat calling, uterine infections & pregnancy.",
-    inclusions: [
-      "Pre-Op Clinical Health Check",
-      "Safe Feline Anesthesia Protocol",
-      "Precision Sterile Spaying Surgery",
-      "Post-Op Antibiotics & Recovery Kit",
-    ],
-  },
-  cat_neutering_male: {
-    title: "Male Cat Castration / Neutering",
-    category: "Surgery & Neutering",
-    petType: "Cat",
-    badge: "Sterilization",
-    description: "Gentle sterilization for tomcats that stops pungent urine spraying, fighting, and wanderlust.",
-    inclusions: [
-      "Pre-Procedure Health Screening",
-      "Quick & Gentle Castration Procedure",
-      "Pain Relief & Recovery Injections",
-      "Post-Surgical Care Instructions",
-    ],
-  },
-};
-
-const extractPackageItems = (packages = []) => {
-  const items = [];
-
-  packages.forEach((pack, packIndex) => {
-    Object.entries(pack).forEach(([key, value]) => {
-      if (!key.endsWith("_price")) return;
-      const formatted = formatMoney(value);
-      if (!formatted) return;
-
-      const baseKey = key.replace("_price", "");
-      const meta = PACKAGE_DETAILS[baseKey] || {
-        title: formatLabel(baseKey),
-        category: baseKey.includes("vaccination")
-          ? "Vaccination"
-          : baseKey.includes("neutering") || baseKey.includes("surgery")
-          ? "Surgery & Neutering"
-          : "Health Care",
-        petType: baseKey.includes("dog") || baseKey.includes("puppy")
-          ? "Dog"
-          : baseKey.includes("cat") || baseKey.includes("kitten")
-          ? "Cat"
-          : "Pet",
-        badge: "Specialized Plan",
-        description: "Comprehensive veterinary care package designed for optimum pet wellness.",
-        inclusions: [
-          "Complete Physical Examination",
-          "Dedicated Doctor Consultation",
-          "Health Records Update",
-        ],
-      };
-
-      items.push({
-        id: `${pack.id || packIndex}-${key}`,
-        key: baseKey,
-        rawPrice: value,
-        formattedPrice: formatted,
-        doctorName: pack.doctor_name,
-        ...meta,
-      });
-    });
-  });
-
-  return items;
 };
 
 const formatLabel = (value) =>
@@ -632,6 +481,7 @@ function ClinicDirectory() {
     orderType: "appointment",
     clinic: null,
     doctor: null,
+    package: null,
   });
 
   useEffect(() => {
@@ -988,8 +838,9 @@ function ClinicDirectory() {
                             setBookingModal({
                               isOpen: true,
                               orderType: "appointment",
-                              clinic: { ...clinic, doctors: entry.doctors || [] },
+                              clinic: { ...clinic, doctors: entry.doctors || [], specialized_packages: entry.specialized_packages || [] },
                               doctor: Array.isArray(entry.doctors) && entry.doctors[0] ? entry.doctors[0] : null,
+                              package: null,
                             });
                           }}
                           className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm shadow-blue-500/20 transition-all hover:from-blue-700 hover:to-blue-800 cursor-pointer"
@@ -1011,10 +862,11 @@ function ClinicDirectory() {
 
       {bookingModal.isOpen && (
         <ModernDoctorBooking
-          onClose={() => setBookingModal({ isOpen: false, orderType: "appointment", clinic: null, doctor: null })}
+          onClose={() => setBookingModal({ isOpen: false, orderType: "appointment", clinic: null, doctor: null, package: null })}
           orderType={bookingModal.orderType}
           initialClinic={bookingModal.clinic}
           initialDoctor={bookingModal.doctor}
+          initialPackage={bookingModal.package}
         />
       )}
     </>
@@ -1033,6 +885,7 @@ function ClinicDetail() {
     orderType: "appointment",
     clinic: null,
     doctor: null,
+    package: null,
   });
   const [copiedLink, setCopiedLink] = useState(false);
   const [packageCategory, setPackageCategory] = useState("all");
@@ -1173,15 +1026,20 @@ function ClinicDetail() {
     }
   };
 
-  const openBookingModal = ({ orderType, doctor = null, clinic: targetClinic = null }) => {
+  const openBookingModal = ({ orderType, doctor = null, clinic: targetClinic = null, package: selectedPackage = null }) => {
     const currentClinic = entry?.clinic || {};
     const currentDoctors = entry?.doctors || [];
-    const fullClinic = targetClinic || { ...currentClinic, doctors: currentDoctors };
+    const fullClinic = targetClinic || {
+      ...currentClinic,
+      doctors: currentDoctors,
+      specialized_packages: entry?.specialized_packages || [],
+    };
     setBookingModal({
       isOpen: true,
       orderType: orderType || "appointment",
       clinic: fullClinic,
       doctor: doctor || (currentDoctors.length > 0 ? currentDoctors[0] : null),
+      package: selectedPackage,
     });
   };
 
@@ -2435,13 +2293,17 @@ function ClinicDetail() {
                         </div>
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            const matchedDoctor = doctors.find(
+                              (d) => d.name === pkg.doctorName || d.doctor_name === pkg.doctorName
+                            ) || (doctors.length > 0 ? doctors[0] : null);
                             openBookingModal({
                               orderType: "appointment",
-                              doctor: doctors.length > 0 ? doctors[0] : null,
-                            })
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all shrink-0"
+                              doctor: matchedDoctor,
+                              package: pkg,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all shrink-0 cursor-pointer"
                         >
                           <CalendarDays className="h-3.5 w-3.5" />
                           <span>Book Package</span>
@@ -2495,10 +2357,11 @@ function ClinicDetail() {
 
       {bookingModal.isOpen && (
         <ModernDoctorBooking
-          onClose={() => setBookingModal({ isOpen: false, orderType: "appointment", clinic: null, doctor: null })}
+          onClose={() => setBookingModal({ isOpen: false, orderType: "appointment", clinic: null, doctor: null, package: null })}
           orderType={bookingModal.orderType}
           initialClinic={bookingModal.clinic}
           initialDoctor={bookingModal.doctor}
+          initialPackage={bookingModal.package}
         />
       )}
     </>

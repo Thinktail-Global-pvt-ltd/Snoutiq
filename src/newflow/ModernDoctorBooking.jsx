@@ -5,6 +5,7 @@ import { readAiAuthState } from "../ai/AiAuth";
 import UserDetailsOtpModal from "./UserDetailsOtpModal";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 import clinicDefaultImg from "../assets/images/clinic.png";
+import { extractPackageItems } from "./packageHelpers";
 
 const API_BASE = "https://snoutiq.com/backend/api";
 
@@ -343,6 +344,7 @@ export default function ModernDoctorBooking({
   orderType = "video_consult",
   initialDoctor = null,
   initialClinic = null,
+  initialPackage = null,
 }) {
   const navigate = useNavigate();
   // Doctor States
@@ -365,15 +367,87 @@ export default function ModernDoctorBooking({
   const [selectedDoctor, setSelectedDoctor] = useState(() => formatInitialDoctor(initialDoctor, initialClinic));
   const [searchQuery, setSearchQuery] = useState("");
   
+  // Package States
+  const [selectedPackage, setSelectedPackage] = useState(() => initialPackage || null);
+  const [clinicPackages, setClinicPackages] = useState(() => {
+    if (initialClinic?.specialized_packages && Array.isArray(initialClinic.specialized_packages)) {
+      return extractPackageItems(initialClinic.specialized_packages);
+    }
+    return [];
+  });
+  const [loadingPackages, setLoadingPackages] = useState(false);
+
   const [selectedExpFilter, setSelectedExpFilter] = useState("any"); // "any" | "1" | "3" | "5" | "10"
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [viewProfileDoctor, setViewProfileDoctor] = useState(null);
 
-  const [flowStep, setFlowStep] = useState(() => (initialDoctor || initialClinic) ? "describe" : "list");
+  const [flowStep, setFlowStep] = useState(() => (initialDoctor || initialClinic || initialPackage) ? "describe" : "list");
   const [issueText, setIssueText] = useState(() => symptomText || localStorage.getItem("symptom_description") || "");
   const [attachedImages, setAttachedImages] = useState([]);
   const [consentGiven, setConsentGiven] = useState(true);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+
+  // Sync / Fetch Clinic Packages
+  useEffect(() => {
+    let isMounted = true;
+    const targetClinic = selectedClinic || initialClinic;
+    const clinicId = targetClinic?.id || targetClinic?.clinic_id;
+    const clinicSlug = targetClinic?.slug || targetClinic?.clinicSlug;
+
+    if (targetClinic?.specialized_packages && Array.isArray(targetClinic.specialized_packages) && targetClinic.specialized_packages.length > 0) {
+      const items = extractPackageItems(targetClinic.specialized_packages);
+      setClinicPackages(items);
+      return;
+    }
+
+    const idOrSlug = clinicId || clinicSlug;
+    if (!idOrSlug) return;
+
+    const fetchPackages = async () => {
+      setLoadingPackages(true);
+      try {
+        const res = await fetch(`${API_BASE}/clinics/${encodeURIComponent(idOrSlug)}/packages`);
+        if (res.ok) {
+          const data = await res.json();
+          const raw = data?.packages || data?.specialized_packages || [];
+          if (Array.isArray(raw) && raw.length > 0) {
+            if (isMounted) setClinicPackages(extractPackageItems(raw));
+            return;
+          }
+        }
+
+        if (clinicSlug) {
+          const pageRes = await fetch(`${API_BASE}/clinic-pages/${encodeURIComponent(clinicSlug)}`);
+          if (pageRes.ok) {
+            const pageData = await pageRes.json();
+            const raw = pageData?.data?.specialized_packages || [];
+            if (Array.isArray(raw) && raw.length > 0) {
+              if (isMounted) setClinicPackages(extractPackageItems(raw));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch clinic packages:", e);
+      } finally {
+        if (isMounted) setLoadingPackages(false);
+      }
+    };
+
+    fetchPackages();
+    return () => { isMounted = false; };
+  }, [selectedClinic?.id, selectedClinic?.slug, initialClinic?.id, initialClinic?.slug]);
+
+  // Sync initialPackage when prop changes or packages load
+  useEffect(() => {
+    if (initialPackage) {
+      if (typeof initialPackage === "object" && (initialPackage.title || initialPackage.key)) {
+        setSelectedPackage(initialPackage);
+      } else if (typeof initialPackage === "string") {
+        const found = clinicPackages.find(p => p.key === initialPackage || p.id === initialPackage);
+        if (found) setSelectedPackage(found);
+      }
+    }
+  }, [initialPackage, clinicPackages]);
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || []);
@@ -446,6 +520,23 @@ export default function ModernDoctorBooking({
   
   const displayPetName = pet.name || pet.pet_name || pet.title || localStorage.getItem("pet_name") || "Pet";
   const displayPetBreed = pet.breed || pet.pet_breed || pet.species || pet.pet_species || pet.pet_type || pet.type || pet.category || localStorage.getItem("pet_breed") || "Dog/Cat";
+
+  const [packagePetTab, setPackagePetTab] = useState("all");
+
+  useEffect(() => {
+    if (selectedPackage?.petType && selectedPackage.petType !== "Pet") {
+      setPackagePetTab(selectedPackage.petType);
+    } else {
+      const b = (displayPetBreed || "").toLowerCase();
+      if (b.includes("cat") || b.includes("feline") || b.includes("kitten")) setPackagePetTab("Cat");
+      else if (b.includes("dog") || b.includes("canine") || b.includes("puppy")) setPackagePetTab("Dog");
+    }
+  }, [displayPetBreed, selectedPackage]);
+
+  const visibleClinicPackages = useMemo(() => {
+    if (packagePetTab === "all") return clinicPackages;
+    return clinicPackages.filter(p => p.petType === packagePetTab);
+  }, [clinicPackages, packagePetTab]);
 
   const unlockCurrentSlot = async (lockIdToUnlock) => {
     const targetLockId = lockIdToUnlock || lockId;
@@ -782,10 +873,15 @@ export default function ModernDoctorBooking({
 
 
   // Live Current Fee calculation
-  const currentFee = selectedDoctor ? getDoctorCurrentPrice(selectedDoctor) : (selectedClinic ? Number(getClinicCurrentPrice(selectedClinic)) : 499);
+  const consultationBaseFee = selectedDoctor ? getDoctorCurrentPrice(selectedDoctor) : (selectedClinic ? Number(getClinicCurrentPrice(selectedClinic)) : 499);
+  const packagePrice = selectedPackage ? Number(selectedPackage.price ?? selectedPackage.rawPrice ?? 0) : null;
+  const isPackageSelected = Boolean(selectedPackage && packagePrice && packagePrice > 0);
+
+  // When a package is selected, its fee is the all-inclusive package price
+  const currentFee = isPackageSelected ? packagePrice : consultationBaseFee;
   const GST_RATE = 0.18;
-  const gstAmount = Math.round(currentFee * GST_RATE);
-  const totalAmount = currentFee + gstAmount;
+  const gstAmount = isPackageSelected ? 0 : Math.round(currentFee * GST_RATE);
+  const totalAmount = isPackageSelected ? currentFee : (currentFee + gstAmount);
 
   // Fetch slots for In-Clinic Appointment
   const fetchDateAvailabilityAndSlots = async (dateStr, targetDoc, targetClinic) => {
@@ -995,9 +1091,17 @@ export default function ModernDoctorBooking({
     const clinicIdToUse = selectedClinic?.id || selectedDoctor?.clinicId || docIdToUse;
     
     // Live Time-based Price calculation at payment instant
-    const liveFee = selectedDoctor ? getDoctorCurrentPrice(selectedDoctor) : (selectedClinic ? Number(getClinicCurrentPrice(selectedClinic)) : 499);
-    const liveGst = Math.round(liveFee * GST_RATE);
-    const liveTotal = liveFee + liveGst;
+    const livePackagePrice = selectedPackage ? Number(selectedPackage.price ?? selectedPackage.rawPrice ?? 0) : null;
+    const isPkg = Boolean(selectedPackage && livePackagePrice && livePackagePrice > 0);
+    const liveFee = isPkg
+      ? livePackagePrice
+      : (selectedDoctor ? getDoctorCurrentPrice(selectedDoctor) : (selectedClinic ? Number(getClinicCurrentPrice(selectedClinic)) : 499));
+    const liveGst = isPkg ? 0 : Math.round(liveFee * GST_RATE);
+    const liveTotal = isPkg ? liveFee : (liveFee + liveGst);
+
+    const packageNote = selectedPackage ? `[Package: ${selectedPackage.title} (₹${liveTotal})]` : "";
+    const fullNotes = [packageNote, issueText].filter(Boolean).join(" ");
+
     const appointmentSubmitPayload = {
       user_id: userId,
       clinic_id: clinicIdToUse,
@@ -1011,7 +1115,7 @@ export default function ModernDoctorBooking({
       date: selectedDate,
       time_slot: selectedTimeSlot,
       amount: liveTotal,
-      notes: issueText,
+      notes: fullNotes,
       lock_id: lockId,
     };
 
@@ -1032,7 +1136,7 @@ export default function ModernDoctorBooking({
         });
         if (lockId) unlockCurrentSlot(lockId);
         setSuccess(true);
-        alert("Visit Confirmed! You can pay ₹" + liveTotal + " at the clinic reception.");
+        alert(`Visit Confirmed! You can pay ₹${liveTotal} ${selectedPackage ? `for ${selectedPackage.title} ` : ""}at the clinic reception.`);
         onClose?.();
       } catch (err) {
         setError("Booking failed");
@@ -1054,6 +1158,9 @@ export default function ModernDoctorBooking({
         gst_amount: liveGst,
         base_amount: liveFee,
         gst_number: gstInvoiceChecked ? gstNumber : "",
+        package_name: selectedPackage?.title || undefined,
+        package_id: selectedPackage?.id || undefined,
+        package_key: selectedPackage?.key || undefined,
       };
 
       const orderRes = await fetch(`${API_BASE}/create-order`, {
@@ -1076,7 +1183,7 @@ export default function ModernDoctorBooking({
           amount: liveTotal * 100,
           currency: "INR",
           name: "SnoutIQ",
-          description: `${orderType === "appointment" ? "Clinic Visit" : "Video Consult"} with ${selectedDoctor?.name || selectedClinic?.name || "Doctor"}`,
+          description: `${selectedPackage ? selectedPackage.title : (orderType === "appointment" ? "Clinic Visit" : "Video Consult")} with ${selectedDoctor?.name || selectedClinic?.name || "Doctor"}`,
           order_id: orderId,
           prefill: { name: user.name || user.owner_name, contact: user.mobile || user.phone },
           theme: { color: "#0052FF" },
@@ -1097,7 +1204,9 @@ export default function ModernDoctorBooking({
           order_type: orderType || "video_consult",
           date: selectedDate,
           time_slot: selectedTimeSlot,
-          summary: issueText,
+          summary: fullNotes,
+          package_name: selectedPackage?.title || undefined,
+          package_id: selectedPackage?.id || undefined,
         })
       });
       const verifyData = await verifyRes.json().catch(() => null);
@@ -1690,6 +1799,106 @@ export default function ModernDoctorBooking({
               </label>
             )}
 
+            {/* SERVICE / PACKAGE SELECTION (In-Clinic Flow) */}
+            {orderType === "appointment" && (clinicPackages.length > 0 || selectedPackage || loadingPackages) && (
+              <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-[11px] font-bold text-slate-900">Select Service or Package</span>
+                  </div>
+                  {loadingPackages ? (
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin text-blue-600" /> Fetching packages...
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {clinicPackages.length} Packages Available
+                    </span>
+                  )}
+                </div>
+
+                {clinicPackages.length > 2 && (
+                  <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                    {["all", "Dog", "Cat"].map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setPackagePetTab(t)}
+                        className={`text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                          packagePetTab === t
+                            ? "bg-slate-900 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {t === "all" ? `All (${clinicPackages.length})` : t === "Dog" ? `🐶 Dogs (${clinicPackages.filter(p => p.petType === "Dog").length})` : `🐱 Cats (${clinicPackages.filter(p => p.petType === "Cat").length})`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                  {/* Standard Consultation Option */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPackage(null)}
+                    className={`text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
+                      !selectedPackage
+                        ? "border-blue-600 bg-blue-50/70 ring-1 ring-blue-600 shadow-xs"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded">
+                          Standard
+                        </span>
+                        <p className="text-xs font-bold text-slate-900 mt-1">General Consultation</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Doctor physical examination & prescription</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-black text-slate-900">₹{consultationBaseFee}</p>
+                        <p className="text-[9px] text-slate-400">+ 18% GST</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Package Options */}
+                  {visibleClinicPackages.map((pkg) => {
+                    const isSelected = selectedPackage?.id === pkg.id || selectedPackage?.key === pkg.key;
+                    return (
+                      <button
+                        key={pkg.id}
+                        type="button"
+                        onClick={() => setSelectedPackage(pkg)}
+                        className={`text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
+                          isSelected
+                            ? "border-blue-600 bg-blue-50/70 ring-1 ring-blue-600 shadow-xs"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0 pr-1">
+                            <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              pkg.category === "Vaccination" ? "bg-emerald-100 text-emerald-800" : "bg-purple-100 text-purple-800"
+                            }`}>
+                              {pkg.badge || pkg.category}
+                            </span>
+                            <p className="text-xs font-bold text-slate-900 mt-1 truncate">{pkg.title}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{pkg.description}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xs font-black text-blue-700">{pkg.formattedPrice}</p>
+                            <p className="text-[9px] text-emerald-600 font-semibold">All-Inclusive</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* APPOINTMENT DATE/SLOTS */}
             {orderType === "appointment" && (
               <>
@@ -1914,18 +2123,60 @@ export default function ModernDoctorBooking({
                   )}
                 </div>
               </div>
+
+              {/* Selected Package or Service Highlight Card */}
+              {selectedPackage ? (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-lg p-2.5 flex items-center justify-between gap-2 mt-1">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9px] font-extrabold uppercase tracking-wider bg-blue-600 text-white px-1.5 py-0.5 rounded shadow-2xs">
+                        📦 Package Selected
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-800">
+                        {selectedPackage.badge || selectedPackage.category || "Specialized Plan"}
+                      </span>
+                    </div>
+                    <p className="font-extrabold text-slate-900 text-xs mt-1 truncate">{selectedPackage.title}</p>
+                    <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                      {Array.isArray(selectedPackage.inclusions) && selectedPackage.inclusions.length > 0 
+                        ? selectedPackage.inclusions.join(" • ") 
+                        : (selectedPackage.description || "All-inclusive preventive & health plan")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFlowStep("describe")}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 bg-white px-2 py-1 rounded-md border border-blue-200 shadow-2xs cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : clinicPackages.length > 0 && orderType === "appointment" ? (
+                <div className="bg-slate-50 rounded-lg p-2 border border-slate-100 flex items-center justify-between text-xs mt-1">
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-medium">Service: <span className="font-bold text-slate-800">General Consultation</span></p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFlowStep("describe")}
+                    className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Choose Package ({clinicPackages.length} available)
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             {/* SECURE CHECKOUT */}
             <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 shadow-xs text-xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">SECURE CHECKOUT</span>
               <div className="flex justify-between py-0.5 text-slate-700">
-                <span>Consultation Fee ({isDayTimeNow() ? "Day Rate" : "Night Rate"})</span>
+                <span>{selectedPackage ? `${selectedPackage.title} (All-Inclusive Package)` : `Consultation Fee (${isDayTimeNow() ? "Day Rate" : "Night Rate"})`}</span>
                 <span className="font-bold text-slate-900">₹{currentFee}</span>
               </div>
               <div className="flex justify-between py-0.5 text-slate-700">
                 <span>Taxes & GST (18%)</span>
-                <span className="font-bold text-slate-900">₹{gstAmount}</span>
+                <span className="font-bold text-slate-900">{isPackageSelected ? "₹0 (Included)" : `₹${gstAmount}`}</span>
               </div>
               <div className="flex justify-between py-1.5 border-t border-slate-100 font-extrabold text-xs text-slate-900">
                 <span>Total payable</span>

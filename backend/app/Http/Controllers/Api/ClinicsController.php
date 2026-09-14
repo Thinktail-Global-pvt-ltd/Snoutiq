@@ -44,6 +44,39 @@ class ClinicsController extends Controller
         return response()->json(['clinic' => $clinic, 'doctors' => $doctors]);
     }
 
+    // GET /api/clinics/{id}/packages
+    public function packages(string $id)
+    {
+        $clinic = DB::table('vet_registerations_temp')
+            ->select('id', DB::raw('COALESCE(name, slug, CONCAT("Clinic #", id)) as name'), 'slug', 'address')
+            ->where(function ($query) use ($id) {
+                if (is_numeric($id)) {
+                    $query->where('id', (int)$id);
+                } else {
+                    $query->where('slug', $id);
+                }
+            })
+            ->first();
+
+        if (!$clinic) {
+            return response()->json(['success' => false, 'error' => 'Clinic not found'], 404);
+        }
+
+        $packages = [];
+        if (Schema::hasTable('clinic_specialized_packages')) {
+            $packages = DB::table('clinic_specialized_packages')
+                ->where('clinic_id', (int)$clinic->id)
+                ->get();
+        }
+
+        return response()->json([
+            'success' => true,
+            'clinic' => $clinic,
+            'packages' => $packages,
+            'specialized_packages' => $packages,
+        ]);
+    }
+
     // GET /api/clinics/{id}/availability
     public function availability(string $id)
     {
