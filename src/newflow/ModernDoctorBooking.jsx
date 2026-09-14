@@ -998,6 +998,22 @@ export default function ModernDoctorBooking({
     const liveFee = selectedDoctor ? getDoctorCurrentPrice(selectedDoctor) : (selectedClinic ? Number(getClinicCurrentPrice(selectedClinic)) : 499);
     const liveGst = Math.round(liveFee * GST_RATE);
     const liveTotal = liveFee + liveGst;
+    const appointmentSubmitPayload = {
+      user_id: userId,
+      clinic_id: clinicIdToUse,
+      doctor_id: docIdToUse,
+      pet_id: petId || undefined,
+      patient_name: displayUserName,
+      patient_phone: displayUserMobile !== "N/A" ? displayUserMobile : "",
+      patient_email: user.email || user.user_email || "",
+      pet_name: displayPetName,
+      appointment_type: "in_clinic",
+      date: selectedDate,
+      time_slot: selectedTimeSlot,
+      amount: liveTotal,
+      notes: issueText,
+      lock_id: lockId,
+    };
 
     if (orderType === "appointment" && (!selectedDate || !selectedTimeSlot)) {
       setError("Please select date and time slot first.");
@@ -1012,7 +1028,7 @@ export default function ModernDoctorBooking({
         await fetch(`${API_BASE}/appointments/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ user_id: userId, clinic_id: clinicIdToUse, doctor_id: docIdToUse, pet_id: petId, date: selectedDate, time_slot: selectedTimeSlot, amount: liveTotal, payment_method: "pay_at_clinic", lock_id: lockId })
+          body: JSON.stringify({ ...appointmentSubmitPayload, payment_method: "pay_at_clinic" })
         });
         if (lockId) unlockCurrentSlot(lockId);
         setSuccess(true);
@@ -1069,18 +1085,36 @@ export default function ModernDoctorBooking({
         rzp.open();
       });
 
-      await fetch(`${API_BASE}/rzp/verify`, {
+      const verifyRes = await fetch(`${API_BASE}/rzp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...paymentResult, user_id: userId, doctor_id: docIdToUse, pet_id: petId, order_type: orderType || "video_consult" })
+        body: JSON.stringify({
+          ...paymentResult,
+          user_id: userId,
+          clinic_id: clinicIdToUse,
+          doctor_id: docIdToUse,
+          pet_id: petId,
+          order_type: orderType || "video_consult",
+          date: selectedDate,
+          time_slot: selectedTimeSlot,
+          summary: issueText,
+        })
       });
+      const verifyData = await verifyRes.json().catch(() => null);
+      if (!verifyRes.ok || verifyData?.success === false) {
+        throw new Error(verifyData?.message || verifyData?.error || "Payment verification failed");
+      }
 
       if (orderType === "appointment") {
-        await fetch(`${API_BASE}/appointments/submit`, {
+        const appointmentRes = await fetch(`${API_BASE}/appointments/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ user_id: userId, clinic_id: clinicIdToUse, doctor_id: docIdToUse, pet_id: petId, date: selectedDate, time_slot: selectedTimeSlot, amount: liveTotal, ...paymentResult, lock_id: lockId })
+          body: JSON.stringify({ ...appointmentSubmitPayload, ...paymentResult, payment_method: "razorpay" })
         });
+        const appointmentData = await appointmentRes.json().catch(() => null);
+        if (!appointmentRes.ok || appointmentData?.success === false) {
+          throw new Error(appointmentData?.message || appointmentData?.error || "Appointment confirmation failed");
+        }
       }
 
       if (lockId) unlockCurrentSlot(lockId);

@@ -264,6 +264,28 @@ class AppointmentSubmissionController extends Controller
             }
         }
 
+        if (empty($validated['razorpay_payment_id'])) {
+            try {
+                $paymentController = app(\App\Http\Controllers\PaymentController::class);
+                $context = [
+                    'clinic_id' => $clinic?->id,
+                    'doctor_id' => $doctor?->id,
+                    'user_id' => $user->id,
+                    'pet_id' => $validated['pet_id'] ?? null,
+                    'appointment_id' => $appointment->id,
+                    'call_identifier' => null,
+                ];
+                $notes = [
+                    'order_type' => 'appointments',
+                    'summary' => $validated['notes'] ?? null,
+                ];
+                $amountInInr = (int) ($validated['amount'] ?? 0);
+
+                $paymentController->sendAppointmentWhatsAppNotifications($context, $notes, $amountInInr);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         return $this->respondWithAppointment($appointment->fresh(), 201);
     }

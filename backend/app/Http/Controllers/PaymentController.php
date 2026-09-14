@@ -986,7 +986,7 @@ class PaymentController extends Controller
                 } else {
                     if (
                         $this->isVideoConsultTransactionType($orderType)
-                        && strtolower(trim((string) $status)) === 'captured'
+                        && $this->isSuccessfulPaymentStatus($status)
                     ) {
                         $videoConsultWhatsAppMeta = $this->sendVideoConsultWhatsAppNotifications(
                             context: $context,
