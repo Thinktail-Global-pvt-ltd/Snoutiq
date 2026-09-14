@@ -867,6 +867,15 @@ export default function SymptomCheckerFlow({
                 <div className="flex w-full flex-wrap justify-center gap-2.5 sm:gap-3 mt-2.5">
                   <button
                     onClick={() =>
+                      handleSubmit(null, "Skin itching or scratching")
+                    }
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
+                  >
+                    Skin itching or scratching
+                  </button>
+
+                  <button
+                    onClick={() =>
                       handleSubmit(null, "Vomiting or stomach upset")
                     }
                     className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
@@ -889,10 +898,10 @@ export default function SymptomCheckerFlow({
                   </button>
 
                   <button
-                    onClick={() => handleSubmit(null, "Limping or skin issue")}
+                    onClick={() => handleSubmit(null, "Limping or leg pain")}
                     className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:text-sm"
                   >
-                    Limping or skin issue
+                    Limping or leg pain
                   </button>
                 </div>
               </div>
