@@ -18,250 +18,24 @@ import {
   FollowUpQuestion,
 } from "./AssessmentUI";
 
-const MIN_ASSESSMENT_WORDS = 8;
-const LOW_SIGNAL_INPUTS = new Set([
+const GREETING_INPUTS = new Set([
   "hi",
   "hello",
   "hey",
   "hii",
   "hiii",
-  "help",
-  "urgent",
-  "vet",
-  "doctor",
-  "problem",
-  "issue",
-  "sick",
+  "hlo",
+  "namaste",
+  "namaskar",
+  "hola",
+  "yo",
+  "good morning",
+  "good afternoon",
+  "good evening",
 ]);
-
-const RED_FLAG_SIGNALS = [
-  "blood",
-  "bleed",
-  "bleeding",
-  "black stool",
-  "breathing difficulty",
-  "difficulty breathing",
-  "seizure",
-  "collapse",
-  "collapsed",
-  "unconscious",
-  "poison",
-  "toxic",
-  "bloated",
-  "bloat",
-  "accident",
-  "hit by",
-  "not breathing",
-];
 
 function normalizeInputText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
-}
-
-function includesAnySignal(text, signals) {
-  return signals.some((signal) => text.includes(signal));
-}
-
-function hasRedFlagSignal(text) {
-  return includesAnySignal(normalizeInputText(text).toLowerCase(), RED_FLAG_SIGNALS);
-}
-
-function hasEnoughSymptomDetail(text) {
-  const cleaned = normalizeInputText(text).toLowerCase();
-  if (!cleaned) return false;
-  if (LOW_SIGNAL_INPUTS.has(cleaned)) return false;
-  if (hasRedFlagSignal(cleaned)) return true;
-
-  const words = cleaned.match(/[a-z0-9]+/gi) || [];
-  if (words.length < MIN_ASSESSMENT_WORDS) return false;
-
-  const hasSymptom = includesAnySignal(cleaned, [
-    "vomit",
-    "diarrhea",
-    "loose motion",
-    "not eating",
-    "letharg",
-    "limp",
-    "lameness",
-    "skin",
-    "itch",
-    "cough",
-    "breath",
-    "fever",
-    "pain",
-    "bleed",
-    "wound",
-    "eye",
-    "ear",
-    "seizure",
-    "urine",
-    "poop",
-    "stool",
-    "appetite",
-    "swelling",
-    "injury",
-    "rash",
-    "allergy",
-    "khana",
-    "ulti",
-    "dard",
-    "langda",
-  ]);
-
-  const hasTiming = includesAnySignal(cleaned, [
-    "today",
-    "yesterday",
-    "morning",
-    "night",
-    "hour",
-    "hours",
-    "day",
-    "days",
-    "week",
-    "weeks",
-    "since",
-    "started",
-    "start",
-    "sudden",
-    "suddenly",
-    "kal",
-    "aaj",
-    "subah",
-    "raat",
-  ]);
-
-  const hasSeverityOrProgression = includesAnySignal(cleaned, [
-    "mild",
-    "severe",
-    "bad",
-    "worse",
-    "worsening",
-    "better",
-    "improving",
-    "cannot",
-    "can't",
-    "unable",
-    "not able",
-    "not putting weight",
-    "crying",
-    "yelping",
-    "continuous",
-    "frequent",
-    "again",
-    "bar bar",
-    "bahut",
-    "zyada",
-  ]);
-
-  const hasBehaviorOrVitals = includesAnySignal(cleaned, [
-    "eating",
-    "drinking",
-    "active",
-    "sleepy",
-    "dull",
-    "lethargic",
-    "play",
-    "walking",
-    "weight",
-    "breathing",
-    "temperature",
-    "food",
-    "water",
-    "pee",
-    "urine",
-    "poop",
-    "stool",
-    "khana",
-    "paani",
-    "chal",
-    "walk",
-  ]);
-
-  const contextCount = [
-    hasTiming,
-    hasSeverityOrProgression,
-    hasBehaviorOrVitals,
-  ].filter(Boolean).length;
-
-  return hasSymptom && contextCount >= 2;
-}
-
-function buildIntakePrompt(petName = "your pet", symptomText = "") {
-  const normalizedSymptom = normalizeInputText(symptomText).toLowerCase();
-  const isRedFlag = hasRedFlagSignal(normalizedSymptom);
-  const isBlood = normalizedSymptom.includes("blood") || normalizedSymptom.includes("bleed");
-  const isVomiting = normalizedSymptom.includes("vomit") || normalizedSymptom.includes("stomach");
-  const isDiarrhea = normalizedSymptom.includes("diarrhea") || normalizedSymptom.includes("loose motion");
-  const isLimping = normalizedSymptom.includes("limp") || normalizedSymptom.includes("skin");
-  const isLethargic = normalizedSymptom.includes("letharg") || normalizedSymptom.includes("not eating");
-
-  if (isBlood) {
-    return `Blood can be urgent for ${petName}. Please share these details so I can guide the next step:
-
-1. Where are you seeing blood: vomit, stool, urine, wound, mouth, nose, or skin?
-2. How much blood is there and when did it start?
-3. Is ${petName} weak, dull, breathing fast, crying, or in pain?
-4. Is ${petName} eating, drinking, and walking normally?
-5. Age, breed, and any injury, medicine, or toxin exposure?`;
-  }
-
-  if (isRedFlag) {
-    return `This may need urgent attention for ${petName}. Please share:
-
-1. What exactly happened?
-2. When did it start?
-3. Is ${petName} breathing normally and responsive?
-4. Any bleeding, seizure, collapse, severe pain, vomiting, or bloating?
-5. Age, breed, and any known medical history or medicine?`;
-  }
-
-  if (isVomiting) {
-    return `I can help assess vomiting or stomach upset for ${petName}, but I need clinical context before showing a risk score. Please answer:
-
-1. When did it start?
-2. How many times has ${petName} vomited?
-3. Is ${petName} eating and drinking?
-4. Any diarrhea, blood, bloated belly, pain, or weakness?
-5. Age, breed, and any recent food change or medicine?`;
-  }
-
-  if (isDiarrhea) {
-    return `I can help assess diarrhea for ${petName}, but I need clinical context before showing a risk score. Please answer:
-
-1. When did it start?
-2. How many times today?
-3. Is there blood, black stool, vomiting, or fever?
-4. Is ${petName} active and drinking water?
-5. Age, breed, and any recent food change or medicine?`;
-  }
-
-  if (isLimping) {
-    return `I can help assess the limping or skin issue for ${petName}, but I need clinical context before showing a risk score. Please answer:
-
-1. When did it start?
-2. Can ${petName} put weight on the leg?
-3. Any swelling, wound, bleeding, crying, or visible pain?
-4. Is ${petName} eating, drinking, and behaving normally?
-5. Age, breed, and any injury/fall you noticed?`;
-  }
-
-  if (isLethargic) {
-    return `I can help assess low energy or not eating for ${petName}, but I need clinical context before showing a risk score. Please answer:
-
-1. When did it start?
-2. Has ${petName} eaten or drunk anything today?
-3. Any vomiting, diarrhea, fever, coughing, pain, or breathing issue?
-4. Is ${petName} responsive and able to walk normally?
-5. Age, breed, and any known medical history or medicine?`;
-  }
-
-  return `I need a little more detail before I can calculate a meaningful risk score for ${petName}. Please share:
-
-1. What symptom are you noticing?
-2. When did it start and is it getting worse?
-3. Is ${petName} eating, drinking, and behaving normally?
-4. Any vomiting, diarrhea, coughing, limping, bleeding, breathing difficulty, or pain?
-5. Age, breed, and any known medical history or medicines?`;
 }
 
 function ModalShell({ children }) {
@@ -741,40 +515,25 @@ export default function SymptomCheckerFlow({
     }
     if (!textToSubmit) return;
 
-    const assessmentMessageCount = messages.filter(
-      (msg) => !msg.isIntakePrompt,
-    ).length;
-    const isFirstAssessmentMessage = assessmentMessageCount === 0;
-    const shouldAskForMoreDetail =
-      isFirstAssessmentMessage &&
-      !attachedImage &&
-      !hasEnoughSymptomDetail(textToSubmit);
+    const cleanedLower = textToSubmit.toLowerCase();
+    const isPureGreeting = GREETING_INPUTS.has(cleanedLower);
 
-    if (shouldAskForMoreDetail) {
-      const hasOpenIntakePrompt = messages.some(
-        (msg) => msg.role === "assistant" && msg.isIntakePrompt,
-      );
+    if (isPureGreeting) {
       pushMessage({
         role: "user",
         text: textToSubmit,
-        isIntakePrompt: true,
       });
-      if (!hasOpenIntakePrompt) {
-        pushMessage({
-          role: "assistant",
-          text: buildIntakePrompt(pet.name || pet.pet_name || "your pet", textToSubmit),
-          isIntakePrompt: true,
-        });
-      } else {
-        pushMessage({
-          role: "assistant",
-          text: `Please add the missing details in one message, for example: "${textToSubmit} started today, getting worse, not eating, drinking water, no vomiting."`,
-          isIntakePrompt: true,
-        });
-      }
+      pushMessage({
+        role: "assistant",
+        text: `Hello! I'm here to help with ${pet.name || pet.pet_name || "your pet"}. What symptoms or health concerns are you noticing today?`,
+      });
       setInputValue("");
       return;
     }
+
+    const assessmentMessageCount = messages.filter(
+      (msg) => msg.role === "user" && !GREETING_INPUTS.has(normalizeInputText(msg.text).toLowerCase()),
+    ).length;
 
     if (!token) {
       setShowAuthGate(true);

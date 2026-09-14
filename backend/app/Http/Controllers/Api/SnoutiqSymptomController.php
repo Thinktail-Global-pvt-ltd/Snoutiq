@@ -250,17 +250,69 @@ class SnoutiqSymptomController extends Controller
         $cacheKey = "snoutiq_symptom:{$sessionId}";
         $state    = $this->loadConversationState($sessionId) ?? $this->defaultState();
 
-        // ── Soft reset on greeting ────────────────────────────────────────────
-        if ($this->isGreeting($message) && !empty($state['history'])) {
-            $this->softReset($state);
-        }
-
         $state['pet'] = $pet;
         $state['user_id'] = $data['user_id'] ?? ($state['user_id'] ?? null);
         $state['pet_id'] = $data['pet_id'] ?? ($state['pet_id'] ?? null);
         $data['user_id'] = $state['user_id'] ?? null;
         $data['pet_id'] = $state['pet_id'] ?? null;
         $turn         = count($state['history']) + 1;
+
+        // ── Clean greeting response: prompt for symptoms directly ───────────
+        if ($this->isGreeting($message)) {
+            $this->softReset($state);
+            $petName = $pet['name'] ?? 'your pet';
+            $greetingMsg = "Hello! I am your Snoutiq AI Vet Assistant. I'm here to help you evaluate {$petName}'s health. What symptoms or changes in behaviour have you noticed?";
+            $response = [
+                'message' => $greetingMsg,
+                'what_we_think_is_happening' => "I'm ready to evaluate {$petName}'s symptoms. Please tell me what you are seeing, such as vomiting, diarrhea, limping, coughing, not eating, bleeding, or any other changes.",
+                'diagnosis_summary' => 'Please share your pet\'s symptoms to begin assessment.',
+                'do_now' => "Tell us what symptoms you have noticed in {$petName}.",
+                'time_sensitivity' => 'Ready when you are',
+                'safe_to_do_while_waiting' => [
+                    "Keep {$petName} comfortable and observed.",
+                    'Do not give any human medications.',
+                    'Keep fresh water accessible if appropriate.',
+                ],
+                'what_to_watch' => [
+                    'Any sudden vomiting, diarrhea, or appetite loss',
+                    'Lethargy or difficulty walking',
+                    'Any signs of pain or distress',
+                ],
+                'be_ready_to_tell_vet' => "Be ready to share when symptoms started and any recent food or routine changes.",
+                'follow_up_question' => [
+                    'label' => 'What is the main concern today?',
+                    'question' => "What symptom are you noticing in {$petName}?",
+                    'options' => ['Vomiting / Stomach upset', 'Not eating / Low energy', 'Limping / Injury', 'Skin itching / Ears', 'Blood / Bleeding'],
+                ],
+            ];
+            $routing = 'monitor';
+            $score = 0;
+            $triageDetail = [
+                'possible_causes' => [],
+                'red_flags_found' => [],
+                'india_context' => '',
+                'safe_to_wait_hours' => 24,
+                'image_observation' => '',
+            ];
+            $this->appendHistory($state, $message, $greetingMsg, $routing, $score);
+            Cache::put($cacheKey, $state, now()->addMinutes(self::SESSION_TTL_MINUTES));
+            $this->saveToDb($data, $sessionId, $message, $greetingMsg, $routing, 'informational');
+            $this->saveWebChatCampaign($data, $sessionId, $turn, $message, $response, $state, $routing, 'informational', $score);
+
+            return response()->json(
+                $this->buildApiPayload(
+                    $sessionId,
+                    $routing,
+                    'informational',
+                    $turn,
+                    $score,
+                    $response,
+                    $triageDetail,
+                    $state,
+                    false
+                )
+            );
+        }
 
         // ── LAYER 1: Hardcoded red flag check — NO AI NEEDED ─────────────────
         [$isRedFlag, $flagPhrase] = $this->checkRedFlags($message, $pet);
@@ -2229,10 +2281,10 @@ class SnoutiqSymptomController extends Controller
                  'crying in pain','yelping','wont let me touch']],
             [2, ['vomiting','vomit','diarrhea','diarrhoea','loose motion','not eating','no appetite',
                  'lethargic','lethargy','painful','difficulty walking','limping','swollen',
-                 'discharge']],
+                 'discharge','cough','coughing','fever','dull','high temperature']],
             [1, ['slight limp','off food','a bit low','not himself','not herself',
                  'seems tired','scratching','sneezing','runny nose','mild','started today',
-                 'since yesterday','for a few days','itching']],
+                 'since yesterday','for a few days','itching','itch','dander']],
         ];
 
         $matchedKeywords = [];
@@ -3297,7 +3349,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             [['itch', 'itching', 'scratching', 'skin', 'rash'], ['an allergy flare', 'a skin infection', 'fleas or ticks']],
             [['limp', 'limping', 'paw pain', 'leg pain'], ['a soft tissue injury', 'a paw injury', 'joint pain']],
             [['cough', 'coughing', 'sneeze', 'sneezing', 'runny nose'], $species === 'cat' ? ['an upper respiratory infection', 'viral irritation', 'an allergy flare'] : ['respiratory irritation', 'an infection', 'an allergy']],
-            [['not eating', 'no appetite', 'loss of appetite', 'lethargic', 'lethargy'], ['fever', 'stomach upset', 'pain or dehydration']],
+            [['fever', 'temperature', 'hot', 'shivering'], ['tick fever (Ehrlichia / Babesia)', 'a viral or bacterial infection', 'an inflammatory illness']],
+            [['dull', 'lethargic', 'lethargy', 'low energy', 'inactive', 'weakness'], ['tick fever (Ehrlichia)', 'early systemic infection', 'stomach upset or dehydration']],
+            [['not eating', 'no appetite', 'loss of appetite'], ['fever', 'stomach upset', 'pain or dehydration']],
             [['urine', 'urinating', 'pee', 'straining to pee'], $species === 'cat' ? ['a urinary blockage', 'a urinary infection', 'bladder inflammation'] : ['a urinary infection', 'stones', 'a blockage']],
         ];
 
