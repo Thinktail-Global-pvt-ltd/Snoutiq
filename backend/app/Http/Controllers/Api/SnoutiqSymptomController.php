@@ -299,10 +299,23 @@ class SnoutiqSymptomController extends Controller
             );
         }
 
-        // ── LAYER 2: Evidence scoring (keyword heuristics, fast, no API call) ─
+        // ── LAYER 2: In-Clinic Clinical Indicators & Evidence Scoring ────────
+        [$isInClinic, $inClinicReason] = $this->checkInClinicIndicators($message, $pet);
+
         $this->scoreEvidence($state, $message);
+        if ($isInClinic) {
+            $state['score'] = max((int) ($state['score'] ?? 0), 5);
+            $state['evidence'][] = $inClinicReason;
+            $state['in_clinic_indicated'] = true;
+        } elseif (!empty($state['in_clinic_indicated'])) {
+            $state['score'] = max((int) ($state['score'] ?? 0), 5);
+        }
+
         $score       = min(10, (int) $state['score']);
         $baseRouting = $this->routingFromScore($score, $turn);
+        if (($isInClinic || !empty($state['in_clinic_indicated'])) && $baseRouting !== 'emergency') {
+            $baseRouting = 'in_clinic';
+        }
 
         // ── LAYER 3: Gemini — Triage call (structured JSON) ───────────────────
         [$imageB64, $imageMime] = $this->resolveImagePayload($request, $data);
@@ -314,7 +327,8 @@ class SnoutiqSymptomController extends Controller
             $state['follow_up_history'] ?? [],
             $imageB64,
             $imageMime,
-            $score
+            $score,
+            $isInClinic ? $inClinicReason : null
         );
         $triageJson['possible_causes'] = $this->normalizePossibleCauses($triageJson['possible_causes'] ?? [], $message, $pet);
         $triageJson['india_context_note'] = $this->normalizeIndiaContextNote(
@@ -326,6 +340,11 @@ class SnoutiqSymptomController extends Controller
 
         // Gemini routing can upgrade but not downgrade the heuristic decision
         $routing = $this->mergeRouting($baseRouting, $triageJson['routing'] ?? $baseRouting);
+
+        // Safety: If in-clinic was indicated, never allow AI to downgrade to video_consult or monitor
+        if (($isInClinic || !empty($state['in_clinic_indicated'])) && in_array($routing, ['video_consult', 'monitor'], true)) {
+            $routing = 'in_clinic';
+        }
 
         // Force emergency if severity is critical
         if (($triageJson['severity'] ?? '') === 'critical') {
@@ -1976,7 +1995,11 @@ class SnoutiqSymptomController extends Controller
         'collapsed', 'collapse', 'unconscious', 'unresponsive',
         'not urinating', 'straining to urinate', 'cannot pee', "can't pee", 'blocked bladder',
         'ate poison', 'ate rat poison', 'rodenticide', 'poisoning', 'ate something toxic',
+        'ate rat kill', 'ate paracetamol', 'ate crocin', 'ate human medicine',
         'hit by car', 'road accident', 'run over', 'severe bleeding', 'bleeding heavily',
+        'profuse bleeding', 'bleeding profusely', 'blood gushing', 'blood pouring',
+        'bleeding non-stop', 'uncontrolled bleeding', 'spurting blood',
+        'heat stroke', 'heatstroke',
         'pale gums', 'blue gums', 'white gums', 'yellow gums',
         'bloated stomach', 'stomach bloat', 'abdomen swollen', 'gdv',
         'broken bone', 'bone visible', 'open fracture',
@@ -2006,6 +2029,140 @@ class SnoutiqSymptomController extends Controller
                     return [true, "urinary obstruction in male cat ({$flag})"];
                 }
             }
+        }
+
+        return [false, null];
+    }
+
+    /**
+     * Check if symptoms require physical examination, diagnostics (blood tests, imaging, cytology),
+     * or procedural veterinary care in a clinic. Remote video consult is contraindicated for these.
+     */
+    private function checkInClinicIndicators(string $message, array $pet): array
+    {
+        $text = mb_strtolower($message);
+
+        // 1. Any Blood or Bleeding (external, gastrointestinal, urinary, nasal, oral, etc.)
+        $bloodPatterns = [
+            '/\b(blood|bloody|bleeding|bleed|bleeds|haemorrhag\w*|hemorrhag\w*|hematuria|hematochezia|melena|khoon)\b/u',
+            '/\b(nose\s*bleed|epistaxis)\b/u',
+            '/\b(coughing\s+blood|cough\s+blood|hemoptysis)\b/u',
+            '/\b(vomiting\s+blood|vomit\s+blood|bloody\s+vomit|hematemesis)\b/u',
+            '/\b(blood\s+in\s+(stool|poop|potty|tatti|urine|pee|toilet|vomit|saliva|cough|sputum|mouth|ear|eye))\b/u',
+            '/\b(bleeding\s+(from\s+)?(nose|mouth|ear|eye|gums|teeth|tongue|anus|potty|vagina|penis|wound|cut|paw|claw|nail|tail))\b/u',
+            '/\b(cut\s+paw|torn\s+nail|broken\s+claw|bleeding\s+nail)\b/u',
+        ];
+        foreach ($bloodPatterns as $pattern) {
+            if (preg_match($pattern, $text)) {
+                return [true, 'blood or active bleeding reported'];
+            }
+        }
+
+        // 2. Physical Trauma, Orthopedic, Lameness & Inability to Walk
+        $orthoPatterns = [
+            '/\b(cannot|can\'?t|cant|unable\s+to|not\s+able\s+to|difficulty)\s+(walk\w*|stand\w*|move\s+legs?|put\s+weight)\b/u',
+            '/\bdragging\s+(?:his\s+|her\s+|hind\s+|front\s+)?(leg|legs|paws?)\b/u',
+            '/\b(limping|limp|severe\s+limp|front\s+leg\s+limp|hind\s+leg\s+limp|not\s+putting\s+weight|lame|lameness)\b/u',
+            '/\b(holding\s+(?:his\s+|her\s+)?(?:paw|leg)\s+up|paw\s+injury|leg\s+injury)\b/u',
+            '/\b(fracture\w*|broken\s+(?:leg|bone|paw|tail|pelvis|hip)|dislocat\w*)\b/u',
+            '/\b(crying|screaming|yelping)\s+(?:in\s+pain|when\s+(?:walking|moving|touch\w*))\b/u',
+        ];
+        foreach ($orthoPatterns as $pattern) {
+            if (preg_match($pattern, $text)) {
+                return [true, 'orthopedic injury, limping, or inability to walk'];
+            }
+        }
+
+        // 3. Eye (Ophthalmic) Injuries & Infections (require physical fluorescein stain/exam)
+        $eyePatterns = [
+            '/\bscratch\w*.*?\beye\b/u',
+            '/\beye\b.*?scratch\w*/u',
+            '/\b(corneal\s+ulcer|cherry\s+eye|proptosis|third\s+eyelid)\b/u',
+            '/\beye\b.*?\b(cloudy|hazy|white\s+spot|blue|swollen|shut|closed|discharge|pus|bleeding|blood|squinting|popped\s+out)\b/u',
+            '/\b(cloudy|hazy|swollen|red|watery)\s+eyes?\b/u',
+            '/\b(cannot|can\'?t|cant|won\'?t)\s+open\s+(?:his\s+|her\s+|the\s+)?eyes?\b/u',
+            '/\b(pus|discharge|green\s+discharge|yellow\s+discharge)\s+from\s+(?:the\s+)?eyes?\b/u',
+            '/\beye\s+injury\b/u',
+        ];
+        foreach ($eyePatterns as $pattern) {
+            if (preg_match($pattern, $text)) {
+                return [true, 'eye injury or ocular condition requiring physical examination'];
+            }
+        }
+
+        // 4. Foreign Body Ingestion / Obstruction Suspicion
+        $foreignBodyPatterns = [
+            '/\b(swallowed|ate|ingested|chewed\s+up)\s+(?:a\s+|an\s+)?.*?\b(bone|chicken\s+bone|mutton\s+bone|toy|plastic|rubber|sock|cloth|thread|needle|coin|stone|battery|string)\b/u',
+            '/\b(choking\s+hazard|foreign\s+body|intestinal\s+blockage|bowel\s+obstruction)\b/u',
+        ];
+        foreach ($foreignBodyPatterns as $pattern) {
+            if (preg_match($pattern, $text)) {
+                return [true, 'potential foreign body ingestion requiring imaging/exam'];
+            }
+        }
+
+        // 5. Severe / Multi-Day Gastrointestinal & Dehydration
+        $severeGiPatterns = [
+            '/\b(vomiting\s+(repeatedly|continuously|frequently|all\s+day|all\s+night|multiple\s+times))\b/u',
+            '/\b(vomit\w*\s+[3456789]\s+times|vomited\s+[3456789]\s+times)\b/u',
+            '/\b(cannot|can\'?t|cant)\s+keep\s+water\s+down\b/u',
+            '/\bvomiting\s+(?:water|after\s+drinking)\b/u',
+            '/\b(diarrhea|loose\s+motion)\s+(for\s+[234567]\s+days|lasting\s+days)\b/u',
+            '/\b(vomiting\s+and\s+diarrhea|diarrhea\s+and\s+vomiting)\b/u',
+            '/\b(not\s+eat\w*\s+for\s+[2345]\s+days|not\s+eaten\s+in\s+[2345]\s+days|no\s+food\s+for\s+[2345]\s+days)\b/u',
+            '/\b(dehydrated|dehydration|sunken\s+eyes|dry\s+tacky\s+gums)\b/u',
+        ];
+        foreach ($severeGiPatterns as $pattern) {
+            if (preg_match($pattern, $text)) {
+                return [true, 'severe gastrointestinal distress or marked dehydration'];
+            }
+        }
+
+        // 6. Deep Wounds, Bites, Abscesses, Swellings & Purulent Infections
+        $woundPatterns = [
+            '/\b(open\s+wound|deep\s+cut|deep\s+wound|puncture\s+wound|laceration|flesh\s+wound)\b/u',
+            '/\b(dog\s+bite|cat\s+bite|animal\s+bite|monkey\s+bite)\b/u',
+            '/\b(abscess|burst\s+abscess|pus\s+draining|draining\s+pus|oozing\s+pus|foul\s+smelling\s+wound)\b/u',
+            '/\b(swollen\s+face|swollen\s+muzzle|swollen\s+cheek|swollen\s+neck|swollen\s+belly)\b/u',
+            '/\b(large\s+lump|growing\s+lump|hard\s+tumor|anal\s+gland\s+abscess|burst\s+anal\s+sac)\b/u',
+            '/\b(ear\s+hematoma|aural\s+hematoma|ear\s+swollen\s+like\s+balloon)\b/u',
+        ];
+        foreach ($woundPatterns as $pattern) {
+            if (preg_match($pattern, $text)) {
+                return [true, 'wound, abscess or physical swelling requiring clinic treatment'];
+            }
+        }
+
+        // 7. Neurological / Vestibular (Head tilt, ataxia, circling)
+        $neuroPatterns = [
+            '/\b(head\s+tilt|circling|loss\s+of\s+balance|wobbly\s+walking|falling\s+over|ataxia|vestibular)\b/u',
+        ];
+        foreach ($neuroPatterns as $pattern) {
+            if (preg_match($pattern, $text)) {
+                return [true, 'neurological or vestibular symptoms requiring physical evaluation'];
+            }
+        }
+
+        // 8. Young puppy or kitten (< 6 months) with vomiting, diarrhea, or refusal to eat
+        $species = strtolower($pet['species'] ?? 'dog');
+        $isYoung = false;
+        if (!empty($pet['dob'])) {
+            try {
+                $dob = new \DateTime($pet['dob']);
+                $now = new \DateTime();
+                if ($now->diff($dob)->days < 180) {
+                    $isYoung = true;
+                }
+            } catch (\Exception $e) {}
+        }
+        if (!empty($pet['age'])) {
+            $ageStr = strtolower((string)$pet['age']);
+            if (preg_match('/(month|puppy|kitten|bachha)/u', $ageStr) && !preg_match('/(year|saal)/u', $ageStr)) {
+                $isYoung = true;
+            }
+        }
+        if ($isYoung && preg_match('/\b(vomit\w*|diarrh\w*|loose\s+motion|not\s+eating|dull|letharg\w*)\b/u', $text)) {
+            return [true, "young {$species} with systemic illness (high Parvovirus/Panleukopenia risk)"];
         }
 
         return [false, null];
@@ -2058,38 +2215,66 @@ class SnoutiqSymptomController extends Controller
 
         $buckets = [
             // [score_to_add, keywords]
-            [4, ['severe','extreme','emergency','not responding','all night','getting much worse',
+            [5, ['severe bleeding','bleeding heavily','profuse bleeding','gushing blood',
+                 'ate poison','rat poison','rodenticide','hit by car','open fracture']],
+            [4, ['blood in stool','bloody stool','blood in urine','bloody vomit','vomiting blood',
+                 'coughing blood','nosebleed','bleeding from','bleeding wound','open wound','deep cut',
+                 'cannot walk','unable to walk','dragging leg','cannot stand',
+                 'eye injury','cloudy eye','swallowed bone','swallowed toy',
+                 'not eating for 2 days','not eating for 3 days','not eaten in 2','not eaten in 3',
+                 'severe','extreme','emergency','not responding','all night','getting much worse',
                  'rapidly worsening','suddenly collapsed','non-stop vomiting']],
-            [3, ['blood in stool','bloody stool','blood in urine','bloody vomit','blood from',
-                 'open wound','deep cut','very swollen','dragging leg','cannot stand',
-                 'not eating for 2 days','not eating for 3 days','not eaten in 2','not eaten in 3']],
-            [2, ['vomiting','vomit','diarrhea','diarrhoea','not eating','no appetite','lethargic',
-                 'lethargy','painful','difficulty walking','swollen','discharge','pus',
-                 'yelping','crying in pain','wont let me touch']],
-            [1, ['limping','slight limp','off food','a bit low','not himself','not herself',
+            [3, ['blood','bleeding','bleed','khoon','vomiting repeatedly','severe diarrhea',
+                 'very swollen','swollen face','ear hematoma','head tilt','abscess','pus',
+                 'crying in pain','yelping','wont let me touch']],
+            [2, ['vomiting','vomit','diarrhea','diarrhoea','loose motion','not eating','no appetite',
+                 'lethargic','lethargy','painful','difficulty walking','limping','swollen',
+                 'discharge']],
+            [1, ['slight limp','off food','a bit low','not himself','not herself',
                  'seems tired','scratching','sneezing','runny nose','mild','started today',
-                 'since yesterday','for a few days']],
+                 'since yesterday','for a few days','itching']],
         ];
 
+        $matchedKeywords = [];
         foreach ($buckets as [$pts, $keywords]) {
             foreach ($keywords as $kw) {
                 if (str_contains($text, $kw)) {
                     $state['score'] = ($state['score'] ?? 0) + $pts;
                     $state['evidence'][] = $kw;
+                    $matchedKeywords[] = $kw;
                     break 1; // one match per bucket per message
                 }
             }
         }
 
-        // Regex additions
+        // Regex additions for patterns not caught by exact bucket keywords
         $regexRules = [
-            [2, '/\bvomit\w*\b|\bthrow(?:ing)?\s+up\b/'],
-            [2, '/\bdiarrh?[eo]a\b/'],
-            [2, '/\b(not\s+eating|loss\s+of\s+appetite|refus\w+\s+food)\b/'],
-            [3, '/\bblood\s+in\s+(stool|urine|vomit)\b/'],
-            [3, '/\bseizure|convuls\w+|fitting\b/'],
+            [5, '/\b(severe\s+bleeding|bleeding\s+heavily|profuse\s+bleeding|blood\s+gushing)\b/i', ['severe bleeding','bleeding heavily','profuse bleeding','gushing blood']],
+            [4, '/\b(blood\s+in\s+(stool|poop|urine|pee|vomit)|vomiting\s+blood|bloody\s+(stool|urine|vomit|diarrhea))\b/i', ['blood in stool','bloody stool','blood in urine','bloody vomit','vomiting blood']],
+            [4, '/\b(cannot|can\'?t|unable\s+to|not\s+able\s+to)\s+(walk|stand)\b|\bdragging\s+(?:his\s+|her\s+|hind\s+|front\s+)?legs?\b/i', ['cannot walk','unable to walk','cannot stand','dragging leg']],
+            [4, '/\b(scratch\w*.*?\beye|eye\b.*?scratch\w*|eye\s+injury|cherry\s+eye|corneal\s+ulcer|\beye\b.*?\b(cloudy|hazy|swollen|shut|closed))\b/i', ['eye injury','cloudy eye']],
+            [3, '/\b(blood|bloody|bleeding|bleed|bleeds|khoon)\b/i', ['blood','bleeding','bleed','khoon','blood in stool','bloody stool','blood in urine','bloody vomit','vomiting blood']],
+            [3, '/\b(swallowed|ate|ingested)\s+(?:a\s+)?(bone|toy|plastic|sock|cloth|needle|thread|stone)\b/i', ['swallowed bone','swallowed toy']],
+            [2, '/\bvomit\w*\b|\bthrow(?:ing)?\s+up\b/i', ['vomiting','vomit','vomiting repeatedly','non-stop vomiting']],
+            [2, '/\bdiarrh?[eo]a\b|\bloose\s+motion\b/i', ['diarrhea','diarrhoea','loose motion','severe diarrhea']],
+            [2, '/\b(not\s+eating|loss\s+of\s+appetite|refus\w+\s+food)\b/i', ['not eating','no appetite','off food']],
+            [3, '/\b(not\s+eat\w*\s+for\s+[2345]\s+days|not\s+eaten\s+in\s+[2345]\s+days)\b/i', ['not eating for 2 days','not eating for 3 days','not eaten in 2','not eaten in 3']],
+            [4, '/\bseizure|convuls\w+|fitting\b/i', ['seizure','convulsion']],
         ];
-        foreach ($regexRules as [$pts, $rx]) {
+
+        foreach ($regexRules as [$pts, $rx, $relatedKeywords]) {
+            // Do not double-count if a related keyword in buckets already matched for this symptom
+            $alreadyScored = false;
+            foreach ($relatedKeywords as $rkw) {
+                if (in_array($rkw, $matchedKeywords, true)) {
+                    $alreadyScored = true;
+                    break;
+                }
+            }
+            if ($alreadyScored) {
+                continue;
+            }
+
             if (preg_match($rx, $text)) {
                 $state['score'] = ($state['score'] ?? 0) + $pts;
             }
@@ -2098,12 +2283,9 @@ class SnoutiqSymptomController extends Controller
 
     private function routingFromScore(int $score, int $turn): string
     {
-        // Backstop: after 3 turns with any symptoms, move to video at minimum
-        if ($turn >= 3 && $score >= 1) return 'video_consult';
-
         if ($score >= 8)  return 'emergency';
         if ($score >= 5)  return 'in_clinic';
-        if ($score >= 2)  return 'video_consult';
+        if ($score >= 2 || ($turn >= 3 && $score >= 1))  return 'video_consult';
         return 'monitor';
     }
 
@@ -2138,11 +2320,15 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
 
     private function callGeminiTriage(
         array $pet, string $message, array $history, array $followUpHistory,
-        ?string $imageB64, string $imageMime, int $score
+        ?string $imageB64, string $imageMime, int $score, ?string $clinicalAlert = null
     ): array {
         $historyStr = $this->formatHistoryForPrompt($history);
         $followUpHistoryStr = $this->formatFollowUpHistoryForPrompt($followUpHistory);
         $petStr     = $this->petToString($pet);
+
+        $clinicalConstraint = $clinicalAlert
+            ? "\nCLINICAL OVERRIDE CONSTRAINT: The pet parent reported: {$clinicalAlert}. In veterinary practice, this requires physical in-person examination, diagnostics (CBC/smear/ultrasound/X-ray), or wound care. Remote video cannot physically examine or treat bleeding, orthopedic trauma, deep wounds, or ocular injury. You MUST choose 'in_clinic' (or 'emergency' if critical/life-threatening). DO NOT select video_consult or monitor.\n"
+            : '';
 
         $prompt =
             self::INDIA_CONTEXT . "\n\n" .
@@ -2150,16 +2336,17 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             ($historyStr ? "CONVERSATION SO FAR:\n{$historyStr}\n\n" : '') .
             ($followUpHistoryStr ? "FOLLOW-UP ANSWERS SO FAR:\n{$followUpHistoryStr}\n\n" : '') .
             "CURRENT MESSAGE: " . mb_substr($message, 0, self::MAX_INPUT_CHARS) . "\n" .
-            "EVIDENCE SCORE SO FAR: {$score}/10\n\n" .
+            "EVIDENCE SCORE SO FAR: {$score}/10\n" .
+            $clinicalConstraint . "\n" .
             "TASK: Assess this pet's situation and output routing decision.\n\n" .
             "Use the pet location if provided. If no location is available, assume India. " .
             "Possible causes should be short, practical, and prioritized for common Indian veterinary presentations when reasonable. " .
             "india_context_note must be a single useful India- or location-aware line, not a disclaimer.\n\n" .
             "Routing options:\n" .
-            "- emergency: life-threatening right now\n" .
-            "- video_consult: vet can assess via video, no immediate danger\n" .
-            "- in_clinic: needs physical exam, cannot be assessed remotely\n" .
-            "- monitor: safe to watch at home with clear instructions\n\n" .
+            "- emergency: life-threatening right now (severe respiratory distress/choking, collapse/unresponsive, active convulsions, bloated hard abdomen with dry retching, blocked urination in male cat, profuse/uncontrolled bleeding, known poison ingestion, heatstroke, severe trauma)\n" .
+            "- in_clinic: physical hands-on examination, palpation, blood tests (CBC/tick fever), imaging, wound treatment, or in-person procedures required. Remote video cannot physically test or treat these. Includes: ANY blood or bleeding (in stool/urine/vomit/cough/wound/nose/mouth), inability to walk, severe limping, eye injuries/cloudiness, foreign body ingestion, repeated vomiting (>2x/day), severe diarrhea lasting >24h, anorexia for >24-48h, severe ear hematoma, or young unvaccinated puppy/kitten illness\n" .
+            "- video_consult: mild, non-urgent issues suitable for remote veterinary discussion and visual inspection (mild itching/scratching, skin dander without sores, minor dietary/feeding advice, behavior concerns, minor single transient vomit or loose stool where pet is active and drinking normally, vaccination advice)\n" .
+            "- monitor: safe to watch at home with clear instructions for completely mild, isolated transient signs in bright, alert, normal pets (single sneeze, mild tiredness after exercise)\n\n" .
             "Return ONLY this JSON object, nothing else:\n" .
             '{"routing":"emergency|video_consult|in_clinic|monitor",' .
             '"severity":"critical|moderate|mild|informational",' .
@@ -2173,8 +2360,10 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             ? $this->geminiCallWithImage($prompt, $imageB64, $imageMime, self::TRIAGE_MAX_TOKENS)
             : $this->geminiCall($prompt, self::TRIAGE_MAX_TOKENS);
 
+        $defaultRouting = $score >= 5 ? 'in_clinic' : 'video_consult';
+        $defaultSeverity = $score >= 5 ? 'moderate' : 'mild';
         $decoded = $this->decodeJson($raw);
-        return is_array($decoded) ? $decoded : ['routing' => 'video_consult', 'severity' => 'mild'];
+        return is_array($decoded) ? $decoded : ['routing' => $defaultRouting, 'severity' => $defaultSeverity];
     }
 
     // =========================================================================
@@ -2195,7 +2384,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $routingInstructions = [
             'emergency'    => 'This pet needs emergency care NOW. Be calm but very direct — go to nearest vet or government hospital immediately. Give ONE thing they can do right now while going (keep warm, do not feed). Do not say it will be okay. Be honest but not terrifying.',
             'video_consult'=> 'Recommend a Snoutiq video consultation. A vet can see the pet on screen and give proper guidance in minutes. Great for night-time or when clinic feels too far. Be reassuring — this can be handled with professional guidance.',
-            'in_clinic'    => 'This needs a physical examination — a vet needs to feel and examine the pet in person. Video will not be enough. Book the earliest clinic appointment or go today. Be gentle but clear.',
+            'in_clinic'    => 'This needs a physical in-person examination — a vet needs to feel and examine the pet in person, check vitals, and perform diagnostics. Remote video consultation will not be enough for this condition. Tell the owner gently but clearly to book a clinic appointment or visit the nearest vet clinic today.',
             'monitor'      => 'Reassure the pet parent this looks manageable for now. Give 3-4 very specific warning signs to watch for. Give a time window — if not better in X hours, book a consult. Offer Snoutiq video consult if they want a vet to check.',
         ];
 
@@ -2737,7 +2926,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
 
         return match ($routing) {
             'emergency' => "Leave now for the nearest vet or emergency hospital with {$petName} kept calm and still.",
-            'in_clinic' => "Call the nearest clinic and book the earliest same-day appointment for {$petName}.",
+            'in_clinic' => "Book a clinic appointment or take {$petName} to the nearest veterinary clinic for a physical examination today.",
             'monitor' => "Offer rest, water if tolerated, and note any change in appetite, energy, vomiting, stool, or breathing.",
             default => "Start a Snoutiq video consult so a vet can review {$petName}'s symptoms in real time.",
         };
@@ -2748,8 +2937,8 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $safeToWait = isset($triage['safe_to_wait_hours']) ? (int) $triage['safe_to_wait_hours'] : 0;
 
         return match ($routing) {
-            'emergency' => 'Go now',
-            'in_clinic' => $safeToWait > 0 ? "Within {$safeToWait} hours" : 'Same day',
+            'emergency' => 'Go now — every minute matters',
+            'in_clinic' => 'Visit clinic today',
             'monitor' => $safeToWait > 0 ? "If not improving within {$safeToWait} hours" : 'If not improving within 24 hours',
             default => $safeToWait > 0 ? "Within {$safeToWait} hours" : 'Within the next few hours',
         };
@@ -2800,6 +2989,15 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
                 "Keep {$petName} calm, quiet, and as still as possible during travel.",
                 'Do not give food, treats, or any human medicine unless a vet has specifically told you to.',
                 'If poisoning or a foreign item is possible, take the packet, wrapper, or a photo with you.',
+            ];
+        }
+
+        if (preg_match('/\b(blood|bloody|bleeding|bleed|khoon)\b/u', $text)) {
+            return [
+                "Keep {$petName} calm and as still as possible; excitement or moving increases blood pressure and bleeding.",
+                "If bleeding is from an external cut or claw, apply gentle, continuous pressure with a clean cloth or gauze for 5-10 minutes without peeking.",
+                "Do not apply human antiseptic creams, turmeric, powders, or tourniquets to the wound.",
+                "Transport {$petName} calmly to the nearest vet clinic for physical examination, diagnostics, and proper bleeding control.",
             ];
         }
 
@@ -2887,7 +3085,14 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         }
 
         $symptomSpecific = [];
-        if (preg_match('/\b(vomit|vomiting|throwing up|diarrh|not eating|no appetite|letharg|fever)\b/', $text)) {
+        if (preg_match('/\b(blood|bloody|bleeding|bleed|khoon)\b/u', $text)) {
+            $symptomSpecific = [
+                "If bleeding does not slow down within 10 minutes of direct pressure, proceed to an emergency vet immediately.",
+                "If {$petName}'s gums turn pale, white, or cold, or if weakness/collapse occurs, this indicates dangerous blood loss.",
+                "If blood is visible in both vomit and stool, or petechial red spots appear on gums/skin, urgent in-person tests are needed.",
+                "Any breathing difficulty or severe lethargy combined with bleeding requires immediate clinic care.",
+            ];
+        } elseif (preg_match('/\b(vomit|vomiting|throwing up|diarrh|not eating|no appetite|letharg|fever)\b/', $text)) {
             $symptomSpecific = [
                 "If {$petName} vomits more than twice in the next 6 hours, upgrade to a same-day clinic visit.",
                 "If gums turn pale, white, or yellow at any point, {$petName} should be seen the same day.",
@@ -2955,6 +3160,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $petName = trim((string) ($pet['name'] ?? 'your pet')) ?: 'your pet';
         $text = mb_strtolower($this->cleanAssistantText($ownerMessage));
 
+        if (preg_match('/\b(blood|bloody|bleeding|bleed|khoon)\b/u', $text)) {
+            return "Be ready to tell the vet exactly where the blood is coming from (stool, vomit, urine, mouth, nose, or wound), how long it has been bleeding, and whether gums appear pale.";
+        }
         if (preg_match('/\b(vomit|vomiting|throwing up|diarrh|not eating|no appetite|letharg|fever)\b/', $text)) {
             return "Be ready to tell the vet when {$petName} last ate a completely normal meal, and whether stool, urine, and vomiting have looked normal in the last 24 hours.";
         }
@@ -2999,6 +3207,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $isSpecificRegion = $region !== 'India';
         $prefix = $isSpecificRegion ? "In {$region}" : 'Across India';
 
+        if (preg_match('/\b(blood|bloody|bleeding|bleed|khoon)\b/u', $text)) {
+            return "{$prefix}, blood in stool or vomit is frequently linked to Parvovirus in young dogs, severe hemorrhagic gastroenteritis, or tick fever causing low platelets. Physical clinic examination and a CBC blood test are essential.";
+        }
         if (preg_match('/\b(not eating|no appetite|loss of appetite|letharg|fever)\b/', $text) && (($pet['species'] ?? '') === 'dog')) {
             return $isSpecificRegion
                 ? "Tick fever (Ehrlichia canis) is year-round in {$region} and frequently causes sudden appetite loss with lethargy — often missed because fever can be intermittent. Worth ruling out early."
@@ -3070,6 +3281,10 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $species = strtolower((string) ($pet['species'] ?? ''));
         if ($text === '') {
             return [];
+        }
+
+        if (preg_match('/\b(blood|bloody|bleeding|bleed|khoon)\b/u', $text)) {
+            return ['gastrointestinal or internal bleeding', 'a hemorrhagic infection or parasite (such as Parvo / hookworms)', 'a physical wound or trauma', 'tick-borne thrombocytopenia (low platelets)'];
         }
 
         if (preg_match('/\b(not eating|no appetite|loss of appetite|letharg|lethargic)\b/', $text) && $species === 'dog') {
@@ -3252,7 +3467,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         if ($healthScore <= 55) {
             return [
                 'label' => 'High Risk',
-                'subtitle' => 'Needs vet attention today',
+                'subtitle' => 'Needs clinic exam today',
                 'color' => '#e53935',
             ];
         }
@@ -3323,10 +3538,10 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
                 'time_badge' => $response['time_sensitivity'] ?? 'Go now — every minute matters',
             ],
             'in_clinic' => [
-                'eyebrow' => 'Assessment complete — routing decision',
+                'eyebrow' => 'Assessment complete — in-clinic visit needed',
                 'title' => 'Visit a Vet Clinic Today',
-                'subtitle' => 'A physical examination is needed today',
-                'time_badge' => $response['time_sensitivity'] ?? 'Book the earliest appointment today',
+                'subtitle' => 'A physical in-person examination and diagnostics are needed today',
+                'time_badge' => $response['time_sensitivity'] ?? 'Book clinic appointment today',
             ],
             'monitor' => [
                 'eyebrow' => 'Assessment complete — home monitoring guidance',
@@ -3335,9 +3550,9 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
                 'time_badge' => $response['time_sensitivity'] ?? 'If no improvement in 48 hours, book a consult',
             ],
             default => [
-                'eyebrow' => 'Assessment complete — routing decision',
+                'eyebrow' => 'Assessment complete — video consult recommended',
                 'title' => 'See a Vet Today via Video',
-                'subtitle' => 'Symptoms need professional assessment today',
+                'subtitle' => 'A licensed vet can evaluate your pet on video within minutes',
                 'time_badge' => $response['time_sensitivity'] ?? 'Book a consult within the next 2-3 hours',
             ],
         };
@@ -3378,7 +3593,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'badge_variant' => 'cb',
             'title' => 'Confirmed Clinic Booking',
             'guarantee' => 'Guaranteed appointment, skip the wait',
-            'bullets' => ['No queue - appointment confirmed instantly', 'Nearest available vet'],
+            'bullets' => ['In-person physical examination & diagnostics', 'No queue - appointment confirmed instantly', 'Nearest verified clinic'],
             'theme' => 'cb',
             'featured' => false,
             'cta' => [
@@ -3387,15 +3602,27 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             ],
         ];
 
+        $clinicBookingFeatured = array_merge($clinicBooking, [
+            'badge' => 'Recommended • In-Clinic Visit',
+            'featured' => true,
+            'bullets' => [
+                'In-person physical examination & diagnostics',
+                'Guaranteed appointment, skip the waiting queue',
+                'Hands-on veterinary care & treatment',
+            ],
+            'cta' => [
+                'label' => '🏥 Book Clinic Appointment',
+                'deeplink' => self::DEEPLINK_CLINIC_BOOKING,
+            ],
+        ]);
+
         return match ($view) {
-            'emergency' => [$vetAtHome, $clinicBooking],
-            'in_clinic' => [$vetAtHome, $clinicBooking],
+            'emergency' => [$clinicBooking, $vetAtHome],
+            'in_clinic' => [$clinicBookingFeatured, $vetAtHome],
             'monitor' => [[
                 'badge' => 'If symptoms worsen',
                 'badge_variant' => '',
                 'title' => $video['title'],
-                'price' => $video['price'],
-                'orig_price' => $video['orig_price'],
                 'guarantee' => $video['guarantee'],
                 'bullets' => $video['bullets'],
                 'theme' => $video['theme'],
@@ -3446,10 +3673,10 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
                                 'deeplink' => self::DEEPLINK_CLINIC,    'color' => '#8b5cf6', 'icon' => 'map-pin'],
             ],
             'in_clinic' => [
-                'primary'   => ['label' => 'Book Vet at Home - ₹999', 'type' => 'vet_at_home',
-                                'deeplink' => self::DEEPLINK_VET_HOME,  'color' => '#8b5cf6', 'icon' => 'home'],
-                'secondary' => ['label' => 'Find Nearest Clinic',     'type' => 'clinic',
-                                'deeplink' => self::DEEPLINK_CLINIC,    'color' => '#3b82f6', 'icon' => 'map-pin'],
+                'primary'   => ['label' => 'Book Clinic Appointment', 'type' => 'clinic',
+                                'deeplink' => self::DEEPLINK_CLINIC_BOOKING,  'color' => '#2563eb', 'icon' => 'calendar'],
+                'secondary' => ['label' => 'Book Vet at Home - ₹999',     'type' => 'vet_at_home',
+                                'deeplink' => self::DEEPLINK_VET_HOME,    'color' => '#8b5cf6', 'icon' => 'home'],
             ],
             'monitor' => [
                 'primary'   => ['label' => 'Save Monitoring Guide',   'type' => 'info',
@@ -3467,7 +3694,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
 
     private function defaultState(): array
     {
-        return ['history' => [], 'follow_up_history' => [], 'pet' => [], 'score' => 0, 'evidence' => []];
+        return ['history' => [], 'follow_up_history' => [], 'pet' => [], 'score' => 0, 'evidence' => [], 'in_clinic_indicated' => false];
     }
 
     private function softReset(array &$state): void
@@ -3476,6 +3703,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         $state['evidence'] = [];
         $state['history']  = [];
         $state['follow_up_history'] = [];
+        $state['in_clinic_indicated'] = false;
     }
 
     private function appendHistory(array &$state, string $q, string $a, string $routing, int $score): void
