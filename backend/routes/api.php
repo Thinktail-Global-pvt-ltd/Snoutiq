@@ -4584,3 +4584,8 @@ Route::middleware([\App\Http\Middleware\FounderRequestLogger::class])->prefix('f
     Route::get('settings', [FounderSettingController::class, 'show']);
     Route::patch('settings', [FounderSettingController::class, 'update']);
 });
+
+// Admin Database Purge Route (users, vet_registerations_temp, pets, doctors)
+Route::match(['get', 'post'], '/admin/database/clear-data', [\App\Http\Controllers\Api\AdminDataPurgeController::class, 'clearData'])
+    ->name('api.admin.database.clear-data');
+
