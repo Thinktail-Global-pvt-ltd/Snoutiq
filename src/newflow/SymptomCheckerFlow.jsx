@@ -18,7 +18,7 @@ import {
   FollowUpQuestion,
 } from "./AssessmentUI";
 
-const MIN_ASSESSMENT_WORDS = 4;
+const MIN_ASSESSMENT_WORDS = 8;
 const LOW_SIGNAL_INPUTS = new Set([
   "hi",
   "hello",
@@ -46,13 +46,17 @@ function hasEnoughSymptomDetail(text) {
   const words = cleaned.match(/[a-z0-9]+/gi) || [];
   if (words.length < MIN_ASSESSMENT_WORDS) return false;
 
-  const symptomSignals = [
+  const includesAny = (signals) =>
+    signals.some((signal) => cleaned.includes(signal));
+
+  const hasSymptom = includesAny([
     "vomit",
     "diarrhea",
     "loose motion",
     "not eating",
     "letharg",
     "limp",
+    "lameness",
     "skin",
     "itch",
     "cough",
@@ -72,13 +76,92 @@ function hasEnoughSymptomDetail(text) {
     "injury",
     "rash",
     "allergy",
-  ];
+    "khana",
+    "ulti",
+    "dard",
+    "langda",
+  ]);
 
-  return symptomSignals.some((signal) => cleaned.includes(signal));
+  const hasTiming = includesAny([
+    "today",
+    "yesterday",
+    "morning",
+    "night",
+    "hour",
+    "hours",
+    "day",
+    "days",
+    "week",
+    "weeks",
+    "since",
+    "started",
+    "start",
+    "sudden",
+    "suddenly",
+    "kal",
+    "aaj",
+    "subah",
+    "raat",
+  ]);
+
+  const hasSeverityOrProgression = includesAny([
+    "mild",
+    "severe",
+    "bad",
+    "worse",
+    "worsening",
+    "better",
+    "improving",
+    "cannot",
+    "can't",
+    "unable",
+    "not able",
+    "not putting weight",
+    "crying",
+    "yelping",
+    "continuous",
+    "frequent",
+    "again",
+    "bar bar",
+    "bahut",
+    "zyada",
+  ]);
+
+  const hasBehaviorOrVitals = includesAny([
+    "eating",
+    "drinking",
+    "active",
+    "sleepy",
+    "dull",
+    "lethargic",
+    "play",
+    "walking",
+    "weight",
+    "breathing",
+    "temperature",
+    "food",
+    "water",
+    "pee",
+    "urine",
+    "poop",
+    "stool",
+    "khana",
+    "paani",
+    "chal",
+    "walk",
+  ]);
+
+  const contextCount = [
+    hasTiming,
+    hasSeverityOrProgression,
+    hasBehaviorOrVitals,
+  ].filter(Boolean).length;
+
+  return hasSymptom && contextCount >= 2;
 }
 
 function buildIntakePrompt(petName = "your pet") {
-  return `I need a little more detail before I can assess risk or recommend the next step for ${petName}. Please share:
+  return `I need a little more detail before I can calculate a meaningful risk score for ${petName}. Please share:
 
 1. What symptom are you noticing?
 2. When did it start and is it getting worse?
