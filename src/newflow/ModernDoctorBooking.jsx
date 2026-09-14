@@ -326,7 +326,6 @@ export default function ModernDoctorBooking({
   // Doctor States
   const [lastVetDoctors, setLastVetDoctors] = useState([]);
   const [hasLastVet, setHasLastVet] = useState(false);
-  const [showAllVets, setShowAllVets] = useState(false);
   const [allVetsLoading, setAllVetsLoading] = useState(false);
   const [allVetsLoaded, setAllVetsLoaded] = useState(false);
   const [otherDoctors, setOtherDoctors] = useState([]);
@@ -697,7 +696,6 @@ export default function ModernDoctorBooking({
   }, [token, orderType, userId, fetchAllDoctors, fetchAllClinics]);
 
   const handleViewMoreClick = () => {
-    setShowAllVets(true);
     if (!allVetsLoaded) {
       fetchAllDoctors();
     }
@@ -1423,46 +1421,36 @@ export default function ModernDoctorBooking({
                     )}
                   </div>
 
-                  {/* View More Vets Button */}
-                  {!showAllVets && (
-                    <div className="pt-1 text-center">
-                      <button
-                        onClick={handleViewMoreClick}
-                        disabled={allVetsLoading}
-                        className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl border border-blue-200 transition-all flex items-center justify-center gap-2 shadow-xs"
-                      >
-                        {allVetsLoading ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
-                            <span>Loading more vets for {displayPetName}...</span>
-                          </>
-                        ) : (
-                          <span>View more vets for {displayPetName} ↓</span>
-                        )}
-                      </button>
-                    </div>
-                  )}
-
                   {/* Other Available Vets Section */}
-                  {showAllVets && (
-                    <div className="space-y-2 pt-2 border-t border-slate-200/80">
-                      <h3 className="text-xs font-bold text-slate-900 px-0.5">Other Available Vets</h3>
-                      {allVetsLoading ? (
-                        <div className="py-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                          <span>Loading available vets...</span>
-                        </div>
-                      ) : filteredOtherDoctors.length === 0 ? (
-                        <div className="p-4 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">
-                          No other doctors found matching filters.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                          {filteredOtherDoctors.map(doc => renderDoctorCard(doc, false))}
-                        </div>
+                  <div className="space-y-2 pt-2 border-t border-slate-200/80">
+                    <div className="flex items-center justify-between px-0.5">
+                      <h3 className="text-xs font-bold text-slate-900">All Available Vets</h3>
+                      {!allVetsLoaded && (
+                        <button
+                          type="button"
+                          onClick={handleViewMoreClick}
+                          disabled={allVetsLoading}
+                          className="text-[10px] font-bold text-blue-700 hover:text-blue-800 disabled:opacity-50"
+                        >
+                          Load vets
+                        </button>
                       )}
                     </div>
-                  )}
+                    {allVetsLoading ? (
+                      <div className="py-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                        <span>Loading available vets...</span>
+                      </div>
+                    ) : filteredOtherDoctors.length === 0 ? (
+                      <div className="p-4 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">
+                        No other doctors found matching filters.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {filteredOtherDoctors.map(doc => renderDoctorCard(doc, false))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 /* CASE B: hasLastVet === false -> DIRECT NORMAL DOCTOR LIST */
