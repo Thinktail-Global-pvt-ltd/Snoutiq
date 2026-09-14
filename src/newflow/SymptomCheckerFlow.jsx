@@ -34,22 +34,48 @@ const LOW_SIGNAL_INPUTS = new Set([
   "sick",
 ]);
 
+const RED_FLAG_SIGNALS = [
+  "blood",
+  "bleed",
+  "bleeding",
+  "black stool",
+  "breathing difficulty",
+  "difficulty breathing",
+  "seizure",
+  "collapse",
+  "collapsed",
+  "unconscious",
+  "poison",
+  "toxic",
+  "bloated",
+  "bloat",
+  "accident",
+  "hit by",
+  "not breathing",
+];
+
 function normalizeInputText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function includesAnySignal(text, signals) {
+  return signals.some((signal) => text.includes(signal));
+}
+
+function hasRedFlagSignal(text) {
+  return includesAnySignal(normalizeInputText(text).toLowerCase(), RED_FLAG_SIGNALS);
 }
 
 function hasEnoughSymptomDetail(text) {
   const cleaned = normalizeInputText(text).toLowerCase();
   if (!cleaned) return false;
   if (LOW_SIGNAL_INPUTS.has(cleaned)) return false;
+  if (hasRedFlagSignal(cleaned)) return true;
 
   const words = cleaned.match(/[a-z0-9]+/gi) || [];
   if (words.length < MIN_ASSESSMENT_WORDS) return false;
 
-  const includesAny = (signals) =>
-    signals.some((signal) => cleaned.includes(signal));
-
-  const hasSymptom = includesAny([
+  const hasSymptom = includesAnySignal(cleaned, [
     "vomit",
     "diarrhea",
     "loose motion",
@@ -82,7 +108,7 @@ function hasEnoughSymptomDetail(text) {
     "langda",
   ]);
 
-  const hasTiming = includesAny([
+  const hasTiming = includesAnySignal(cleaned, [
     "today",
     "yesterday",
     "morning",
@@ -104,7 +130,7 @@ function hasEnoughSymptomDetail(text) {
     "raat",
   ]);
 
-  const hasSeverityOrProgression = includesAny([
+  const hasSeverityOrProgression = includesAnySignal(cleaned, [
     "mild",
     "severe",
     "bad",
@@ -127,7 +153,7 @@ function hasEnoughSymptomDetail(text) {
     "zyada",
   ]);
 
-  const hasBehaviorOrVitals = includesAny([
+  const hasBehaviorOrVitals = includesAnySignal(cleaned, [
     "eating",
     "drinking",
     "active",
@@ -162,10 +188,32 @@ function hasEnoughSymptomDetail(text) {
 
 function buildIntakePrompt(petName = "your pet", symptomText = "") {
   const normalizedSymptom = normalizeInputText(symptomText).toLowerCase();
+  const isRedFlag = hasRedFlagSignal(normalizedSymptom);
+  const isBlood = normalizedSymptom.includes("blood") || normalizedSymptom.includes("bleed");
   const isVomiting = normalizedSymptom.includes("vomit") || normalizedSymptom.includes("stomach");
   const isDiarrhea = normalizedSymptom.includes("diarrhea") || normalizedSymptom.includes("loose motion");
   const isLimping = normalizedSymptom.includes("limp") || normalizedSymptom.includes("skin");
   const isLethargic = normalizedSymptom.includes("letharg") || normalizedSymptom.includes("not eating");
+
+  if (isBlood) {
+    return `Blood can be urgent for ${petName}. Please share these details so I can guide the next step:
+
+1. Where are you seeing blood: vomit, stool, urine, wound, mouth, nose, or skin?
+2. How much blood is there and when did it start?
+3. Is ${petName} weak, dull, breathing fast, crying, or in pain?
+4. Is ${petName} eating, drinking, and walking normally?
+5. Age, breed, and any injury, medicine, or toxin exposure?`;
+  }
+
+  if (isRedFlag) {
+    return `This may need urgent attention for ${petName}. Please share:
+
+1. What exactly happened?
+2. When did it start?
+3. Is ${petName} breathing normally and responsive?
+4. Any bleeding, seizure, collapse, severe pain, vomiting, or bloating?
+5. Age, breed, and any known medical history or medicine?`;
+  }
 
   if (isVomiting) {
     return `I can help assess vomiting or stomach upset for ${petName}, but I need clinical context before showing a risk score. Please answer:
@@ -711,10 +759,16 @@ export default function SymptomCheckerFlow({
         text: textToSubmit,
         isIntakePrompt: true,
       });
-        if (!hasOpenIntakePrompt) {
+      if (!hasOpenIntakePrompt) {
         pushMessage({
           role: "assistant",
           text: buildIntakePrompt(pet.name || pet.pet_name || "your pet", textToSubmit),
+          isIntakePrompt: true,
+        });
+      } else {
+        pushMessage({
+          role: "assistant",
+          text: `Please add the missing details in one message, for example: "${textToSubmit} started today, getting worse, not eating, drinking water, no vomiting."`,
           isIntakePrompt: true,
         });
       }
