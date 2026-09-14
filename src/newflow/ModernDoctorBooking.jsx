@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, Users, Calendar, Clock, Loader2, Filter, Star, MapPin, Award, Check, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { readAiAuthState } from "../ai/AiAuth";
 import UserDetailsOtpModal from "./UserDetailsOtpModal";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
@@ -45,6 +46,19 @@ function normalizeImage(value) {
 }
 
 const DEFAULT_CLINIC_FALLBACK = "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&w=400&q=80";
+
+function resolveClinicProfileKey(doc) {
+  return String(
+    doc?.clinicSlug ||
+      doc?.clinic_slug ||
+      doc?.vet_slug ||
+      doc?.clinic?.slug ||
+      doc?.clinicId ||
+      doc?.clinic_id ||
+      doc?.vet_registeration_id ||
+      "",
+  ).trim();
+}
 
 function resolveClinicImage(clinic) {
   if (!clinic) return DEFAULT_CLINIC_FALLBACK;
@@ -155,6 +169,7 @@ function formatInitialDoctor(doc, clinic = null) {
     available: true,
     responseTimeDay: "0 To 15 Mins",
     clinicId: doc.vet_registeration_id || clinic?.id || clinic?.clinic_id || doc.clinicId,
+    clinicSlug: doc.clinicSlug || doc.clinic_slug || doc.vet_slug || clinic?.slug || "",
     clinicName: clinic?.name || doc.clinicName || "",
     clinicAddress: clinic?.address || clinic?.formatted_address || doc.clinicAddress || "",
     clinicCity: clinic?.city || doc.clinicCity || "Gurugram",
@@ -220,6 +235,8 @@ function enrichDoctorObject(doc, clinicMap = new Map()) {
     distance_km: parsedDistance,
     clinicCity: doc.clinic?.city || doc.clinic_address || clinic?.city || "",
     clinicName: doc.clinic_name || doc.clinic?.name || clinic?.name || "",
+    clinicSlug: doc.clinic_slug || doc.vet_slug || doc.clinic?.slug || clinic?.slug || "",
+    clinicId: regId,
     vet_registeration_id: regId
   };
 }
@@ -323,6 +340,7 @@ export default function ModernDoctorBooking({
   initialDoctor = null,
   initialClinic = null,
 }) {
+  const navigate = useNavigate();
   // Doctor States
   const [lastVetDoctors, setLastVetDoctors] = useState([]);
   const [hasLastVet, setHasLastVet] = useState(false);
@@ -890,6 +908,19 @@ export default function ModernDoctorBooking({
     setFlowStep("describe");
   };
 
+  const handleViewProfileClick = (doc) => {
+    const clinicKey = resolveClinicProfileKey(doc);
+    if (!clinicKey) {
+      setViewProfileDoctor(doc);
+      return;
+    }
+
+    sessionStorage.removeItem("snoutiq_modal_open");
+    sessionStorage.removeItem("snoutiq_modal_order_type");
+    navigate(`/clinics/${encodeURIComponent(clinicKey)}`);
+    onClose?.();
+  };
+
   // Handle initialClinic / initialDoctor props passed from external pages (like clinic slug pages)
   useEffect(() => {
     if (orderType === "appointment" && initialClinic) {
@@ -1131,7 +1162,7 @@ export default function ModernDoctorBooking({
 
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setViewProfileDoctor(doc)}
+              onClick={() => handleViewProfileClick(doc)}
               className="px-3 py-1 border border-blue-200 text-blue-600 hover:bg-blue-50 text-[11px] font-bold rounded-full transition-all"
             >
               View Profile
