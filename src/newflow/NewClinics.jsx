@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
@@ -77,6 +77,92 @@ const getClinicSummary = (clinic) =>
   clinic?.bio ||
   clinic?.address ||
   "";
+
+const isClinicEntryUsable = (entry) => {
+  const clinic = entry?.clinic || {};
+  return Boolean(
+    hasValue(clinic.name) ||
+      hasValue(clinic.website_title) ||
+      hasValue(clinic.clinic_profile) ||
+      hasValue(clinic.hospital_profile) ||
+      hasValue(clinic.address) ||
+      hasValue(clinic.formatted_address) ||
+      (Array.isArray(entry?.doctors) && entry.doctors.length > 0)
+  );
+};
+
+const doctorImageUrl = (doctor) =>
+  doctor?.doctor_image_blob_url ||
+  doctor?.doctor_blob_url ||
+  doctor?.doctor_image_url ||
+  doctor?.doctor_image ||
+  doctor?.image ||
+  "";
+
+const doctorToClinicFallbackEntry = (doctor, clinicKey) => {
+  if (!doctor) return null;
+
+  const doctorName = doctor.doctor_name || doctor.name || "Veterinary Doctor";
+  const clinicId =
+    doctor.vet_registeration_id ||
+    doctor.clinic_id ||
+    doctor.vet_id ||
+    (String(clinicKey || "").match(/^\d+$/) ? Number(clinicKey) : clinicKey);
+  const image = doctorImageUrl(doctor);
+  const clinicName =
+    doctor.clinic_name ||
+    doctor.clinic?.name ||
+    `${formatDoctorName(doctorName)}'s consultation profile`;
+
+  return {
+    clinic: {
+      id: clinicId,
+      slug: doctor.clinic_slug || doctor.vet_slug || String(clinicKey || clinicId || ""),
+      name: clinicName,
+      city: doctor.clinic_city || doctor.city || "",
+      address: doctor.clinic_address || doctor.address || "",
+      formatted_address:
+        doctor.clinic_formatted_address ||
+        doctor.formatted_address ||
+        doctor.clinic_address ||
+        doctor.address ||
+        "",
+      lat: doctor.clinic_lat || doctor.lat || null,
+      lng: doctor.clinic_lng || doctor.lng || null,
+      rating: doctor.google_rating || doctor.rating || null,
+      user_ratings_total:
+        doctor.google_user_ratings_total || doctor.user_ratings_total || null,
+      mobile: doctor.clinic_mobile || doctor.doctor_mobile || doctor.phone || "",
+      clinic_image_url: image || clinicFallbackImage,
+      clinic_profile:
+        doctor.bio ||
+        doctor.clinic_profile ||
+        "Verified SnoutIQ veterinarian available for online consultation.",
+      website_subtitle:
+        doctor.bio ||
+        "Book a video consultation with a verified SnoutIQ veterinarian.",
+      clinic_day_fee: doctor.doctors_price || doctor.video_day_rate || null,
+      clinic_night_fee: doctor.video_night_rate || null,
+    },
+    doctors: [
+      {
+        ...doctor,
+        id: doctor.id || doctor.doctor_id,
+        doctor_name: doctorName,
+        vet_registeration_id: clinicId,
+        doctor_mobile: doctor.doctor_mobile || doctor.phone || "",
+        doctor_image_blob_url: image,
+      },
+    ],
+    services: Array.isArray(doctor.clinic_services) ? doctor.clinic_services : [],
+    machinery: [],
+    specialized_packages: [],
+    vet_at_home_services: [],
+    clinic_availability: [],
+    video_schedules: [],
+    is_doctor_fallback: true,
+  };
+};
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -937,6 +1023,8 @@ function ClinicDirectory() {
 
 function ClinicDetail() {
   const { clinicSlug } = useParams();
+  const [searchParams] = useSearchParams();
+  const requestedDoctorId = searchParams.get("doctor_id");
   const [entry, setEntry] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1097,25 +1185,97 @@ function ClinicDetail() {
     });
   };
 
+  const loadDoctorFallbackEntry = async () => {
+    if (requestedDoctorId) {
+      const { data } = await axiosClient.get("/exported_from_excell_doctors", {
+        params: { doctor_id: requestedDoctorId },
+      });
+      const doctor = data?.data;
+      if (doctor) {
+        return doctorToClinicFallbackEntry(doctor, clinicSlug);
+      }
+    }
+
+    if (/^\d+$/.test(String(clinicSlug || ""))) {
+      try {
+        const { data } = await axiosClient.get(`/clinics/${clinicSlug}/doctors`);
+        const doctors = Array.isArray(data?.doctors) ? data.doctors : [];
+        if (doctors.length > 0) {
+          const doctor = doctors[0];
+          return doctorToClinicFallbackEntry(
+            {
+              ...doctor,
+              doctor_name: doctor.doctor_name || doctor.name,
+              vet_registeration_id: clinicSlug,
+              clinic_name: data?.clinic?.name,
+              clinic_address: data?.clinic?.address,
+            },
+            clinicSlug
+          );
+        }
+      } catch {
+        // Try the public exported doctor feed below.
+      }
+
+      const { data } = await axiosClient.get("/exported_from_excell_doctors");
+      const doctors = Array.isArray(data?.data) ? data.data : [];
+      const doctor = doctors.find(
+        (item) =>
+          String(item?.vet_registeration_id || item?.clinic_id || "") ===
+          String(clinicSlug)
+      );
+      if (doctor) {
+        return doctorToClinicFallbackEntry(doctor, clinicSlug);
+      }
+    }
+
+    return null;
+  };
+
   useEffect(() => {
     let cancelled = false;
 
     const loadClinic = async () => {
       setIsLoading(true);
       setError("");
+      setEntry(null);
 
       try {
         const { data } = await axiosClient.get(
           `/clinic-pages/${encodeURIComponent(clinicSlug)}`
         );
 
-        if (!cancelled) setEntry(data?.data || null);
-      } catch (err) {
+        const nextEntry = data?.data || null;
+        if (isClinicEntryUsable(nextEntry)) {
+          if (!cancelled) setEntry(nextEntry);
+          return;
+        }
+
+        const fallbackEntry = await loadDoctorFallbackEntry();
         if (!cancelled) {
-          setError(
-            err?.response?.data?.message ||
-              "Unable to load this clinic right now."
-          );
+          if (fallbackEntry) {
+            setEntry(fallbackEntry);
+          } else {
+            setError("Clinic profile is incomplete and no connected doctor was found.");
+          }
+        }
+      } catch (err) {
+        let fallbackEntry = null;
+        try {
+          fallbackEntry = await loadDoctorFallbackEntry();
+        } catch {
+          fallbackEntry = null;
+        }
+
+        if (!cancelled) {
+          if (fallbackEntry) {
+            setEntry(fallbackEntry);
+          } else {
+            setError(
+              err?.response?.data?.message ||
+                "Unable to load this clinic right now."
+            );
+          }
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -1126,7 +1286,7 @@ function ClinicDetail() {
     return () => {
       cancelled = true;
     };
-  }, [clinicSlug]);
+  }, [clinicSlug, requestedDoctorId]);
 
   if (isLoading) {
     return (

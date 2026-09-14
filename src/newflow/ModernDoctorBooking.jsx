@@ -60,6 +60,10 @@ function resolveClinicProfileKey(doc) {
   ).trim();
 }
 
+function resolveDoctorProfileKey(doc) {
+  return String(doc?.doctor_id || doc?.id || "").trim();
+}
+
 function resolveClinicImage(clinic) {
   if (!clinic) return DEFAULT_CLINIC_FALLBACK;
 
@@ -915,9 +919,12 @@ export default function ModernDoctorBooking({
       return;
     }
 
+    const doctorKey = resolveDoctorProfileKey(doc);
+    const query = doctorKey ? `?doctor_id=${encodeURIComponent(doctorKey)}` : "";
+
     sessionStorage.removeItem("snoutiq_modal_open");
     sessionStorage.removeItem("snoutiq_modal_order_type");
-    navigate(`/clinics/${encodeURIComponent(clinicKey)}`);
+    navigate(`/clinics/${encodeURIComponent(clinicKey)}${query}`);
     onClose?.();
   };
 
