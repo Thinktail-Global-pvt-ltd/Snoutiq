@@ -151,16 +151,14 @@ const HomeVetBookingFlow = lazy(() => import("./ai/HomeVetBookingFlow"));
 const ProtectedBookingRoute = lazy(() => import("./ai/ProtectedBookingRoute"));
 const AppointmentThankYouPage = lazy(() => import("./ai/AppointmentThankYouPage"));
 const SymptomCheckerApp = lazy(() => import("./newflow/SymptomCheckerApp"));
-const AppointmentPage = lazy(() =>
-  import("./ai/usePetOverviewCards.jsx").then((module) => ({
-    default: module.AppointmentPage,
-  }))
-);
+const AppointmentPage = lazy(() => import("./pages/MyAppointmentsPage"));
+const MyAppointmentsPage = lazy(() => import("./pages/MyAppointmentsPage"));
 const FollowupPage = lazy(() =>
   import("./ai/usePetOverviewCards.jsx").then((module) => ({
     default: module.FollowupPage,
   }))
 );
+const ModernDoctorBooking = lazy(() => import("./newflow/ModernDoctorBooking"));
 
 function ConsultationShortLinkBridge() {
   const { publicId = "" } = useParams();
@@ -195,8 +193,11 @@ export default function AppRoutes() {
         <Route path="/video-consult" element={<ProtectedBookingRoute><ConsultBookingFlow /></ProtectedBookingRoute>} />
         <Route path="/inclinic-fast-booking" element={<ProtectedBookingRoute><InClinicFastBookingFlow /></ProtectedBookingRoute>} />
         <Route path="/vet-at-home-booking" element={<ProtectedBookingRoute><HomeVetBookingFlow /></ProtectedBookingRoute>} />
+        <Route path="/doctor-booking" element={<ModernDoctorBooking />} />
         <Route path="/appointment-thank-you" element={<AppointmentThankYouPage />} />
-        <Route path="/appointment-page" element={<AppointmentPage />} />
+        <Route path="/appointment-page" element={<MyAppointmentsPage />} />
+        <Route path="/appointments" element={<MyAppointmentsPage />} />
+        <Route path="/my-appointments" element={<MyAppointmentsPage />} />
         <Route path="/followup-page" element={<FollowupPage />} />
         <Route path="/symptom-checker" element={<Navigate to="/" replace />} />
         <Route path="/about" element={<NewAbout />} />

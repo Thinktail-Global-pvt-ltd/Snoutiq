@@ -13,12 +13,11 @@ const getBaseURL = () => {
     }
   }
   
-  return 'https://app.snoutiq.com/public/api';
+  return 'https://snoutiq.com/backend/api';
 };
 
 const axiosClient = axios.create({
   baseURL: getBaseURL(),
-  withCredentials: true,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json',

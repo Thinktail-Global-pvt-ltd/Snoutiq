@@ -13,7 +13,8 @@ import {
   Trash2,
   ChevronLeft,
   Video,
-  Calendar
+  Calendar,
+  CalendarCheck
 } from "lucide-react";
 import { apiBaseUrl } from "../lib/api";
 import { readAiAuthState } from "../ai/AiAuth";
@@ -43,25 +44,19 @@ export default function SymptomCheckerSidebar({
       setAuthState(readAiAuthState());
     };
     window.addEventListener("snoutiq_pet_changed", handleAuthChange);
-    window.addEventListener("snoutiq_auth_changed", handleAuthChange);
     window.addEventListener("storage", handleAuthChange);
+    window.addEventListener("snoutiq_auth_changed", handleAuthChange);
     return () => {
       window.removeEventListener("snoutiq_pet_changed", handleAuthChange);
-      window.removeEventListener("snoutiq_auth_changed", handleAuthChange);
       window.removeEventListener("storage", handleAuthChange);
+      window.removeEventListener("snoutiq_auth_changed", handleAuthChange);
     };
   }, []);
 
   const handleOpenBookingFlow = (orderType) => {
     sessionStorage.setItem("snoutiq_modal_order_type", orderType);
     sessionStorage.setItem("snoutiq_modal_open", "1");
-    if (window.location.pathname !== "/") {
-      navigate("/");
-    } else {
-      window.dispatchEvent(
-        new CustomEvent("snoutiq_open_booking_modal", { detail: { orderType } })
-      );
-    }
+    navigate(`/doctor-booking?type=${orderType}`);
     if (setIsOpen) setIsOpen(false);
   };
 
@@ -77,10 +72,30 @@ export default function SymptomCheckerSidebar({
           icon: Calendar,
           onClick: () => handleOpenBookingFlow("appointment"),
         },
+        {
+          name: "My Appointments",
+          path: "/appointment-page",
+          icon: CalendarCheck,
+        },
         { name: "Pet Care Guides", path: "/blog", icon: BookOpen },
         { name: "About Us", path: "/about", icon: Info },
       ]
     : [
+        {
+          name: "Talk to Vet",
+          icon: Video,
+          onClick: () => handleOpenBookingFlow("video_consult"),
+        },
+        {
+          name: "Book Visit",
+          icon: Calendar,
+          onClick: () => handleOpenBookingFlow("appointment"),
+        },
+        {
+          name: "My Appointments",
+          path: "/appointment-page",
+          icon: CalendarCheck,
+        },
         { name: "Register for Vet", path: "/vets", icon: Stethoscope },
         { name: "Register for Clinics", path: "/clinics", icon: MapPin },
         { name: "Pet Care Guides", path: "/blog", icon: BookOpen },
