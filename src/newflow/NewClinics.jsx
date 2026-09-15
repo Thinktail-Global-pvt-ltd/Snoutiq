@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
@@ -554,6 +554,7 @@ function ClinicLeadForm() {
 }
 
 function ClinicDirectory() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isDay = useIsDayTime();
   const [clinics, setClinics] = useState([]);
@@ -584,11 +585,12 @@ function ClinicDirectory() {
   };
 
   const closeBookingModal = () => {
+    document.body.style.overflow = "";
     const currentParams = new URLSearchParams(window.location.search);
     currentParams.delete("step");
     currentParams.delete("type");
     currentParams.delete("orderType");
-    setSearchParams(currentParams);
+    setSearchParams(currentParams, { replace: true });
     setBookingModal({
       isOpen: false,
       orderType: "appointment",
@@ -681,6 +683,23 @@ function ClinicDirectory() {
         {/* Ambient background decoration */}
         <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-blue-200/30 blur-3xl" />
         <div className="pointer-events-none absolute right-0 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-sky-100/40 blur-3xl" />
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate("/");
+              }
+            }}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs transition-all cursor-pointer"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back</span>
+          </button>
+        </div>
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-6 lg:grid-cols-[1fr_0.42fr] lg:items-end">
@@ -980,6 +999,7 @@ function ClinicDirectory() {
 }
 
 function ClinicDetail() {
+  const navigate = useNavigate();
   const { clinicSlug } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const isDay = useIsDayTime();
@@ -1157,11 +1177,12 @@ function ClinicDetail() {
   };
 
   const closeBookingModal = () => {
+    document.body.style.overflow = "";
     const currentParams = new URLSearchParams(window.location.search);
     currentParams.delete("step");
     currentParams.delete("type");
     currentParams.delete("orderType");
-    setSearchParams(currentParams);
+    setSearchParams(currentParams, { replace: true });
     setBookingModal({
       isOpen: false,
       orderType: "appointment",
@@ -1333,12 +1354,26 @@ function ClinicDetail() {
       <div className="border-b border-slate-200/80 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
           <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-slate-500 overflow-x-auto py-0.5">
-            <Link
-              to="/clinics"
-              className="inline-flex items-center gap-1 font-medium text-slate-600 hover:text-blue-600 transition-colors shrink-0"
+            <button
+              type="button"
+              onClick={() => {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate("/clinics");
+                }
+              }}
+              className="inline-flex items-center gap-1 font-medium text-slate-600 hover:text-blue-600 transition-colors shrink-0 cursor-pointer"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>All Clinics</span>
+              <span>Back</span>
+            </button>
+            <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+            <Link
+              to="/clinics"
+              className="font-medium text-slate-600 hover:text-blue-600 transition-colors shrink-0"
+            >
+              All Clinics
             </Link>
             <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
             {clinic.city && (
@@ -1440,7 +1475,7 @@ function ClinicDetail() {
                     <button
                       type="button"
                       onClick={() => openBookingModal({ orderType: "video_consult", doctor: doctors[0] })}
-                      className="group inline-flex items-center justify-center gap-2 rounded-xl border-2 border-blue-600/25 bg-white px-4.5 py-3 text-xs sm:text-sm font-bold text-blue-700 shadow-2xs hover:bg-blue-50 hover:border-blue-600/40 active:scale-98 transition-all sm:flex-initial flex-1"
+                      className="group inline-flex items-center justify-center gap-2 rounded-xl border-2 border-blue-600/25 bg-white px-4.5 py-3 text-xs sm:text-sm font-bold text-blue-700 shadow-2xs hover:bg-blue-50 hover:border-blue-600/40 active:scale-98 transition-all sm:flex-initial flex-1 p-2"
                     >
                       <Video className="h-4 w-4 text-blue-600 transition-transform group-hover:scale-110" />
                       <span>Book Video Calling</span>
@@ -2514,6 +2549,12 @@ function ClinicDetail() {
 
 export default function NewClinics() {
   const { clinicSlug } = useParams();
+
+  // Ensure scroll is fully restored and page is scrolled to top on mount/route change
+  useEffect(() => {
+    document.body.style.overflow = "";
+    window.scrollTo(0, 0);
+  }, [clinicSlug]);
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
