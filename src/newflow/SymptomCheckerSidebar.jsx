@@ -81,21 +81,6 @@ export default function SymptomCheckerSidebar({
         { name: "About Us", path: "/about", icon: Info },
       ]
     : [
-        {
-          name: "Talk to Vet",
-          icon: Video,
-          onClick: () => handleOpenBookingFlow("video_consult"),
-        },
-        {
-          name: "Book Visit",
-          icon: Calendar,
-          onClick: () => handleOpenBookingFlow("appointment"),
-        },
-        {
-          name: "My Appointments",
-          path: "/appointment-page",
-          icon: CalendarCheck,
-        },
         { name: "Register for Vet", path: "/vets", icon: Stethoscope },
         { name: "Register for Clinics", path: "/clinics", icon: MapPin },
         { name: "Pet Care Guides", path: "/blog", icon: BookOpen },

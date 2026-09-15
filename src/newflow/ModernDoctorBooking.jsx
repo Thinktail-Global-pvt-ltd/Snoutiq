@@ -1076,24 +1076,45 @@ export default function ModernDoctorBooking({
     setShowAllClinics(prev => !prev);
   };
 
-  // Available Specialties list for Filter Modal
-  const availableSpecialties = useMemo(() => {
-    const list = [
-      "General Vet", "Dermatology", "Surgery", "Dentistry", 
-      "Ophthalmology", "Orthopedics", "Cardiology", "Neurology", 
-      "Internal Medicine", "Gastroenterology", "Vaccination", "Emergency Care"
-    ];
-    const dynamicSet = new Set(list);
-    otherDoctors.forEach(doc => {
-      if (doc.specialization) {
-        doc.specialization.split(",").forEach(s => {
-          const clean = s.trim();
-          if (clean && clean.length > 2 && clean.length < 30) dynamicSet.add(clean);
-        });
-      }
-    });
-    return Array.from(dynamicSet);
-  }, [otherDoctors]);
+  // Available Specialties strictly matching the Registration Form options (no extra fabricated fields)
+  const availableSpecialties = useMemo(() => [
+    "General Practice",
+    "Dogs",
+    "Cats",
+    "Surgery",
+    "Skin / Dermatology",
+    "Exotic Pet",
+    "Livestock",
+  ], []);
+
+  const matchesDoctorSpecialty = (docSpec, filter) => {
+    if (!filter || filter === "all") return true;
+    const target = filter.toLowerCase().trim();
+    const specText = (docSpec || "").toLowerCase();
+
+    if (target === "general practice" || target === "general vet") {
+      return specText.includes("general");
+    }
+    if (target.includes("skin") || target.includes("dermatology")) {
+      return specText.includes("skin") || specText.includes("dermatology");
+    }
+    if (target === "dogs") {
+      return specText.includes("dog");
+    }
+    if (target === "cats") {
+      return specText.includes("cat");
+    }
+    if (target === "exotic pet") {
+      return specText.includes("exotic");
+    }
+    if (target === "livestock") {
+      return specText.includes("livestock");
+    }
+    if (target === "surgery") {
+      return specText.includes("surgery") || specText.includes("surgeon");
+    }
+    return specText.includes(target);
+  };
 
   // Filter Last Vet Doctors by Search (debounced), Experience, Specialty & Price
   const filteredLastVetDoctors = useMemo(() => {
@@ -1109,7 +1130,7 @@ export default function ModernDoctorBooking({
         (doc.clinicName || "").toLowerCase().includes(q) ||
         (doc.clinic_address || "").toLowerCase().includes(q);
       const matchesExp = (doc.experience || 0) >= minYears;
-      const matchesSpecialty = selectedSpecialtyFilter === "all" || (doc.specialization || "").toLowerCase().includes(selectedSpecialtyFilter.toLowerCase());
+      const matchesSpecialty = matchesDoctorSpecialty(doc.specialization, selectedSpecialtyFilter);
       const docPrice = getDoctorCurrentPrice(doc, isDay);
       let matchesPrice = true;
       if (selectedPriceFilter === "0-500") matchesPrice = docPrice <= 500;
@@ -1138,7 +1159,7 @@ export default function ModernDoctorBooking({
         (doc.clinicName || "").toLowerCase().includes(q) ||
         (doc.clinic_address || "").toLowerCase().includes(q);
       const matchesExp = (doc.experience || 0) >= minYears;
-      const matchesSpecialty = selectedSpecialtyFilter === "all" || (doc.specialization || "").toLowerCase().includes(selectedSpecialtyFilter.toLowerCase());
+      const matchesSpecialty = matchesDoctorSpecialty(doc.specialization, selectedSpecialtyFilter);
       const docPrice = getDoctorCurrentPrice(doc, isDay);
       let matchesPrice = true;
       if (selectedPriceFilter === "0-500") matchesPrice = docPrice <= 500;
