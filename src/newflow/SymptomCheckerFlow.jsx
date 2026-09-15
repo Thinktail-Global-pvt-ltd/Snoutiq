@@ -515,6 +515,25 @@ export default function SymptomCheckerFlow({
     }
     if (!textToSubmit) return;
 
+    if (!token) {
+      if (textToSubmit) {
+        setInputValue(textToSubmit);
+      }
+      setPendingSubmit(true);
+      setShowAuthGate(true);
+      return;
+    }
+
+    if (!hasUsablePetProfile(authState)) {
+      if (textToSubmit) {
+        setInputValue(textToSubmit);
+      }
+      setPendingSubmit(true);
+      setPetFormPart(1);
+      setShowPetModal(true);
+      return;
+    }
+
     const cleanedLower = textToSubmit.toLowerCase();
     const isPureGreeting = GREETING_INPUTS.has(cleanedLower);
 
@@ -534,16 +553,6 @@ export default function SymptomCheckerFlow({
     const assessmentMessageCount = messages.filter(
       (msg) => msg.role === "user" && !GREETING_INPUTS.has(normalizeInputText(msg.text).toLowerCase()),
     ).length;
-
-    if (!token) {
-      setShowAuthGate(true);
-      return;
-    }
-    if (!hasUsablePetProfile(authState)) {
-      setPetFormPart(1);
-      setShowPetModal(true);
-      return;
-    }
 
     const healthDone = isHealthProfileDoneForPet(pet);
     // Part 2 Modal (Vaccine, Deworming, Neutering) triggers on 2nd chat message (messages.length >= 1)
@@ -778,9 +787,9 @@ export default function SymptomCheckerFlow({
 
   return (
     <>
-      <div className="flex h-full min-h-0 flex-col bg-white">
+      <div className="flex h-full min-h-0 flex-col bg-white overflow-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {messages.length === 0 && !historyLoading ? (
-          <div className="flex-1 flex flex-col items-center justify-between px-4 py-4 sm:px-6 h-[calc(100vh-3.5rem)] overflow-hidden">
+          <div className="flex-1 flex flex-col items-center justify-between px-4 py-4 sm:px-6 h-full overflow-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div className="my-auto flex flex-col items-center justify-center text-center w-full max-w-3xl">
               <h3 className="mb-2 text-[13px] font-semibold text-[#aaa89f] sm:text-sm">
                 Trusted by 300+ pet parents
@@ -947,7 +956,7 @@ export default function SymptomCheckerFlow({
               </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pb-4 sm:space-y-6">
+            <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pb-4 sm:space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {historyLoading && (
                 <div className="flex items-center justify-center py-10">
                   <div className="flex items-center gap-2 text-slate-400 text-sm">

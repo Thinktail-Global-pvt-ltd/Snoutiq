@@ -221,7 +221,7 @@ export default function SymptomCheckerSidebar({
           </div>
         )}
 
-        <div className={`flex-1 overflow-y-auto px-3 pb-3 ${!isDesktopOpen ? "lg:hidden" : ""}`}>
+        <div className={`flex-1 overflow-y-auto px-3 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${!isDesktopOpen ? "lg:hidden" : ""}`}>
           {/* History Section */}
           {userId && (
             <div>

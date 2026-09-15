@@ -176,6 +176,7 @@ export default function AppRoutes() {
   return (
     <HelmetProvider>
       <Routes>
+        <Route path="/" element={<SymptomCheckerApp />} />
         <Route path="/c/:publicId" element={<ConsultationShortLinkBridge />} />
            <Route path="/counsltflow/*" element={<NewDoctorRoute />} />
         <Route path="/doctor/*" element={<Navigate to="/counsltflow/" replace />} />
