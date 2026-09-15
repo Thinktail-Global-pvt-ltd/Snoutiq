@@ -91,7 +91,7 @@
                     <div>
                         <h2 class="h5 mb-1">Full onboarding data</h2>
                         <p class="text-muted mb-0">
-                            Clinic registrations{{ $fromDate ? ' from '.\Illuminate\Support\Carbon::parse($fromDate)->format('d M Y') : '' }} with doctors, services, packages, clinic hours, video hours, and vet-at-home settings. Queue shifts daily.
+                            Clinic registrations{{ $fromDate ? ' from '.\Illuminate\Support\Carbon::parse($fromDate)->format('d M Y') : '' }} with doctors, services, packages, clinic hours, video hours, and vet-at-home settings. Website queue pointer shifts daily.
                         </p>
                     </div>
                     <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
@@ -145,6 +145,7 @@
                                 $profileCompletion = $profileCompletionByClinic->get($clinic->id, ['percentage' => 0, 'completed_fields' => 0, 'total_fields' => 0, 'missing_fields' => []]);
                                 $profileCompletionPercent = (int) ($profileCompletion['percentage'] ?? 0);
                                 $profileCompletionBarClass = $profileCompletionPercent >= 75 ? 'bg-success' : ($profileCompletionPercent >= 40 ? 'bg-warning' : 'bg-danger');
+                                $isQueuePointer = (int) $queuePointerClinicId === (int) $clinic->id;
                             @endphp
                             <div class="accordion-item border-0 shadow-sm mb-3 rounded overflow-hidden">
                                 <h2 class="accordion-header" id="clinicHeading{{ $clinic->id }}">
@@ -153,6 +154,9 @@
                                             <span>
                                                 <span class="fw-semibold">{{ $clinic->name ?? 'Unnamed clinic' }}</span>
                                                 <span class="text-muted small ms-2">#{{ $clinic->id }}</span>
+                                                @if($isQueuePointer)
+                                                    <span class="badge text-bg-warning text-dark ms-2">Website queue starts here</span>
+                                                @endif
                                             </span>
                                             <span class="small text-muted">
                                                 {{ $clinic->city ?? '—' }} • {{ number_format($clinic->doctors->count()) }} doctors • {{ number_format($regularServices->count()) }} services • {{ number_format($machineryServices->count()) }} machinery • {{ $profileCompletionPercent }}% complete

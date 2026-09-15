@@ -5108,8 +5108,10 @@ class AdminPanelController extends Controller
             ->when($fromDate, fn ($query) => $query->where('created_at', '>=', $fromDate.' 00:00:00'))
             ->orderByDesc('created_at')
             ->get();
-        $clinics = $this->clinicQueueRotationService->rotate($clinics);
         $queueRotation = $this->clinicQueueRotationService->status($clinics->count());
+        $queuePointerClinicId = $clinics
+            ->values()
+            ->get($queueRotation['effective_offset'] ?? 0)?->id;
 
         $clinicIds = $clinics->pluck('id')->map(fn ($id) => (int) $id)->all();
         $doctorIds = $clinics
@@ -5288,7 +5290,8 @@ class AdminPanelController extends Controller
             'profileCompletionByClinic',
             'dateFilter',
             'fromDate',
-            'queueRotation'
+            'queueRotation',
+            'queuePointerClinicId'
         ));
     }
 
