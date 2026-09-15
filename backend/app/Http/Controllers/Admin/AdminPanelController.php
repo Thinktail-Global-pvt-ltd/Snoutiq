@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\View\View;
 use App\Services\CallAnalyticsService;
 use App\Services\ClinicProfileCompletionService;
+use App\Services\ClinicQueueRotationService;
 use App\Services\ConsultationBookingWhatsAppService;
 use App\Services\DoctorAvailabilityService;
 use App\Services\LeadAiMarketingPushService;
@@ -40,6 +41,7 @@ class AdminPanelController extends Controller
         private readonly CallAnalyticsService $callAnalyticsService,
         private readonly ConsultationBookingWhatsAppService $consultationBookingWhatsAppService,
         private readonly ClinicProfileCompletionService $clinicProfileCompletionService,
+        private readonly ClinicQueueRotationService $clinicQueueRotationService,
     ) {
     }
 
@@ -5106,6 +5108,8 @@ class AdminPanelController extends Controller
             ->when($fromDate, fn ($query) => $query->where('created_at', '>=', $fromDate.' 00:00:00'))
             ->orderByDesc('created_at')
             ->get();
+        $clinics = $this->clinicQueueRotationService->rotate($clinics);
+        $queueRotation = $this->clinicQueueRotationService->status($clinics->count());
 
         $clinicIds = $clinics->pluck('id')->map(fn ($id) => (int) $id)->all();
         $doctorIds = $clinics
@@ -5283,8 +5287,18 @@ class AdminPanelController extends Controller
             'transactionsByClinic',
             'profileCompletionByClinic',
             'dateFilter',
-            'fromDate'
+            'fromDate',
+            'queueRotation'
         ));
+    }
+
+    public function shiftFullOnboardingQueue(Request $request): RedirectResponse
+    {
+        $this->clinicQueueRotationService->shiftManually();
+
+        return redirect()
+            ->route('admin.full-onboarding', $request->only(['date_filter', 'from_date']))
+            ->with('status', 'Clinic queue shifted by one place.');
     }
 
     public function deleteFullOnboardingEntry(VetRegisterationTemp $clinic): RedirectResponse

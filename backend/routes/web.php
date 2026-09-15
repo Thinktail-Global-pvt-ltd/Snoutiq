@@ -324,8 +324,9 @@ Route::prefix('admin')->group(function () {
         Route::get('/doctors/excell-export', [AdminPanelController::class, 'excellExportDoctors'])->name('admin.doctors.excell-export');
         Route::post('/doctors/{doctor}/image', [AdminPanelController::class, 'updateDoctorImage'])->name('admin.doctors.image');
         Route::get('/online-doctors', [AdminPanelController::class, 'onlineDoctors'])->name('admin.online-doctors');
-    Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
+        Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
         Route::get('/full-onboarding', [AdminPanelController::class, 'fullOnboardingEntries'])->name('admin.full-onboarding');
+        Route::post('/full-onboarding/queue-shift', [AdminPanelController::class, 'shiftFullOnboardingQueue'])->name('admin.full-onboarding.queue.shift');
         Route::post('/full-onboarding/{clinic}/media', [AdminPanelController::class, 'updateFullOnboardingClinicMedia'])->name('admin.full-onboarding.media.update');
         Route::delete('/full-onboarding/{clinic}/media/{field}', [AdminPanelController::class, 'deleteFullOnboardingClinicMedia'])->name('admin.full-onboarding.media.delete');
         Route::delete('/full-onboarding/{clinic}', [AdminPanelController::class, 'deleteFullOnboardingEntry'])->name('admin.full-onboarding.delete');

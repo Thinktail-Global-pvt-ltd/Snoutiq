@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 // use App
+use App\Services\ClinicQueueRotationService;
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AiSearchController;
 use App\Http\Controllers\Api\RawGeminiController;
@@ -1037,12 +1038,15 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
         $summary = $summary->sortBy(function ($item) {
             return $item['distance_km'] === null ? INF : $item['distance_km'];
         })->values();
+    } else {
+        $summary = app(ClinicQueueRotationService::class)->rotate($summary);
     }
 
     return response()->json([
         'success' => true,
         'from_date' => $fromDate,
         'count' => $summary->count(),
+        'queue_rotation' => app(ClinicQueueRotationService::class)->status($summary->count()),
         'data' => $summary,
     ]);
 });
@@ -1399,6 +1403,26 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
         $formatted = $formatted->sortBy(function ($item) {
             return $item['distance_km'] === null ? INF : $item['distance_km'];
         });
+    } else {
+        $clinicQueue = app(ClinicQueueRotationService::class);
+        $orderedClinicIds = VetRegisterationTemp::query()
+            ->whereIn('id', $clinicIds)
+            ->orderByDesc('created_at')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $queueRankByClinic = $clinicQueue
+            ->rotate($orderedClinicIds)
+            ->values()
+            ->flip();
+
+        $formatted = $formatted->sortBy(function ($item) use ($queueRankByClinic) {
+            $clinicId = (int) ($item['vet_registeration_id'] ?? 0);
+            $clinicRank = (int) $queueRankByClinic->get($clinicId, PHP_INT_MAX);
+            $doctorId = (int) ($item['id'] ?? 0);
+
+            return ($clinicRank * 1000000) + $doctorId;
+        });
     }
 
     $formatted = $formatted->values();
@@ -1412,6 +1436,7 @@ Route::get('/exported_from_excell_doctors', function (Request $request) {
 
     return response()->json([
         'success' => true,
+        'queue_rotation' => app(ClinicQueueRotationService::class)->status($formatted->count()),
         'data' => $formatted,
     ]);
 })->name('exported_from_excell_doctors');
@@ -4590,4 +4615,3 @@ Route::middleware([\App\Http\Middleware\FounderRequestLogger::class])->prefix('f
 // Admin Database Purge Route (users, vet_registerations_temp, pets, doctors)
 Route::match(['get', 'post'], '/admin/database/clear-data', [\App\Http\Controllers\Api\AdminDataPurgeController::class, 'clearData'])
     ->name('api.admin.database.clear-data');
-

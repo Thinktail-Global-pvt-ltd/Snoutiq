@@ -131,6 +131,16 @@ class AppointmentSubmissionController extends Controller
             ], 422);
         }
 
+        $submittedPhone = $this->normalizePhone($validated['patient_phone'] ?? null);
+        if (
+            $submittedPhone
+            && empty($user->phone)
+            && Schema::hasColumn('users', 'phone')
+        ) {
+            $user->phone = $submittedPhone;
+            $user->save();
+        }
+
         // ---------------------------------------------------------------
         // If no date (and therefore no time_slot) was provided, skip
         // creating an appointment row and return only the user record.
@@ -264,6 +274,7 @@ class AppointmentSubmissionController extends Controller
             }
         }
 
+        $whatsAppResult = null;
         if (empty($validated['razorpay_payment_id'])) {
             try {
                 $paymentController = app(\App\Http\Controllers\PaymentController::class);
@@ -274,6 +285,7 @@ class AppointmentSubmissionController extends Controller
                     'pet_id' => $validated['pet_id'] ?? null,
                     'appointment_id' => $appointment->id,
                     'call_identifier' => null,
+                    'patient_phone' => $validated['patient_phone'] ?? ($appointment->mobile ?? null),
                 ];
                 $notes = [
                     'order_type' => 'appointments',
@@ -281,13 +293,25 @@ class AppointmentSubmissionController extends Controller
                 ];
                 $amountInInr = (int) ($validated['amount'] ?? 0);
 
-                $paymentController->sendAppointmentWhatsAppNotifications($context, $notes, $amountInInr);
+                $whatsAppResult = $paymentController->sendAppointmentWhatsAppNotifications($context, $notes, $amountInInr);
             } catch (\Throwable $e) {
                 report($e);
+                $whatsAppResult = [
+                    'whatsapp' => ['sent' => false, 'reason' => $e->getMessage()],
+                    'vet_whatsapp' => ['sent' => false, 'reason' => $e->getMessage()],
+                ];
             }
         }
 
-        return $this->respondWithAppointment($appointment->fresh(), 201);
+        $response = $this->respondWithAppointment($appointment->fresh(), 201);
+        if ($whatsAppResult !== null) {
+            $responseData = $response->getData(true);
+            $responseData['whatsapp'] = $whatsAppResult['whatsapp'] ?? null;
+            $responseData['vet_whatsapp'] = $whatsAppResult['vet_whatsapp'] ?? null;
+            $response->setData($responseData);
+        }
+
+        return $response;
     }
 
     public function edit(Appointment $appointment): JsonResponse

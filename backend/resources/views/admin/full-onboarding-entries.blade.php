@@ -91,7 +91,7 @@
                     <div>
                         <h2 class="h5 mb-1">Full onboarding data</h2>
                         <p class="text-muted mb-0">
-                            Clinic registrations{{ $fromDate ? ' from '.\Illuminate\Support\Carbon::parse($fromDate)->format('d M Y') : '' }} with doctors, services, packages, clinic hours, video hours, and vet-at-home settings. Recent clinics appear first.
+                            Clinic registrations{{ $fromDate ? ' from '.\Illuminate\Support\Carbon::parse($fromDate)->format('d M Y') : '' }} with doctors, services, packages, clinic hours, video hours, and vet-at-home settings. Queue shifts daily.
                         </p>
                     </div>
                     <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
@@ -103,7 +103,18 @@
                             <input type="date" name="from_date" value="{{ $fromDate ?? '2026-05-10' }}" class="form-control form-control-sm" @disabled($dateFilter === 'all')>
                             <button type="submit" class="btn btn-sm btn-dark">Filter</button>
                         </form>
+                        <form method="POST" action="{{ route('admin.full-onboarding.queue.shift') }}" class="d-flex">
+                            @csrf
+                            <input type="hidden" name="date_filter" value="{{ $dateFilter }}">
+                            <input type="hidden" name="from_date" value="{{ $fromDate ?? '2026-05-10' }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                Shift queue
+                            </button>
+                        </form>
                         <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">{{ number_format($clinics->count()) }} clinics</span>
+                        <span class="badge text-bg-light text-secondary border px-3 py-2">
+                            Queue #{{ ($queueRotation['effective_offset'] ?? 0) + 1 }}
+                        </span>
                     </div>
                 </div>
 
@@ -744,4 +755,3 @@ function set24Hours(btn) {
 }
 </script>
 @endpush
-

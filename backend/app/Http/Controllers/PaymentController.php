@@ -2290,12 +2290,15 @@ class PaymentController extends Controller
 
         try {
             $user = $context['user_id'] ? User::find($context['user_id']) : null;
-            if (! $user || empty($user->phone)) {
+            if (! $user) {
                 return [
                     'whatsapp' => null,
                     'vet_whatsapp' => null,
                 ];
             }
+
+            $parentPhone = $this->normalizePhone($user->phone)
+                ?: $this->normalizePhone($context['patient_phone'] ?? null);
 
             $doctorId = $context['doctor_id'] ?? null;
             $doctor = $doctorId ? Doctor::find($doctorId) : null;
@@ -2326,7 +2329,6 @@ class PaymentController extends Controller
             $responseTime = (string) ($notes['response_time_minutes'] ?? 15);
 
             // Send to Parent: cf_payment_confirmed_parent
-            $parentPhone = $this->normalizePhone($user->phone);
             $templateParent = config('services.whatsapp.templates.cf_payment_confirmed_parent', 'cf_payment_confirmed_parent');
             $languageParent = config('services.whatsapp.templates.cf_payment_confirmed_parent_language', 'en');
 
@@ -2342,13 +2344,23 @@ class PaymentController extends Controller
                 ],
             ];
 
-            $this->whatsApp->sendTemplate(
-                $parentPhone,
-                $templateParent,
-                $componentsParent,
-                $languageParent,
-                'cf_payment_confirmed_parent_alert'
-            );
+            $parentWhatsAppResponse = null;
+            if ($parentPhone) {
+                $this->whatsApp->sendTemplate(
+                    $parentPhone,
+                    $templateParent,
+                    $componentsParent,
+                    $languageParent,
+                    'cf_payment_confirmed_parent_alert'
+                );
+
+                $parentWhatsAppResponse = [
+                    'sent' => true,
+                    'to' => $parentPhone,
+                    'template' => $templateParent,
+                    'language' => $languageParent,
+                ];
+            }
 
             // Send to Vet (Doctor/Clinic): cf_payment_confirmed_vet
             $vetPhone = null;
@@ -2371,7 +2383,7 @@ class PaymentController extends Controller
                         'parameters' => [
                             ['type' => 'text', 'text' => $amount],
                             ['type' => 'text', 'text' => $user->name ?: 'Pet Parent'],
-                            ['type' => 'text', 'text' => $this->normalizePhone($user->phone) ?: ''],
+                            ['type' => 'text', 'text' => $parentPhone ?: ''],
                         ],
                     ],
                 ];
@@ -2393,11 +2405,9 @@ class PaymentController extends Controller
             }
 
             return [
-                'whatsapp' => [
-                    'sent' => true,
-                    'to' => $user->phone,
-                    'template' => $templateParent,
-                    'language' => $languageParent,
+                'whatsapp' => $parentWhatsAppResponse ?: [
+                    'sent' => false,
+                    'reason' => 'user_phone_missing',
                 ],
                 'vet_whatsapp' => $vetWhatsAppResponse,
             ];

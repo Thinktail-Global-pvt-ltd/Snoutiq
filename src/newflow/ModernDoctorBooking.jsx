@@ -824,13 +824,14 @@ export default function ModernDoctorBooking({
   // Filter Last Vet Doctors by Search & Experience
   const filteredLastVetDoctors = useMemo(() => {
     const minYears = parseInt(selectedExpFilter) || 0;
-    return lastVetDoctors.filter(doc => {
+    const filtered = lastVetDoctors.filter(doc => {
       const matchesSearch = (doc.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (doc.specialization || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (doc.clinicCity || "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesExp = (doc.experience || 0) >= minYears;
       return matchesSearch && matchesExp;
     });
+    return filtered;
   }, [lastVetDoctors, searchQuery, selectedExpFilter]);
 
   // Filter Other Doctors by Search & Experience, EXCLUDING duplicates from lastVetDoctors
@@ -840,22 +841,24 @@ export default function ModernDoctorBooking({
       doc => !lastVetDoctors.some(lv => String(lv.doctor_id || lv.id) === String(doc.id || doc.doctor_id))
     );
 
-    return deduplicated.filter(doc => {
+    const filtered = deduplicated.filter(doc => {
       const matchesSearch = (doc.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (doc.specialization || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (doc.clinicCity || "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesExp = (doc.experience || 0) >= minYears;
       return matchesSearch && matchesExp;
     });
+    return filtered;
   }, [otherDoctors, lastVetDoctors, searchQuery, selectedExpFilter]);
 
   // Filter Last Vet Clinics by Search
   const filteredLastVetClinics = useMemo(() => {
-    return lastVetClinics.filter(c => 
+    const filtered = lastVetClinics.filter(c => 
       (c.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
       (c.city || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.address || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
+    return filtered;
   }, [lastVetClinics, searchQuery]);
 
   // Filter Other Clinics by Search, EXCLUDING duplicates from lastVetClinics
@@ -864,11 +867,12 @@ export default function ModernDoctorBooking({
       c => !lastVetClinics.some(lc => String(lc.id || lc.clinic_id) === String(c.id || c.clinic_id))
     );
 
-    return deduplicated.filter(c => 
+    const filtered = deduplicated.filter(c => 
       (c.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
       (c.city || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.address || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
+    return filtered;
   }, [otherClinics, lastVetClinics, searchQuery]);
 
 
