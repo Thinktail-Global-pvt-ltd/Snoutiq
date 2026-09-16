@@ -3,7 +3,7 @@ import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, 
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { readAiAuthState } from "../ai/AiAuth";
 import { confirmPaymentStart } from "../ai/booking/bookingAlerts";
-import UserDetailsOtpModal from "./UserDetailsOtpModal";
+import PhoneVerifyGate from "../ai/PhoneVerifyGate";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 import clinicDefaultImg from "../assets/images/clinic.png";
 import { extractPackageItems } from "./packageHelpers";
@@ -23,6 +23,10 @@ function loadRazorpayScript() {
     script.onerror = () => resolve(false);
     document.body.appendChild(script);
   });
+}
+
+function normalizePhone(v) {
+  return String(v || "").replace(/\D/g, "").slice(-10);
 }
 
 function formatCurrency(amount) {
@@ -668,12 +672,48 @@ export default function ModernDoctorBooking({
   const [success, setSuccess] = useState(false);
   const [bookingSuccessData, setBookingSuccessData] = useState(null);
 
-  const authState = useMemo(() => readAiAuthState(), []);
+  const [authState, setAuthState] = useState(() => readAiAuthState());
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setAuthState(readAiAuthState());
+    };
+    window.addEventListener("snoutiq_auth_changed", handleAuthChange);
+    window.addEventListener("snoutiq_pet_changed", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      window.removeEventListener("snoutiq_auth_changed", handleAuthChange);
+      window.removeEventListener("snoutiq_pet_changed", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
+
   const token = authState?.token;
   const user = authState?.user || {};
   const userId = user.id || user.user_id || authState?.user_id || authState?.userId || 1179;
 
-  let rawPet = preSelectedPet || (user.pets && user.pets[0]) || authState?.pet || {};
+  const [selectedPetId, setSelectedPetId] = useState(null);
+
+  const availablePets = useMemo(() => {
+    const list = Array.isArray(user.pets) && user.pets.length > 0
+      ? user.pets
+      : (user.pet ? [user.pet] : []);
+    const map = new Map();
+    list.forEach((p) => {
+      if (!p) return;
+      const key = p.id || p.pet_id || p.name || p.pet_name;
+      if (key && !map.has(key)) map.set(key, p);
+    });
+    return Array.from(map.values());
+  }, [user.pets, user.pet]);
+
+  let rawPet = (selectedPetId && availablePets.find(p => String(p.id || p.pet_id) === String(selectedPetId)))
+    || preSelectedPet
+    || availablePets[0]
+    || user.pet
+    || authState?.pet
+    || {};
+
   if (!rawPet || Object.keys(rawPet).length === 0) {
     try {
       const storedPet = localStorage.getItem("selected_pet_data") || localStorage.getItem("current_pet");
@@ -682,8 +722,13 @@ export default function ModernDoctorBooking({
   }
   const pet = rawPet;
 
+  const [showPhoneGate, setShowPhoneGate] = useState(false);
+  const [verifiedPhone, setVerifiedPhone] = useState(null);
+
   const displayUserName = user.name || user.owner_name || user.first_name || user.user_name || user.full_name || localStorage.getItem("user_name") || "Pet Parent";
-  const displayUserMobile = user.mobile || user.phone || user.phone_number || user.user_mobile || user.contact || localStorage.getItem("user_mobile") || "N/A";
+  const rawMobile = user.mobile || user.phone || user.phone_number || user.user_mobile || user.contact || localStorage.getItem("user_mobile") || "";
+  const displayUserMobile = rawMobile ? normalizePhone(rawMobile) : "N/A";
+  const effectiveUserMobile = (verifiedPhone && normalizePhone(verifiedPhone)) || (displayUserMobile !== "N/A" ? normalizePhone(displayUserMobile) : null);
   
   const displayPetName = pet.name || pet.pet_name || pet.title || localStorage.getItem("pet_name") || "Pet";
   const displayPetBreed = pet.breed || pet.pet_breed || pet.species || pet.pet_species || pet.pet_type || pet.type || pet.category || localStorage.getItem("pet_breed") || "Dog/Cat";
@@ -1466,9 +1511,15 @@ export default function ModernDoctorBooking({
     }
   };
 
-  const handlePayment = async (chosenMethod = null) => {
+  const handlePayment = async (chosenMethod = null, phoneOverride = null) => {
     const methodToUse = chosenMethod || paymentPreference || (currentOrderType === "appointment" ? "pay_at_clinic" : "pay_online");
     setPaymentPreference(methodToUse);
+
+    const phoneToUse = (phoneOverride && normalizePhone(phoneOverride)) || effectiveUserMobile;
+    if (!phoneToUse) {
+      setShowPhoneGate(true);
+      return;
+    }
 
     const userId = user.id || user.user_id || authState?.user_id || authState?.userId || 1179;
     const petId = pet?.id || pet?.pet_id || 0;
@@ -1495,7 +1546,7 @@ export default function ModernDoctorBooking({
       doctor_id: docIdToUse,
       pet_id: petId ? Number(petId) : undefined,
       patient_name: displayUserName,
-      patient_phone: displayUserMobile !== "N/A" ? displayUserMobile : "",
+      patient_phone: phoneToUse || "",
       patient_email: user.email || user.user_email || "",
       pet_name: displayPetName,
       appointment_type: "in_clinic",
@@ -1617,7 +1668,7 @@ export default function ModernDoctorBooking({
       const isLoaded = await loadRazorpayScript();
       if (!isLoaded) throw new Error("Could not load payment gateway.");
 
-      const paymentResult = await new Promise((resolve) => {
+      const paymentResult = await new Promise((resolve, reject) => {
         const rzp = new window.Razorpay({
           key: razorpayKey,
           amount: liveTotal * 100,
@@ -1625,9 +1676,17 @@ export default function ModernDoctorBooking({
           name: "SnoutIQ",
           description: `${selectedPackage ? selectedPackage.title : (currentOrderType === "appointment" ? "Clinic Visit" : "Video Consult")} with ${selectedDoctor?.name || selectedClinic?.name || "Doctor"}`,
           order_id: orderId,
-          prefill: { name: user.name || user.owner_name, contact: user.mobile || user.phone },
+          prefill: { name: user.name || user.owner_name, contact: phoneToUse || user.mobile || user.phone },
           theme: { color: "#309BD8" },
+          modal: {
+            ondismiss: () => {
+              reject(new Error("Payment cancelled by user"));
+            },
+          },
           handler: (response) => resolve(response),
+        });
+        rzp.on("payment.failed", (response) => {
+          reject(new Error(response?.error?.description || "Payment failed"));
         });
         rzp.open();
       });
@@ -1680,7 +1739,12 @@ export default function ModernDoctorBooking({
       setSuccess(true);
     } catch (err) {
       console.error("Payment error", err);
-      setError(err.message || "Payment failed");
+      const isCancelled = err?.message?.toLowerCase().includes("cancelled") || err?.message?.toLowerCase().includes("dismiss");
+      if (!isCancelled) {
+        setError(err.message || "Payment failed");
+      } else {
+        setError("");
+      }
     } finally {
       setProcessing(false);
     }
@@ -2689,18 +2753,39 @@ export default function ModernDoctorBooking({
                   <p className="font-extrabold text-[#081037] text-xs truncate">{displayUserName}</p>
                   <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
                     <Phone size={10} className="text-slate-400 shrink-0" />
-                    <span>{displayUserMobile}</span>
+                    <span>{effectiveUserMobile || displayUserMobile}</span>
                   </p>
                 </div>
 
                 {/* Pet Info */}
                 <div className="bg-slate-50/70 p-2 rounded-lg border border-slate-100">
-                  <p className="text-[9px] uppercase font-bold text-slate-400">Pet</p>
-                  <p className="font-extrabold text-[#081037] text-xs truncate flex items-center gap-1">
-                    <HeartHandshake size={11} className="text-[#309BD8] shrink-0" />
-                    <span>{displayPetName}</span>
-                  </p>
-                  <p className="text-[10px] text-slate-500 truncate">{displayPetBreed}</p>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <p className="text-[9px] uppercase font-bold text-slate-400">Pet</p>
+                    {availablePets.length > 1 && (
+                      <span className="text-[9px] font-bold text-[#309BD8] bg-blue-50 px-1.5 py-0.2 rounded">
+                        {availablePets.length} Pets
+                      </span>
+                    )}
+                  </div>
+                  {availablePets.length > 1 ? (
+                    <select
+                      value={String(pet?.id || pet?.pet_id || "")}
+                      onChange={(e) => setSelectedPetId(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-[#081037] outline-none focus:border-[#309BD8]"
+                    >
+                      {availablePets.map((p) => (
+                        <option key={p.id || p.pet_id} value={String(p.id || p.pet_id)}>
+                          {p.name || p.pet_name} ({p.breed || p.pet_type || "Pet"})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="font-extrabold text-[#081037] text-xs truncate flex items-center gap-1">
+                      <HeartHandshake size={11} className="text-[#309BD8] shrink-0" />
+                      <span>{displayPetName}</span>
+                    </p>
+                  )}
+                  <p className="text-[10px] text-slate-500 truncate mt-0.5">{displayPetBreed}</p>
                 </div>
 
                 {/* Schedule / Consult Mode Info */}
@@ -3391,6 +3476,20 @@ export default function ModernDoctorBooking({
 
           </div>
         </div>
+      )}
+
+      {showPhoneGate && (
+        <PhoneVerifyGate
+          onVerified={(newPhone) => {
+            const clean = normalizePhone(newPhone);
+            setVerifiedPhone(clean);
+            setShowPhoneGate(false);
+            setTimeout(() => {
+              handlePayment(paymentPreference, clean);
+            }, 50);
+          }}
+          onClose={() => setShowPhoneGate(false)}
+        />
       )}
 
     </div>

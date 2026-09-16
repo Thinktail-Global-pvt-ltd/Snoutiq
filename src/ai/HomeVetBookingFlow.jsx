@@ -15,6 +15,7 @@ import {
   HeartHandshake,
 } from "lucide-react";
 import { readAiAuthState } from "./AiAuth";
+import PhoneVerifyGate from "./PhoneVerifyGate";
 import { confirmPaymentStart, showBookingError, showBookingWarning } from "./booking/bookingAlerts";
 import { fetchPetOverview } from "./petOverviewService";
 
@@ -134,7 +135,22 @@ export default function HomeVetBookingFlow({
       : location?.state && typeof location.state === "object"
         ? location.state
         : {};
-  const authState = useMemo(() => readAiAuthState(), []);
+  const [authState, setAuthState] = useState(() => readAiAuthState());
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setAuthState(readAiAuthState());
+    };
+    window.addEventListener("snoutiq_auth_changed", handleAuthChange);
+    window.addEventListener("snoutiq_pet_changed", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      window.removeEventListener("snoutiq_auth_changed", handleAuthChange);
+      window.removeEventListener("snoutiq_pet_changed", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
+
   const authUser = authState?.user && typeof authState.user === "object" ? authState.user : {};
   const paymentInFlightRef = useRef(false);
 
@@ -165,8 +181,24 @@ export default function HomeVetBookingFlow({
     notes: symptomText,
     consentGiven: false,
   });
+
+  useEffect(() => {
+    if (!authUser || Object.keys(authUser).length === 0) return;
+    setForm((current) => ({
+      ...current,
+      ownerName: current.ownerName || normalizeText(pickFirst(authUser.pet_owner_name, authUser.owner_name, authUser.name)),
+      phone: current.phone || normalizePhone(pickFirst(authUser.phone, authUser.mobile, authUser.mobileNumber)),
+      email: current.email || normalizeText(pickFirst(authUser.email)),
+      address: current.address || normalizeText(pickFirst(authUser.address, authUser.location)),
+      city: current.city || normalizeText(pickFirst(authUser.city)),
+      pincode: current.pincode || normalizeText(pickFirst(authUser.pincode)),
+      petName: current.petName || normalizeText(pickFirst(authUser.pet_name, authUser.pet?.name, authUser.pet?.pet_name)),
+      petType: current.petType || normalizeText(pickFirst(authUser.pet_type, authUser.pet?.pet_type)) || "dog",
+    }));
+  }, [authUser]);
   const [locationLoading, setLocationLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [showPhoneGate, setShowPhoneGate] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [successState, setSuccessState] = useState(null);
@@ -297,8 +329,13 @@ export default function HomeVetBookingFlow({
     });
   }
 
-  async function handlePayNow() {
+  async function handlePayNow(phoneOverride = null) {
     if (paymentInFlightRef.current) return;
+    const effectivePhone = (phoneOverride && normalizePhone(phoneOverride)) || normalizePhone(form.phone) || normalizePhone(authUser.phone) || normalizePhone(authUser.mobile);
+    if (!effectivePhone) {
+      setShowPhoneGate(true);
+      return;
+    }
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -343,7 +380,7 @@ export default function HomeVetBookingFlow({
         user_id: resolvedUserId,
         pet_id: effectivePetId,
         parent_name: form.ownerName,
-        phone: normalizePhone(form.phone),
+        phone: effectivePhone,
         email: form.email,
         pet_name: form.petName,
         pet_type: form.petType,
@@ -462,8 +499,13 @@ export default function HomeVetBookingFlow({
         void showBookingWarning(message);
       } else {
         const message = paymentError?.message || "Payment failed. Please try again.";
-        setError(message);
-        void showBookingError(message);
+        const isCancelled = message.toLowerCase().includes("cancelled") || message.toLowerCase().includes("dismiss");
+        if (!isCancelled) {
+          setError(message);
+          void showBookingError(message);
+        } else {
+          setError("");
+        }
       }
     } finally {
       paymentInFlightRef.current = false;
@@ -730,6 +772,32 @@ export default function HomeVetBookingFlow({
           </div>
         </div>
       </div>
+
+      {showPhoneGate && (
+        <PhoneVerifyGate
+          onVerified={(verifiedPhone, nextState, petsList) => {
+            const cleanPhone = normalizePhone(verifiedPhone);
+            setShowPhoneGate(false);
+            const userObj = nextState?.user || {};
+            const firstPet = (petsList && petsList[0]) || userObj.pet || (userObj.pets && userObj.pets[0]);
+            setForm((prev) => ({
+              ...prev,
+              phone: cleanPhone,
+              ownerName: prev.ownerName || normalizeText(userObj.name || userObj.owner_name),
+              email: prev.email || normalizeText(userObj.email),
+              address: prev.address || normalizeText(userObj.address || userObj.location),
+              city: prev.city || normalizeText(userObj.city),
+              pincode: prev.pincode || normalizeText(userObj.pincode),
+              petName: prev.petName || (firstPet ? normalizeText(firstPet.name || firstPet.pet_name) : prev.petName),
+              petType: prev.petType || (firstPet ? normalizeText(firstPet.pet_type || firstPet.species) : prev.petType) || "dog",
+            }));
+            setTimeout(() => {
+              handlePayNow(cleanPhone);
+            }, 50);
+          }}
+          onClose={() => setShowPhoneGate(false)}
+        />
+      )}
     </div>
   );
 }

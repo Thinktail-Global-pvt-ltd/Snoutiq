@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { MapPin, Check, AlertCircle, Loader2 } from "lucide-react";
 import {
   clearAiPetFormDraft,
   readAiAuthState,
@@ -812,26 +813,20 @@ useEffect(() => {
   const authState = readAiAuthState();
   const storedCoordinates = getStoredCoordinates(authState?.user || {});
 
-  if (storedCoordinates.latitude == null || storedCoordinates.longitude == null) {
-    return;
-  }
-
-  setForm((prev) => {
-    if (prev.latitude != null && prev.longitude != null) {
-      return prev;
-    }
-
-    return {
+  if (storedCoordinates.latitude != null && storedCoordinates.longitude != null) {
+    setForm((prev) => ({
       ...prev,
-      latitude: storedCoordinates.latitude,
-      longitude: storedCoordinates.longitude,
-    };
-  });
-
-  setLocationStatus("ready");
-  setLocationError("");
-  setLocationSuccessMessage("Location already selected from your saved device location.");
-  setLocationUpdatedAt(new Date());
+      latitude: prev.latitude ?? storedCoordinates.latitude,
+      longitude: prev.longitude ?? storedCoordinates.longitude,
+    }));
+    setLocationStatus("ready");
+    setLocationError("");
+    setLocationSuccessMessage("Location selected successfully from device.");
+    setLocationUpdatedAt(new Date());
+  } else {
+    // Auto-request location access immediately on form mount
+    captureCurrentLocation();
+  }
 }, []);
 
   useEffect(() => {
@@ -977,6 +972,22 @@ useEffect(() => {
 
       if (!normalizeDateValue(form.pet_dob)) {
         setError("Please select your pet's date of birth.");
+        return;
+      }
+
+      const storedCoordinates = getStoredCoordinates(currentUser);
+      const effectiveLat =
+        toNullableNumber(form.latitude) ??
+        storedCoordinates.latitude ??
+        toNullableNumber(localStorage.getItem("userLatitude"));
+      const effectiveLng =
+        toNullableNumber(form.longitude) ??
+        storedCoordinates.longitude ??
+        toNullableNumber(localStorage.getItem("userLongitude"));
+
+      if (effectiveLat == null || effectiveLng == null) {
+        setError("Location is required to find nearby veterinary services. Please allow location access.");
+        captureCurrentLocation();
         return;
       }
     }
@@ -1203,31 +1214,73 @@ if (typeof onComplete === "function") {
               </div>
             </div>
 
-            <div style={styles.locationCard}>
+            <div style={{
+              ...styles.locationCard,
+              border: locationStatus === "error" ? "1px solid #fecaca" : locationStatus === "ready" ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
+              background: locationStatus === "error" ? "#fff5f5" : locationStatus === "ready" ? "#f0fdf4" : "#f8fafc",
+            }}>
               <div style={styles.locationCardHeader}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "12px" }}>📍</span>
-                  <span style={styles.locationTitle}>
-                    {locationStatus === "ready" ? "Location saved" : "Current location"}
-                  </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "8px",
+                    background: locationStatus === "error" ? "#fee2e2" : locationStatus === "ready" ? "#dcfce7" : "#e0f2fe",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0
+                  }}>
+                    <MapPin size={14} color={locationStatus === "error" ? "#ef4444" : locationStatus === "ready" ? "#16a34a" : "#2563eb"} />
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span style={styles.locationTitle}>Device Location</span>
+                      <span style={{ fontSize: "10px", fontWeight: "700", color: locationStatus === "ready" ? "#16a34a" : "#ef4444" }}>
+                        {locationStatus === "ready" ? "(Verified)" : "* (Required)"}
+                      </span>
+                    </div>
+                    <p style={{ margin: "1px 0 0", fontSize: "10px", color: "#64748b" }}>
+                      Needed to recommend nearest clinics & vets
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
-                  style={styles.locationButton}
+                  style={{
+                    ...styles.locationButton,
+                    background: locationStatus === "error" ? "#ef4444" : "#ffffff",
+                    color: locationStatus === "error" ? "#ffffff" : "#2563eb",
+                    borderColor: locationStatus === "error" ? "#ef4444" : "#cbd5e1",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "5px 10px",
+                    fontSize: "11px",
+                  }}
                   onClick={captureCurrentLocation}
                   disabled={locationStatus === "loading"}
                 >
-                  {locationStatus === "loading"
-                    ? "Checking..."
-                    : locationStatus === "ready"
-                      ? "Update"
-                      : "Detect location"}
+                  {locationStatus === "loading" ? (
+                    <>
+                      <Loader2 size={11} className="animate-spin" />
+                      <span>Detecting...</span>
+                    </>
+                  ) : locationStatus === "ready" ? (
+                    <>
+                      <Check size={11} color="#16a34a" />
+                      <span>Update</span>
+                    </>
+                  ) : (
+                    <span>Allow Location</span>
+                  )}
                 </button>
               </div>
 
               {locationError ? (
-                <div style={{ ...styles.helperText, ...styles.helperTextError, marginTop: "4px" }}>
-                  {locationError}
+                <div style={{ ...styles.helperText, ...styles.helperTextError, marginTop: "6px", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <AlertCircle size={12} color="#ef4444" style={{ flexShrink: 0 }} />
+                  <span>{locationError}</span>
                 </div>
               ) : null}
             </div>
