@@ -361,7 +361,7 @@ function isSlotAfterCurrentTime(slotTimeStr, selectedDateStr) {
   const match = String(slotTimeStr).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
   if (!match) return true;
 
-  let hours = parseInt(match, 10);
+  let hours = parseInt(match[1], 10);
   const mins = parseInt(match[2], 10);
   const ampm = match[3] ? match[3].toUpperCase() : null;
 
@@ -370,6 +370,11 @@ function isSlotAfterCurrentTime(slotTimeStr, selectedDateStr) {
 
   const slotMinutes = hours * 60 + mins;
   return slotMinutes > currentMinutes;
+}
+
+function isValidGstNumber(gst) {
+  if (!gst) return false;
+  return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i.test(String(gst).trim());
 }
 
 function getUpcomingDates(count = 7) {
@@ -671,6 +676,7 @@ export default function ModernDoctorBooking({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [bookingSuccessData, setBookingSuccessData] = useState(null);
+  const paymentSettledRef = useRef(false);
 
   const [authState, setAuthState] = useState(() => readAiAuthState());
 
@@ -688,9 +694,25 @@ export default function ModernDoctorBooking({
     };
   }, []);
 
+  // Unlock slot if tab/window is closed
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (lockId) {
+        const payload = JSON.stringify({ lock_id: lockId });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(`${API_BASE}/doctors/slots/unlock`, new Blob([payload], { type: "application/json" }));
+        }
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [lockId]);
+
   const token = authState?.token;
   const user = authState?.user || {};
-  const userId = user.id || user.user_id || authState?.user_id || authState?.userId || 1179;
+  const userId = user.id || user.user_id || authState?.user_id || authState?.userId || null;
 
   const [selectedPetId, setSelectedPetId] = useState(null);
 
@@ -1476,7 +1498,7 @@ export default function ModernDoctorBooking({
     const docIdToUse = resolvedDoctorId || selectedDoctor?.id;
     if (currentOrderType === "appointment" && (!selectedDate || !selectedTimeSlot || !docIdToUse)) return;
 
-    // Talk to Vet requires at least 1 photo attachment and disclaimer acceptance
+    // Talk to Vet requires at least 1 photo + disclaimer acceptance
     if (currentOrderType !== "appointment") {
       if (attachedImages.length === 0) {
         setError("At least one image is required to continue.");
@@ -1512,6 +1534,11 @@ export default function ModernDoctorBooking({
   };
 
   const handlePayment = async (chosenMethod = null, phoneOverride = null) => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setError("No internet connection detected. Please check your network and try again.");
+      return;
+    }
+
     const methodToUse = chosenMethod || paymentPreference || (currentOrderType === "appointment" ? "pay_at_clinic" : "pay_online");
     setPaymentPreference(methodToUse);
 
@@ -1521,10 +1548,35 @@ export default function ModernDoctorBooking({
       return;
     }
 
-    const userId = user.id || user.user_id || authState?.user_id || authState?.userId || 1179;
+    const userId = user.id || user.user_id || authState?.user_id || authState?.userId || null;
+    if (!userId) {
+      setShowPhoneGate(true);
+      return;
+    }
+
     const petId = pet?.id || pet?.pet_id || 0;
-    const docIdToUse = resolvedDoctorId || selectedDoctor?.id;
-    const clinicIdToUse = selectedClinic?.id || selectedDoctor?.clinicId || docIdToUse;
+    
+    const rawDocId = resolvedDoctorId || selectedDoctor?.id;
+    const docIdToUse = rawDocId && !isNaN(Number(rawDocId)) && Number(rawDocId) > 0 ? Number(rawDocId) : null;
+    
+    const rawClinicId = selectedClinic?.id || selectedDoctor?.clinicId || docIdToUse;
+    const clinicIdToUse = rawClinicId && !isNaN(Number(rawClinicId)) && Number(rawClinicId) > 0 ? Number(rawClinicId) : null;
+
+    if (currentOrderType === "appointment" && !clinicIdToUse && !docIdToUse) {
+      setError("Please select a valid doctor or clinic to proceed.");
+      return;
+    }
+    if (currentOrderType === "video_consult" && !docIdToUse) {
+      setError("Please select a valid doctor for video consultation.");
+      return;
+    }
+
+    if (gstInvoiceChecked) {
+      if (!gstNumber || !isValidGstNumber(gstNumber)) {
+        setError("Please enter a valid 15-character GST number (e.g. 07AAAAA0000A1Z5).");
+        return;
+      }
+    }
     
     // Live Time-based Price calculation at payment instant
     const livePackagePrice = selectedPackage ? Number(selectedPackage.price ?? selectedPackage.rawPrice ?? 0) : null;
@@ -1668,6 +1720,7 @@ export default function ModernDoctorBooking({
       const isLoaded = await loadRazorpayScript();
       if (!isLoaded) throw new Error("Could not load payment gateway.");
 
+      paymentSettledRef.current = false;
       const paymentResult = await new Promise((resolve, reject) => {
         const rzp = new window.Razorpay({
           key: razorpayKey,
@@ -1680,12 +1733,20 @@ export default function ModernDoctorBooking({
           theme: { color: "#309BD8" },
           modal: {
             ondismiss: () => {
+              if (paymentSettledRef.current) return;
+              paymentSettledRef.current = true;
               reject(new Error("Payment cancelled by user"));
             },
           },
-          handler: (response) => resolve(response),
+          handler: (response) => {
+            if (paymentSettledRef.current) return;
+            paymentSettledRef.current = true;
+            resolve(response);
+          },
         });
         rzp.on("payment.failed", (response) => {
+          if (paymentSettledRef.current) return;
+          paymentSettledRef.current = true;
           reject(new Error(response?.error?.description || "Payment failed"));
         });
         rzp.open();
