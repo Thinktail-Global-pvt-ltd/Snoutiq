@@ -430,6 +430,8 @@ class SnoutiqSymptomController extends Controller
             'india_context' => $triageJson['india_context_note'] ?? '',
             'safe_to_wait_hours' => $triageJson['safe_to_wait_hours'] ?? 0,
             'image_observation' => $triageJson['image_observation'] ?? '',
+            'image_attached' => (bool) $imageB64,
+            'visual_differential_summary' => $triageJson['visual_differential_summary'] ?? '',
         ];
 
         return response()->json(
@@ -2393,7 +2395,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "TASK: Assess this pet's situation and output routing decision.\n\n" .
             "Use the pet location if provided. If no location is available, assume India. " .
             "Possible causes should be short, practical, and prioritized for common Indian veterinary presentations when reasonable. " .
-            ($imageB64 ? "Because an image is attached, image_observation must say what is visibly seen in the photo in one modest sentence. " : '') .
+            ($imageB64 ? "Because an image is attached, image_observation must say what is visibly seen in the photo in one modest sentence. possible_causes must be based on the visible skin/body findings plus the message, not only the text. visual_differential_summary must explain how the photo changes or supports the likely causes. " : '') .
             "india_context_note must be a single useful India- or location-aware line, not a disclaimer.\n\n" .
             "Routing options:\n" .
             "- emergency: life-threatening right now (severe respiratory distress/choking, collapse/unresponsive, active convulsions, bloated hard abdomen with dry retching, blocked urination in male cat, profuse/uncontrolled bleeding, known poison ingestion, heatstroke, severe trauma)\n" .
@@ -2406,6 +2408,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             '"possible_causes":["cause1","cause2"],' .
             '"red_flags_present":["flag if any"],' .
             '"image_observation":"1 sentence visible photo observation, or empty string if no image",' .
+            '"visual_differential_summary":"photo-informed possible causes, or empty string if no image",' .
             '"india_context_note":"1 sentence India-specific risk",' .
             '"safe_to_wait_hours":0}';
 
@@ -2477,6 +2480,8 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "Return ONLY this JSON:\n" .
             '{"message":"Main response 2-4 sentences plain language",' .
             '"what_we_think_is_happening":"2-4 sentence explanation for the section titled What we think is happening",' .
+            '"image_findings":"visible photo findings, or empty string if no image",' .
+            '"visual_differential_summary":"how the photo changes or supports possible causes, or empty string if no image",' .
             '"diagnosis_summary":"One short sentence with preliminary likely causes, never a confirmed diagnosis",' .
             '"do_now":"One immediate action",' .
             '"time_sensitivity":"e.g. Go now / Within 2-4 hours / If not better in 24 hours",' .
@@ -2656,6 +2661,20 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         if ($diagnosisSummary === '') {
             $diagnosisSummary = $this->buildDiagnosisSummary($triage, $ownerMessage, $pet);
         }
+        $imageFindings = $this->cleanAssistantText((string) (
+            $payload['image_findings']
+            ?? $triage['image_observation']
+            ?? ''
+        ));
+
+        $visualDifferential = $this->cleanAssistantText((string) (
+            $payload['visual_differential_summary']
+            ?? $triage['visual_differential_summary']
+            ?? ''
+        ));
+        if (($triage['image_attached'] ?? false) && $visualDifferential === '') {
+            $visualDifferential = $this->buildPhotoInformedDifferential($triage, $diagnosisSummary);
+        }
         $message = $this->prependImageObservationToMessage($message, $triage);
         $whatWeThink = $this->prependImageObservationToMessage($whatWeThink, $triage);
         $message = $this->appendDiagnosisToMessage($message, $diagnosisSummary);
@@ -2708,6 +2727,8 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             'message' => $message,
             'what_we_think_is_happening' => $whatWeThink,
             'diagnosis_summary' => $diagnosisSummary,
+            'image_findings' => $imageFindings,
+            'visual_differential_summary' => $visualDifferential,
             'do_now' => $doNow,
             'time_sensitivity' => $timeSensitivity,
             'safe_to_do_while_waiting' => $safeToDoWhileWaiting,
@@ -3329,6 +3350,26 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         }
 
         return trim($message . ' ' . $diagnosisSummary);
+    }
+
+    private function buildPhotoInformedDifferential(array $triage, string $diagnosisSummary): string
+    {
+        $imageObservation = $this->cleanAssistantText((string) ($triage['image_observation'] ?? ''));
+        $causes = $this->humanJoin(array_slice($triage['possible_causes'] ?? [], 0, 3));
+
+        if ($causes !== '' && $imageObservation !== '') {
+            return "Photo-informed possible diagnosis/cause: {$causes}. This is based on the visible finding: {$imageObservation}";
+        }
+
+        if ($causes !== '') {
+            return "Photo-informed possible diagnosis/cause: {$causes}.";
+        }
+
+        if ($imageObservation !== '') {
+            return "Photo-informed possible diagnosis/cause should be guided by the visible finding: {$imageObservation}";
+        }
+
+        return $diagnosisSummary;
     }
 
     private function prependImageObservationToMessage(string $message, array $triage): string

@@ -85,13 +85,25 @@ function inferDiagnosisFromText(text = "") {
   return "";
 }
 
-function getDiagnosisText(payload, fallbackText = "") {
+function getDiagnosisText(payload, fallbackText = "", hasImage = false) {
+  const imageAttached = hasImage || Boolean(payload?.triage_detail?.image_attached);
+  const visualDifferential =
+    payload?.response?.visual_differential_summary ||
+    payload?.triage_detail?.visual_differential_summary ||
+    "";
+
+  if (imageAttached && visualDifferential) {
+    return /^photo-informed possible diagnosis\/cause:/i.test(visualDifferential)
+      ? visualDifferential
+      : `Photo-informed possible diagnosis/cause: ${visualDifferential}`;
+  }
+
   const direct =
     payload?.response?.diagnosis_summary ||
     payload?.diagnosis_summary ||
     "";
 
-  if (direct) {
+  if (direct && !imageAttached) {
     return /^possible diagnosis\/cause:/i.test(direct)
       ? direct
       : `Possible diagnosis/cause: ${direct.replace(/^possible causes include\s+/i, "")}`;
@@ -99,8 +111,21 @@ function getDiagnosisText(payload, fallbackText = "") {
 
   const causes = payload?.triage_detail?.possible_causes;
   const joinedCauses = Array.isArray(causes) ? joinReadable(causes) : "";
+  const imageFinding =
+    payload?.response?.image_findings ||
+    payload?.triage_detail?.image_observation ||
+    "";
+  if (joinedCauses && imageAttached) {
+    return `Photo-informed possible diagnosis/cause: ${joinedCauses}.${imageFinding ? ` Visible finding considered: ${imageFinding}` : ""}`;
+  }
   if (joinedCauses) {
     return `Possible diagnosis/cause: ${joinedCauses}.`;
+  }
+
+  if (direct) {
+    return /^possible diagnosis\/cause:/i.test(direct)
+      ? direct
+      : `Possible diagnosis/cause: ${direct.replace(/^possible causes include\s+/i, "")}`;
   }
 
   return inferDiagnosisFromText(fallbackText);
@@ -110,6 +135,7 @@ function getImageAcknowledgement(payload, previousUserMessage) {
   if (!previousUserMessage?.image) return "";
 
   const observation =
+    payload?.response?.image_findings ||
     payload?.triage_detail?.image_observation ||
     payload?.response?.image_observation ||
     payload?.image_observation ||
@@ -1089,6 +1115,7 @@ export default function SymptomCheckerFlow({
                 const diagnosisText = getDiagnosisText(
                   msg.raw_response,
                   previousUserMessage?.text || msg.text,
+                  Boolean(previousUserMessage?.image),
                 );
 
                 return (
