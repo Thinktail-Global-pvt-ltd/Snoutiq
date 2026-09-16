@@ -27,6 +27,7 @@ import {
   Dog,
   Cat,
   Check,
+  Loader2,
 } from "lucide-react";
 import { readAiAuthState } from "../ai/AiAuth";
 
@@ -87,6 +88,196 @@ export default function MyAppointmentsPage() {
 
   // Prescription modal state
   const [selectedPrescription, setSelectedPrescription] = useState(null);
+
+  // Cancel & Reschedule Modal states
+  const [cancelModalItem, setCancelModalItem] = useState(null);
+  const [cancelReason, setCancelReason] = useState("Change of plans / Schedule conflict");
+  const [cancellingLoading, setCancellingLoading] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+
+  const [rescheduleModalItem, setRescheduleModalItem] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTimeSlot, setRescheduleTimeSlot] = useState("10:00 AM");
+  const [reschedulingLoading, setReschedulingLoading] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState("");
+
+  const [actionToast, setActionToast] = useState("");
+
+  useEffect(() => {
+    if (actionToast) {
+      const timer = setTimeout(() => setActionToast(""), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [actionToast]);
+
+  // Check if an appointment is eligible for Cancel / Reschedule (>= 2h cutoff)
+  const canCancelOrReschedule = useCallback((appointment) => {
+    if (!appointment) return false;
+    const status = String(appointment.status || "").toLowerCase();
+    if (["completed", "cancelled", "rejected", "failed", "refunded"].includes(status)) {
+      return false;
+    }
+    const appDate = appointment.date || appointment.appointment_date || appointment.created_at;
+    const appTime = appointment.time_slot || appointment.time || "10:00:00";
+    if (!appDate) return true;
+
+    try {
+      const rawDateStr = String(appDate).split("T")[0];
+      const firstPart = String(appTime).split("-")[0]?.trim() || "10:00:00";
+      const amPmMatch = firstPart.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+      let hours = 10;
+      let minutes = 0;
+      if (amPmMatch) {
+        hours = Number(amPmMatch[1]);
+        minutes = Number(amPmMatch[2] || 0);
+        if (amPmMatch[3].toUpperCase() === "PM" && hours !== 12) hours += 12;
+        if (amPmMatch[3].toUpperCase() === "AM" && hours === 12) hours = 0;
+      } else if (firstPart.includes(":")) {
+        const parts = firstPart.split(":").map(Number);
+        hours = parts[0] || 10;
+        minutes = parts[1] || 0;
+      }
+      const ymd = rawDateStr.split("-").map(Number);
+      if (ymd.length === 3) {
+        const appDateTime = new Date(ymd[0], ymd[1] - 1, ymd[2], hours, minutes);
+        const diffHours = (appDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
+        return diffHours >= 2;
+      }
+    } catch (_) {}
+    return true;
+  }, []);
+
+  // Cancel Appointment Action Handler
+  const handleConfirmCancel = async () => {
+    if (!cancelModalItem) return;
+    setCancellingLoading(true);
+    setCancelError("");
+    const apptId = cancelModalItem.id || cancelModalItem.appointment_id || cancelModalItem.transaction_id;
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      let res = await fetch(`${API_BASE}/appointments/${encodeURIComponent(apptId)}/cancel`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          user_id: userId,
+          reason: cancelReason,
+          cancelled_at: new Date().toISOString(),
+        }),
+      }).catch(() => null);
+
+      if (!res || !res.ok) {
+        res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(apptId)}/cancel`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            user_id: userId,
+            reason: cancelReason,
+          }),
+        }).catch(() => null);
+      }
+
+      if (!res || !res.ok) {
+        throw new Error("Failed to cancel appointment. Please try again.");
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data?.success === false) {
+        throw new Error(data?.message || "Cancellation was not confirmed by the server.");
+      }
+
+      // Optimistically update local lists
+      setInClinicList((prev) =>
+        prev.map((it) =>
+          String(it.id) === String(apptId) || String(it.transaction_id) === String(apptId)
+            ? { ...it, status: "cancelled" }
+            : it
+        )
+      );
+      setVideoConsultList((prev) =>
+        prev.map((it) =>
+          String(it.id) === String(apptId) || String(it.transaction_id) === String(apptId)
+            ? { ...it, status: "cancelled" }
+            : it
+        )
+      );
+
+      setCancelModalItem(null);
+      setActionToast("Appointment cancelled successfully.");
+    } catch (err) {
+      setCancelError(err?.message || "Failed to cancel appointment. Please try again.");
+    } finally {
+      setCancellingLoading(false);
+    }
+  };
+
+  // Reschedule Appointment Action Handler
+  const handleConfirmReschedule = async () => {
+    if (!rescheduleModalItem) return;
+    if (!rescheduleDate || !rescheduleTimeSlot) {
+      setRescheduleError("Please select a date and time slot.");
+      return;
+    }
+    setReschedulingLoading(true);
+    setRescheduleError("");
+    const apptId = rescheduleModalItem.id || rescheduleModalItem.appointment_id || rescheduleModalItem.transaction_id;
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      let res = await fetch(`${API_BASE}/appointments/${encodeURIComponent(apptId)}/reschedule`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          user_id: userId,
+          new_date: rescheduleDate,
+          new_time_slot: rescheduleTimeSlot,
+          date: rescheduleDate,
+          time_slot: rescheduleTimeSlot,
+        }),
+      }).catch(() => null);
+
+      if (!res || !res.ok) {
+        res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(apptId)}/reschedule`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            user_id: userId,
+            new_date: rescheduleDate,
+            new_time_slot: rescheduleTimeSlot,
+          }),
+        }).catch(() => null);
+      }
+
+      if (!res || !res.ok) {
+        throw new Error("Failed to reschedule appointment. Please try again.");
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data?.success === false) {
+        throw new Error(data?.message || "Rescheduling was not confirmed by the server.");
+      }
+
+      // Optimistically update local state
+      setInClinicList((prev) =>
+        prev.map((it) =>
+          String(it.id) === String(apptId) || String(it.transaction_id) === String(apptId)
+            ? { ...it, date: rescheduleDate, appointment_date: rescheduleDate, time_slot: rescheduleTimeSlot, time: rescheduleTimeSlot }
+            : it
+        )
+      );
+
+      setRescheduleModalItem(null);
+      setActionToast("Appointment rescheduled successfully.");
+    } catch (err) {
+      setRescheduleError(err?.message || "Failed to reschedule appointment. Please try again.");
+    } finally {
+      setReschedulingLoading(false);
+    }
+  };
 
   // Auth State
   const authState = useMemo(() => readAiAuthState(), []);
@@ -294,6 +485,7 @@ export default function MyAppointmentsPage() {
   const formatTime = (timeStr) => {
     if (!timeStr) return "";
     try {
+      if (/AM|PM/i.test(timeStr)) return timeStr;
       if (timeStr.includes(":")) {
         const [hh, mm] = timeStr.split(":");
         const hour = parseInt(hh, 10);
@@ -418,7 +610,7 @@ export default function MyAppointmentsPage() {
 
   // Helper pet matching
   const matchesPetFilter = (item) => {
-    if (selectedPetId === "all") return true;
+    if (selectedPetId === "all" || !selectedPetId) return true;
     const targetPet = petsList.find((p) => String(p.id || p.pet_id) === String(selectedPetId));
     const targetPetName = (targetPet?.name || targetPet?.pet_name || "").toLowerCase().trim();
 
@@ -538,18 +730,18 @@ export default function MyAppointmentsPage() {
     <div className="min-h-screen bg-[#F4F7FB] flex flex-col text-slate-800 antialiased font-sans">
       {/* 1. APP-STYLE COMPACT SCREEN HEADER */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200/80 shadow-2xs">
-        <div className="max-w-xl mx-auto px-3 h-12 sm:h-13 flex items-center justify-between gap-2">
+        <div className="max-w-xl mx-auto px-2.5 h-11 sm:h-12 flex items-center justify-between gap-2">
           {/* Left: Back & Heading */}
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => navigate(-1)}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors focus:outline-none shrink-0"
+              className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors focus:outline-none shrink-0"
               aria-label="Go Back"
             >
-              <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-800" />
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-800" />
             </button>
             <h1 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight truncate">
-              Appointments History
+              Appointments
             </h1>
           </div>
 
@@ -560,19 +752,19 @@ export default function MyAppointmentsPage() {
               <button
                 type="button"
                 onClick={() => setIsPetModalOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-semibold text-slate-800 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[10px] font-semibold text-slate-800 transition-colors"
               >
-                <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[9px]">
+                <span className="w-3 h-3 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[8px]">
                   {String(selectedPetObj?.pet_type || "").toLowerCase() === "cat" ? (
                     <Cat className="w-2 h-2" />
                   ) : (
                     <Dog className="w-2 h-2" />
                   )}
                 </span>
-                <span className="max-w-[65px] sm:max-w-[95px] truncate font-medium text-[11px]">
+                <span className="max-w-[65px] sm:max-w-[95px] truncate font-medium text-[10px]">
                   {selectedPetDisplayName}
                 </span>
-                <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
+                <ChevronDown className="w-2 h-2 text-slate-400" />
               </button>
             )}
 
@@ -580,7 +772,7 @@ export default function MyAppointmentsPage() {
             <button
               type="button"
               onClick={() => setIsFilterModalOpen(true)}
-              className={`relative p-1.5 rounded-lg border transition-all ${
+              className={`relative p-1 rounded-lg border transition-all ${
                 isAnyFilterActive
                   ? "bg-[#309BD8]/10 text-[#309BD8] border-[#309BD8]/30 shadow-2xs"
                   : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
@@ -598,7 +790,7 @@ export default function MyAppointmentsPage() {
               type="button"
               onClick={() => loadAllData(true)}
               disabled={refreshing || loading}
-              className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+              className="p-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
               title="Refresh"
             >
               <RefreshCw
@@ -610,22 +802,22 @@ export default function MyAppointmentsPage() {
       </header>
 
       {/* MAIN CONTENT CONTAINER */}
-      <main className="flex-1 max-w-xl w-full mx-auto px-3 py-3 space-y-2.5">
+      <main className="flex-1 max-w-xl w-full mx-auto px-2.5 py-2 space-y-2">
         {/* Not Logged In Notice */}
         {!userId && !loading && (
-          <div className="bg-white rounded-xl p-5 border border-amber-200 text-center shadow-2xs max-w-xs mx-auto my-6">
-            <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-2 border border-amber-200">
-              <User className="w-5 h-5" />
+          <div className="bg-white rounded-xl p-4 border border-amber-200 text-center shadow-2xs max-w-xs mx-auto my-4">
+            <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-1.5 border border-amber-200">
+              <User className="w-4 h-4" />
             </div>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900 mb-1">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 mb-0.5">
               Sign In to View Appointments
             </h3>
-            <p className="text-slate-600 text-[11px] mb-4">
-              Please sign in with your phone number to access your upcoming clinic visits, video call consultations, and prescriptions.
+            <p className="text-slate-600 text-[10px] mb-3">
+              Please sign in with your phone number to access your clinic visits and video calls.
             </p>
             <Link
               to="/auth"
-              className="inline-flex items-center justify-center px-4 py-1.5 rounded-lg bg-[#309BD8] text-white font-semibold text-[11px] hover:bg-[#2887bc] shadow-sm transition-all"
+              className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-[#309BD8] text-white font-semibold text-[11px] hover:bg-[#2887bc] shadow-sm transition-all"
             >
               Sign In / Register
             </Link>
@@ -634,22 +826,39 @@ export default function MyAppointmentsPage() {
 
         {userId && (
           <>
+            {/* Action Feedback Toast */}
+            {actionToast && (
+              <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs animate-in fade-in duration-150">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                  <span>{actionToast}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActionToast("")}
+                  className="text-emerald-700 hover:text-emerald-950 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+
             {/* 2. DUAL TOGGLE: VIDEOCALL vs IN CLINIC */}
-            <div className="bg-white p-1 rounded-xl shadow-2xs border border-slate-200/90">
+            <div className="bg-white p-0.5 rounded-xl shadow-2xs border border-slate-200/90">
               <div className="grid grid-cols-2 gap-1">
                 <button
                   type="button"
                   onClick={() => setActiveTab("video_call")}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                  className={`flex items-center justify-center gap-1 py-1 px-2 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
                     activeTab === "video_call"
                       ? "bg-[#309BD8] text-white shadow-xs"
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
-                  <Video className="w-3.5 h-3.5" />
+                  <Video className="w-3 h-3" />
                   <span>Videocall</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    className={`text-[9px] px-1 py-0.2 rounded-full font-bold ${
                       activeTab === "video_call"
                         ? "bg-white/25 text-white"
                         : "bg-slate-100 text-slate-600"
@@ -662,16 +871,16 @@ export default function MyAppointmentsPage() {
                 <button
                   type="button"
                   onClick={() => setActiveTab("in_clinic")}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                  className={`flex items-center justify-center gap-1 py-1 px-2 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
                     activeTab === "in_clinic"
                       ? "bg-[#309BD8] text-white shadow-xs"
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span>In Clinic</span>
+                  <Building2 className="w-3 h-3" />
+                  <span>In-Clinic</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    className={`text-[9px] px-1 py-0.2 rounded-full font-bold ${
                       activeTab === "in_clinic"
                         ? "bg-white/25 text-white"
                         : "bg-slate-100 text-slate-600"
@@ -934,6 +1143,24 @@ export default function MyAppointmentsPage() {
                             <ChevronRight className="w-2.5 h-2.5" />
                           </button>
                         </div>
+
+                        {/* Cancel Action if eligible */}
+                        {canCancelOrReschedule(item) && (
+                          <div className="flex items-center justify-end pt-1 border-t border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCancelError("");
+                                setCancelReason("Change of plans / Schedule conflict");
+                                setCancelModalItem(item);
+                              }}
+                              className="py-1 px-2.5 text-[10px] font-bold text-red-600 hover:bg-red-50 rounded-lg border border-red-200 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                            >
+                              <X size={11} />
+                              <span>Cancel Consultation</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -1103,6 +1330,39 @@ export default function MyAppointmentsPage() {
                             <ChevronRight className="w-2.5 h-2.5" />
                           </button>
                         </div>
+
+                        {/* Cancel & Reschedule Action Bar if eligible */}
+                        {canCancelOrReschedule(item) && (
+                          <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const rawDate = item.date || item.appointment_date || new Date().toISOString().split("T")[0];
+                                setRescheduleDate(rawDate);
+                                setRescheduleTimeSlot(item.time_slot || item.time || "10:00 AM");
+                                setRescheduleError("");
+                                setRescheduleModalItem(item);
+                              }}
+                              className="flex-1 py-1.5 px-2 text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer"
+                            >
+                              <Clock size={12} className="text-slate-500" />
+                              <span>Reschedule</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCancelError("");
+                                setCancelReason("Change of plans / Schedule conflict");
+                                setCancelModalItem(item);
+                              }}
+                              className="py-1.5 px-3 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg border border-red-200 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                            >
+                              <X size={12} />
+                              <span>Cancel</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -1462,6 +1722,200 @@ export default function MyAppointmentsPage() {
                 className="px-3.5 py-1 rounded-lg bg-[#081037] text-white text-[10px] font-semibold hover:bg-[#0c1b50] transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL APPOINTMENT CONFIRMATION MODAL */}
+      {cancelModalItem && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-2xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3.5 border border-slate-200 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-red-600">
+                <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertCircle size={18} className="text-red-600" />
+                </div>
+                <h3 className="font-bold text-sm text-slate-900">Cancel Appointment?</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!cancellingLoading) setCancelModalItem(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to cancel the booking for{" "}
+              <strong className="text-slate-900 font-bold">
+                {cancelModalItem.pet_name || cancelModalItem.pet?.name || "your pet"}
+              </strong>
+              ?
+            </p>
+
+            {cancelError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded-xl">
+                {cancelError}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-600 block">
+                Reason for cancellation
+              </label>
+              <select
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                disabled={cancellingLoading}
+                className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none bg-slate-50 focus:bg-white focus:border-[#309BD8] transition-all"
+              >
+                <option value="Change of plans / Schedule conflict">Change of plans / Schedule conflict</option>
+                <option value="Pet has recovered / feels better">Pet has recovered / feels better</option>
+                <option value="Booked by mistake">Booked by mistake</option>
+                <option value="Found alternative vet">Found alternative vet</option>
+                <option value="Other reason">Other reason</option>
+              </select>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setCancelModalItem(null)}
+                disabled={cancellingLoading}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Keep Booking
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={cancellingLoading}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-xs font-bold text-white shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 cursor-pointer"
+              >
+                {cancellingLoading ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Cancelling...</span>
+                  </>
+                ) : (
+                  <span>Yes, Cancel</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RESCHEDULE APPOINTMENT MODAL */}
+      {rescheduleModalItem && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-2xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3.5 border border-slate-200 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[#309BD8]">
+                <div className="w-8 h-8 rounded-full bg-[#309BD8]/10 flex items-center justify-center">
+                  <Clock size={18} className="text-[#309BD8]" />
+                </div>
+                <h3 className="font-bold text-sm text-slate-900">Reschedule Appointment</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!reschedulingLoading) setRescheduleModalItem(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Select a new date and time for{" "}
+              <strong className="text-slate-900 font-bold">
+                {rescheduleModalItem.pet_name || rescheduleModalItem.pet?.name || "your pet"}
+              </strong>
+              .
+            </p>
+
+            {rescheduleError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded-xl">
+                {rescheduleError}
+              </div>
+            )}
+
+            {/* Date Input */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-600 block">
+                Select New Date
+              </label>
+              <input
+                type="date"
+                min={new Date().toISOString().split("T")[0]}
+                value={rescheduleDate}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                disabled={reschedulingLoading}
+                className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none bg-slate-50 focus:bg-white focus:border-[#309BD8] transition-all font-semibold text-slate-800"
+              />
+            </div>
+
+            {/* Time Slot Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-600 block">
+                Select Preferred Time Slot
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  "10:00 AM",
+                  "11:30 AM",
+                  "01:00 PM",
+                  "03:00 PM",
+                  "05:00 PM",
+                  "06:30 PM",
+                ].map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setRescheduleTimeSlot(slot)}
+                    disabled={reschedulingLoading}
+                    className={`py-1.5 px-2 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                      rescheduleTimeSlot === slot
+                        ? "bg-[#309BD8] text-white border-[#309BD8] shadow-xs"
+                        : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                    }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setRescheduleModalItem(null)}
+                disabled={reschedulingLoading}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReschedule}
+                disabled={reschedulingLoading || !rescheduleDate || !rescheduleTimeSlot}
+                className="flex-1 py-2.5 rounded-xl bg-[#309BD8] hover:bg-[#2887bc] text-xs font-bold text-white shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 cursor-pointer"
+              >
+                {reschedulingLoading ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Updating...</span>
+                  </>
+                ) : (
+                  <span>Confirm Slot</span>
+                )}
               </button>
             </div>
           </div>
