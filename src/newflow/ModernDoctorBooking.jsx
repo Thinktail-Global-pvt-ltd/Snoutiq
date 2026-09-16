@@ -538,9 +538,10 @@ export default function ModernDoctorBooking({
 
   // Prevent double scrollbar by locking body scroll while booking modal is open
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow || "";
     };
   }, []);
 
@@ -2087,14 +2088,14 @@ export default function ModernDoctorBooking({
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-100 w-full min-h-screen overflow-hidden animate-">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-100 w-full min-h-screen overflow-hidden transition-opacity duration-200">
       
       {/* Full Page Mobile / App Style Top Header Bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between px-3.5 py-2.5 bg-white border-b border-slate-200 shadow-xs">
         <div className="flex items-center gap-2.5">
           <button 
             onClick={handleHeaderBack} 
-            className="p-1.5 -ml-1 text-[#081037] hover:text-black bg-slate-100 hover:bg-slate-200 rounded-full transition-colors cursor-pointer"
+            className="p-1.5 -ml-1 text-[#081037] hover:text-black bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-full transition-all cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -2112,7 +2113,7 @@ export default function ModernDoctorBooking({
           </div>
         </div>
 
-        <button onClick={handleModalClose} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors text-slate-600 cursor-pointer">
+        <button onClick={handleModalClose} className="p-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-full transition-all text-slate-600 cursor-pointer">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -2123,7 +2124,7 @@ export default function ModernDoctorBooking({
         
         {/* STEP 0: List View */}
         {flowStep === "list" && (
-          <div className="space-y-3">
+          <div key="list" className="animate-in fade-in duration-150 space-y-3">
             
             {/* Geolocation Permission / Location Status Card */}
             {!userCoords ? (
@@ -2374,7 +2375,7 @@ export default function ModernDoctorBooking({
 
         {/* STEP 1: Describe Issue / Date Slots */}
         {flowStep === "describe" && (
-          <div className="space-y-2.5 max-w-xl mx-auto">
+          <div key="describe" className="animate-in fade-in duration-150 space-y-2.5 max-w-xl mx-auto">
             
             {/* Header info */}
             {currentOrderType === "appointment" ? (
@@ -2802,7 +2803,7 @@ export default function ModernDoctorBooking({
 
         {/* STEP 2: Checkout */}
         {flowStep === "checkout" && (
-          <div className="space-y-2.5 max-w-xl mx-auto">
+          <div key="checkout" className="animate-in fade-in duration-150 space-y-2.5 max-w-xl mx-auto">
 
             {/* COMPACT POINT-WISE SUMMARY CARD */}
             <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs space-y-2 text-xs">

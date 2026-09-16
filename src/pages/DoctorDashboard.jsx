@@ -808,7 +808,7 @@
 // }
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { socket } from "./socket";
 import {
@@ -816,7 +816,11 @@ import {
   subscribeToForegroundMessages,
 } from "../lib/firebaseMessaging";
 
-export default function DoctorDashboard({ doctorId = 501 }) {
+export default function DoctorDashboard({ doctorId: propDoctorId }) {
+  const routeParams = useParams();
+  const doctorId =
+    propDoctorId ||
+    (routeParams?.doctorId ? parseInt(routeParams.doctorId, 10) : 501);
   const [incomingCalls, setIncomingCalls] = useState([]);
   const [isOnline, setIsOnline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("connecting");

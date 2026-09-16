@@ -809,25 +809,24 @@ const [locationUpdatedAt, setLocationUpdatedAt] = useState(
     }
   }, [onComplete, isModal]);
 
-useEffect(() => {
-  const authState = readAiAuthState();
-  const storedCoordinates = getStoredCoordinates(authState?.user || {});
+  useEffect(() => {
+    const authState = readAiAuthState();
+    const storedCoordinates = getStoredCoordinates(authState?.user || {});
 
-  if (storedCoordinates.latitude != null && storedCoordinates.longitude != null) {
-    setForm((prev) => ({
-      ...prev,
-      latitude: prev.latitude ?? storedCoordinates.latitude,
-      longitude: prev.longitude ?? storedCoordinates.longitude,
-    }));
-    setLocationStatus("ready");
-    setLocationError("");
-    setLocationSuccessMessage("Location selected successfully from device.");
-    setLocationUpdatedAt(new Date());
-  } else {
-    // Auto-request location access immediately on form mount
-    captureCurrentLocation();
-  }
-}, []);
+    if (storedCoordinates.latitude != null && storedCoordinates.longitude != null) {
+      setForm((prev) => ({
+        ...prev,
+        latitude: prev.latitude ?? storedCoordinates.latitude,
+        longitude: prev.longitude ?? storedCoordinates.longitude,
+      }));
+      setLocationStatus("ready");
+      setLocationError("");
+      setLocationSuccessMessage("Location selected successfully from device.");
+      setLocationUpdatedAt(new Date());
+    } else {
+      setLocationStatus("idle");
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;

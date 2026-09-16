@@ -1,8 +1,22 @@
 import "./app.css";
 
-import React, { lazy, useEffect } from "react";
+import React, { lazy, useEffect, Suspense } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+
+function RouteLoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-3 border-[#309BD8] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+function DoctorDashboardWrapper() {
+  const { doctorId } = useParams();
+  const parsedId = doctorId ? parseInt(doctorId, 10) : 501;
+  return <DoctorDashboard doctorId={isNaN(parsedId) ? 501 : parsedId} />;
+}
 const TalkToVet = lazy(() => import("./newflow/TalkToVet"));
 const PetDoctorOnline = lazy(() => import("./newflow/PetDoctorOnline"));
 
@@ -175,7 +189,8 @@ function ConsultationShortLinkBridge() {
 export default function AppRoutes() {
   return (
     <HelmetProvider>
-      <Routes>
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
         <Route path="/" element={<SymptomCheckerApp />} />
         <Route path="/c/:publicId" element={<ConsultationShortLinkBridge />} />
            <Route path="/counsltflow/*" element={<NewDoctorRoute />} />
@@ -292,11 +307,7 @@ export default function AppRoutes() {
         <Route path="/UI-test" element={<Uiapp />} />
         <Route
           path="/doctor-dashboard/:doctorId"
-          element={
-            <DoctorDashboard
-              doctorId={parseInt(window.location.pathname.split("/")[2]) || 501}
-            />
-          }
+          element={<DoctorDashboardWrapper />}
         />
         <Route path="/call-demo" element={<CallRecordingDemo />} />
         <Route path="/csv-upload" element={<CsvUploadPage />} />
@@ -401,6 +412,7 @@ export default function AppRoutes() {
         <Route path="/clinics-solution" element={<ClinicsSolutionPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </HelmetProvider>
+    </Suspense>
+  </HelmetProvider>
   );
 }

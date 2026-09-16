@@ -830,17 +830,49 @@ export default function FindVetsNearYou() {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [brokenImages, setBrokenImages] = useState(() => new Set());
 
+  // Geolocation & Coords state
+  const [coords, setCoords] = useState(null);
+  const [locationStatus, setLocationStatus] = useState("idle"); // "idle" | "requesting" | "granted" | "denied"
+
   const resolvedUserId =
     searchParams.get("user_id") || searchParams.get("userId") || "";
   const queryDate = searchParams.get("date") || "";
   const queryDay = searchParams.get("day") || "";
+
+  const requestLocation = () => {
+    if (!navigator?.geolocation) {
+      setLocationStatus("denied");
+      return;
+    }
+    setLocationStatus("requesting");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setCoords({ lat, lng });
+        setLocationStatus("granted");
+      },
+      (err) => {
+        console.warn("Geolocation access denied or failed:", err);
+        setLocationStatus("denied");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  // Auto request location on mount if no user_id is provided
+  useEffect(() => {
+    if (!resolvedUserId) {
+      requestLocation();
+    }
+  }, [resolvedUserId]);
 
   useEffect(() => {
     setUserIdInput(resolvedUserId);
   }, [resolvedUserId]);
 
   useEffect(() => {
-    if (!resolvedUserId) {
+    if (!resolvedUserId && !coords) {
       setPayload(null);
       setNearbyDoctors([]);
       setFeaturedDoctors([]);
@@ -856,19 +888,25 @@ export default function FindVetsNearYou() {
       setError("");
 
       try {
+        let url = "";
         const params = new URLSearchParams();
-        params.set("user_id", resolvedUserId);
         if (queryDate) params.set("date", queryDate);
         if (queryDay) params.set("day", queryDay);
 
-        const response = await fetch(
-          `${getBackendBase()}${API_ENDPOINT}?${params.toString()}`,
-          {
-            method: "GET",
-            signal: controller.signal,
-            headers: { Accept: "application/json" },
-          }
-        );
+        if (resolvedUserId) {
+          params.set("user_id", resolvedUserId);
+          url = `${getBackendBase()}${API_ENDPOINT}?${params.toString()}`;
+        } else if (coords) {
+          params.set("lat", String(coords.lat));
+          params.set("lng", String(coords.lng));
+          url = `${getBackendBase()}/api/nearby-vets-by-location?${params.toString()}`;
+        }
+
+        const response = await fetch(url, {
+          method: "GET",
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        });
 
         const data = await response.json().catch(() => null);
         if (!response.ok) {
@@ -879,7 +917,11 @@ export default function FindVetsNearYou() {
 
         setPayload(data);
         setNearbyDoctors(normalizeNearbyDoctors(data));
-        setFeaturedDoctors(normalizeFeaturedDoctors(data));
+        if (data?.featured) {
+          setFeaturedDoctors(normalizeFeaturedDoctors(data));
+        } else {
+          setFeaturedDoctors([]);
+        }
       } catch (fetchError) {
         if (fetchError?.name === "AbortError") return;
         setPayload(null);
@@ -897,7 +939,7 @@ export default function FindVetsNearYou() {
     void loadDoctors();
 
     return () => controller.abort();
-  }, [resolvedUserId, queryDate, queryDay, refreshNonce]);
+  }, [resolvedUserId, coords, queryDate, queryDay, refreshNonce]);
 
   const featuredClinic = payload?.featured?.data?.clinic || null;
 
@@ -1026,9 +1068,8 @@ export default function FindVetsNearYou() {
                     </h1>
 
                     <p className="mt-4 max-w-2xl text-sm leading-7 text-white/75 sm:text-base">
-                      Nearby doctors come from `nearby-plus-featured`. The page
-                      uses backend-provided clinic distance, doctor profile,
-                      pricing, response time, and featured clinic history.
+                      Nearby doctors are matched using your device location or saved profile.
+                      Browse verified clinic distance, doctor profile, pricing, and response times.
                     </p>
 
                     <div className="mt-6 inline-flex items-center gap-3 rounded-full bg-[linear-gradient(135deg,#f97316_0%,#f59e0b_100%)] px-5 py-3 text-sm font-bold text-white shadow-[0_16px_35px_rgba(249,115,22,0.3)]">
@@ -1065,18 +1106,32 @@ export default function FindVetsNearYou() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setRefreshNonce((value) => value + 1)}
-                          className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15"
+                          onClick={() => {
+                            requestLocation();
+                            setRefreshNonce((value) => value + 1);
+                          }}
+                          disabled={locationStatus === "requesting"}
+                          className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15 active:scale-95 disabled:opacity-50 cursor-pointer"
                         >
-                          <Crosshair className="h-4 w-4" />
-                          Near Me
+                          <Crosshair className={`h-4 w-4 ${locationStatus === "requesting" ? "animate-spin text-amber-300" : ""}`} />
+                          {locationStatus === "requesting" ? "Locating..." : "Near Me"}
                         </button>
                       </div>
                     </div>
 
                     <div className="mt-3 text-xs leading-6 text-white/65">
-                      Backend rule: this endpoint requires exact `user_id`, and
-                      that user must already have latitude/longitude saved.
+                      {coords ? (
+                        <span className="text-emerald-300 font-semibold flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5 inline shrink-0" />
+                          Showing vets near your location ({coords.lat.toFixed(2)}, {coords.lng.toFixed(2)})
+                        </span>
+                      ) : locationStatus === "denied" ? (
+                        <span className="text-amber-200">
+                          Location access denied. Enter a backend user_id or click "Near Me" to retry.
+                        </span>
+                      ) : (
+                        "Auto-detecting your location, or enter a user_id to load results."
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1198,16 +1253,28 @@ export default function FindVetsNearYou() {
                   </div>
                   <p className="mt-2 text-sm leading-6">{error}</p>
                 </div>
-              ) : !resolvedUserId ? (
+              ) : !resolvedUserId && !coords ? (
                 <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="font-display text-xl font-extrabold text-slate-900">
-                    Add `user_id` to load nearby results
+                    {locationStatus === "denied"
+                      ? "Location access denied or user ID required"
+                      : "Add user_id or allow location access"}
                   </div>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    `nearby-plus-featured` does not work without `user_id`. You
-                    can either enter it in the hero input or open this page with
-                    a query like `/find-vets-near-you?user_id=123`.
+                    {locationStatus === "denied"
+                      ? "Please allow location access in your browser, or enter your user ID above to load nearby doctors."
+                      : "To view nearby verified vets, allow browser location access or enter your user ID in the search bar above."}
                   </p>
+                  {locationStatus === "denied" && (
+                    <button
+                      type="button"
+                      onClick={requestLocation}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700 active:scale-95 cursor-pointer"
+                    >
+                      <Crosshair className="h-4 w-4" />
+                      Allow / Retry Location Access
+                    </button>
+                  )}
                 </div>
               ) : filteredDoctors.length === 0 ? (
                 <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -1215,8 +1282,7 @@ export default function FindVetsNearYou() {
                     No nearby doctors matched this filter
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Try removing city or specialization filters, or refresh with
-                    another backend `user_id`.
+                    Try removing filters, or refresh your location / user ID.
                   </p>
                 </div>
               ) : (
