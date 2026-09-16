@@ -2820,32 +2820,11 @@ export default function ModernDoctorBooking({
 
                 {/* Pet Info */}
                 <div className="bg-slate-50/70 p-2 rounded-lg border border-slate-100">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <p className="text-[9px] uppercase font-bold text-slate-400">Pet</p>
-                    {availablePets.length > 1 && (
-                      <span className="text-[9px] font-bold text-[#309BD8] bg-blue-50 px-1.5 py-0.2 rounded">
-                        {availablePets.length} Pets
-                      </span>
-                    )}
-                  </div>
-                  {availablePets.length > 1 ? (
-                    <select
-                      value={String(pet?.id || pet?.pet_id || "")}
-                      onChange={(e) => setSelectedPetId(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-[#081037] outline-none focus:border-[#309BD8]"
-                    >
-                      {availablePets.map((p) => (
-                        <option key={p.id || p.pet_id} value={String(p.id || p.pet_id)}>
-                          {p.name || p.pet_name} ({p.breed || p.pet_type || "Pet"})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="font-extrabold text-[#081037] text-xs truncate flex items-center gap-1">
-                      <HeartHandshake size={11} className="text-[#309BD8] shrink-0" />
-                      <span>{displayPetName}</span>
-                    </p>
-                  )}
+                  <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Pet</p>
+                  <p className="font-extrabold text-[#081037] text-xs truncate flex items-center gap-1">
+                    <HeartHandshake size={11} className="text-[#309BD8] shrink-0" />
+                    <span>{displayPetName}</span>
+                  </p>
                   <p className="text-[10px] text-slate-500 truncate mt-0.5">{displayPetBreed}</p>
                 </div>
 
