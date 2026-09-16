@@ -199,6 +199,7 @@ export default function HomeVetBookingFlow({
   const [locationLoading, setLocationLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [showPhoneGate, setShowPhoneGate] = useState(false);
+  const [showLocationHelpModal, setShowLocationHelpModal] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [successState, setSuccessState] = useState(null);
@@ -257,6 +258,22 @@ export default function HomeVetBookingFlow({
     if (!navigator.geolocation || locationLoading) return;
     setLocationLoading(true);
     setError("");
+
+    // Agar permission pehle se hi denied hai, browser popup nahi dikhayega —
+    // isliye seedha guide-modal dikha do
+    if (navigator.permissions?.query) {
+      try {
+        const permStatus = await navigator.permissions.query({ name: "geolocation" });
+        if (permStatus.state === "denied") {
+          setLocationLoading(false);
+          setShowLocationHelpModal(true);
+          return;
+        }
+      } catch (_) {
+        // Permissions API unsupported ho to normal flow chalne do
+      }
+    }
+
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -297,12 +314,19 @@ export default function HomeVetBookingFlow({
       } catch {
         setStatus("Current GPS coordinates detected.");
       }
-    } catch (_) {
-      setStatus("Location permission denied. Please enter address manually.");
+    } catch (err) {
+      if (err.code === 1) {
+        // PERMISSION_DENIED — real prompt reopen nahi ho sakta, guide dikhao
+        setShowLocationHelpModal(true);
+      } else {
+        setStatus("Could not fetch location. Please enter address manually.");
+      }
     } finally {
       setLocationLoading(false);
     }
   }
+
+
 
   async function openRazorpay({ key, orderId, amountInPaise }) {
     const loaded = await loadRazorpayScript();
@@ -773,7 +797,47 @@ export default function HomeVetBookingFlow({
         </div>
       </div>
 
+      {showLocationHelpModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl">
+            <div className="mb-2 flex items-center gap-2">
+              <MapPin size={16} className="text-blue-600" />
+              <h3 className="text-sm font-bold text-slate-900">Location access blocked hai</h3>
+            </div>
+            <p className="mb-3 text-xs text-slate-600">
+              Pehle location deny kiya gaya tha, isliye browser dobara popup nahi dikhata.
+              Manually enable karne ke liye:
+            </p>
+            <ol className="mb-3 list-decimal space-y-1 pl-4 text-xs text-slate-600">
+              <li>Address bar mein site name ke paas lock/info icon par click karein</li>
+              <li>"Location" permission dhoond kar "Allow" select karein</li>
+              <li>Page reload karke "Use current GPS" dobara try karein</li>
+            </ol>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowLocationHelpModal(false)}
+                className="flex-1 rounded-lg border border-slate-200 py-1.5 text-xs font-semibold text-slate-600"
+              >
+                Manually Enter
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLocationHelpModal(false);
+                  useCurrentLocation();
+                }}
+                className="flex-1 rounded-lg bg-blue-600 py-1.5 text-xs font-semibold text-white"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPhoneGate && (
+
         <PhoneVerifyGate
           onVerified={(verifiedPhone, nextState, petsList) => {
             const cleanPhone = normalizePhone(verifiedPhone);
