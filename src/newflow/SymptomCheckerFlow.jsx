@@ -8,6 +8,7 @@ import PetForn from "../ai/PetForn";
 import { useNavigate } from "react-router-dom";
 import { hasUsablePetProfile, submitIntakeForm } from "./authHelpers";
 import ModernDoctorBooking from "./ModernDoctorBooking";
+import HomeVetBookingFlow from "../ai/HomeVetBookingFlow";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 import {
   BannerCard,
@@ -139,6 +140,7 @@ export default function SymptomCheckerFlow({
   const [showDoctorsModal, setShowDoctorsModal] = useState(
     () => sessionStorage.getItem("snoutiq_modal_open") === "1",
   );
+  const [showHomeVetModal, setShowHomeVetModal] = useState(false);
   const [bookingOrderType, setBookingOrderType] = useState(
     () => sessionStorage.getItem("snoutiq_modal_order_type") || "video_consult",
   );
@@ -174,15 +176,20 @@ export default function SymptomCheckerFlow({
       sessionStorage.setItem("snoutiq_modal_open", "1");
       setShowDoctorsModal(true);
     };
+    const handleOpenHomeVet = () => {
+      setShowHomeVetModal(true);
+    };
     window.addEventListener("snoutiq_pet_changed", handlePetChange);
     window.addEventListener("storage", handlePetChange);
     window.addEventListener("snoutiq_open_pet_modal", handleOpenModal);
     window.addEventListener("snoutiq_open_booking_modal", handleOpenBooking);
+    window.addEventListener("snoutiq_open_home_vet_modal", handleOpenHomeVet);
     return () => {
       window.removeEventListener("snoutiq_pet_changed", handlePetChange);
       window.removeEventListener("storage", handlePetChange);
       window.removeEventListener("snoutiq_open_pet_modal", handleOpenModal);
       window.removeEventListener("snoutiq_open_booking_modal", handleOpenBooking);
+      window.removeEventListener("snoutiq_open_home_vet_modal", handleOpenHomeVet);
     };
   }, []);
 
@@ -389,21 +396,32 @@ export default function SymptomCheckerFlow({
     const label = String(cta?.label || "").toLowerCase();
     const deeplink = String(cta?.deeplink || "").toLowerCase();
 
-    // Both video_consult and vet_at_home use the same API / booking modal flow
+    // 1. Check Vet at Home FIRST
+    if (
+      type === "vet_at_home" ||
+      type === "home_service" ||
+      type === "home_vet" ||
+      type === "home" ||
+      type.includes("home") ||
+      label.includes("home") ||
+      deeplink.includes("vet-at-home") ||
+      deeplink.includes("vet_at_home") ||
+      deeplink.includes("home-vet") ||
+      deeplink.includes("home_vet")
+    ) {
+      return "vet_at_home";
+    }
+
+    // 2. Video consult
     if (
       type === "video_consult" ||
       type === "video" ||
-      type === "vet_at_home" ||
       type.includes("video") ||
-      type.includes("home") ||
       label.includes("video") ||
       label.includes("talk to vet") ||
       label.includes("consult") ||
-      label.includes("home") ||
       deeplink.includes("video-consult") ||
-      deeplink.includes("video_consult") ||
-      deeplink.includes("vet-at-home") ||
-      deeplink.includes("vet_at_home")
+      deeplink.includes("video_consult")
     ) {
       return "video_consult";
     }
@@ -412,6 +430,7 @@ export default function SymptomCheckerFlow({
       return "emergency";
     }
 
+    // 3. In-clinic
     if (
       type === "clinic" ||
       type.includes("clinic") ||
@@ -436,6 +455,11 @@ export default function SymptomCheckerFlow({
         : resolveActionType(cta);
 
     console.log("🔍 Resolved action type:", resolvedType, "from raw:", cta);
+
+    if (resolvedType === "vet_at_home") {
+      setShowHomeVetModal(true);
+      return;
+    }
 
     if (resolvedType === "video_consult" || resolvedType === "clinic") {
       const orderType =
@@ -1270,6 +1294,28 @@ export default function SymptomCheckerFlow({
             symptomText={getUserSymptomText()}
             preSelectedPet={pet}
             orderType={bookingOrderType}
+          />
+        )}
+
+        {showHomeVetModal && (
+          <HomeVetBookingFlow
+            mode="modal"
+            routeStateOverride={{
+              userId: user.id || user.user_id,
+              petId: pet.id || pet.pet_id,
+              petName: pet.name || pet.pet_name,
+              petType: pet.pet_type || "dog",
+              token: token,
+              symptomText: getUserSymptomText(),
+            }}
+            onClose={() => setShowHomeVetModal(false)}
+            onSuccess={(payload) => {
+              setShowHomeVetModal(false);
+              navigate("/appointment-thank-you", {
+                replace: true,
+                state: payload,
+              });
+            }}
           />
         )}
 

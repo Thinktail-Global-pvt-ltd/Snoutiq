@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, Users, Calendar, Clock, Loader2, Filter, Star, MapPin, Award, Check, Sparkles, Video, Navigation, RefreshCw } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Search, Shield, CreditCard, CheckCircle, CheckCircle2, Users, User, Calendar, Clock, Loader2, Filter, Star, MapPin, Award, Check, Sparkles, Video, Navigation, RefreshCw, Phone, Zap, Building2, Package, Camera, AlertCircle, HeartHandshake } from "lucide-react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { readAiAuthState } from "../ai/AiAuth";
+import { confirmPaymentStart } from "../ai/booking/bookingAlerts";
 import UserDetailsOtpModal from "./UserDetailsOtpModal";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 import clinicDefaultImg from "../assets/images/clinic.png";
@@ -1523,6 +1524,27 @@ export default function ModernDoctorBooking({
       return;
     }
 
+    const isPayAtClinic = currentOrderType === "appointment" && methodToUse === "pay_at_clinic";
+    const clinicOrDocName = selectedClinic?.name || selectedDoctor?.clinicName || selectedDoctor?.name;
+    const confirmation = await confirmPaymentStart({
+      amount: liveTotal,
+      title: isPayAtClinic
+        ? "Confirm Clinic Appointment"
+        : (currentOrderType === "appointment" ? "Confirm Clinic Appointment" : "Confirm Vet Consultation"),
+      text: isPayAtClinic
+        ? (clinicOrDocName
+            ? `Confirm appointment at ${clinicOrDocName}. Pay ₹${liveTotal} at clinic reception.`
+            : `Confirm clinic appointment. Pay ₹${liveTotal} at clinic reception.`)
+        : (selectedDoctor?.name
+            ? `Pay ₹${liveTotal} (incl. 18% GST) to confirm consultation with ${selectedDoctor.name}.`
+            : `Pay ₹${liveTotal} (incl. 18% GST) to confirm your booking.`),
+      confirmButtonText: isPayAtClinic ? "Confirm Visit" : "Pay now",
+    });
+
+    if (!confirmation || !confirmation.isConfirmed) {
+      return;
+    }
+
     setProcessing(true);
     setError("");
 
@@ -1705,15 +1727,18 @@ export default function ModernDoctorBooking({
                   </span>
                   {doc.distance_km != null && !isNaN(Number(doc.distance_km)) && (
                     <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1">
-                      <span>📍 {Number(doc.distance_km).toFixed(1)} km</span>
+                      <MapPin size={10} className="text-slate-500 shrink-0" />
+                      <span>{Number(doc.distance_km).toFixed(1)} km</span>
                     </span>
                   )}
                 </div>
               </div>
               
               {/* Amber Google Rating Badge */}
-              <span className="bg-amber-50 text-amber-900 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-amber-200/70 flex items-center gap-0.5 flex-shrink-0">
-                ⭐ {doc.googleRating || 5.0} <span className="text-amber-700 font-medium">({doc.googleReviewCount || 50})</span>
+              <span className="bg-amber-50 text-amber-900 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-amber-200/70 flex items-center gap-1 flex-shrink-0">
+                <Star size={10} className="fill-amber-400 text-amber-500 shrink-0" />
+                <span>{doc.googleRating || 5.0}</span>
+                <span className="text-amber-700 font-medium">({doc.googleReviewCount || 50})</span>
               </span>
             </div>
 
@@ -1781,8 +1806,8 @@ export default function ModernDoctorBooking({
               className="w-full h-full object-cover rounded-2xl" 
             />
             {isTrusted && (
-              <span className="absolute bottom-1 right-1 bg-emerald-500 text-white text-[8px] font-extrabold px-1 rounded shadow-xs">
-                ★
+              <span className="absolute bottom-1 right-1 bg-emerald-500 text-white text-[8px] font-extrabold px-1 py-0.5 rounded shadow-xs flex items-center gap-0.5">
+                <Star size={8} className="fill-white text-white" />
               </span>
             )}
           </div>
@@ -1800,21 +1825,26 @@ export default function ModernDoctorBooking({
                   )}
                 </div>
 
-                <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">
-                  📍 {clinic.address || clinic.city || "Gurugram"}{clinic.pincode ? `, ${clinic.pincode}` : ""}
+                <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1 flex items-center gap-1">
+                  <MapPin size={10} className="text-slate-400 shrink-0 inline" />
+                  <span>{clinic.address || clinic.city || "Gurugram"}{clinic.pincode ? `, ${clinic.pincode}` : ""}</span>
                 </p>
 
                 {/* Badges: Rating, Vets, Distance */}
                 <div className="flex items-center gap-1 mt-1 text-[10px] flex-wrap">
-                  <span className="bg-amber-50 text-amber-900 border border-amber-200/80 font-bold px-1.5 py-0.2 rounded-md flex items-center gap-0.5 shrink-0">
-                    ⭐ {clinic.google_rating || 5.0} <span className="text-amber-700 font-medium">({clinic.google_user_ratings_total || 50})</span>
+                  <span className="bg-amber-50 text-amber-900 border border-amber-200/80 font-bold px-1.5 py-0.2 rounded-md flex items-center gap-1 shrink-0">
+                    <Star size={10} className="fill-amber-400 text-amber-500 shrink-0" />
+                    <span>{clinic.google_rating || 5.0}</span>
+                    <span className="text-amber-700 font-medium">({clinic.google_user_ratings_total || 50})</span>
                   </span>
-                  <span className="bg-[#f0f9ff] text-[#309BD8] font-semibold px-1.5 py-0.2 rounded-md shrink-0 border border-[#bae6fd]">
-                    👤 {doctorsCount} Vet{doctorsCount > 1 ? "s" : ""}
+                  <span className="bg-[#f0f9ff] text-[#309BD8] font-semibold px-1.5 py-0.2 rounded-md shrink-0 border border-[#bae6fd] flex items-center gap-1">
+                    <Users size={10} className="text-[#309BD8] shrink-0" />
+                    <span>{doctorsCount} Vet{doctorsCount > 1 ? "s" : ""}</span>
                   </span>
                   {clinic.distance_km != null && !isNaN(Number(clinic.distance_km)) && (
-                    <span className="bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.2 rounded-md border border-slate-200/80 inline-flex items-center gap-0.5 shrink-0">
-                      <span>📍 {Number(clinic.distance_km).toFixed(1)} km</span>
+                    <span className="bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.2 rounded-md border border-slate-200/80 inline-flex items-center gap-1 shrink-0">
+                      <MapPin size={10} className="text-slate-500 shrink-0" />
+                      <span>{Number(clinic.distance_km).toFixed(1)} km</span>
                     </span>
                   )}
                 </div>
@@ -2224,19 +2254,21 @@ export default function ModernDoctorBooking({
                     <h3 className="font-bold text-[#081037] text-xs">{selectedClinic?.name || selectedDoctor?.clinicName || "Clinic"}</h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">{selectedClinic?.city || "Gurugram"}{selectedClinic?.pincode ? `, ${selectedClinic.pincode}` : ""}</p>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      <span className="bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px] px-2 py-0.5 rounded-md">
-                        ★ {selectedClinic?.google_rating || 5.0} ({selectedClinic?.google_user_ratings_total || 78})
+                      <span className="bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Star size={10} className="fill-amber-500 text-amber-500 shrink-0" />
+                        <span>{selectedClinic?.google_rating || 5.0} ({selectedClinic?.google_user_ratings_total || 78})</span>
                       </span>
                       {selectedClinic?.distance_km != null && !isNaN(Number(selectedClinic.distance_km)) && (
                         <span className="bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px] px-2 py-0.5 rounded-md inline-flex items-center gap-1">
-                          <span>📍 {Number(selectedClinic.distance_km).toFixed(1)} km</span>
+                          <MapPin size={10} className="text-slate-500 shrink-0" />
+                          <span>{Number(selectedClinic.distance_km).toFixed(1)} km</span>
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
-                <div className="w-10 h-10 bg-[#f0f9ff] border border-[#bae6fd] rounded-xl flex items-center justify-center text-[#309BD8] text-base font-bold flex-shrink-0">
-                  🏥
+                <div className="w-10 h-10 bg-[#f0f9ff] border border-[#bae6fd] rounded-xl flex items-center justify-center text-[#309BD8] flex-shrink-0">
+                  <Building2 size={20} className="text-[#309BD8]" />
                 </div>
               </div>
             ) : (
@@ -2254,7 +2286,8 @@ export default function ModernDoctorBooking({
                     <p className="text-[11px] font-semibold text-[#309BD8]">{selectedDoctor?.degree} · {selectedDoctor?.experience} Yrs Exp</p>
                     {selectedDoctor?.distance_km != null && !isNaN(Number(selectedDoctor.distance_km)) && (
                       <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1">
-                        <span>📍 {Number(selectedDoctor.distance_km).toFixed(1)} km</span>
+                        <MapPin size={10} className="text-slate-500 shrink-0" />
+                        <span>{Number(selectedDoctor.distance_km).toFixed(1)} km</span>
                       </span>
                     )}
                   </div>
@@ -2288,8 +2321,9 @@ export default function ModernDoctorBooking({
                   <p className="text-[10px] text-slate-400">Upload a clear image of the issue.</p>
                 </div>
                 
-                <label className="cursor-pointer bg-[#309BD8] hover:bg-[#2887bc] text-white font-bold text-[11px] px-3 py-1.5 rounded-lg shadow-xs transition-all inline-flex items-center gap-1 flex-shrink-0">
-                  <span className="text-xs">☁</span> Add Photo
+                <label className="cursor-pointer bg-[#309BD8] hover:bg-[#2887bc] text-white font-bold text-[11px] px-3 py-1.5 rounded-lg shadow-xs transition-all inline-flex items-center gap-1.5 flex-shrink-0">
+                  <Camera size={13} className="shrink-0" />
+                  <span>Add Photo</span>
                   <input 
                     type="file" 
                     accept="image/*" 
@@ -2387,7 +2421,7 @@ export default function ModernDoctorBooking({
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         }`}
                       >
-                        {t === "all" ? `All (${clinicPackages.length})` : t === "Dog" ? `🐶 Dogs (${clinicPackages.filter(p => p.petType === "Dog").length})` : `🐱 Cats (${clinicPackages.filter(p => p.petType === "Cat").length})`}
+                        {t === "all" ? `All (${clinicPackages.length})` : t === "Dog" ? `Dogs (${clinicPackages.filter(p => p.petType === "Dog").length})` : `Cats (${clinicPackages.filter(p => p.petType === "Cat").length})`}
                       </button>
                     ))}
                   </div>
@@ -2540,7 +2574,7 @@ export default function ModernDoctorBooking({
                     >
                       <p className="text-[9px] font-bold leading-tight">More</p>
                       <p className="text-[9px] font-bold">Dates</p>
-                      <p className="text-[10px] mt-0.5">📅</p>
+                      <Calendar size={13} className="mx-auto mt-0.5 text-[#309BD8]" />
                       <input
                         id="hidden-date-picker"
                         type="date"
@@ -2562,7 +2596,9 @@ export default function ModernDoctorBooking({
                       <span className="text-[10px] font-bold text-[#309BD8] bg-[#f0f9ff] border border-[#bae6fd] px-2 py-0.5 rounded-md">
                         {new Date(selectedDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
                       </span>
-                      <button onClick={() => { setSelectedDate(""); setSelectedTimeSlot(""); setAvailableSlots([]); }} className="text-[10px] text-red-400 hover:text-red-600 cursor-pointer">✕</button>
+                      <button onClick={() => { setSelectedDate(""); setSelectedTimeSlot(""); setAvailableSlots([]); }} className="text-red-400 hover:text-red-600 cursor-pointer p-0.5" aria-label="Clear date">
+                        <X size={11} />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2604,7 +2640,7 @@ export default function ModernDoctorBooking({
 
             {error && (
               <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold rounded-xl flex items-center gap-1.5">
-                <span>⚠️</span>
+                <AlertCircle size={14} className="text-red-500 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
@@ -2651,13 +2687,19 @@ export default function ModernDoctorBooking({
                 <div className="bg-slate-50/70 p-2 rounded-lg border border-slate-100">
                   <p className="text-[9px] uppercase font-bold text-slate-400">Pet Parent</p>
                   <p className="font-extrabold text-[#081037] text-xs truncate">{displayUserName}</p>
-                  <p className="text-[10px] text-slate-500 truncate">📞 {displayUserMobile}</p>
+                  <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                    <Phone size={10} className="text-slate-400 shrink-0" />
+                    <span>{displayUserMobile}</span>
+                  </p>
                 </div>
 
                 {/* Pet Info */}
                 <div className="bg-slate-50/70 p-2 rounded-lg border border-slate-100">
                   <p className="text-[9px] uppercase font-bold text-slate-400">Pet</p>
-                  <p className="font-extrabold text-[#081037] text-xs truncate">🐾 {displayPetName}</p>
+                  <p className="font-extrabold text-[#081037] text-xs truncate flex items-center gap-1">
+                    <HeartHandshake size={11} className="text-[#309BD8] shrink-0" />
+                    <span>{displayPetName}</span>
+                  </p>
                   <p className="text-[10px] text-slate-500 truncate">{displayPetBreed}</p>
                 </div>
 
@@ -2668,12 +2710,21 @@ export default function ModernDoctorBooking({
                   </p>
                   {currentOrderType === "appointment" ? (
                     <>
-                      <p className="font-extrabold text-[#081037] text-xs truncate">📅 {selectedDate}</p>
-                      <p className="text-[10px] text-[#309BD8] font-bold truncate">⏰ {selectedTimeSlot}</p>
+                      <p className="font-extrabold text-[#081037] text-xs truncate flex items-center gap-1">
+                        <Calendar size={10} className="text-slate-400 shrink-0" />
+                        <span>{selectedDate}</span>
+                      </p>
+                      <p className="text-[10px] text-[#309BD8] font-bold truncate flex items-center gap-1">
+                        <Clock size={10} className="text-[#309BD8] shrink-0" />
+                        <span>{selectedTimeSlot}</span>
+                      </p>
                     </>
                   ) : (
                     <>
-                      <p className="font-extrabold text-[#081037] text-xs truncate">⚡ Instant Video</p>
+                      <p className="font-extrabold text-[#081037] text-xs truncate flex items-center gap-1">
+                        <Zap size={11} className="text-amber-500 fill-amber-500 shrink-0" />
+                        <span>Instant Video</span>
+                      </p>
                       <p className="text-[10px] text-emerald-700 font-bold truncate">Connects in 0-15m</p>
                     </>
                   )}
@@ -2685,8 +2736,9 @@ export default function ModernDoctorBooking({
                 <div className="bg-[#f0f9ff] border border-[#bae6fd] rounded-lg p-2.5 flex items-center justify-between gap-2 mt-1">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[9px] font-extrabold uppercase tracking-wider bg-[#309BD8] text-white px-1.5 py-0.5 rounded shadow-2xs">
-                        📦 Package Selected
+                      <span className="text-[9px] font-extrabold uppercase tracking-wider bg-[#309BD8] text-white px-1.5 py-0.5 rounded shadow-2xs flex items-center gap-1">
+                        <Package size={10} className="shrink-0" />
+                        <span>Package Selected</span>
                       </span>
                       <span className="text-[10px] font-bold text-[#081037]">
                         {selectedPackage.badge || selectedPackage.category || "Specialized Plan"}
@@ -2795,8 +2847,10 @@ export default function ModernDoctorBooking({
                       }`}
                     >
                       <div className="flex items-start justify-between gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-base">🏥</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0">
+                            <Building2 size={14} />
+                          </div>
                           <div>
                             <p className="text-xs font-bold text-[#081037]">Pay at Clinic</p>
                             <p className="text-[10px] text-emerald-700 font-semibold">Cash / UPI / Cards</p>
@@ -2805,7 +2859,7 @@ export default function ModernDoctorBooking({
                         <div className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] shrink-0 ${
                           paymentPreference === "pay_at_clinic" ? "border-emerald-600 bg-emerald-600 text-white font-bold" : "border-slate-300"
                         }`}>
-                          {paymentPreference === "pay_at_clinic" && "✓"}
+                          {paymentPreference === "pay_at_clinic" && <Check size={10} />}
                         </div>
                       </div>
                       <p className="text-[10px] text-slate-500 leading-snug">
@@ -2823,8 +2877,10 @@ export default function ModernDoctorBooking({
                       }`}
                     >
                       <div className="flex items-start justify-between gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-base">⚡</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-blue-100/80 text-[#309BD8] flex items-center justify-center shrink-0">
+                            <Zap size={14} className="fill-[#309BD8]" />
+                          </div>
                           <div>
                             <p className="text-xs font-bold text-[#081037]">Pay Online Now</p>
                             <p className="text-[10px] text-[#309BD8] font-semibold">UPI / Netbanking / Cards</p>
@@ -2833,7 +2889,7 @@ export default function ModernDoctorBooking({
                         <div className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] shrink-0 ${
                           paymentPreference === "pay_online" ? "border-[#309BD8] bg-[#309BD8] text-white font-bold" : "border-slate-300"
                         }`}>
-                          {paymentPreference === "pay_online" && "✓"}
+                          {paymentPreference === "pay_online" && <Check size={10} />}
                         </div>
                       </div>
                       <p className="text-[10px] text-slate-500 leading-snug">
@@ -2909,7 +2965,8 @@ export default function ModernDoctorBooking({
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        <span>🏥 Confirm Visit · Pay at Clinic →</span>
+                        <Building2 size={16} />
+                        <span>Confirm Visit · Pay at Clinic →</span>
                       </>
                     )}
                   </button>
@@ -2924,7 +2981,8 @@ export default function ModernDoctorBooking({
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        <span>⚡ Pay ₹{totalAmount} & Confirm Booking →</span>
+                        <Zap size={16} className="fill-white" />
+                        <span>Pay ₹{totalAmount} & Confirm Booking →</span>
                       </>
                     )}
                   </button>
@@ -2945,7 +3003,10 @@ export default function ModernDoctorBooking({
                 {processing ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  `Pay ₹${totalAmount} & Book Consultation →`
+                  <>
+                    <Zap size={14} className="fill-white" />
+                    <span>Pay ₹{totalAmount} & Book Consultation →</span>
+                  </>
                 )}
               </button>
             )}
@@ -2966,8 +3027,9 @@ export default function ModernDoctorBooking({
             </div>
 
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                🎉 Booking Confirmed
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 inline-flex items-center gap-1">
+                <CheckCircle2 size={12} className="text-emerald-600" />
+                <span>Booking Confirmed</span>
               </span>
               <h2 className="text-base sm:text-lg font-extrabold text-[#081037] mt-2">
                 Thank You for Choosing SnoutIQ!
@@ -2984,19 +3046,35 @@ export default function ModernDoctorBooking({
             {/* Booking Summary Card */}
             <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 text-left text-xs space-y-2">
               <div className="flex items-center justify-between py-0.5 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">🐾 Patient (Pet)</span>
+                <span className="text-slate-500 font-medium flex items-center gap-1">
+                  <HeartHandshake size={12} className="text-[#309BD8]" />
+                  <span>Patient (Pet)</span>
+                </span>
                 <span className="font-bold text-[#081037]">{bookingSuccessData.petName}</span>
               </div>
               <div className="flex items-center justify-between py-0.5 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">
-                  {bookingSuccessData.orderType === "appointment" ? "🏥 Clinic / Hospital" : "👨‍⚕️ Veterinarian"}
+                <span className="text-slate-500 font-medium flex items-center gap-1">
+                  {bookingSuccessData.orderType === "appointment" ? (
+                    <>
+                      <Building2 size={12} className="text-emerald-600" />
+                      <span>Clinic / Hospital</span>
+                    </>
+                  ) : (
+                    <>
+                      <User size={12} className="text-[#309BD8]" />
+                      <span>Veterinarian</span>
+                    </>
+                  )}
                 </span>
                 <span className="font-bold text-[#081037] truncate max-w-[200px]">
                   {bookingSuccessData.orderType === "appointment" ? bookingSuccessData.clinicName : bookingSuccessData.doctorName}
                 </span>
               </div>
               <div className="flex items-center justify-between py-0.5 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">📅 Schedule</span>
+                <span className="text-slate-500 font-medium flex items-center gap-1">
+                  <Calendar size={12} className="text-slate-400" />
+                  <span>Schedule</span>
+                </span>
                 <span className="font-bold text-[#081037]">
                   {bookingSuccessData.orderType === "appointment"
                     ? `${bookingSuccessData.date} at ${bookingSuccessData.timeSlot}`
@@ -3004,7 +3082,10 @@ export default function ModernDoctorBooking({
                 </span>
               </div>
               <div className="flex items-center justify-between py-0.5">
-                <span className="text-slate-500 font-medium">💳 Payment Method</span>
+                <span className="text-slate-500 font-medium flex items-center gap-1">
+                  <CreditCard size={12} className="text-slate-400" />
+                  <span>Payment Method</span>
+                </span>
                 <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${
                   bookingSuccessData.paymentMethod === "pay_at_clinic"
                     ? "bg-amber-100 text-amber-900 border border-amber-200"
@@ -3221,13 +3302,15 @@ export default function ModernDoctorBooking({
                     </p>
                     {viewProfileDoctor.distance_km != null && !isNaN(Number(viewProfileDoctor.distance_km)) && (
                       <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1">
-                        <span>📍 {Number(viewProfileDoctor.distance_km).toFixed(1)} km away</span>
+                        <MapPin size={10} className="text-slate-500 shrink-0" />
+                        <span>{Number(viewProfileDoctor.distance_km).toFixed(1)} km away</span>
                       </span>
                     )}
                   </div>
                   {viewProfileDoctor.googleRating !== null && (
                     <span className="inline-flex items-center gap-1 mt-1 bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded-md text-[10px] font-bold">
-                      ⭐ {viewProfileDoctor.googleRating} ({viewProfileDoctor.googleReviewCount})
+                      <Star size={10} className="fill-amber-400 text-amber-500 shrink-0" />
+                      <span>{viewProfileDoctor.googleRating} ({viewProfileDoctor.googleReviewCount})</span>
                     </span>
                   )}
                 </div>

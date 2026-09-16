@@ -1,5 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Home,
+  MapPin,
+  Calendar,
+  Clock,
+  CheckCircle,
+  X,
+  FileText,
+  Shield,
+  Loader2,
+  Navigation,
+  Phone,
+  HeartHandshake,
+} from "lucide-react";
 import { readAiAuthState } from "./AiAuth";
 import { confirmPaymentStart, showBookingError, showBookingWarning } from "./booking/bookingAlerts";
 import { fetchPetOverview } from "./petOverviewService";
@@ -16,7 +30,8 @@ function normalizeText(value) {
 }
 
 function normalizePhone(value) {
-  return String(value || "").replace(/[^\d+]/g, "").trim();
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.slice(-10);
 }
 
 function pickFirst(...values) {
@@ -197,11 +212,12 @@ export default function HomeVetBookingFlow({
   }
 
   function validate() {
-    if (!resolvedUserId || !effectivePetId) return "User/Pet context missing hai.";
-    if (!normalizeText(form.dateOfVisit)) return "Visit date required hai.";
-    if (!normalizeText(form.timeOfVisit)) return "Visit time required hai.";
-    if (!normalizeText(form.notes)) return "Please describe symptoms.";
-    if (!form.consentGiven) return "Please acknowledge consent before payment.";
+    if (!resolvedUserId || !effectivePetId) return "User / Pet profile not found. Please log in.";
+    if (!normalizeText(form.address)) return "Please enter your home address for the visit.";
+    if (!normalizeText(form.dateOfVisit)) return "Visit date is required.";
+    if (!normalizeText(form.timeOfVisit)) return "Visit time slot is required.";
+    if (!normalizeText(form.notes)) return "Please describe pet symptoms or reason for visit.";
+    if (!form.consentGiven) return "Please accept the consent checkbox to continue.";
     return "";
   }
 
@@ -217,11 +233,40 @@ export default function HomeVetBookingFlow({
           maximumAge: 5 * 60 * 1000,
         });
       });
-      updateForm("lat", Number(position.coords.latitude.toFixed(6)));
-      updateForm("lng", Number(position.coords.longitude.toFixed(6)));
-      setStatus("Current location added.");
+      const lat = Number(position.coords.latitude.toFixed(6));
+      const lng = Number(position.coords.longitude.toFixed(6));
+      updateForm("lat", lat);
+      updateForm("lng", lng);
+
+      // Attempt reverse geocoding via OpenStreetMap Nominatim
+      try {
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        );
+        if (geoRes.ok) {
+          const geoData = await geoRes.json();
+          const addr = geoData.address || {};
+          const detectedCity = addr.city || addr.town || addr.village || addr.suburb || addr.county || "";
+          const detectedPostcode = addr.postcode || "";
+          const fullStreet = geoData.display_name || "";
+
+          setForm((prev) => ({
+            ...prev,
+            lat,
+            lng,
+            city: detectedCity || prev.city,
+            pincode: detectedPostcode || prev.pincode,
+            address: fullStreet || prev.address,
+          }));
+          setStatus("Location fetched successfully.");
+        } else {
+          setStatus("Current GPS coordinates detected.");
+        }
+      } catch {
+        setStatus("Current GPS coordinates detected.");
+      }
     } catch (_) {
-      setStatus("Location permission is off. You can enter address manually.");
+      setStatus("Location permission denied. Please enter address manually.");
     } finally {
       setLocationLoading(false);
     }
@@ -229,7 +274,7 @@ export default function HomeVetBookingFlow({
 
   async function openRazorpay({ key, orderId, amountInPaise }) {
     const loaded = await loadRazorpayScript();
-    if (!loaded) throw new Error("Razorpay SDK load nahi hua.");
+    if (!loaded) throw new Error("Unable to load Razorpay SDK.");
 
     return new Promise((resolve, reject) => {
       const checkout = new window.Razorpay({
@@ -263,8 +308,8 @@ export default function HomeVetBookingFlow({
 
     const confirmation = await confirmPaymentStart({
       amount: TOTAL_AMOUNT,
-      title: "Continue to payment",
-      text: `Pay ${formatCurrency(TOTAL_AMOUNT)} for vet at home visit.`,
+      title: "Confirm Home Visit Booking",
+      text: `Pay ${formatCurrency(TOTAL_AMOUNT)} (incl. 18% GST) for Vet at Home visit.`,
     });
     if (!confirmation.isConfirmed) return;
 
@@ -288,9 +333,9 @@ export default function HomeVetBookingFlow({
         }),
       });
       const fromPetData = await readApiBody(fromPetRes);
-      if (!fromPetRes.ok) throw new Error(fromPetData?.message || "Home vet booking create nahi hui.");
+      if (!fromPetRes.ok) throw new Error(fromPetData?.message || "Could not create home vet booking.");
       confirmedBookingId = resolveBookingId(fromPetData);
-      if (!confirmedBookingId) throw new Error("Home vet booking id missing hai.");
+      if (!confirmedBookingId) throw new Error("Home vet booking id missing.");
 
       const step2Payload = stripEmpty({
         home_service_booking_id: confirmedBookingId,
@@ -298,7 +343,7 @@ export default function HomeVetBookingFlow({
         user_id: resolvedUserId,
         pet_id: effectivePetId,
         parent_name: form.ownerName,
-        phone: normalizePhone(form.phone).replace(/\D/g, "").slice(-10),
+        phone: normalizePhone(form.phone),
         email: form.email,
         pet_name: form.petName,
         pet_type: form.petType,
@@ -317,7 +362,7 @@ export default function HomeVetBookingFlow({
         body: JSON.stringify(step2Payload),
       });
       const step2Data = await readApiBody(step2Res);
-      if (!step2Res.ok) throw new Error(step2Data?.message || "Home vet details save nahi hue.");
+      if (!step2Res.ok) throw new Error(step2Data?.message || "Could not save home visit details.");
       confirmedBookingId = resolveBookingId(step2Data) || confirmedBookingId;
 
       const orderPayload = {
@@ -337,13 +382,13 @@ export default function HomeVetBookingFlow({
         body: JSON.stringify(orderPayload),
       });
       const orderData = await readApiBody(orderRes);
-      if (!orderRes.ok) throw new Error(orderData?.message || orderData?.error || "Order create nahi hua.");
+      if (!orderRes.ok) throw new Error(orderData?.message || orderData?.error || "Could not create payment order.");
       const order = orderData?.order || orderData?.data?.order || orderData?.data || {};
       const key = normalizeText(orderData?.key || orderData?.data?.key);
       const orderId = normalizeText(order?.id || order?.order_id || orderData?.order_id || orderData?.data?.order_id);
       const amountInPaise = Number(order?.amount || TOTAL_AMOUNT * 100);
-      if (!key) throw new Error("Razorpay key missing hai.");
-      if (!orderId) throw new Error("Order ID missing hai.");
+      if (!key) throw new Error("Payment gateway key missing.");
+      if (!orderId) throw new Error("Order ID missing.");
 
       const razorpayResponse = await openRazorpay({ key, orderId, amountInPaise });
       paidResponse = razorpayResponse;
@@ -365,7 +410,7 @@ export default function HomeVetBookingFlow({
       });
       const verifyData = await readApiBody(verifyRes);
       if (!verifyRes.ok || !verifyData?.success) {
-        throw new Error(verifyData?.message || verifyData?.error || "Payment verify nahi hua.");
+        throw new Error(verifyData?.message || verifyData?.error || "Payment verification failed.");
       }
 
       const successPayload = {
@@ -432,14 +477,14 @@ export default function HomeVetBookingFlow({
     <div
       className={
         isModal
-          ? "fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 lg:items-center"
-          : "min-h-screen bg-slate-50 pb-28 text-slate-900 lg:pb-0"
+          ? "fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+          : "min-h-screen bg-slate-50 pb-20 text-slate-900"
       }
     >
       {isModal ? (
         <button
           type="button"
-          className="absolute inset-0 cursor-default"
+          className="absolute inset-0 cursor-default bg-transparent"
           aria-label="Close vet at home booking"
           onClick={onClose}
         />
@@ -448,124 +493,238 @@ export default function HomeVetBookingFlow({
       <div
         className={
           isModal
-            ? "relative max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-t-3xl bg-slate-50 px-3 py-3 text-slate-900 shadow-2xl sm:px-5 lg:max-h-[88vh] lg:rounded-3xl lg:px-6"
-            : "mx-auto max-w-5xl px-3 py-4 sm:px-5 lg:px-6"
+            ? "relative max-h-[92vh] sm:max-h-[88vh] lg:max-h-[85vh] w-full max-w-full sm:max-w-2xl lg:max-w-3xl overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-slate-50 p-2.5 sm:p-3.5 text-slate-900 shadow-2xl animate-[scaleIn_0.2s_ease-out]"
+            : "mx-auto max-w-4xl px-3 py-4 sm:px-5"
         }
       >
-        {isModal ? (
-          <div className="mb-3 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
-            <div>
-              <h1 className="text-lg font-bold text-slate-900">Book Vet at Home</h1>
-              {/* <p className="text-sm text-slate-500">SnoutIQ team will assign a vet and confirm your visit.</p> */}
+        {/* Compact Header */}
+        <div className="mb-2.5 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-2 ring-blue-100 shrink-0">
+              <Home size={14} />
             </div>
+            <div>
+              <h1 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">Book Vet at Home</h1>
+              <p className="text-[10px] text-slate-500">Doorstep physical checkup for {form.petName || "pet"}</p>
+            </div>
+          </div>
+          {isModal && (
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors shrink-0"
               aria-label="Close"
             >
-              x
+              <X size={13} />
             </button>
-          </div>
-        ) : null}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className={isModal ? "hidden" : "border-b border-slate-200 px-4 py-4 sm:px-6"}>
-            <h1 className="text-xl font-bold sm:text-2xl">Book Vet at Home</h1>
-            <p className="mt-1 text-sm text-slate-500">Vet at home visit for {form.petName || "your pet"}.</p>
-          </div>
+          )}
+        </div>
 
-          <div className="grid gap-4 px-3 py-4 lg:grid-cols-[1.3fr_0.7fr] sm:px-5 lg:px-6">
-            <div className="space-y-4">
-              <section className="hidden">
-                <h2 className="text-base font-semibold">Pet & parent details</h2>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <input className="rounded-2xl border border-slate-200 px-4 py-3" value={form.ownerName} onChange={(e) => updateForm("ownerName", e.target.value)} placeholder="Owner name" />
-                  <input className="rounded-2xl border border-slate-200 px-4 py-3" value={form.phone} onChange={(e) => updateForm("phone", e.target.value)} placeholder="Phone" />
-                  <input className="rounded-2xl border border-slate-200 px-4 py-3" value={form.email} onChange={(e) => updateForm("email", e.target.value)} placeholder="Email" />
-                  <input className="rounded-2xl border border-slate-200 px-4 py-3" value={form.petName} onChange={(e) => updateForm("petName", e.target.value)} placeholder="Pet name" />
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="grid gap-3.5 p-3 sm:p-4 lg:grid-cols-[1.25fr_0.75fr]">
+            <div className="space-y-3">
+              {/* Pet & Parent Details (Non-editable summary card) */}
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-2.5 sm:p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Parent & Pet Details
+                  </span>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Verified Profile
+                  </span>
                 </div>
-              </section>
-
-              <section className="hidden">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-base font-semibold">Visit address</h2>
-                  <button type="button" onClick={useCurrentLocation} disabled={locationLoading} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60">
-                    {locationLoading ? "Adding..." : "Use current location"}
-                  </button>
-                </div>
-                <div className="mt-4 grid gap-3">
-                  <textarea className="rounded-2xl border border-slate-200 px-4 py-3" rows={3} value={form.address} onChange={(e) => updateForm("address", e.target.value)} placeholder="Address" />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <input className="rounded-2xl border border-slate-200 px-4 py-3" value={form.city} onChange={(e) => updateForm("city", e.target.value)} placeholder="City" />
-                    <input className="rounded-2xl border border-slate-200 px-4 py-3" value={form.pincode} onChange={(e) => updateForm("pincode", e.target.value)} placeholder="Pincode" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white p-2 rounded-lg border border-slate-200/60 shadow-2xs">
+                    <p className="text-[9px] uppercase font-bold text-slate-400">Pet Parent</p>
+                    <p className="font-extrabold text-[#081037] text-xs truncate">
+                      {form.ownerName || authUser.pet_owner_name || authUser.owner_name || authUser.name || "Pet Parent"}
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                      <Phone size={10} className="text-slate-400 shrink-0" />
+                      <span>{form.phone ? `+91 ${form.phone}` : (authUser.phone || authUser.mobile || "N/A")}</span>
+                    </p>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-200/60 shadow-2xs">
+                    <p className="text-[9px] uppercase font-bold text-slate-400">Pet Info</p>
+                    <p className="font-extrabold text-[#081037] text-xs truncate flex items-center gap-1">
+                      <HeartHandshake size={11} className="text-blue-500 shrink-0" />
+                      <span>{form.petName || fallbackPet?.name || authUser.pet_name || "Pet"}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate capitalize">
+                      {form.petType || "Dog"}{form.email ? ` • ${form.email}` : ""}
+                    </p>
                   </div>
                 </div>
-              </section>
+              </div>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h2 className="text-base font-semibold">Date & time slot</h2>
-                <input className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3" type="date" min={todayIso()} value={form.dateOfVisit} onChange={(e) => updateForm("dateOfVisit", e.target.value)} />
-                <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                  {TIME_SLOTS.map((slot) => (
-                    <button key={slot} type="button" onClick={() => updateForm("timeOfVisit", slot)} className={`rounded-2xl border px-3 py-3 text-sm font-semibold ${form.timeOfVisit === slot ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-700"}`}>
-                      {slot}
-                    </button>
-                  ))}
+              {/* Visit Address */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Visit Address
+                  </span>
+                  <button
+                    type="button"
+                    onClick={useCurrentLocation}
+                    disabled={locationLoading}
+                    className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-60"
+                  >
+                    {locationLoading ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} />}
+                    <span>{locationLoading ? "Detecting..." : "Use current GPS"}</span>
+                  </button>
                 </div>
-              </section>
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h2 className="text-base font-semibold">Describe symptoms</h2>
-                <textarea className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3" rows={4} value={form.notes} onChange={(e) => updateForm("notes", e.target.value)} placeholder="Symptoms or notes" />
-                <label className="mt-4 block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">Upload image / report</span>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf,.doc,.docx"
-                    onChange={(event) => setMediaFiles(Array.from(event.target.files || []))}
-                    className="block w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                <div className="space-y-2">
+                  <textarea
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
+                    rows={2}
+                    value={form.address}
+                    onChange={(e) => updateForm("address", e.target.value)}
+                    placeholder="House/Flat No., Building, Street, Landmark"
                   />
-                  {mediaFiles[0] ? (
-                    <div className="mt-2 text-xs font-medium text-slate-500">{mediaFiles[0].name}</div>
-                  ) : null}
-                </label>
-                <label className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <input type="checkbox" checked={form.consentGiven} onChange={(e) => updateForm("consentGiven", e.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600" />
-                  <span className="text-sm text-slate-700">I acknowledge and agree to proceed with this home visit booking.</span>
-                </label>
-              </section>
-
-              {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-              {status ? <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">{status}</div> : null}
-              {successState ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                  <h2 className="text-xl font-bold">Vet at home booked successfully</h2>
-                  {/* <p className="mt-2 text-sm text-emerald-800">SnoutIQ team will assign a vet and confirm your visit.</p> */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
+                      value={form.city}
+                      onChange={(e) => updateForm("city", e.target.value)}
+                      placeholder="City"
+                    />
+                    <input
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
+                      value={form.pincode}
+                      maxLength={6}
+                      onChange={(e) => updateForm("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="Pincode"
+                    />
+                  </div>
                 </div>
-              ) : null}
+              </div>
+
+              {/* Date & Time Slot */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Date & Slot
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_2fr] items-center">
+                  <input
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
+                    type="date"
+                    min={todayIso()}
+                    value={form.dateOfVisit}
+                    onChange={(e) => updateForm("dateOfVisit", e.target.value)}
+                  />
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                    {TIME_SLOTS.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => updateForm("timeOfVisit", slot)}
+                        className={`rounded-lg py-1.5 px-1 text-[11px] font-bold transition-all ${
+                          form.timeOfVisit === slot
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700 hover:border-slate-300"
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Symptoms / Notes & Consent */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Symptoms & Consent
+                </div>
+                <textarea
+                  className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm focus:border-blue-500 focus:outline-none"
+                  rows={2}
+                  value={form.notes}
+                  onChange={(e) => updateForm("notes", e.target.value)}
+                  placeholder="Describe your pet's symptoms or reason for visit..."
+                />
+                <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.consentGiven}
+                    onChange={(e) => updateForm("consentGiven", e.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-[10px] sm:text-[11px] text-slate-600 leading-tight">
+                    I confirm details are accurate and agree to book this home vet visit.
+                  </span>
+                </label>
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  {error}
+                </div>
+              )}
+              {status && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
+                  {status}
+                </div>
+              )}
+              {successState && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <h2 className="text-xs font-bold text-emerald-900">Vet at Home Booked Successfully!</h2>
+                  <p className="text-[11px] text-emerald-700">A vet will visit on {form.dateOfVisit} at {form.timeOfVisit}.</p>
+                </div>
+              )}
             </div>
 
-            <aside
-              className={
-                isModal
-                  ? "lg:sticky lg:top-6 lg:h-fit"
-                  : "fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white p-3 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] lg:sticky lg:inset-auto lg:top-6 lg:h-fit lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none"
-              }
-            >
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">Payment summary</div>
-                <div className="mt-4 rounded-2xl bg-slate-900 p-4 text-white">
-                  <div className="text-sm text-slate-300">Total payable</div>
-                  <div className="mt-1 text-3xl font-bold">{formatCurrency(TOTAL_AMOUNT)}</div>
+            {/* Payment Summary Sidebar */}
+            <aside className="lg:sticky lg:top-2 lg:h-fit">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">Summary</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                    <Shield size={10} /> Verified
+                  </span>
                 </div>
-                <div className="mt-4 divide-y divide-slate-100 text-sm">
-                  <div className="flex justify-between py-2"><span className="text-slate-500">Visit fee</span><span>{formatCurrency(BASE_AMOUNT)}</span></div>
-                  <div className="flex justify-between py-2"><span className="text-slate-500">GST ({GST_PERCENT}%)</span><span>{formatCurrency(GST_AMOUNT)}</span></div>
-                  <div className="flex justify-between py-2 font-semibold"><span>Total</span><span>{formatCurrency(TOTAL_AMOUNT)}</span></div>
+
+                <div className="mt-2.5 rounded-xl bg-slate-900 p-3 text-white">
+                  <div className="text-[10px] text-slate-300">Total Payable</div>
+                  <div className="text-lg sm:text-xl font-black text-white">{formatCurrency(TOTAL_AMOUNT)}</div>
+                  <div className="text-[10px] text-emerald-400">Includes 18% GST</div>
                 </div>
-                <button type="button" onClick={handlePayNow} disabled={paymentLoading} className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60">
-                  {paymentLoading ? "Processing..." : "Continue to payment"}
+
+                <div className="mt-2.5 divide-y divide-slate-200 text-xs">
+                  <div className="flex justify-between py-1.5 text-slate-600">
+                    <span>Visit Fee</span>
+                    <span className="font-semibold text-slate-800">{formatCurrency(BASE_AMOUNT)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 text-slate-600">
+                    <span>GST ({GST_PERCENT}%)</span>
+                    <span className="font-semibold text-slate-800">{formatCurrency(GST_AMOUNT)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 font-bold text-slate-900">
+                    <span>Total</span>
+                    <span>{formatCurrency(TOTAL_AMOUNT)}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePayNow}
+                  disabled={paymentLoading}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs transition-all hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {paymentLoading ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <span>Pay {formatCurrency(TOTAL_AMOUNT)} & Confirm</span>
+                  )}
                 </button>
+
+                <p className="mt-2 text-center text-[10px] text-slate-400 flex items-center justify-center gap-1">
+                  <Shield size={11} className="text-emerald-500 shrink-0" />
+                  <span>100% Secure via Razorpay</span>
+                </p>
               </div>
             </aside>
           </div>
@@ -574,3 +733,5 @@ export default function HomeVetBookingFlow({
     </div>
   );
 }
+
+
