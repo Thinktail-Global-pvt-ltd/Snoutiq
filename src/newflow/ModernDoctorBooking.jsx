@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { readAiAuthState } from "../ai/AiAuth";
 import { confirmPaymentStart } from "../ai/booking/bookingAlerts";
 import PhoneVerifyGate from "../ai/PhoneVerifyGate";
+import { getGoogleCalendarUrl, downloadIcsFile } from "../utils/calendarHelpers";
 import snoutiq_app_icon from "../assets/snoutiq_app_icon.png";
 import clinicDefaultImg from "../assets/images/clinic.png";
 import { extractPackageItems } from "./packageHelpers";
@@ -1668,6 +1669,12 @@ export default function ModernDoctorBooking({
           });
         }
 
+        let submitData = null;
+        if (submitRes && submitRes.ok) {
+          submitData = await submitRes.json().catch(() => null);
+        }
+        const confirmedBookingId = submitData?.booking_id || submitData?.id || submitData?.data?.id || "N/A";
+
         if (lockId) unlockCurrentSlot(lockId);
         setBookingSuccessData({
           orderType: "appointment",
@@ -1676,8 +1683,10 @@ export default function ModernDoctorBooking({
           date: selectedDate,
           timeSlot: selectedTimeSlot,
           clinicName: selectedClinic?.name || selectedDoctor?.clinicName || "Veterinary Clinic",
+          clinicAddress: selectedClinic?.address || selectedDoctor?.clinicAddress || selectedDoctor?.address || "",
           doctorName: selectedDoctor?.name || "Veterinary Doctor",
           petName: displayPetName,
+          bookingId: confirmedBookingId,
         });
         setSuccess(true);
       } catch (err) {
@@ -1774,17 +1783,20 @@ export default function ModernDoctorBooking({
         throw new Error(verifyData?.message || verifyData?.error || "Payment verification failed");
       }
 
+      let appointmentData = null;
       if (currentOrderType === "appointment") {
         const appointmentRes = await fetch(`${API_BASE}/appointments/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({ ...appointmentSubmitPayload, ...paymentResult, payment_method: "razorpay" })
         });
-        const appointmentData = await appointmentRes.json().catch(() => null);
+        appointmentData = await appointmentRes.json().catch(() => null);
         if (!appointmentRes.ok || appointmentData?.success === false) {
           throw new Error(appointmentData?.message || appointmentData?.error || "Appointment confirmation failed");
         }
       }
+
+      const confirmedBookingId = appointmentData?.booking_id || appointmentData?.id || appointmentData?.data?.id || orderData?.order_id || "N/A";
 
       if (lockId) unlockCurrentSlot(lockId);
       setBookingSuccessData({
@@ -1794,8 +1806,10 @@ export default function ModernDoctorBooking({
         date: selectedDate,
         timeSlot: selectedTimeSlot,
         clinicName: selectedClinic?.name || selectedDoctor?.clinicName || "Veterinary Clinic",
+        clinicAddress: selectedClinic?.address || selectedDoctor?.clinicAddress || selectedDoctor?.address || "",
         doctorName: selectedDoctor?.name || "Veterinary Doctor",
         petName: displayPetName,
+        bookingId: confirmedBookingId,
       });
       setSuccess(true);
     } catch (err) {
@@ -3220,6 +3234,49 @@ export default function ModernDoctorBooking({
                     ? `Pay ₹${bookingSuccessData.amount} at Clinic`
                     : `Paid ₹${bookingSuccessData.amount} (Online)`}
                 </span>
+              </div>
+            </div>
+
+            {/* Add to Calendar */}
+            <div className="pt-1">
+              <p className="text-[10px] uppercase font-bold text-slate-400 text-left mb-1.5 flex items-center gap-1">
+                <Calendar size={11} className="text-[#309BD8]" />
+                <span>Add to Calendar</span>
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={getGoogleCalendarUrl({
+                    title: `Vet Appointment - ${bookingSuccessData.petName || "Pet"}`,
+                    description: `Booking ID: ${bookingSuccessData.bookingId || "N/A"}\nProvider: ${bookingSuccessData.doctorName || bookingSuccessData.clinicName || "SnoutIQ Vet"}\nMode: ${bookingSuccessData.orderType === "appointment" ? "In-Clinic Visit" : "Video Consultation"}\nPlatform: SnoutIQ`,
+                    location: bookingSuccessData.clinicAddress || (bookingSuccessData.orderType === "appointment" ? (bookingSuccessData.clinicName || "Veterinary Clinic") : "SnoutIQ Video Call"),
+                    date: bookingSuccessData.date,
+                    timeSlot: bookingSuccessData.timeSlot,
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2 px-2 bg-slate-50 hover:bg-blue-50/70 text-[#081037] hover:text-[#309BD8] font-bold text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5 border border-slate-200 hover:border-blue-200 shadow-xs"
+                >
+                  <Calendar size={12} className="text-[#309BD8]" />
+                  <span>Google Calendar</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    downloadIcsFile({
+                      title: `Vet Appointment - ${bookingSuccessData.petName || "Pet"}`,
+                      description: `Booking ID: ${bookingSuccessData.bookingId || "N/A"}\nProvider: ${bookingSuccessData.doctorName || bookingSuccessData.clinicName || "SnoutIQ Vet"}\nMode: ${bookingSuccessData.orderType === "appointment" ? "In-Clinic Visit" : "Video Consultation"}\nPlatform: SnoutIQ`,
+                      location: bookingSuccessData.clinicAddress || (bookingSuccessData.orderType === "appointment" ? (bookingSuccessData.clinicName || "Veterinary Clinic") : "SnoutIQ Video Call"),
+                      date: bookingSuccessData.date,
+                      timeSlot: bookingSuccessData.timeSlot,
+                      filename: `snoutiq-appointment-${bookingSuccessData.date || "booking"}.ics`,
+                    })
+                  }
+                  className="py-2 px-2 bg-slate-50 hover:bg-slate-100 text-[#081037] font-bold text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5 border border-slate-200 shadow-xs cursor-pointer"
+                >
+                  <Calendar size={12} className="text-slate-700" />
+                  <span>Apple / iCal</span>
+                </button>
               </div>
             </div>
 

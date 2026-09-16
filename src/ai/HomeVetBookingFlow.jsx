@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { readAiAuthState } from "./AiAuth";
 import PhoneVerifyGate from "./PhoneVerifyGate";
+import { getGoogleCalendarUrl, downloadIcsFile } from "../utils/calendarHelpers";
 import { confirmPaymentStart, showBookingError, showBookingWarning } from "./booking/bookingAlerts";
 import { fetchPetOverview } from "./petOverviewService";
 
@@ -733,9 +734,49 @@ export default function HomeVetBookingFlow({
                 </div>
               )}
               {successState && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                  <h2 className="text-xs font-bold text-emerald-900">Vet at Home Booked Successfully!</h2>
-                  <p className="text-[11px] text-emerald-700">A vet will visit on {form.dateOfVisit} at {form.timeOfVisit}.</p>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                  <div>
+                    <h2 className="text-xs font-bold text-emerald-900">Vet at Home Booked Successfully!</h2>
+                    <p className="text-[11px] text-emerald-700">A vet will visit on {form.dateOfVisit} at {form.timeOfVisit}.</p>
+                    <p className="text-[11px] text-emerald-600">🐾 Our team will assign a verified vet near you — you will receive a confirmation via call or WhatsApp shortly.</p>
+                  </div>
+
+                  {/* Add to Calendar */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-emerald-200/70">
+                    <a
+                      href={getGoogleCalendarUrl({
+                        title: `Vet at Home - ${form.petName || "Pet"}`,
+                        description: `Booking ID: ${successState.bookingId || "N/A"}\nService: Vet at Home\nAddress: ${form.address || "Home Visit"}\nPlatform: SnoutIQ`,
+                        location: form.address || "Home Visit",
+                        date: form.dateOfVisit,
+                        time: form.timeOfVisit,
+                      })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-1.5 px-2 bg-white hover:bg-emerald-100/70 text-emerald-900 font-bold text-[11px] rounded-lg transition-all flex items-center justify-center gap-1 border border-emerald-300 shadow-xs"
+                    >
+                      <Calendar size={12} className="text-emerald-700" />
+                      <span>Google Calendar</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadIcsFile({
+                          title: `Vet at Home - ${form.petName || "Pet"}`,
+                          description: `Booking ID: ${successState.bookingId || "N/A"}\nService: Vet at Home\nAddress: ${form.address || "Home Visit"}\nPlatform: SnoutIQ`,
+                          location: form.address || "Home Visit",
+                          date: form.dateOfVisit,
+                          time: form.timeOfVisit,
+                          filename: `snoutiq-home-vet-${form.dateOfVisit || "booking"}.ics`,
+                        })
+                      }
+                      className="flex-1 py-1.5 px-2 bg-white hover:bg-emerald-100/70 text-emerald-900 font-bold text-[11px] rounded-lg transition-all flex items-center justify-center gap-1 border border-emerald-300 shadow-xs cursor-pointer"
+                    >
+                      <Calendar size={12} className="text-slate-700" />
+                      <span>Apple / iCal</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
