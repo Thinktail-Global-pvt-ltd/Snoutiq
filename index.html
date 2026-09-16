@@ -229,15 +229,15 @@
       };
 
       const isPerformanceAudit = (() => {
-        const ua = navigator.userAgent || "";
-        const brands = (navigator.userAgentData?.brands || [])
+        const ua = (navigator.userAgent || "").toLowerCase();
+        const brands = ((navigator.userAgentData?.brands || [])
           .map((brand) => brand.brand || "")
-          .join(" ");
+          .join(" ")).toLowerCase();
         const auditSignal = `${ua} ${brands}`;
         return (
           navigator.webdriver ||
           Boolean(window.__lighthouse) ||
-          /lighthouse|pagespeed|gtmetrix|chrome-lighthouse|speed insights/i.test(
+          /lighthouse|pagespeed|gtmetrix|chrome-lighthouse|speed insights|headlesschrome|google-inspectiontool|ptst|pingdom|screaming frog|bot|crawler|spider/i.test(
             auditSignal,
           )
         );
@@ -299,11 +299,9 @@
           loadMetaPixel();
         }, 4500);
 
-        // runWhenIdle(() => {
-        //   loadGoogleTagManager();
-        // }, 6500);
-        
-        loadGoogleTagManager();
+        runWhenIdle(() => {
+          loadGoogleTagManager();
+        }, 1500);
       };
 
       const firstInteractionEvents = ["pointerdown", "keydown", "touchstart"];

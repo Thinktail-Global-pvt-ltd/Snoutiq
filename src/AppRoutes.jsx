@@ -3,8 +3,8 @@ import "./app.css";
 import React, { lazy, useEffect } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
-import TalkToVet from "./newflow/TalkToVet";
-import PetDoctorOnline from "./newflow/PetDoctorOnline";
+const TalkToVet = lazy(() => import("./newflow/TalkToVet"));
+const PetDoctorOnline = lazy(() => import("./newflow/PetDoctorOnline"));
 
 const CallLab = lazy(() => import("./pages/CallLab"));
 const DoctorReceiver = lazy(() => import("./pages/DoctorReceiver"));

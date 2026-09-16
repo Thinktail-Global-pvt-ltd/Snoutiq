@@ -60,7 +60,39 @@ export default defineConfig(({ mode }) => {
           };
 
           const homePreloads = collectChunkPreloads(["MainLayout", "HomePage"]);
-          const vetNearMePreloadsByPath = {
+          const bookingRoutePreloadsByPath = {
+            "/doctor-booking": collectChunkPreloads([
+              "MainLayout",
+              "ModernDoctorBooking",
+            ]),
+            "/vet-at-home-booking": collectChunkPreloads([
+              "MainLayout",
+              "HomeVetBookingFlow",
+            ]),
+            "/inclinic-fast-booking": collectChunkPreloads([
+              "MainLayout",
+              "InClinicFastBookingFlow",
+            ]),
+            "/video-consult": collectChunkPreloads([
+              "MainLayout",
+              "ConsultBookingFlow",
+            ]),
+            "/video-counsult": collectChunkPreloads([
+              "MainLayout",
+              "ConsultBookingFlow",
+            ]),
+            "/my-appointments": collectChunkPreloads([
+              "MainLayout",
+              "MyAppointmentsPage",
+            ]),
+            "/appointments": collectChunkPreloads([
+              "MainLayout",
+              "MyAppointmentsPage",
+            ]),
+            "/online-vet-consultation": collectChunkPreloads([
+              "MainLayout",
+              "VideoConsultLP",
+            ]),
             "/vet-at-home-gurgaon": collectChunkPreloads([
               "VetNearMeBookingLayout",
               "VetNearMeLeadPage",
@@ -112,7 +144,7 @@ export default defineConfig(({ mode }) => {
           }
 
           if (
-            Object.values(vetNearMePreloadsByPath).some(
+            Object.values(bookingRoutePreloadsByPath).some(
               ({ styleFiles, moduleFiles }) =>
                 styleFiles.length || moduleFiles.length,
             )
@@ -120,7 +152,7 @@ export default defineConfig(({ mode }) => {
             transformedHtml = transformedHtml.replace(
               "</head>",
               `<script>(function(){var bookingPreloads=${JSON.stringify(
-                vetNearMePreloadsByPath,
+                bookingRoutePreloadsByPath,
               )};var pathname=window.location.pathname.replace(/\\/$/,"")||"/";var current=bookingPreloads[pathname];if(!current)return;current.styleFiles.forEach(function(href){if(document.querySelector('link[rel="stylesheet"][href="'+href+'"]'))return;var link=document.createElement("link");link.rel="stylesheet";link.href=href;document.head.appendChild(link);});current.moduleFiles.forEach(function(href){var link=document.createElement("link");link.rel="modulepreload";link.href=href;link.crossOrigin="";document.head.appendChild(link);});})();</script></head>`,
             );
           }
@@ -164,6 +196,34 @@ export default defineConfig(({ mode }) => {
         entryFileNames: "assets/[name]-[hash].js",
         chunkFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash][extname]",
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (
+              id.includes("agora-rtc-sdk-ng") ||
+              id.includes("agora-react-uikit") ||
+              id.includes("agora-token") ||
+              id.includes("agora-access-token")
+            ) {
+              return "agora-vendor";
+            }
+            if (
+              id.includes("chart.js") ||
+              id.includes("recharts") ||
+              id.includes("react-chartjs-2")
+            ) {
+              return "charts-vendor";
+            }
+            if (id.includes("firebase") || id.includes("@firebase")) {
+              return "firebase-vendor";
+            }
+            if (id.includes("sweetalert2")) {
+              return "sweetalert-vendor";
+            }
+            if (id.includes("quill") || id.includes("react-quill")) {
+              return "quill-vendor";
+            }
+          }
+        },
       },
     },
   },
