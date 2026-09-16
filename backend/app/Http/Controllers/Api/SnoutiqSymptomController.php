@@ -3304,7 +3304,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             return '';
         }
 
-        return 'Possible causes include ' . $this->humanJoin($causes) . '.';
+        return 'Possible diagnosis/cause: ' . $this->humanJoin($causes) . '.';
     }
 
     private function appendDiagnosisToMessage(string $message, string $diagnosisSummary): string
@@ -3316,7 +3316,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             return $message;
         }
 
-        if (preg_match('/\b(possible causes?|likely causes?|preliminary diagnosis|diagnosis summary)\b/i', $message)) {
+        if (preg_match('/\b(possible causes?|possible diagnosis|diagnosis\/cause|likely causes?|preliminary diagnosis|diagnosis summary)\b/i', $message)) {
             return $message;
         }
 

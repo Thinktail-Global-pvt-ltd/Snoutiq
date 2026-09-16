@@ -39,6 +39,20 @@ function normalizeInputText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
 
+function getAssistantDisplayText(payload, fallback = "") {
+  const response = payload?.response || {};
+  return (
+    response.what_we_think_is_happening ||
+    response.message ||
+    response.diagnosis_summary ||
+    response.do_now ||
+    payload?.message ||
+    payload?.vet_summary ||
+    fallback ||
+    "I have reviewed this. Please share one more detail about what you are noticing, or book a vet consult if the concern feels urgent."
+  );
+}
+
 function ModalShell({ children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px] animate-[fadeIn_0.2s_ease-out]">
@@ -195,7 +209,7 @@ export default function SymptomCheckerFlow({
 
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
-    if (lastMsg && lastMsg.role === "user") {
+    if (lastMsg) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
@@ -692,10 +706,7 @@ export default function SymptomCheckerFlow({
       console.log("💬 Chat response:", data);
       pushMessage({
         role: "assistant",
-        text:
-          data?.response?.what_we_think_is_happening ||
-          data?.vet_summary ||
-          "Analyzed",
+        text: getAssistantDisplayText(data),
         raw_response: data,
       });
 
@@ -1027,6 +1038,12 @@ export default function SymptomCheckerFlow({
                     ) : (
                       <div className="w-full">
                         {/* AI Rich Response Rendering */}
+                        <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                          <p className="whitespace-pre-wrap text-sm leading-7 text-slate-800 sm:text-base sm:leading-relaxed">
+                            {getAssistantDisplayText(msg.raw_response, msg.text)}
+                          </p>
+                        </div>
+
                         {msg.raw_response?.ui?.banner && (
                           <BannerCard
                             banner={msg.raw_response.ui.banner}
@@ -1040,30 +1057,29 @@ export default function SymptomCheckerFlow({
                           />
                         )}
 
-                        <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
-                          <p className="whitespace-pre-wrap text-sm leading-7 text-slate-800 sm:text-base sm:leading-relaxed mb-4">
-                            {msg.raw_response?.response
-                              ?.what_we_think_is_happening || msg.text}
-                          </p>
+                        {msg.raw_response?.response?.do_now ||
+                        msg.raw_response?.response?.what_to_watch?.length ||
+                        msg.raw_response?.response?.safe_to_do_while_waiting?.length ? (
+                          <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
+                            {msg.raw_response?.response?.do_now && (
+                              <DoNowCard
+                                text={msg.raw_response.response.do_now}
+                              />
+                            )}
 
-                          {msg.raw_response?.response?.do_now && (
-                            <DoNowCard
-                              text={msg.raw_response.response.do_now}
+                            <ListSection
+                              title="What to watch"
+                              items={msg.raw_response?.response?.what_to_watch}
                             />
-                          )}
-
-                          <ListSection
-                            title="What to watch"
-                            items={msg.raw_response?.response?.what_to_watch}
-                          />
-                          <ListSection
-                            title="Safe to do while waiting"
-                            items={
-                              msg.raw_response?.response
-                                ?.safe_to_do_while_waiting
-                            }
-                          />
-                        </div>
+                            <ListSection
+                              title="Safe to do while waiting"
+                              items={
+                                msg.raw_response?.response
+                                  ?.safe_to_do_while_waiting
+                              }
+                            />
+                          </div>
+                        ) : null}
 
                         {msg.raw_response?.follow_up_question && (
                           <FollowUpQuestion
