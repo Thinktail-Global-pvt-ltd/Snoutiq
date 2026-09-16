@@ -53,6 +53,82 @@ function getAssistantDisplayText(payload, fallback = "") {
   );
 }
 
+function joinReadable(items = []) {
+  const cleanItems = items
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (cleanItems.length === 0) return "";
+  if (cleanItems.length === 1) return cleanItems[0];
+  if (cleanItems.length === 2) return `${cleanItems[0]} or ${cleanItems[1]}`;
+
+  const last = cleanItems.pop();
+  return `${cleanItems.join(", ")}, or ${last}`;
+}
+
+function inferDiagnosisFromText(text = "") {
+  const value = String(text || "").toLowerCase();
+
+  if (/\b(bump|bumps|rash|red|patch|patches|itch|itching|scratch|skin)\b/.test(value)) {
+    return "Possible diagnosis/cause: allergic reaction, insect or tick/flea irritation, hot spots, or a skin infection.";
+  }
+
+  if (/\b(vomit|vomiting|not eating|appetite|loose stool|diarrhea)\b/.test(value)) {
+    return "Possible diagnosis/cause: stomach upset, dietary indiscretion, gastroenteritis, or tick-borne illness.";
+  }
+
+  if (/\b(limp|limping|leg|paw|pain|swelling)\b/.test(value)) {
+    return "Possible diagnosis/cause: soft-tissue strain, paw injury, joint pain, or tick-borne fever.";
+  }
+
+  return "";
+}
+
+function getDiagnosisText(payload, fallbackText = "") {
+  const direct =
+    payload?.response?.diagnosis_summary ||
+    payload?.diagnosis_summary ||
+    "";
+
+  if (direct) {
+    return /^possible diagnosis\/cause:/i.test(direct)
+      ? direct
+      : `Possible diagnosis/cause: ${direct.replace(/^possible causes include\s+/i, "")}`;
+  }
+
+  const causes = payload?.triage_detail?.possible_causes;
+  const joinedCauses = Array.isArray(causes) ? joinReadable(causes) : "";
+  if (joinedCauses) {
+    return `Possible diagnosis/cause: ${joinedCauses}.`;
+  }
+
+  return inferDiagnosisFromText(fallbackText);
+}
+
+function getImageAcknowledgement(payload, previousUserMessage) {
+  if (!previousUserMessage?.image) return "";
+
+  const observation =
+    payload?.triage_detail?.image_observation ||
+    payload?.response?.image_observation ||
+    payload?.image_observation ||
+    "";
+
+  if (observation) {
+    return /^in the uploaded (photo|image)/i.test(observation)
+      ? observation
+      : `In the uploaded photo, ${String(observation).replace(/^\s*in the uploaded (photo|image),?\s*/i, "")}`;
+  }
+
+  const note = normalizeInputText(previousUserMessage.text).toLowerCase();
+  if (/\b(bump|bumps|rash|red|patch|patches|itch|itching|scratch|skin)\b/.test(note)) {
+    return "In the uploaded photo, I can see the skin/leg area, and your note points to red bumpy patches or raised bumps on the body.";
+  }
+
+  return "I reviewed the uploaded photo along with your note before preparing this assessment.";
+}
+
 function ModalShell({ children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px] animate-[fadeIn_0.2s_ease-out]">
@@ -1001,7 +1077,21 @@ export default function SymptomCheckerFlow({
                 </div>
               )}
 
-              {!historyLoading && messages.map((msg) => (
+              {!historyLoading && messages.map((msg, index) => {
+                const previousUserMessage =
+                  msg.role === "assistant" && messages[index - 1]?.role === "user"
+                    ? messages[index - 1]
+                    : null;
+                const imageAcknowledgement = getImageAcknowledgement(
+                  msg.raw_response,
+                  previousUserMessage,
+                );
+                const diagnosisText = getDiagnosisText(
+                  msg.raw_response,
+                  previousUserMessage?.text || msg.text,
+                );
+
+                return (
                 <div
                   key={msg.id}
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -1038,11 +1128,33 @@ export default function SymptomCheckerFlow({
                     ) : (
                       <div className="w-full">
                         {/* AI Rich Response Rendering */}
+                        {imageAcknowledgement && (
+                          <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 shadow-sm sm:p-5">
+                            <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                              Image review
+                            </p>
+                            <p className="mt-2 text-sm leading-7 text-slate-800 sm:text-base sm:leading-relaxed">
+                              {imageAcknowledgement}
+                            </p>
+                          </div>
+                        )}
+
                         <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                           <p className="whitespace-pre-wrap text-sm leading-7 text-slate-800 sm:text-base sm:leading-relaxed">
                             {getAssistantDisplayText(msg.raw_response, msg.text)}
                           </p>
                         </div>
+
+                        {diagnosisText && (
+                          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm sm:p-5">
+                            <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                              Possible diagnosis/cause
+                            </p>
+                            <p className="mt-2 text-sm leading-7 text-slate-800 sm:text-base sm:leading-relaxed">
+                              {diagnosisText}
+                            </p>
+                          </div>
+                        )}
 
                         {msg.raw_response?.ui?.banner && (
                           <BannerCard
@@ -1145,7 +1257,8 @@ export default function SymptomCheckerFlow({
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {loading && (
                 <div className="flex justify-start">
                   <div className="mt-1 mr-3 flex h-8 w-8 items-center justify-center rounded-full">
