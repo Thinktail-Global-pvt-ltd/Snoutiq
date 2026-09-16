@@ -2393,6 +2393,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             "TASK: Assess this pet's situation and output routing decision.\n\n" .
             "Use the pet location if provided. If no location is available, assume India. " .
             "Possible causes should be short, practical, and prioritized for common Indian veterinary presentations when reasonable. " .
+            ($imageB64 ? "Because an image is attached, image_observation must say what is visibly seen in the photo in one modest sentence. " : '') .
             "india_context_note must be a single useful India- or location-aware line, not a disclaimer.\n\n" .
             "Routing options:\n" .
             "- emergency: life-threatening right now (severe respiratory distress/choking, collapse/unresponsive, active convulsions, bloated hard abdomen with dry retching, blocked urination in male cat, profuse/uncontrolled bleeding, known poison ingestion, heatstroke, severe trauma)\n" .
@@ -2404,6 +2405,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             '"severity":"critical|moderate|mild|informational",' .
             '"possible_causes":["cause1","cause2"],' .
             '"red_flags_present":["flag if any"],' .
+            '"image_observation":"1 sentence visible photo observation, or empty string if no image",' .
             '"india_context_note":"1 sentence India-specific risk",' .
             '"safe_to_wait_hours":0}';
 
@@ -2462,7 +2464,7 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
             ($imageObservation !== '' ? "Image observation: {$imageObservation}\n" : '') .
             "India context: " . ($triage['india_context_note'] ?? '') . "\n\n" .
             "Instruction: " . ($routingInstructions[$routing] ?? $routingInstructions['video_consult']) . "\n\n" .
-            ($imageB64 ? "An image is attached. Use only visible findings from the image and keep observations modest and concrete.\n" : '') .
+            ($imageB64 ? "An image is attached. Use only visible findings from the image and keep observations modest and concrete. The `message` and `what_we_think_is_happening` fields must first acknowledge what is visible in the uploaded image, then explain the possible diagnosis/cause and next action.\n" : '') .
             "The `message` field must sound natural and should reference what the owner is seeing right now. " .
             "If there is recent conversation history, continue from it instead of restarting.\n\n" .
             "Make `safe_to_do_while_waiting` a list of 3-4 very safe, low-risk steps the owner can do while waiting. " .
@@ -2654,6 +2656,8 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         if ($diagnosisSummary === '') {
             $diagnosisSummary = $this->buildDiagnosisSummary($triage, $ownerMessage, $pet);
         }
+        $message = $this->prependImageObservationToMessage($message, $triage);
+        $whatWeThink = $this->prependImageObservationToMessage($whatWeThink, $triage);
         $message = $this->appendDiagnosisToMessage($message, $diagnosisSummary);
         $whatWeThink = $this->appendDiagnosisToMessage($whatWeThink, $diagnosisSummary);
 
@@ -3325,6 +3329,26 @@ INDIA VETERINARY CONTEXT — ALWAYS APPLY:
         }
 
         return trim($message . ' ' . $diagnosisSummary);
+    }
+
+    private function prependImageObservationToMessage(string $message, array $triage): string
+    {
+        $message = trim($message);
+        $imageObservation = $this->cleanAssistantText((string) ($triage['image_observation'] ?? ''));
+
+        if ($imageObservation === '') {
+            return $message;
+        }
+
+        if (preg_match('/\b(image|photo|picture|uploaded|visible|I can see|I see)\b/i', $message)) {
+            return $message;
+        }
+
+        if (!preg_match('/[.!?]$/', $imageObservation)) {
+            $imageObservation .= '.';
+        }
+
+        return trim('In the uploaded photo, ' . lcfirst($imageObservation) . ' ' . $message);
     }
 
     private function inferPossibleCausesFromMessage(string $ownerMessage, array $pet = []): array
