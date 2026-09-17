@@ -583,10 +583,12 @@ class PrescriptionController extends Controller
         $payload = $request->validate([
             'user_id' => ['nullable', 'integer', 'min:1'],
             'pet_id'  => ['nullable', 'integer', 'min:1'],
+            'transaction_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $userId = $payload['user_id'] ?? null;
         $petId = $payload['pet_id'] ?? null;
+        $transactionId = $payload['transaction_id'] ?? null;
 
         if (!$userId && !$petId) {
             return response()->json([
@@ -624,10 +626,12 @@ class PrescriptionController extends Controller
             $petsQuery->where('id', $petId);
         }
 
+        $reportedSymptomLog = $this->reportedSymptomLogForPrescriptionPayload($transactionId, $petId, $user->id);
+
         $pets = $petsQuery
             ->orderByDesc('id')
             ->get()
-            ->map(function (Pet $pet) use ($hasPetWeightColumn) {
+            ->map(function (Pet $pet) use ($hasPetWeightColumn, $reportedSymptomLog) {
                 // Surface vaccination info from dog_disease_payload if present.
                 $payload = $pet->dog_disease_payload ?? null;
                 if (is_string($payload)) {
@@ -643,6 +647,20 @@ class PrescriptionController extends Controller
 
                 $blobUrl = $this->petDoc2BlobUrl($pet);
                 $blobNewUrl = $this->petDoc2BlobNewUrl($pet);
+                if ($reportedSymptomLog && (int) ($reportedSymptomLog->pet_id ?? 0) === (int) $pet->id) {
+                    $loggedSymptom = trim((string) ($reportedSymptomLog->reported_symptom ?? ''));
+                    if ($loggedSymptom !== '') {
+                        $pet->setAttribute('reported_symptom', $loggedSymptom);
+                    }
+
+                    $loggedImageUrl = $this->reportedSymptomLogImageUrl($reportedSymptomLog);
+                    if ($loggedImageUrl) {
+                        $blobNewUrl = $loggedImageUrl;
+                    }
+
+                    $pet->setAttribute('reported_symptom_log_id', $reportedSymptomLog->id ?? null);
+                    $pet->setAttribute('reported_symptom_log_transaction_id', $reportedSymptomLog->transaction_id ?? null);
+                }
                 $pet->setAttribute('pet_doc2_blob_url', $blobUrl);
                 $pet->setAttribute('pet_doc2_blob_new_url', $blobNewUrl);
                 $pet->setAttribute('pet_image_url', $blobNewUrl ?: $blobUrl ?: ($pet->pet_doc1 ?? $pet->pet_doc2 ?? $pet->pic_link ?? null));
@@ -728,6 +746,46 @@ class PrescriptionController extends Controller
                 'prescriptions' => $prescriptions,
             ],
         ], 200, [], $jsonFlags);
+    }
+
+    private function reportedSymptomLogForPrescriptionPayload($transactionId, $petId, $userId)
+    {
+        if (
+            ! $transactionId
+            || ! Schema::hasTable('reported_symptom_logs')
+            || ! Schema::hasTable('transactions')
+            || ! Schema::hasColumn('reported_symptom_logs', 'transaction_id')
+        ) {
+            return null;
+        }
+
+        $columns = [
+            'rsl.id',
+            'rsl.pet_id',
+            'rsl.doctor_id',
+            'rsl.transaction_id',
+            'rsl.reported_symptom',
+        ];
+        if (Schema::hasColumn('reported_symptom_logs', 'image_blob')) {
+            $columns[] = DB::raw('CASE WHEN rsl.image_blob IS NOT NULL AND length(rsl.image_blob) > 0 THEN 1 ELSE 0 END as has_image_blob');
+        }
+
+        return DB::table('reported_symptom_logs as rsl')
+            ->join('transactions as t', 't.id', '=', 'rsl.transaction_id')
+            ->select($columns)
+            ->where('rsl.transaction_id', (int) $transactionId)
+            ->when($petId, fn ($query) => $query->where('t.pet_id', (int) $petId))
+            ->where('t.user_id', (int) $userId)
+            ->first();
+    }
+
+    private function reportedSymptomLogImageUrl($reportedSymptomLog): ?string
+    {
+        if (! $reportedSymptomLog || empty($reportedSymptomLog->has_image_blob)) {
+            return null;
+        }
+
+        return route('api.reported-symptom-logs.image', ['log' => (int) $reportedSymptomLog->id]);
     }
 
     // POST /api/prescriptions
