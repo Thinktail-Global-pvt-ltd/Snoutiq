@@ -7,6 +7,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Doctor;
@@ -165,6 +168,8 @@ class VideoCallingController extends Controller
             ->having('distance', '<=', $radiusKm)
             ->orderBy('distance', 'asc')
             ->get();
+
+        $vets = $this->mergeFallbackGeocodedVets($vets, $lat, $lng, $radiusKm);
 
         if ($vets->isEmpty()) {
             return $this->jsonResponse([
@@ -340,6 +345,248 @@ class VideoCallingController extends Controller
             'available_doctors_by_vet' => (object) $availableDoctorsByVet,
             'referral_by_vet' => (object) $referralByVet,
         ]);
+    }
+
+    private function mergeFallbackGeocodedVets(Collection $vets, float $lat, float $lng, float $radiusKm): Collection
+    {
+        $existingIds = $vets->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $fallbackQuery = VetRegisterationTemp::query()
+            ->whereHas('doctors');
+
+        if (!empty($existingIds)) {
+            $fallbackQuery->whereNotIn('id', $existingIds);
+        }
+
+        $fallbackClinics = $fallbackQuery
+            ->where(function ($query) {
+                $query->whereNull('lat')
+                    ->orWhereNull('lng')
+                    ->orWhere('lat', '')
+                    ->orWhere('lng', '')
+                    ->orWhereNull('coordinates')
+                    ->orWhere('coordinates', '');
+            })
+            ->limit(500)
+            ->get();
+
+        if ($fallbackClinics->isEmpty()) {
+            return $vets;
+        }
+
+        $resolved = $fallbackClinics
+            ->map(function (VetRegisterationTemp $clinic) use ($lat, $lng, $radiusKm) {
+                $coordinates = $this->resolveClinicCoordinates($clinic);
+                if (!$coordinates) {
+                    return null;
+                }
+
+                $distance = $this->distanceKm($lat, $lng, $coordinates['lat'], $coordinates['lng']);
+                if ($distance === null || $distance > $radiusKm) {
+                    return null;
+                }
+
+                $clinic->setAttribute('resolved_lat', $coordinates['lat']);
+                $clinic->setAttribute('resolved_lng', $coordinates['lng']);
+                $clinic->setAttribute('distance', $distance);
+
+                $this->cacheClinicCoordinates($clinic, $coordinates['lat'], $coordinates['lng']);
+
+                return (object) $clinic->getAttributes();
+            })
+            ->filter()
+            ->values();
+
+        if ($resolved->isEmpty()) {
+            return $vets;
+        }
+
+        return $vets
+            ->concat($resolved)
+            ->unique(fn ($clinic) => (int) ($clinic->id ?? 0))
+            ->sortBy(fn ($clinic) => (float) ($clinic->distance ?? INF))
+            ->values();
+    }
+
+    private function resolveClinicCoordinates($clinic): ?array
+    {
+        $clinicLat = $this->numericOrNull($clinic->lat ?? null);
+        $clinicLng = $this->numericOrNull($clinic->lng ?? null);
+
+        if ($clinicLat !== null && $clinicLng !== null) {
+            return ['lat' => $clinicLat, 'lng' => $clinicLng];
+        }
+
+        $fromCoordinates = $this->coordinatesFromJson($clinic->coordinates ?? null);
+        if ($fromCoordinates) {
+            return $fromCoordinates;
+        }
+
+        $fromGeoPincode = $this->coordinatesFromGeoPincodes($clinic);
+        if ($fromGeoPincode) {
+            return $fromGeoPincode;
+        }
+
+        return $this->coordinatesFromGoogle($clinic);
+    }
+
+    private function coordinatesFromJson($coordinates): ?array
+    {
+        if (!$coordinates) {
+            return null;
+        }
+
+        if (is_string($coordinates)) {
+            $decoded = json_decode($coordinates, true);
+            if (is_array($decoded)) {
+                $coordinates = $decoded;
+            }
+        }
+
+        if (!is_array($coordinates)) {
+            return null;
+        }
+
+        $lat = $this->numericOrNull($coordinates[0] ?? $coordinates['lat'] ?? $coordinates['latitude'] ?? null);
+        $lng = $this->numericOrNull($coordinates[1] ?? $coordinates['lng'] ?? $coordinates['longitude'] ?? null);
+
+        return $lat !== null && $lng !== null ? ['lat' => $lat, 'lng' => $lng] : null;
+    }
+
+    private function coordinatesFromGeoPincodes($clinic): ?array
+    {
+        if (!Schema::hasTable('geo_pincodes')) {
+            return null;
+        }
+
+        $pincode = trim((string) ($clinic->pincode ?? ''));
+        $city = trim((string) ($clinic->city ?? ''));
+        $state = trim((string) ($clinic->state ?? ''));
+
+        $query = DB::table('geo_pincodes')
+            ->whereNotNull('lat')
+            ->whereNotNull('lon');
+
+        $geoRow = null;
+        if ($pincode !== '') {
+            $geoRow = (clone $query)->where('pincode', $pincode)->first(['lat', 'lon']);
+        }
+
+        if (!$geoRow && $city !== '') {
+            $cityQuery = (clone $query)->where('city', $city);
+            if ($state !== '' && Schema::hasColumn('geo_pincodes', 'state')) {
+                $cityQuery->where('state', $state);
+            }
+            $geoRow = $cityQuery->first(['lat', 'lon']);
+        }
+
+        $lat = $this->numericOrNull($geoRow->lat ?? null);
+        $lng = $this->numericOrNull($geoRow->lon ?? null);
+
+        return $lat !== null && $lng !== null ? ['lat' => $lat, 'lng' => $lng] : null;
+    }
+
+    private function coordinatesFromGoogle($clinic): ?array
+    {
+        $apiKey = env('GOOGLE_MAPS_API_KEY') ?: env('GOOGLE_API_KEY');
+        if (!$apiKey) {
+            return null;
+        }
+
+        $name = trim((string) ($clinic->name ?? ''));
+        $address = trim((string) (($clinic->formatted_address ?? null) ?: ($clinic->address ?? '')));
+        $city = trim((string) ($clinic->city ?? ''));
+        $state = trim((string) ($clinic->state ?? ''));
+        $pincode = trim((string) ($clinic->pincode ?? ''));
+
+        $candidates = array_values(array_unique(array_filter([
+            implode(', ', array_filter([$address, $city, $state, $pincode, 'India'])),
+            implode(', ', array_filter([$pincode, $city, $state, 'India'])),
+            implode(', ', array_filter([$name, $city, $state, 'India'])),
+            implode(', ', array_filter([$city, $state, 'India'])),
+        ])));
+
+        foreach ($candidates as $queryLocation) {
+            try {
+                $response = Http::timeout(3)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                    'address' => $queryLocation,
+                    'key' => $apiKey,
+                ]);
+
+                if (!$response->successful()) {
+                    continue;
+                }
+
+                $location = $response->json('results.0.geometry.location');
+                $lat = $this->numericOrNull($location['lat'] ?? null);
+                $lng = $this->numericOrNull($location['lng'] ?? null);
+
+                if ($lat !== null && $lng !== null) {
+                    return ['lat' => $lat, 'lng' => $lng];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('nearby_vets_location_geocode_failed', [
+                    'clinic_id' => $clinic->id ?? null,
+                    'query' => $queryLocation,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
+    }
+
+    private function cacheClinicCoordinates($clinic, float $lat, float $lng): void
+    {
+        $updates = [];
+
+        if (Schema::hasColumn('vet_registerations_temp', 'lat') && $this->numericOrNull($clinic->lat ?? null) === null) {
+            $updates['lat'] = $lat;
+        }
+
+        if (Schema::hasColumn('vet_registerations_temp', 'lng') && $this->numericOrNull($clinic->lng ?? null) === null) {
+            $updates['lng'] = $lng;
+        }
+
+        if (Schema::hasColumn('vet_registerations_temp', 'coordinates') && empty($clinic->coordinates)) {
+            $updates['coordinates'] = json_encode([$lat, $lng]);
+        }
+
+        if (empty($updates)) {
+            return;
+        }
+
+        try {
+            VetRegisterationTemp::query()
+                ->where('id', $clinic->id)
+                ->update($updates);
+        } catch (\Throwable $e) {
+            Log::warning('nearby_vets_location_coordinate_cache_failed', [
+                'clinic_id' => $clinic->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): ?float
+    {
+        $earthRadius = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) * sin($dLat / 2)
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+            * sin($dLng / 2) * sin($dLng / 2);
+
+        return round($earthRadius * (2 * atan2(sqrt($a), sqrt(1 - $a))), 2);
+    }
+
+    private function numericOrNull($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (float) $value : null;
     }
 
     private function normalizeDayOfWeek(string $day): ?string
