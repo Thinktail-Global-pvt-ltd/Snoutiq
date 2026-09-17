@@ -12,6 +12,8 @@ class ReportedSymptomLog extends Model
         'doctor_id',
         'transaction_id',
         'reported_symptom',
+        'image_blob',
+        'image_mime',
     ];
 
     public function pet(): BelongsTo

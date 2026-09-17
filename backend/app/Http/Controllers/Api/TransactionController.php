@@ -60,6 +60,12 @@ class TransactionController extends Controller
             if (Schema::hasColumn('pets', 'weight')) {
                 $petColumns[] = 'weight';
             }
+            if (Schema::hasColumn('pets', 'reported_symptom')) {
+                $petColumns[] = 'reported_symptom';
+            }
+            if (Schema::hasColumn('pets', 'video_calling_upload_file')) {
+                $petColumns[] = 'video_calling_upload_file';
+            }
         }
 
         $supportsCallsJoin = Schema::hasTable('transactions')
@@ -119,6 +125,7 @@ class TransactionController extends Controller
             ->limit($limit)
             ->get();
 
+        $reportedSymptomLogs = $this->reportedSymptomLogsForTransactions($transactions);
         $prescriptionChannelSet = $this->prescriptionChannelSetForTransactions($transactions);
 
         $latestSessions = $this->latestCallSessionsForTransactionChannels(
@@ -136,9 +143,11 @@ class TransactionController extends Controller
 
         $deviceTokensByUser = $this->deviceTokensForUsers($transactions, $latestSessions);
 
-        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet) {
+        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet, $reportedSymptomLogs) {
             $user = $tx->user;
             $pet = $tx->pet;
+            $reportedSymptomLog = $reportedSymptomLogs->get((int) $tx->id);
+            $transactionReportedSymptom = $this->reportedSymptomForTransaction($tx, $pet, $reportedSymptomLog);
             $transactionChannel = is_string($tx->channel_name ?? null) ? trim((string) $tx->channel_name) : '';
             $callSession = $transactionChannel !== '' ? $latestSessions->get($transactionChannel) : null;
             $videoApointment = $latestVideoApointments->get((int) $tx->user_id);
@@ -154,10 +163,12 @@ class TransactionController extends Controller
 
             $petBlobUrl = $pet ? $this->petDoc2BlobUrl($pet) : null;
             $petBlobNewUrl = $pet ? $this->petDoc2BlobNewUrl($pet) : null;
+            $reportedSymptomImageUrl = $this->reportedSymptomLogImageUrl($reportedSymptomLog);
+            $appointmentBlobNewUrl = $reportedSymptomImageUrl ?: $petBlobNewUrl;
             $petDoc1Url = $pet ? $this->absolutePetDoc2Url($pet->pet_doc1 ?? null) : null;
             $petDoc2Url = $pet ? $this->absolutePetDoc2Url($pet->pet_doc2 ?? null) : null;
             $petPicLinkUrl = $pet ? $this->absolutePetDoc2Url($pet->pic_link ?? null) : null;
-            $petImageUrl = $petBlobUrl ?: $petDoc1Url ?: $petDoc2Url ?: $petPicLinkUrl;
+            $petImageUrl = $reportedSymptomImageUrl ?: $petBlobUrl ?: $petDoc1Url ?: $petDoc2Url ?: $petPicLinkUrl;
             $requiresPrescription = $this->transactionRequiresPrescription((string) ($tx->type ?? ''));
             $hasPrescription = $requiresPrescription
                 ? $this->hasMatchingPrescriptionForTransaction($tx, $prescriptionChannelSet)
@@ -188,20 +199,26 @@ class TransactionController extends Controller
                 'doctor_name' => $tx->doctor->doctor_name ?? null,
                 'device_tokens' => $deviceTokens,
                 'pet_doc2_blob_url' => $petBlobUrl,
-                'pet_doc2_blob_new_url' => $petBlobNewUrl,
+                'pet_doc2_blob_new_url' => $appointmentBlobNewUrl,
                 'pet_image_url' => $petImageUrl,
+                'reported_symptom' => $transactionReportedSymptom,
+                'pet_reported_symptom' => $transactionReportedSymptom,
+                'reported_symptom_log_id' => $reportedSymptomLog->id ?? null,
+                'reported_symptom_log_transaction_id' => $reportedSymptomLog->transaction_id ?? null,
                 'pet' => $pet ? [
                     'id' => $pet->id,
                     'name' => $pet->name,
+                    'reported_symptom' => $transactionReportedSymptom,
                     'gender' => $pet->pet_gender ?? $pet->gender ?? null,
                     'breed' => $pet->breed ?? null,
                     'age' => $pet->pet_age ?? null,
                     'weight' => $pet->weight ?? null,
                     'pet_doc2' => $pet->pet_doc2 ?? null,
                     'pet_doc2_blob_url' => $petBlobUrl,
-                    'pet_doc2_blob_new_url' => $petBlobNewUrl,
+                    'pet_doc2_blob_new_url' => $appointmentBlobNewUrl,
                     'pet_doc2_url' => $petDoc2Url,
                     'pet_image_url' => $petImageUrl,
+                    'video_calling_upload_file' => $pet->video_calling_upload_file ?? null,
                 ] : null,
                 'call' => $this->formatJoinedCall($tx),
                 'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
@@ -216,6 +233,102 @@ class TransactionController extends Controller
             'count' => $payload->count(),
             'data' => $payload,
         ]);
+    }
+
+    public function reportedSymptomLogImage($log)
+    {
+        if (
+            ! Schema::hasTable('reported_symptom_logs')
+            || ! Schema::hasColumn('reported_symptom_logs', 'image_blob')
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Reported symptom image storage is not available.',
+            ], 404);
+        }
+
+        $row = DB::table('reported_symptom_logs')
+            ->select(['id', 'image_blob', 'image_mime'])
+            ->where('id', $log)
+            ->first();
+
+        if (! $row || $row->image_blob === null || $row->image_blob === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Reported symptom image not found.',
+            ], 404);
+        }
+
+        return response($row->image_blob, 200, [
+            'Content-Type' => $row->image_mime ?: 'application/octet-stream',
+            'Content-Disposition' => 'inline; filename="reported-symptom-log-' . (int) $row->id . '"',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
+    protected function reportedSymptomLogsForTransactions(Collection $transactions): Collection
+    {
+        if (
+            $transactions->isEmpty()
+            || ! Schema::hasTable('reported_symptom_logs')
+            || ! Schema::hasColumn('reported_symptom_logs', 'transaction_id')
+        ) {
+            return collect();
+        }
+
+        $transactionIds = $transactions->pluck('id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        if ($transactionIds->isEmpty()) {
+            return collect();
+        }
+
+        $columns = ['id', 'transaction_id', 'reported_symptom'];
+        if (Schema::hasColumn('reported_symptom_logs', 'image_blob')) {
+            $columns[] = DB::raw('CASE WHEN image_blob IS NOT NULL AND length(image_blob) > 0 THEN 1 ELSE 0 END as has_image_blob');
+        }
+        if (Schema::hasColumn('reported_symptom_logs', 'image_mime')) {
+            $columns[] = 'image_mime';
+        }
+
+        return DB::table('reported_symptom_logs')
+            ->select($columns)
+            ->whereIn('transaction_id', $transactionIds->all())
+            ->get()
+            ->keyBy(fn ($row) => (int) $row->transaction_id);
+    }
+
+    protected function reportedSymptomForTransaction(Transaction $transaction, $pet, $reportedSymptomLog): ?string
+    {
+        $metadata = is_array($transaction->metadata ?? null) ? $transaction->metadata : [];
+        $values = [
+            $reportedSymptomLog->reported_symptom ?? null,
+            data_get($metadata, 'reported_symptom'),
+            data_get($metadata, 'symptoms'),
+            data_get($metadata, 'notes.reported_symptom'),
+            data_get($metadata, 'notes.question'),
+            data_get($metadata, 'notes.symptoms'),
+            $pet->reported_symptom ?? null,
+        ];
+
+        foreach ($values as $value) {
+            if (is_array($value)) {
+                $value = implode(', ', array_filter(array_map('trim', $value)));
+            }
+
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    protected function reportedSymptomLogImageUrl($reportedSymptomLog): ?string
+    {
+        if (! $reportedSymptomLog || empty($reportedSymptomLog->has_image_blob)) {
+            return null;
+        }
+
+        return route('api.reported-symptom-logs.image', ['log' => (int) $reportedSymptomLog->id]);
     }
 
     protected function prescriptionChannelSetForTransactions(Collection $transactions): Collection

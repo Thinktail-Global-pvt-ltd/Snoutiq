@@ -3974,6 +3974,9 @@ Route::get('/auth/pets/{pet}/pet-doc2-blob', [AuthController::class, 'petDoc2Blo
 Route::get('/auth/pets/{pet}/pet-doc2-blob-new', [AuthController::class, 'petDoc2BlobNew'])
     ->whereNumber('pet')
     ->name('api.pets.pet-doc2-blob-new');
+Route::get('/reported-symptom-logs/{log}/image', [\App\Http\Controllers\Api\TransactionController::class, 'reportedSymptomLogImage'])
+    ->whereNumber('log')
+    ->name('api.reported-symptom-logs.image');
 Route::post('/auth/register-via-mobile', [AuthController::class, 'registerViaMobile']);
 Route::post('/auth/initial-register', [AuthController::class, 'createInitialRegistration']);
 Route::post('/auth/initial-register-mobile', [AuthController::class, 'createInitialRegistrationMobile']);

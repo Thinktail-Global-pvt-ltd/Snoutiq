@@ -18,6 +18,7 @@ class TransactionsWithUserDataTest extends TestCase
         Schema::dropIfExists('call_sessions');
         Schema::dropIfExists('prescriptions');
         Schema::dropIfExists('device_tokens');
+        Schema::dropIfExists('reported_symptom_logs');
         Schema::dropIfExists('transactions');
         Schema::dropIfExists('pets');
         Schema::dropIfExists('doctors');
@@ -45,6 +46,10 @@ class TransactionsWithUserDataTest extends TestCase
             $table->string('pet_gender')->nullable();
             $table->decimal('weight', 8, 2)->nullable();
             $table->string('pet_doc2')->nullable();
+            $table->text('reported_symptom')->nullable();
+            $table->text('video_calling_upload_file')->nullable();
+            $table->binary('pet_doc2_blob_new')->nullable();
+            $table->string('pet_doc2_mime')->nullable();
             $table->timestamps();
         });
 
@@ -63,6 +68,17 @@ class TransactionsWithUserDataTest extends TestCase
             $table->string('payment_method')->nullable();
             $table->string('reference')->nullable();
             $table->json('metadata')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('reported_symptom_logs', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('pet_id')->nullable();
+            $table->unsignedBigInteger('doctor_id')->nullable();
+            $table->unsignedBigInteger('transaction_id')->nullable()->unique();
+            $table->text('reported_symptom')->nullable();
+            $table->binary('image_blob')->nullable();
+            $table->string('image_mime')->nullable();
             $table->timestamps();
         });
 
@@ -129,6 +145,7 @@ class TransactionsWithUserDataTest extends TestCase
             'pet_gender' => 'male',
             'weight' => 24.50,
             'pet_doc2' => 'pet-doc.pdf',
+            'reported_symptom' => 'latest pet symptom',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -216,5 +233,108 @@ class TransactionsWithUserDataTest extends TestCase
             ->assertJsonPath('data.0.pet.name', 'Bruno')
             ->assertJsonPath('data.0.call_session.channel_name', 'channel_cont_123')
             ->assertJsonPath('data.0.video_appointment.order_id', 'order_cont_123');
+    }
+
+    public function test_transactions_with_user_data_prefers_per_transaction_reported_symptom_logs(): void
+    {
+        DB::table('users')->insert([
+            'id' => 1387,
+            'name' => 'Maayank Pet',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('doctors')->insert([
+            'id' => 116,
+            'doctor_name' => 'Dr. Maayank',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 501,
+            'user_id' => 1387,
+            'name' => 'Bsbsbsb',
+            'breed' => 'affenpinscher',
+            'pet_age' => 1,
+            'pet_gender' => 'male',
+            'reported_symptom' => 'latest pet level symptom should not win',
+            'pet_doc2_blob_new' => 'latest-pet-image',
+            'pet_doc2_mime' => 'image/png',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('transactions')->insert([
+            [
+                'id' => 901,
+                'doctor_id' => 116,
+                'user_id' => 1387,
+                'pet_id' => 501,
+                'amount_paise' => 100,
+                'status' => 'captured',
+                'type' => 'video_consult',
+                'channel_name' => 'video_901',
+                'created_at' => '2026-09-17 16:35:00',
+                'updated_at' => '2026-09-17 16:35:00',
+            ],
+            [
+                'id' => 902,
+                'doctor_id' => 116,
+                'user_id' => 1387,
+                'pet_id' => 501,
+                'amount_paise' => 100,
+                'status' => 'captured',
+                'type' => 'video_consult',
+                'channel_name' => 'video_902',
+                'created_at' => '2026-09-17 16:40:00',
+                'updated_at' => '2026-09-17 16:40:00',
+            ],
+        ]);
+
+        DB::table('reported_symptom_logs')->insert([
+            [
+                'pet_id' => 501,
+                'doctor_id' => 116,
+                'transaction_id' => 901,
+                'reported_symptom' => 'First appointment symptom',
+                'image_blob' => 'first-image',
+                'image_mime' => 'image/jpeg',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'pet_id' => 501,
+                'doctor_id' => 116,
+                'transaction_id' => 902,
+                'reported_symptom' => 'Second appointment symptom',
+                'image_blob' => 'second-image',
+                'image_mime' => 'image/jpeg',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $response = $this->getJson('/api/transactions/with-user-data?doctor_id=116&date=2026-09-17');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.0.id', 902)
+            ->assertJsonPath('data.0.reported_symptom', 'Second appointment symptom')
+            ->assertJsonPath('data.0.pet.reported_symptom', 'Second appointment symptom')
+            ->assertJsonPath('data.0.reported_symptom_log_transaction_id', 902)
+            ->assertJsonPath('data.1.id', 901)
+            ->assertJsonPath('data.1.reported_symptom', 'First appointment symptom')
+            ->assertJsonPath('data.1.pet.reported_symptom', 'First appointment symptom')
+            ->assertJsonPath('data.1.reported_symptom_log_transaction_id', 901);
+
+        $payload = $response->json('data');
+
+        $this->assertStringContainsString('/reported-symptom-logs/', $payload[0]['pet']['pet_doc2_blob_new_url']);
+        $this->assertStringContainsString('/reported-symptom-logs/', $payload[1]['pet']['pet_doc2_blob_new_url']);
+        $this->assertNotSame(
+            $payload[0]['pet']['pet_doc2_blob_new_url'],
+            $payload[1]['pet']['pet_doc2_blob_new_url']
+        );
     }
 }

@@ -214,6 +214,12 @@ class GeminiChatController extends Controller
         $category = $inference['category'] ?? 'normal';
 
         $petDoc2BlobSaved = $this->storeUploadInPetDoc2BlobNew($request, (int) $data['pet_id'], 'video_calling_upload_file');
+        $this->syncLatestVideoConsultReportedSymptomLog(
+            petId: (int) $data['pet_id'],
+            userId: (int) $data['user_id'],
+            reportedSymptom: $reportedSymptom,
+            captureCurrentImage: $petDoc2BlobSaved
+        );
         $vaccinationPayload = $data['vaccination'] ?? null;
         $batchNumber = $this->firstFilledString([
             $data['vaccination_batch_number'] ?? null,
@@ -315,6 +321,12 @@ class GeminiChatController extends Controller
 
         unset($payload['video_calling_upload_file']);
         $petDoc2BlobSaved = $this->storeUploadInPetDoc2BlobNew($request, (int) $petRow->id, 'video_calling_upload_file');
+        $this->syncLatestVideoConsultReportedSymptomLog(
+            petId: (int) $petRow->id,
+            userId: !empty($data['user_id']) ? (int) $data['user_id'] : (int) ($petRow->user_id ?? 0),
+            reportedSymptom: $reportedSymptom,
+            captureCurrentImage: $petDoc2BlobSaved
+        );
 
         $updatePayload = [
             'dog_disease_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
@@ -2076,6 +2088,96 @@ PROMPT;
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function syncLatestVideoConsultReportedSymptomLog(int $petId, int $userId, ?string $reportedSymptom, bool $captureCurrentImage): void
+    {
+        if (
+            $petId <= 0
+            || ! Schema::hasTable('reported_symptom_logs')
+            || ! Schema::hasTable('transactions')
+            || ! Schema::hasColumn('reported_symptom_logs', 'transaction_id')
+        ) {
+            return;
+        }
+
+        try {
+            $query = DB::table('transactions')
+                ->where('pet_id', $petId)
+                ->whereIn('type', ['video_consult', 'video_call', 'video call', 'appointment', 'appointments', 'continuety_subscription'])
+                ->where(function ($statusQuery) {
+                    $statusQuery->whereNull('status')
+                        ->orWhereNotIn(DB::raw('LOWER(status)'), ['failed', 'refunded', 'cancelled', 'canceled', 'rejected']);
+                });
+
+            if ($userId > 0 && Schema::hasColumn('transactions', 'user_id')) {
+                $query->where('user_id', $userId);
+            }
+
+            $transaction = $query
+                ->orderByDesc('id')
+                ->first(['id', 'pet_id', 'doctor_id']);
+
+            if (! $transaction) {
+                return;
+            }
+
+            $currentSymptom = $reportedSymptom;
+            if (($currentSymptom === null || trim($currentSymptom) === '')
+                && Schema::hasTable('pets')
+                && Schema::hasColumn('pets', 'reported_symptom')) {
+                $currentSymptom = DB::table('pets')->where('id', $petId)->value('reported_symptom');
+            }
+
+            $values = [
+                'pet_id' => $petId,
+                'doctor_id' => is_numeric($transaction->doctor_id ?? null) ? (int) $transaction->doctor_id : null,
+                'updated_at' => now(),
+            ];
+
+            if ($currentSymptom !== null && trim((string) $currentSymptom) !== '') {
+                $values['reported_symptom'] = trim((string) $currentSymptom);
+            }
+
+            if (
+                $captureCurrentImage
+                && Schema::hasColumn('reported_symptom_logs', 'image_blob')
+                && Schema::hasTable('pets')
+                && Schema::hasColumn('pets', 'pet_doc2_blob_new')
+            ) {
+                $petColumns = ['pet_doc2_blob_new'];
+                if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
+                    $petColumns[] = 'pet_doc2_mime';
+                }
+                $pet = DB::table('pets')->select($petColumns)->where('id', $petId)->first();
+                $blob = $pet->pet_doc2_blob_new ?? null;
+                if ($blob !== null && $blob !== '') {
+                    $values['image_blob'] = $blob;
+                    if (Schema::hasColumn('reported_symptom_logs', 'image_mime')) {
+                        $values['image_mime'] = $this->detectBlobMimeType($blob) ?: ($pet->pet_doc2_mime ?? null);
+                    }
+                }
+            }
+
+            $exists = DB::table('reported_symptom_logs')
+                ->where('transaction_id', (int) $transaction->id)
+                ->exists();
+
+            if (! $exists) {
+                $values['created_at'] = now();
+            }
+
+            DB::table('reported_symptom_logs')->updateOrInsert(
+                ['transaction_id' => (int) $transaction->id],
+                $values
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Unable to sync reported symptom log for video consult upload', [
+                'pet_id' => $petId,
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function detectBlobMimeType($blob): ?string
