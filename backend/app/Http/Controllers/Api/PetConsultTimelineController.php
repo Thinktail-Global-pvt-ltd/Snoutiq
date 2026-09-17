@@ -234,12 +234,35 @@ class PetConsultTimelineController extends Controller
         if (!in_array($transactionScope, ['consult', 'all'], true)) {
             $transactionScope = 'consult';
         }
+
+        $pet = Pet::query()->find($petId);
+        if (! $pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found.',
+            ], 404);
+        }
+
+        $petOwnerId = $pet->user_id ?? null;
+        $petBelongsToUser = is_numeric($petOwnerId) && (int) $petOwnerId === $userId;
+        if (is_numeric($petOwnerId) && ! $petBelongsToUser) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet does not belong to the supplied user.',
+            ], 403);
+        }
+
         $appointments = Appointment::query()
             ->where('pet_id', $petId)
             ->orderByDesc('created_at')
             ->get()
-            ->filter(function (Appointment $appointment) use ($userId) {
-                return $this->extractPatientUserId($appointment->notes) === $userId;
+            ->filter(function (Appointment $appointment) use ($userId, $petBelongsToUser) {
+                $appointmentUserId = $this->extractPatientUserId($appointment->notes);
+                if ($appointmentUserId === null && $petBelongsToUser) {
+                    return true;
+                }
+
+                return $appointmentUserId === $userId;
             })
             ->values();
 
