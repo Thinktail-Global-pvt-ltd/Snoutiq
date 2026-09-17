@@ -61,7 +61,35 @@ class VideoCallingController extends Controller
         ]);
     }
 
-    private function buildNearbyResponse(Request $request, string $mode)
+    public function nearbyVetsByLocation(Request $request)
+    {
+        $validated = $request->validate([
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $nearbyResponse = $this->buildNearbyResponse(
+            $request,
+            'doctor',
+            (float) $validated['lat'],
+            (float) $validated['lng']
+        );
+
+        if ($nearbyResponse->getStatusCode() !== 200) {
+            return $nearbyResponse;
+        }
+
+        $nearby = $nearbyResponse->getData(true);
+
+        return $this->jsonResponse([
+            'status' => 'success',
+            'date' => $nearby['date'] ?? null,
+            'day' => $nearby['day'] ?? null,
+            'nearby' => $nearby,
+        ]);
+    }
+
+    private function buildNearbyResponse(Request $request, string $mode, ?float $lat = null, ?float $lng = null)
     {
         $userId = $request->query('user_id');
         $dateParam = $request->query('date');
@@ -77,7 +105,7 @@ class VideoCallingController extends Controller
             }
         }
 
-        if (!$userId) {
+        if (($lat === null || $lng === null) && !$userId) {
             return $this->jsonResponse([
                 'status' => 'error',
                 'message' => 'user_id is required'
@@ -94,23 +122,26 @@ class VideoCallingController extends Controller
             ]);
         }
 
-        // 1) User lat/lng lao
-        $user = DB::table('users')
-            ->select('latitude', 'longitude')
-            ->where('id', $userId)
-            ->first();
+        if ($lat === null || $lng === null) {
+            // 1) User lat/lng lao
+            $user = DB::table('users')
+                ->select('latitude', 'longitude')
+                ->where('id', $userId)
+                ->first();
 
-        if (!$user) {
-            return $this->jsonResponse(['status' => 'error', 'message' => 'User not found'], 404);
+            if (!$user) {
+                return $this->jsonResponse(['status' => 'error', 'message' => 'User not found'], 404);
+            }
+
+            if ($user->latitude === null || $user->longitude === null || $user->latitude === '' || $user->longitude === '') {
+                return $this->jsonResponse(['status' => 'error', 'message' => 'User lat/long missing'], 422);
+            }
+
+            // 2) Numbers ensure karo
+            $lat = (float) $user->latitude;
+            $lng = (float) $user->longitude;
         }
 
-        if ($user->latitude === null || $user->longitude === null || $user->latitude === '' || $user->longitude === '') {
-            return $this->jsonResponse(['status' => 'error', 'message' => 'User lat/long missing'], 422);
-        }
-
-        // 2) Numbers ensure karo
-        $lat = (float) $user->latitude;
-        $lng = (float) $user->longitude;
         $radiusKm = 100;
         $clinicLatExpr = "COALESCE(vet_registerations_temp.lat, CASE WHEN JSON_VALID(vet_registerations_temp.coordinates) THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(vet_registerations_temp.coordinates, '$[0]')) AS DECIMAL(10,7)) ELSE NULL END)";
         $clinicLngExpr = "COALESCE(vet_registerations_temp.lng, CASE WHEN JSON_VALID(vet_registerations_temp.coordinates) THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(vet_registerations_temp.coordinates, '$[1]')) AS DECIMAL(10,7)) ELSE NULL END)";

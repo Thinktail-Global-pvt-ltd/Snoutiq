@@ -3767,6 +3767,7 @@ Route::get('/doctors/by-service-category', [\App\Http\Controllers\Api\DoctorServ
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/nearby-doctors', [VideoCallingController::class, 'nearbyDoctors']);
 Route::get('/nearby-plus-featured', [VideoCallingController::class, 'nearbyPlusFeatured']);
+Route::get('/nearby-vets-by-location', [VideoCallingController::class, 'nearbyVetsByLocation']);
 // Route::get('/active-doctors', ActiveDoctorController::class);
 
 // ---- Prescriptions ----
