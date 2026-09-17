@@ -270,12 +270,39 @@ export const VideoCallPayment = ({
   }, [navigate, onPay, shouldShowSuccessHomeButton, successfulPayment, vet]);
 
   const paymentContext = useMemo(
-    () =>
-      stripEmpty({
+    () => {
+      const doctorId = toNumber(
+        pickValue(
+          paymentMeta?.doctor_id,
+          paymentMeta?.doctorId,
+          vet?.doctor_id,
+          vet?.doctorId,
+          vet?.id,
+          vet?.raw?.doctor_id,
+          vet?.raw?.id
+        )
+      );
+      const clinicId = toNumber(
+        pickValue(
+          paymentMeta?.clinic_id,
+          paymentMeta?.clinicId,
+          vet?.clinic_id,
+          vet?.clinicId,
+          vet?.vet_registeration_id,
+          vet?.clinic?.id,
+          vet?.clinic?.clinic_id,
+          vet?.raw?.clinic_id,
+          vet?.raw?.vet_registeration_id
+        )
+      );
+
+      return stripEmpty({
         order_type: paymentMeta?.order_type || "excell_export_campaign",
         call_session_id: paymentMeta?.call_session_id,
         pet_id: paymentMeta?.pet_id,
         user_id: paymentMeta?.user_id,
+        doctor_id: doctorId,
+        clinic_id: clinicId,
         gst_number: gstNumber ? gstNumber.trim() : undefined,
         gst_number_given: gstNumber.trim() ? 1 : undefined,
         amount_includes_gst: 0,
@@ -290,7 +317,8 @@ export const VideoCallPayment = ({
         offer_discount_inr: toInt(discountAmount),
         original_amount_inr: toInt(totalBeforeDiscount),
         final_amount_inr: toInt(total),
-      }),
+      });
+    },
     [
       consultationAmount,
       discountAmount,
@@ -298,6 +326,10 @@ export const VideoCallPayment = ({
       gstAmountBeforeDiscount,
       gstNumber,
       paymentMeta?.call_session_id,
+      paymentMeta?.clinic_id,
+      paymentMeta?.clinicId,
+      paymentMeta?.doctor_id,
+      paymentMeta?.doctorId,
       paymentMeta?.order_type,
       paymentMeta?.pet_id,
       paymentMeta?.user_id,
@@ -306,6 +338,7 @@ export const VideoCallPayment = ({
       taxableAmountBeforeDiscount,
       total,
       totalBeforeDiscount,
+      vet,
     ]
   );
 

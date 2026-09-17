@@ -247,16 +247,42 @@ export const PaymentScreen = ({
     const gstNumberCleaned =
       typeof gstNumberValue === "string" ? gstNumberValue.trim() : gstNumberValue;
     const hasGstNumber = Boolean(gstNumberCleaned);
+    const doctorId =
+      toNumber(
+        pickValue(
+          paymentMeta?.doctor_id,
+          paymentMeta?.doctorId,
+          vet?.doctor_id,
+          vet?.doctorId,
+          vet?.id,
+          vet?.raw?.doctor_id,
+          vet?.raw?.id
+        )
+      ) || STATIC_DOCTOR_ID;
+    const clinicId =
+      toNumber(
+        pickValue(
+          paymentMeta?.clinic_id,
+          paymentMeta?.clinicId,
+          vet?.clinic_id,
+          vet?.clinicId,
+          vet?.vet_registeration_id,
+          vet?.clinic?.id,
+          vet?.clinic?.clinic_id,
+          vet?.raw?.clinic_id,
+          vet?.raw?.vet_registeration_id
+        )
+      ) || STATIC_CLINIC_ID;
 
     return stripEmpty({
       order_type: orderType,
-      clinic_id: STATIC_CLINIC_ID,
+      clinic_id: clinicId,
       service_id: STATIC_SERVICE_ID,
       booking_rate_type: STATIC_RATE_TYPE,
       slot_label: STATIC_SLOT_LABEL,
       call_session_id: callSessionId,
       pet_id: petId,
-      doctor_id: STATIC_DOCTOR_ID,
+      doctor_id: doctorId,
       user_id: userId,
       gst_number: hasGstNumber ? gstNumberCleaned : undefined,
       gst_number_given: hasGstNumber ? 1 : undefined,
@@ -274,6 +300,7 @@ export const PaymentScreen = ({
       final_amount_inr: toInt(total),
     });
   }, [
+    vet,
     paymentMeta,
     petDetails,
     gstNumber,
