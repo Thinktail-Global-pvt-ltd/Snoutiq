@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Phone, X, Loader2, ShieldCheck } from "lucide-react";
-import { updateAiUserData } from "./AiAuth";
+import { readAiAuthState, updateAiUserData } from "./AiAuth";
 
 const API_BASE = "https://snoutiq.com/backend/api";
 
@@ -53,19 +53,86 @@ export default function PhoneVerifyGate({ onVerified, onClose }) {
     }
     setLoading(true);
     try {
+      // Capture current session snapshot before OTP verification
+      const existingAuth = readAiAuthState();
+      const existingUser = existingAuth?.user || {};
+      const existingHasPet = Boolean(
+        existingUser?.pet_id ||
+        existingUser?.pet?.id ||
+        (Array.isArray(existingUser?.pets) && existingUser.pets.length > 0)
+      );
+
+      const googleEmail =
+        existingUser?.email ||
+        existingUser?.google_email ||
+        localStorage.getItem("user_email") ||
+        "";
+      const googleToken =
+        existingUser?.google_token ||
+        existingUser?.googleToken ||
+        "";
+      const isGoogleSession = Boolean(googleEmail || googleToken);
+
+      const currentPet =
+        existingUser?.pet ||
+        (Array.isArray(existingUser?.pets) && existingUser.pets.length > 0
+          ? existingUser.pets[0]
+          : null);
+
       const referralClinicId =
         localStorage.getItem("referral_clinic_id") ||
         sessionStorage.getItem("referral_clinic_id");
 
-      const verifyPayload = {
-        token,
-        otp: otp.trim(),
-        phone: toApiPhone(cleanDigits),
-        role: "pet",
-        ...(referralClinicId ? { referral_clinic_id: Number(referralClinicId) || referralClinicId } : {}),
-      };
+      const existingUserId = existingUser?.id || existingUser?.user_id || undefined;
 
-      const res = await fetch(`${API_BASE}/verify-otp`, {
+      const useEndpoint = isGoogleSession ? "google-merge-user" : "verify-otp";
+
+      let petAgeNum = null;
+      if (currentPet?.pet_age != null && currentPet.pet_age !== "") {
+        const parsed = parseInt(String(currentPet.pet_age).replace(/[^\d]/g, ""), 10);
+        if (Number.isFinite(parsed)) petAgeNum = parsed;
+      }
+
+      const verifyPayload = isGoogleSession
+        ? {
+            phone: toApiPhone(cleanDigits),
+            otp: otp.trim(),
+            token,
+            name:
+              existingUser?.name ||
+              existingUser?.owner_name ||
+              existingUser?.pet_owner_name ||
+              "Pet Parent",
+            email: googleEmail,
+            google_token: googleToken || undefined,
+            ...(currentPet?.name || currentPet?.pet_name
+              ? {
+                  pet_name: currentPet.name || currentPet.pet_name,
+                  pet_breed: currentPet.breed || currentPet.pet_breed || undefined,
+                  breed: currentPet.breed || currentPet.pet_breed || undefined,
+                  pet_type: currentPet.pet_type || currentPet.species || "dog",
+                  type: currentPet.pet_type || currentPet.species || "dog",
+                  pet_gender: currentPet.pet_gender || currentPet.gender || undefined,
+                  gender: currentPet.pet_gender || currentPet.gender || undefined,
+                  ...(petAgeNum !== null ? { pet_age: petAgeNum } : {}),
+                }
+              : {}),
+            ...(referralClinicId
+              ? { referral_clinic_id: Number(referralClinicId) || referralClinicId }
+              : {}),
+          }
+        : {
+            token,
+            otp: otp.trim(),
+            phone: toApiPhone(cleanDigits),
+            role: "pet",
+            ...(existingUserId ? { existing_user_id: existingUserId } : {}),
+            ...(referralClinicId
+              ? { referral_clinic_id: Number(referralClinicId) || referralClinicId }
+              : {}),
+          };
+
+      const res = await fetch(`${API_BASE}/${useEndpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(verifyPayload),
@@ -90,7 +157,8 @@ export default function PhoneVerifyGate({ onVerified, onClose }) {
         data.access_token ||
         data.jwt ||
         data.data?.token ||
-        null;
+        existingAuth?.token ||
+        (rawUserId ? `user_google_${rawUserId}` : null);
       const latestChat = data.latest_chat || data.data?.latest_chat || null;
       const latestCallSession = data.latest_call_session || data.data?.latest_call_session || null;
 
@@ -156,9 +224,15 @@ export default function PhoneVerifyGate({ onVerified, onClose }) {
         localStorage.setItem("phone_number", verifiedPhone);
         localStorage.setItem("otp_verified", "true");
         localStorage.setItem("user_identifier", `user_${verifiedPhone}`);
-        if (rawUserId) {
-          localStorage.setItem("current_user_id", String(rawUserId));
-          localStorage.setItem("user_id", String(rawUserId));
+        
+        // Only overwrite user_id in localStorage if existing session has no pet or user IDs match
+        const resolvedUserId = rawUserId && (!existingHasPet || String(rawUserId) === String(existingUser?.id || existingUser?.user_id))
+          ? rawUserId
+          : (existingUser?.id || existingUser?.user_id || rawUserId);
+
+        if (resolvedUserId) {
+          localStorage.setItem("current_user_id", String(resolvedUserId));
+          localStorage.setItem("user_id", String(resolvedUserId));
         }
         if (authToken) {
           localStorage.setItem("auth_token", authToken);
@@ -175,11 +249,13 @@ export default function PhoneVerifyGate({ onVerified, onClose }) {
         if (latestCallSession) {
           localStorage.setItem("latest_call_session", JSON.stringify(latestCallSession));
         }
-        if (primaryPet) {
-          localStorage.setItem("selected_pet_data", JSON.stringify(primaryPet));
-          localStorage.setItem("current_pet", JSON.stringify(primaryPet));
-          localStorage.setItem("pet_name", primaryPet.name || primaryPet.pet_name || "");
-          localStorage.setItem("pet_breed", primaryPet.breed || "");
+
+        const resolvedPet = primaryPet || (existingHasPet ? (existingUser.pet || (existingUser.pets && existingUser.pets[0])) : null);
+        if (resolvedPet) {
+          localStorage.setItem("selected_pet_data", JSON.stringify(resolvedPet));
+          localStorage.setItem("current_pet", JSON.stringify(resolvedPet));
+          localStorage.setItem("pet_name", resolvedPet.name || resolvedPet.pet_name || "");
+          localStorage.setItem("pet_breed", resolvedPet.breed || "");
         }
         localStorage.setItem("user_mobile", cleanPhone);
         if (userData?.name || userData?.owner_name) {
@@ -195,23 +271,48 @@ export default function PhoneVerifyGate({ onVerified, onClose }) {
         phone: verifiedPhone,
         mobileNumber: verifiedPhone,
         mobile: cleanPhone,
-        ...(rawUserId ? { id: rawUserId, user_id: rawUserId } : {}),
-        ...(normalizedPets.length > 0 ? {
-          pets: normalizedPets,
-          ...(primaryPet ? {
-            pet: primaryPet,
-            pet_id: primaryPet.id,
-            pet_name: primaryPet.name,
-            pet_gender: primaryPet.pet_gender,
-            breed: primaryPet.breed,
-            pet_age: primaryPet.pet_age,
-            pet_type: primaryPet.pet_type,
-            pet_doc1: primaryPet.pet_doc1,
-            pet_image_url: primaryPet.pet_image_url,
-          } : {}),
-        } : {}),
-        latest_chat: latestChat,
-        latest_call_session: latestCallSession,
+
+        // Only replace user_id if existing session had no pet, or if user_id is the same
+        ...(rawUserId &&
+        (!existingHasPet || String(rawUserId) === String(existingUser?.id || existingUser?.user_id))
+          ? { id: rawUserId, user_id: rawUserId }
+          : { id: existingUser?.id || rawUserId, user_id: existingUser?.user_id || existingUser?.id || rawUserId }),
+
+        // Retain existing pet data if response returned empty pets
+        ...(normalizedPets.length > 0
+          ? {
+              pets: normalizedPets,
+              ...(primaryPet
+                ? {
+                    pet: primaryPet,
+                    pet_id: primaryPet.id,
+                    pet_name: primaryPet.name,
+                    pet_gender: primaryPet.pet_gender,
+                    breed: primaryPet.breed,
+                    pet_age: primaryPet.pet_age,
+                    pet_type: primaryPet.pet_type,
+                    pet_doc1: primaryPet.pet_doc1,
+                    pet_image_url: primaryPet.pet_image_url,
+                  }
+                : {}),
+            }
+          : existingHasPet
+            ? {
+                pets: existingUser.pets,
+                pet: existingUser.pet,
+                pet_id: existingUser.pet_id,
+                pet_name: existingUser.pet_name,
+                pet_gender: existingUser.pet_gender,
+                breed: existingUser.breed,
+                pet_age: existingUser.pet_age,
+                pet_type: existingUser.pet_type,
+                pet_doc1: existingUser.pet_doc1,
+                pet_image_url: existingUser.pet_image_url,
+              }
+            : {}),
+
+        latest_chat: latestChat || existingUser.latest_chat,
+        latest_call_session: latestCallSession || existingUser.latest_call_session,
         ...(latestChat?.chat_room_token ? { chat_room_token: latestChat.chat_room_token } : {}),
       };
 
@@ -222,7 +323,11 @@ export default function PhoneVerifyGate({ onVerified, onClose }) {
       });
 
       if (typeof onVerified === "function") {
-        onVerified(cleanPhone, nextState, normalizedPets);
+        onVerified(
+          cleanPhone,
+          nextState,
+          normalizedPets.length > 0 ? normalizedPets : (existingUser.pets || [])
+        );
       }
     } catch (e) {
       setError(e.message || "Invalid OTP. Please try again.");

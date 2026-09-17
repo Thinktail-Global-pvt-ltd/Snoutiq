@@ -457,6 +457,7 @@ function sortByNearbyDistance(list) {
 export default function ModernDoctorBooking({ 
   onClose, 
   symptomText, 
+  initialImage = null,
   preSelectedPet, 
   orderType = "video_consult",
   initialDoctor = null,
@@ -532,9 +533,39 @@ export default function ModernDoctorBooking({
 
   const [flowStep, setFlowStep] = useState(() => urlStep || ((initialDoctor || initialClinic || initialPackage) ? "describe" : "list"));
   const [issueText, setIssueText] = useState(() => symptomText || localStorage.getItem("symptom_description") || "");
-  const [attachedImages, setAttachedImages] = useState([]);
+  const [attachedImages, setAttachedImages] = useState(() => {
+    const img = initialImage || (() => {
+      try {
+        return localStorage.getItem("symptom_image");
+      } catch (e) {
+        return null;
+      }
+    })();
+    return img ? [{ id: Date.now() + Math.random(), src: img, file: null }] : [];
+  });
   const [consentGiven, setConsentGiven] = useState(true);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+
+  // Sync symptomText dynamically
+  useEffect(() => {
+    if (symptomText && !issueText) {
+      setIssueText(symptomText);
+    }
+  }, [symptomText, issueText]);
+
+  // Sync initialImage / localStorage symptom_image dynamically
+  useEffect(() => {
+    if (initialImage && attachedImages.length === 0) {
+      setAttachedImages([{ id: Date.now() + Math.random(), src: initialImage, file: null }]);
+    } else if (!initialImage && attachedImages.length === 0) {
+      try {
+        const stored = localStorage.getItem("symptom_image");
+        if (stored) {
+          setAttachedImages([{ id: Date.now() + Math.random(), src: stored, file: null }]);
+        }
+      } catch (e) {}
+    }
+  }, [initialImage, attachedImages.length]);
 
   // Prevent double scrollbar by locking body scroll while booking modal is open
   useEffect(() => {

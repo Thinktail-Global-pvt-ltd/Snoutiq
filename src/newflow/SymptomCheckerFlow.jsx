@@ -603,6 +603,22 @@ export default function SymptomCheckerFlow({
     return "";
   };
 
+  const getUserSymptomImage = () => {
+    const userMsgsWithImage = messages.filter((m) => m.role === "user" && m.image);
+    if (userMsgsWithImage.length > 0) {
+      const latestImg = userMsgsWithImage[userMsgsWithImage.length - 1].image;
+      try {
+        localStorage.setItem("symptom_image", latestImg);
+      } catch (e) {}
+      return latestImg;
+    }
+    try {
+      const stored = localStorage.getItem("symptom_image");
+      if (stored) return stored;
+    } catch (e) {}
+    return "";
+  };
+
   const getProcessedServiceCards = (raw) => {
     let cards = raw?.ui?.service_cards;
     if (!Array.isArray(cards)) return cards;
@@ -710,6 +726,11 @@ export default function SymptomCheckerFlow({
       text: textToSubmit,
       image: attachedImage?.base64,
     });
+    if (attachedImage?.base64) {
+      try {
+        localStorage.setItem("symptom_image", attachedImage.base64);
+      } catch (e) {}
+    }
     setInputValue("");
     const imgData = attachedImage;
     setAttachedImage(null);
@@ -1448,6 +1469,7 @@ export default function SymptomCheckerFlow({
               setShowDoctorsModal(false);
             }}
             symptomText={getUserSymptomText()}
+            initialImage={getUserSymptomImage()}
             preSelectedPet={pet}
             orderType={bookingOrderType}
           />
@@ -1463,6 +1485,7 @@ export default function SymptomCheckerFlow({
               petType: pet.pet_type || "dog",
               token: token,
               symptomText: getUserSymptomText(),
+              symptomImage: getUserSymptomImage(),
             }}
             onClose={() => setShowHomeVetModal(false)}
             onSuccess={(payload) => {
