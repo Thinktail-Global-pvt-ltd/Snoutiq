@@ -80,6 +80,8 @@ class VideoCallingController extends Controller
         }
 
         $nearby = $nearbyResponse->getData(true);
+        $nearby['data'] = $this->compactNearbyDoctorPayload($nearby['data'] ?? []);
+        unset($nearby['available_doctors_by_vet'], $nearby['referral_by_vet']);
 
         return $this->jsonResponse([
             'status' => 'success',
@@ -383,6 +385,41 @@ class VideoCallingController extends Controller
         }
 
         return $payload->values();
+    }
+
+    private function compactNearbyDoctorPayload(array $entries): array
+    {
+        return collect($entries)
+            ->map(function (array $entry) {
+                $doctor = $entry['doctor'] ?? [];
+                if (!is_array($doctor)) {
+                    $doctor = (array) $doctor;
+                }
+
+                $doctorImage = $doctor['doctor_image'] ?? $doctor['image'] ?? null;
+                unset(
+                    $doctor['doctor_image_blob'],
+                    $doctor['password'],
+                    $doctor['api_token'],
+                    $doctor['api_token_hash'],
+                    $doctor['remember_token']
+                );
+
+                if ($doctorImage !== null) {
+                    $doctor['doctor_image'] = $doctorImage;
+                }
+
+                return [
+                    'clinic_id' => $entry['clinic_id'] ?? $entry['id'] ?? null,
+                    'name' => $entry['name'] ?? null,
+                    'city' => $entry['city'] ?? null,
+                    'address' => $entry['formatted_address'] ?? $entry['address'] ?? null,
+                    'distance' => isset($entry['distance']) ? round((float) $entry['distance'], 2) : null,
+                    'doctor' => $doctor,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function buildReferralByVet(Collection $vets): array
