@@ -20,6 +20,7 @@ use App\Models\UserMonthlySubscription;
 use Illuminate\Support\Str;
 use App\Services\WhatsAppService;
 use App\Services\Push\FcmService;
+use App\Services\PetDiseaseInferenceService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -87,6 +88,7 @@ class PaymentController extends Controller
         ]);
         $context = $this->resolveTransactionContext($request, $notes);
         $notes = $this->mergeContextIntoNotes($notes, $context);
+        $this->syncPaymentReportedSymptom($context, $notes, 'api.create-order');
         $transactionType = $this->resolveTransactionType($notes);
         $isCustomerSubscriptionTransaction = $this->isCustomerSubscriptionTransactionType($transactionType);
         $subscriptionSelectionProvided = $request->exists('subscription_selected') || $request->exists('subscriptionSelected');
@@ -894,6 +896,7 @@ class PaymentController extends Controller
                 paymentId: $data['razorpay_payment_id']
             );
             $notes = $this->mergeContextIntoNotes($notes, $context);
+            $this->syncPaymentReportedSymptom($context, $notes, 'api.rzp.verify');
             $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
 
             [$record, $storedTransaction, $monthlySubscription] = DB::transaction(function () use (
@@ -1549,6 +1552,57 @@ class PaymentController extends Controller
         }
     }
 
+    protected function syncPaymentReportedSymptom(array $context, array $notes, string $source): void
+    {
+        $petId = $this->toNullableInt($context['pet_id'] ?? ($notes['pet_id'] ?? null));
+        if (
+            ! $petId
+            || ! Schema::hasTable('pets')
+            || ! Schema::hasColumn('pets', 'reported_symptom')
+        ) {
+            return;
+        }
+
+        $reportedSymptom = $this->resolveReportedSymptomFromNotes($notes);
+        if ($reportedSymptom === null) {
+            return;
+        }
+
+        try {
+            app(PetDiseaseInferenceService::class)->syncFromReportedSymptom(
+                petId: $petId,
+                reportedSymptom: $reportedSymptom,
+                source: $source
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function resolveReportedSymptomFromNotes(array $notes): ?string
+    {
+        foreach (['reported_symptom', 'symptoms', 'symptom', 'notes', 'issue_description', 'issue', 'concern', 'question'] as $key) {
+            if (!array_key_exists($key, $notes)) {
+                continue;
+            }
+
+            $value = $notes[$key];
+            if (is_array($value)) {
+                $value = implode(', ', array_filter(array_map(
+                    fn ($item) => trim((string) $item),
+                    $value
+                )));
+            }
+
+            $text = trim((string) $value);
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return null;
+    }
+
     protected function normalizeTransactionStatus(?string $status): string
     {
         $normalized = strtolower(trim((string) $status));
@@ -1784,18 +1838,31 @@ class PaymentController extends Controller
             'gst_number_given' => ['gst_number_given', 'gstNumberGiven'],
             'vet_template' => ['vet_template', 'vetTemplate', 'vet_template_name'],
             'vet_template_language' => ['vet_template_language', 'vetTemplateLanguage'],
+            'reported_symptom' => ['reported_symptom', 'reportedSymptom', 'symptoms', 'symptom', 'notes', 'issue_description', 'issue', 'concern', 'question'],
         ];
 
         foreach ($mapping as $noteKey => $keys) {
             foreach ($keys as $key) {
                 if ($request->filled($key)) {
-                    $notes[$noteKey] = (string) $request->input($key);
+                    $notes[$noteKey] = $this->normalizeNoteValue($request->input($key));
                     break;
                 }
             }
         }
 
         return $notes;
+    }
+
+    protected function normalizeNoteValue($value): string
+    {
+        if (is_array($value)) {
+            return implode(', ', array_filter(array_map(
+                fn ($item) => trim((string) $item),
+                $value
+            )));
+        }
+
+        return trim((string) $value);
     }
 
     /**
