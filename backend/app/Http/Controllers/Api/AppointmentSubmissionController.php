@@ -397,6 +397,120 @@ class AppointmentSubmissionController extends Controller
         return response()->json($this->sanitizeForJson($payload));
     }
 
+    public function cancel(Request $request, Appointment $appointment): JsonResponse
+    {
+        $validated = $request->validate([
+            'user_id'  => ['nullable', 'integer'],
+            'reason'   => ['nullable', 'string', 'max:255'],
+            'comments' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($block = $this->appointmentMutationBlock($appointment, $validated['user_id'] ?? null, 'cancel')) {
+            return $block;
+        }
+
+        $notesPayload = $this->decodeNotes($appointment->notes);
+        $cancelledAt  = Carbon::now(config('app.timezone', 'UTC'))->toIso8601String();
+        $isPaidOnline = !empty($notesPayload['razorpay_payment_id'])
+            || !empty($notesPayload['razorpay_order_id'])
+            || !empty($appointment->transaction_id);
+        $refundAmount = 0;
+        if ($isPaidOnline && isset($notesPayload['amount_paise']) && is_numeric($notesPayload['amount_paise'])) {
+            $refundAmount = round(((int) $notesPayload['amount_paise']) / 100, 2);
+        }
+        $refundStatus = $isPaidOnline ? 'initiated' : 'not_applicable';
+
+        $notesPayload['cancelled_at'] = $cancelledAt;
+        $notesPayload['cancel_reason'] = $validated['reason'] ?? null;
+        $notesPayload['cancel_comments'] = $validated['comments'] ?? null;
+        $notesPayload['cancelled_by_user_id'] = $validated['user_id'] ?? null;
+        $notesPayload['refund_status'] = $refundStatus;
+        $notesPayload['refund_amount'] = $refundAmount;
+
+        $appointment->status = 'cancelled';
+        $appointment->notes = json_encode($notesPayload);
+        $appointment->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Appointment cancelled successfully',
+            'data' => [
+                'id' => $appointment->id,
+                'status' => $appointment->status,
+                'cancelled_at' => $cancelledAt,
+                'refund_status' => $refundStatus,
+                'refund_amount' => $refundAmount,
+            ],
+        ]);
+    }
+
+    public function reschedule(Request $request, Appointment $appointment): JsonResponse
+    {
+        $validated = $request->validate([
+            'user_id'       => ['nullable', 'integer'],
+            'new_date'      => ['nullable', 'date'],
+            'date'          => ['nullable', 'date'],
+            'new_time_slot' => ['nullable', 'string', 'max:50'],
+            'time_slot'     => ['nullable', 'string', 'max:50'],
+            'reason'        => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $newDate = $validated['new_date'] ?? $validated['date'] ?? null;
+        $newTimeSlot = $validated['new_time_slot'] ?? $validated['time_slot'] ?? null;
+        if (!$newDate || !$newTimeSlot) {
+            return response()->json([
+                'success' => false,
+                'message' => 'new_date and new_time_slot are required',
+                'errors' => [
+                    'new_date' => $newDate ? [] : ['The new date field is required.'],
+                    'new_time_slot' => $newTimeSlot ? [] : ['The new time slot field is required.'],
+                ],
+            ], 422);
+        }
+
+        if ($block = $this->appointmentMutationBlock($appointment, $validated['user_id'] ?? null, 'reschedule')) {
+            return $block;
+        }
+
+        $notesPayload = $this->decodeNotes($appointment->notes);
+        $previousSlots = $notesPayload['previous_slots'] ?? [];
+        if (!is_array($previousSlots)) {
+            $previousSlots = [];
+        }
+        $previousSlots[] = [
+            'date' => $appointment->appointment_date,
+            'time_slot' => $appointment->appointment_time,
+            'changed_at' => Carbon::now(config('app.timezone', 'UTC'))->toIso8601String(),
+            'reason' => $validated['reason'] ?? null,
+        ];
+
+        $rescheduledCount = ((int) ($notesPayload['rescheduled_count'] ?? 0)) + 1;
+        $notesPayload['previous_slots'] = $previousSlots;
+        $notesPayload['rescheduled_count'] = $rescheduledCount;
+        $notesPayload['last_rescheduled_at'] = Carbon::now(config('app.timezone', 'UTC'))->toIso8601String();
+        $notesPayload['reschedule_reason'] = $validated['reason'] ?? null;
+        $notesPayload['rescheduled_by_user_id'] = $validated['user_id'] ?? null;
+
+        $appointment->appointment_date = $newDate;
+        $appointment->appointment_time = $newTimeSlot;
+        $appointment->status = 'confirmed';
+        $appointment->notes = json_encode($notesPayload);
+        $appointment->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Appointment rescheduled successfully',
+            'data' => [
+                'id' => $appointment->id,
+                'status' => $appointment->status,
+                'date' => $appointment->appointment_date,
+                'time_slot' => $appointment->appointment_time,
+                'rescheduled_count' => $rescheduledCount,
+                'updated_at' => optional($appointment->updated_at)->toIso8601String(),
+            ],
+        ]);
+    }
+
     public function update(Request $request, Appointment $appointment): JsonResponse
     {
         $petValidation = ['sometimes', 'nullable', 'integer'];
@@ -839,6 +953,49 @@ class AppointmentSubmissionController extends Controller
     // =========================================================================
     // Private helpers (unchanged from original)
     // =========================================================================
+
+    private function appointmentMutationBlock(Appointment $appointment, ?int $requestedUserId, string $action): ?JsonResponse
+    {
+        $status = Str::lower((string) $appointment->status);
+        $pastAction = $action === 'cancel' ? 'cancelled' : 'rescheduled';
+        if (in_array($status, ['completed', 'cancelled', 'canceled', 'rejected', 'failed', 'refunded'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Appointment cannot be ' . $pastAction . ' in its current status',
+                'error_code' => 'APPOINTMENT_NOT_CHANGEABLE',
+            ], 400);
+        }
+
+        $notes = $this->decodeNotes($appointment->notes);
+        $patientUserId = $this->resolvePatientUserId($appointment, $notes);
+        if ($requestedUserId && $patientUserId && (int) $requestedUserId !== (int) $patientUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This appointment does not belong to the supplied user_id',
+                'error_code' => 'APPOINTMENT_USER_MISMATCH',
+            ], 403);
+        }
+
+        $timezone = config('app.timezone', 'UTC');
+        $slot = $this->appointmentDateTime($appointment, $timezone);
+        if (!$slot) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Appointment date/time is missing or invalid',
+                'error_code' => 'APPOINTMENT_TIME_MISSING',
+            ], 400);
+        }
+
+        if ($slot->lt(Carbon::now($timezone)->addHours(2))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot ' . $action . ' appointment less than 2 hours before scheduled time',
+                'error_code' => $action === 'cancel' ? 'CANCELLATION_WINDOW_EXPIRED' : 'RESCHEDULE_WINDOW_EXPIRED',
+            ], 400);
+        }
+
+        return null;
+    }
 
     private function respondWithAppointment(Appointment $appointment, int $status = 200): JsonResponse
     {

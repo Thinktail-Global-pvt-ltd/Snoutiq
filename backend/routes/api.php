@@ -3622,6 +3622,14 @@ Route::get('/appointments/by-user/{user}', [AppointmentSubmissionController::cla
     ->name('api.appointments.by-user');
 Route::get('/appointments/{appointment}/patient-details', [AppointmentSubmissionController::class, 'patientDetails'])
     ->name('api.appointments.patient-details');
+Route::post('/appointments/{appointment}/cancel', [AppointmentSubmissionController::class, 'cancel'])
+    ->name('api.appointments.cancel');
+Route::post('/appointments/{appointment}/reschedule', [AppointmentSubmissionController::class, 'reschedule'])
+    ->name('api.appointments.reschedule');
+Route::post('/bookings/{appointment}/cancel', [AppointmentSubmissionController::class, 'cancel'])
+    ->name('api.appointment-bookings.cancel');
+Route::post('/bookings/{appointment}/reschedule', [AppointmentSubmissionController::class, 'reschedule'])
+    ->name('api.appointment-bookings.reschedule');
 Route::get('/appointments/{appointment}', [AppointmentSubmissionController::class, 'show'])
     ->name('api.appointments.show');
 Route::get('/appointments/{appointment}/edit', [AppointmentSubmissionController::class, 'edit'])
