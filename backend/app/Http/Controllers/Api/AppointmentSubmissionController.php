@@ -59,6 +59,9 @@ class AppointmentSubmissionController extends Controller
             'razorpay_order_id'    => ['nullable', 'string', 'max:191'],
             'razorpay_signature'   => ['nullable', 'string', 'max:255'],
             'notes'                => ['nullable', 'string'],
+            'symptoms'             => ['nullable'],
+            'reported_symptom'     => ['nullable', 'string'],
+            'issue_description'    => ['nullable', 'string'],
         ]);
 
         if (array_key_exists('appointment_type', $validated) && ! $this->appointmentTypeColumnExists()) {
@@ -181,20 +184,22 @@ class AppointmentSubmissionController extends Controller
             'razorpay_signature' => $validated['razorpay_signature'] ?? null,
         ];
 
-        if (!empty($validated['notes'])) {
-            $notesPayload['text'] = $validated['notes'];
+        $reportedSymptom = $this->appointmentReportedSymptom($validated);
+
+        if ($reportedSymptom !== null) {
+            $notesPayload['text'] = $reportedSymptom;
         }
 
         // Keep the pet's reported symptom aligned with the latest walk-in notes.
         if (
-            !empty($validated['notes'])
+            $reportedSymptom !== null
             && !empty($validated['pet_id'])
             && Schema::hasTable('pets')
             && Schema::hasColumn('pets', 'reported_symptom')
         ) {
             app(PetDiseaseInferenceService::class)->syncFromReportedSymptom(
                 petId: (int) $validated['pet_id'],
-                reportedSymptom: $validated['notes'],
+                reportedSymptom: $reportedSymptom,
                 source: 'api.appointments.submit'
             );
         }
@@ -992,6 +997,30 @@ class AppointmentSubmissionController extends Controller
                 'message' => 'Cannot ' . $action . ' appointment less than 2 hours before scheduled time',
                 'error_code' => $action === 'cancel' ? 'CANCELLATION_WINDOW_EXPIRED' : 'RESCHEDULE_WINDOW_EXPIRED',
             ], 400);
+        }
+
+        return null;
+    }
+
+    private function appointmentReportedSymptom(array $validated): ?string
+    {
+        foreach (['notes', 'reported_symptom', 'issue_description', 'symptoms'] as $key) {
+            if (!array_key_exists($key, $validated)) {
+                continue;
+            }
+
+            $value = $validated[$key];
+            if (is_array($value)) {
+                $value = implode(', ', array_filter(array_map(
+                    fn ($item) => trim((string) $item),
+                    $value
+                )));
+            }
+
+            $text = trim((string) $value);
+            if ($text !== '') {
+                return $text;
+            }
         }
 
         return null;

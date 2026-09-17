@@ -16,6 +16,7 @@ class AppointmentSubmissionApiTest extends TestCase
         Schema::dropIfExists('appointments');
         Schema::dropIfExists('doctors');
         Schema::dropIfExists('vet_registerations_temp');
+        Schema::dropIfExists('pets');
         Schema::dropIfExists('users');
 
         Schema::create('vet_registerations_temp', function (Blueprint $table) {
@@ -62,6 +63,31 @@ class AppointmentSubmissionApiTest extends TestCase
             $table->text('notes')->nullable();
             $table->timestamps();
         });
+
+        Schema::create('pets', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('name')->nullable();
+            $table->string('breed')->nullable();
+            $table->integer('pet_age')->nullable();
+            $table->integer('pet_age_months')->nullable();
+            $table->date('pet_dob')->nullable();
+            $table->date('dob')->nullable();
+            $table->string('pet_gender')->nullable();
+            $table->text('reported_symptom')->nullable();
+            $table->string('suggested_disease')->nullable();
+            $table->string('health_state')->nullable();
+            $table->text('ai_summary')->nullable();
+            $table->string('pet_doc1')->nullable();
+            $table->string('pet_doc2')->nullable();
+            $table->boolean('is_nuetered')->nullable();
+            $table->boolean('is_neutered')->nullable();
+            $table->boolean('deworming_yes_no')->nullable();
+            $table->date('last_deworming_date')->nullable();
+            $table->string('deworming_status')->nullable();
+            $table->date('next_deworming_date')->nullable();
+            $table->timestamps();
+        });
     }
 
     protected function tearDown(): void
@@ -69,6 +95,7 @@ class AppointmentSubmissionApiTest extends TestCase
         Schema::dropIfExists('appointments');
         Schema::dropIfExists('doctors');
         Schema::dropIfExists('vet_registerations_temp');
+        Schema::dropIfExists('pets');
         Schema::dropIfExists('users');
 
         parent::tearDown();
@@ -130,6 +157,103 @@ class AppointmentSubmissionApiTest extends TestCase
             'doctor_id' => $doctorId,
             'appointment_date' => '2026-04-11',
             'appointment_time' => '11:45:00',
+        ]);
+    }
+
+    public function test_store_syncs_exact_notes_to_pet_reported_symptom(): void
+    {
+        DB::table('users')->insert([
+            'id' => 701,
+            'name' => 'Pet Parent',
+            'email' => 'pet-parent@example.test',
+            'phone' => '9000090000',
+            'role' => 'pet_parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 801,
+            'user_id' => 701,
+            'name' => 'Sheru',
+            'breed' => 'Indie',
+            'pet_age' => 4,
+            'pet_gender' => 'male',
+            'reported_symptom' => 'old symptom',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $reportedSymptom = 'Vomiting twice since morning and not eating food';
+
+        $response = $this->postJson('/api/appointments/submit', [
+            'user_id' => 701,
+            'patient_name' => 'Pet Parent',
+            'patient_phone' => '9000090000',
+            'pet_id' => 801,
+            'pet_name' => 'Sheru',
+            'date' => '2026-04-12',
+            'time_slot' => '12:15:00',
+            'notes' => $reportedSymptom,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.appointment.appointment_table.notes_decoded.text', $reportedSymptom);
+
+        $this->assertDatabaseHas('pets', [
+            'id' => 801,
+            'reported_symptom' => $reportedSymptom,
+        ]);
+
+        $this->getJson('/api/pets/801/overview')
+            ->assertOk()
+            ->assertJsonPath('data.pet.reported_symptom', $reportedSymptom);
+    }
+
+    public function test_store_syncs_reported_symptom_alias_to_pet(): void
+    {
+        DB::table('users')->insert([
+            'id' => 702,
+            'name' => 'Alias Parent',
+            'email' => 'alias-parent@example.test',
+            'phone' => '9000090001',
+            'role' => 'pet_parent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pets')->insert([
+            'id' => 802,
+            'user_id' => 702,
+            'name' => 'Milo',
+            'breed' => 'Beagle',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $reportedSymptom = 'Limping after evening walk';
+
+        $response = $this->postJson('/api/appointments/submit', [
+            'user_id' => 702,
+            'patient_name' => 'Alias Parent',
+            'patient_phone' => '9000090001',
+            'pet_id' => 802,
+            'pet_name' => 'Milo',
+            'date' => '2026-04-13',
+            'time_slot' => '13:30:00',
+            'reported_symptom' => $reportedSymptom,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.appointment.appointment_table.notes_decoded.text', $reportedSymptom);
+
+        $this->assertDatabaseHas('pets', [
+            'id' => 802,
+            'reported_symptom' => $reportedSymptom,
         ]);
     }
 
