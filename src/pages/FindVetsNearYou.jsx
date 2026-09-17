@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import {
   AlertCircle,
+  Building2,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
   Clock3,
@@ -15,15 +17,17 @@ import {
   ShieldCheck,
   Sparkles,
   Stethoscope,
+  Video,
   X,
 } from "lucide-react";
 import { apiBaseUrl } from "../lib/api";
 import { Navbar } from "../newflow/Navbar";
 import { Footer } from "../newflow/NewFooter";
+import ModernDoctorBooking from "../newflow/ModernDoctorBooking";
 
 const PAGE_TITLE = "Find Vets Near You | SnoutIQ Verified Doctors";
 const PAGE_DESCRIPTION =
-  "Find verified veterinary doctors and clinics near your location. Filter by distance, specialization, and view real doctor profiles on SnoutIQ.";
+  "Find verified veterinary doctors and clinics near your location. Filter by distance, specialization, and book video consults or clinic visits on SnoutIQ.";
 
 const SESSION_COORDS_KEY = "snoutiq_vets_coords";
 
@@ -65,6 +69,40 @@ const buildDoctorImageUrl = (doc) => {
 
   const base = getBackendBase();
   return `${base}/${cleaned}`;
+};
+
+const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const numLat1 = Number(lat1);
+  const numLon1 = Number(lon1);
+  const numLat2 = Number(lat2);
+  const numLon2 = Number(lon2);
+  if (isNaN(numLat1) || isNaN(numLon1) || isNaN(numLat2) || isNaN(numLon2)) return null;
+
+  const R = 6371; // km
+  const dLat = (numLat2 - numLat1) * (Math.PI / 180);
+  const dLon = (numLon2 - numLon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(numLat1 * (Math.PI / 180)) *
+      Math.cos(numLat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+const extractCoords = (item) => {
+  if (!item) return null;
+  if (item.lat && item.lng && !isNaN(Number(item.lat)) && !isNaN(Number(item.lng))) {
+    return { lat: Number(item.lat), lng: Number(item.lng) };
+  }
+  if (Array.isArray(item.coordinates) && item.coordinates.length >= 2) {
+    const lat = Number(item.coordinates[0]);
+    const lng = Number(item.coordinates[1]);
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+  }
+  return null;
 };
 
 const formatDistance = (dist) => {
@@ -122,8 +160,8 @@ const formatInr = (val) => {
   return `₹${num.toLocaleString("en-IN")}`;
 };
 
-/* ---------------- Compact Doctor Card (4-col grid) ---------------- */
-const DoctorCard = ({ doctor, onSelect, onImageError, isImageBroken }) => {
+/* ---------------- Doctor Card (Aligned with NewClinics styling) ---------------- */
+const DoctorCard = ({ doctor, onSelect, onBook, onImageError, isImageBroken }) => {
   const [imgSrc, setImgSrc] = useState(doctor.doctorImage);
   const [triedStorageFallback, setTriedStorageFallback] = useState(false);
 
@@ -139,32 +177,35 @@ const DoctorCard = ({ doctor, onSelect, onImageError, isImageBroken }) => {
   };
 
   const hasValidImage = Boolean(imgSrc) && !isImageBroken;
+  const dayRate = formatInr(doctor.videoDayRate);
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,23,42,0.1)]">
+    <article className="group flex flex-col overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-blue-300/80 hover:shadow-[0_16px_36px_rgba(30,58,138,0.12)]">
       {/* Card Header Banner */}
-      <div className="relative flex h-32 items-end bg-gradient-to-br from-slate-900 via-sky-950 to-blue-900 p-3 text-white">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="relative flex h-28 items-end bg-gradient-to-br from-slate-900 via-sky-950 to-blue-900 p-3.5 text-white">
+        <div className="flex items-center gap-3 min-w-0">
           {hasValidImage ? (
             <img
               src={imgSrc}
               alt={doctor.doctorName}
-              className="h-11 w-11 shrink-0 rounded-xl border-2 border-white/80 object-cover shadow"
+              className="h-12 w-12 shrink-0 rounded-2xl border-2 border-white/80 object-cover shadow-md"
               loading="lazy"
               onError={handleImageError}
             />
           ) : (
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-white/60 bg-white/20 text-xs font-black text-white shadow backdrop-blur">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-2 border-white/60 bg-white/20 text-xs font-black text-white shadow-md backdrop-blur">
               {getInitials(doctor.doctorName)}
             </div>
           )}
 
-          <div className="min-w-0 pr-14">
+          <div className="min-w-0 pr-16">
             <h3 className="truncate font-display text-sm font-extrabold text-white">
               {doctor.doctorName}
             </h3>
-            <p className="truncate text-xs text-white/80">
-              {doctor.clinicName}
+            <p className="truncate text-xs text-sky-200 font-medium">
+              {[doctor.degree, doctor.experience ? `${doctor.experience} yrs exp` : null]
+                .filter(Boolean)
+                .join(" • ") || "Veterinary Doctor"}
             </p>
           </div>
         </div>
@@ -185,19 +226,36 @@ const DoctorCard = ({ doctor, onSelect, onImageError, isImageBroken }) => {
       </div>
 
       {/* Card Body */}
-      <div className="flex flex-1 flex-col justify-between space-y-2.5 p-3">
-        <div className="space-y-2">
-          {/* Location & Distance */}
-          <div className="flex items-center justify-between gap-1 text-xs text-slate-500">
-            <span className="inline-flex items-center gap-1 truncate">
-              <MapPin className="h-3.5 w-3.5 shrink-0 text-sky-600" />
-              <span className="truncate">{doctor.clinicCity || doctor.clinicAddress || "Nearby"}</span>
-            </span>
+      <div className="flex flex-1 flex-col justify-between p-3.5 space-y-3">
+        <div className="space-y-2.5">
+          {/* Clinic & Distance */}
+          <div className="flex items-start justify-between gap-1.5 text-xs">
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-slate-800 flex items-center gap-1">
+                <Building2 className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+                <span className="truncate">{doctor.clinicName}</span>
+              </p>
+              <p className="truncate text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
+                <span className="truncate">{doctor.clinicCity || doctor.clinicAddress || "Nearby"}</span>
+              </p>
+            </div>
             {doctor.distance !== null && (
-              <span className="shrink-0 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
+              <span className="shrink-0 rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
                 {formatDistance(doctor.distance)}
               </span>
             )}
+          </div>
+
+          {/* Fee & Consult Availability Pill */}
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-2.5 py-1.5 border border-slate-100 text-xs">
+            <span className="text-[11px] font-medium text-slate-600 flex items-center gap-1">
+              <Stethoscope className="h-3.5 w-3.5 text-blue-600" />
+              Consult Fee
+            </span>
+            <span className="font-extrabold text-blue-700 text-xs">
+              {dayRate ? `${dayRate}` : "₹499"}
+            </span>
           </div>
 
           {/* Specialization Chips (max 2) */}
@@ -206,13 +264,13 @@ const DoctorCard = ({ doctor, onSelect, onImageError, isImageBroken }) => {
               {doctor.specializations.slice(0, 2).map((spec, i) => (
                 <span
                   key={`${doctor.id}-spec-${i}`}
-                  className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-700"
+                  className="rounded-md border border-slate-100 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600"
                 >
                   {spec}
                 </span>
               ))}
               {doctor.specializations.length > 2 && (
-                <span className="rounded-full bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
                   +{doctor.specializations.length - 2}
                 </span>
               )}
@@ -220,22 +278,47 @@ const DoctorCard = ({ doctor, onSelect, onImageError, isImageBroken }) => {
           )}
         </div>
 
-        {/* View Profile CTA */}
-        <button
-          type="button"
-          onClick={() => onSelect(doctor)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 py-2 text-xs font-bold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100 active:scale-95 cursor-pointer"
-        >
-          View Profile
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
+        {/* Action Buttons */}
+        <div className="space-y-2 pt-1 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-2">
+            {/* Talk to Vet Button (Video Consult) */}
+            <button
+              type="button"
+              onClick={() => onBook(doctor, "video_consult")}
+              className="inline-flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2 px-2 text-xs font-bold text-white shadow-xs transition hover:from-emerald-700 hover:to-teal-700 active:scale-95 cursor-pointer"
+            >
+              <Video className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Talk to Vet</span>
+            </button>
+
+            {/* Book Visit Button (In-clinic) */}
+            <button
+              type="button"
+              onClick={() => onBook(doctor, "appointment")}
+              className="inline-flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-2 px-2 text-xs font-bold text-white shadow-xs transition hover:from-blue-700 hover:to-blue-800 active:scale-95 cursor-pointer"
+            >
+              <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Book Visit</span>
+            </button>
+          </div>
+
+          {/* View Profile Link */}
+          <button
+            type="button"
+            onClick={() => onSelect(doctor)}
+            className="flex w-full items-center justify-center gap-1 rounded-lg py-1 text-[11px] font-semibold text-slate-500 transition hover:text-blue-700 hover:bg-slate-50 cursor-pointer"
+          >
+            <span>View Full Profile</span>
+            <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
       </div>
     </article>
   );
 };
 
 /* ---------------- Profile Modal ---------------- */
-const ProfileModal = ({ doctor, onClose, isImageBroken, onImageError }) => {
+const ProfileModal = ({ doctor, onClose, onBook, isImageBroken, onImageError }) => {
   useEffect(() => {
     if (!doctor) return;
     const handleKey = (e) => {
@@ -335,7 +418,7 @@ const ProfileModal = ({ doctor, onClose, isImageBroken, onImageError }) => {
             {dayRate && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Day Consult</span>
-                <p className="text-xs font-extrabold text-sky-700 mt-1 flex items-center justify-center gap-0.5">
+                <p className="text-xs font-extrabold text-blue-700 mt-1 flex items-center justify-center gap-0.5">
                   <IndianRupee className="h-3 w-3" />
                   {dayRate.replace("₹", "")}
                 </p>
@@ -356,14 +439,14 @@ const ProfileModal = ({ doctor, onClose, isImageBroken, onImageError }) => {
           {doctor.specializations.length > 0 && (
             <div>
               <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
-                <Stethoscope className="h-3.5 w-3.5 text-sky-600" />
+                <Stethoscope className="h-3.5 w-3.5 text-blue-600" />
                 Specializations
               </h4>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {doctor.specializations.map((spec, i) => (
                   <span
                     key={`modal-spec-${i}`}
-                    className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800 border border-sky-100"
+                    className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800 border border-blue-100"
                   >
                     {spec}
                   </span>
@@ -434,12 +517,36 @@ const ProfileModal = ({ doctor, onClose, isImageBroken, onImageError }) => {
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="border-t border-slate-100 bg-slate-50 p-4 shrink-0">
+        {/* Modal Footer with CTAs */}
+        <div className="border-t border-slate-100 bg-slate-50 p-4 shrink-0 space-y-2">
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onBook(doctor, "video_consult");
+              }}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:from-emerald-700 hover:to-teal-700 active:scale-95 cursor-pointer"
+            >
+              <Video className="h-4 w-4" />
+              <span>Talk to Vet</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onBook(doctor, "appointment");
+              }}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 py-2.5 text-xs font-bold text-white shadow-sm transition hover:from-blue-700 hover:to-blue-800 active:scale-95 cursor-pointer"
+            >
+              <CalendarDays className="h-4 w-4" />
+              <span>Book Visit</span>
+            </button>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-xl border border-slate-300 bg-white py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100 active:scale-95 cursor-pointer"
+            className="w-full rounded-xl border border-slate-300 bg-white py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 active:scale-95 cursor-pointer"
           >
             Close Profile
           </button>
@@ -474,8 +581,81 @@ export default function FindVetsNearYou() {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [brokenImages, setBrokenImages] = useState(() => new Set());
 
+  // Booking Modal State
+  const [bookingModal, setBookingModal] = useState({
+    isOpen: false,
+    orderType: "video_consult",
+    doctor: null,
+    clinic: null,
+  });
+
   const markImageBroken = (id) => {
     setBrokenImages((prev) => new Set(prev).add(id));
+  };
+
+  const handleBookAction = (doctor, orderType) => {
+    const formattedDoctor = {
+      id: doctor.id,
+      doctor_id: doctor.id,
+      name: doctor.doctorName,
+      doctor_name: doctor.doctorName,
+      degree: doctor.degree || "BVSc",
+      years_of_experience: doctor.experience || 5,
+      experience: doctor.experience || 5,
+      specialization_select_all_that_apply: doctor.specializations,
+      specialization: doctor.specializations.join(", "),
+      video_day_rate: doctor.videoDayRate || 499,
+      video_night_rate: doctor.videoNightRate || 650,
+      doctors_price: doctor.videoDayRate || 499,
+      feeDay: Number(doctor.videoDayRate) || 499,
+      feeNight: Number(doctor.videoNightRate) || 650,
+      doctor_image: doctor.doctorImage,
+      doctor_image_blob_url: doctor.doctorImage,
+      doctor_blob_url: doctor.doctorImage,
+      image: doctor.doctorImage,
+      doctor_status: doctor.isAvailable ? "available" : "offline",
+      status: doctor.isAvailable ? "available" : "offline",
+      bio: doctor.bio,
+      vet_registeration_id: doctor.clinicId,
+      clinicId: doctor.clinicId,
+      clinic_id: doctor.clinicId,
+      clinicName: doctor.clinicName,
+      clinic_name: doctor.clinicName,
+      clinicCity: doctor.clinicCity,
+      clinic_city: doctor.clinicCity,
+      clinicAddress: doctor.clinicAddress,
+      clinic_address: doctor.clinicAddress,
+      distance_km: doctor.distance,
+    };
+
+    const formattedClinic = {
+      id: doctor.clinicId || `clinic-${doctor.id}`,
+      clinic_id: doctor.clinicId || `clinic-${doctor.id}`,
+      name: doctor.clinicName || "SnoutIQ Partner Clinic",
+      city: doctor.clinicCity || "Gurugram",
+      address: doctor.clinicAddress || "",
+      formatted_address: doctor.clinicAddress || "",
+      doctors: [formattedDoctor],
+      clinic_day_fee: doctor.videoDayRate || 499,
+      clinic_night_fee: doctor.videoNightRate || 650,
+      doctors_price: doctor.videoDayRate || 499,
+    };
+
+    setBookingModal({
+      isOpen: true,
+      orderType,
+      doctor: formattedDoctor,
+      clinic: formattedClinic,
+    });
+  };
+
+  const closeBookingModal = () => {
+    setBookingModal({
+      isOpen: false,
+      orderType: "video_consult",
+      doctor: null,
+      clinic: null,
+    });
   };
 
   // Immediate location request
@@ -526,80 +706,178 @@ export default function FindVetsNearYou() {
     }
   }, []);
 
-  // Fetch doctors whenever coords update
+  // Fetch doctors using 10-may inclinic registrations & excel doctors APIs
   useEffect(() => {
-    if (!coords?.lat || !coords?.lng) return;
-
     let isMounted = true;
     setLoading(true);
     setError("");
 
-    const url = `${getBackendBase()}/api/nearby-vets-by-location?lat=${coords.lat}&lng=${coords.lng}`;
+    const locQuery = coords?.lat && coords?.lng ? `?lat=${coords.lat}&lng=${coords.lng}` : "";
+    const base = getBackendBase();
 
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
+    Promise.all([
+      fetch(`${base}/api/inclinic-lists-new-after-10th-may-registerations${locQuery}`, {
+        headers: { Accept: "application/json" },
       })
-      .then((data) => {
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+      fetch(`${base}/api/exported_from_excell_doctors${locQuery}`, {
+        headers: { Accept: "application/json" },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+    ])
+      .then(([clinicRes, docRes]) => {
         if (!isMounted) return;
-        const list = Array.isArray(data?.nearby?.data)
-          ? data.nearby.data
-          : Array.isArray(data?.data)
-          ? data.data
-          : Array.isArray(data)
-          ? data
+
+        const rawClinics = Array.isArray(clinicRes?.data?.data)
+          ? clinicRes.data.data
+          : Array.isArray(clinicRes?.data)
+          ? clinicRes.data
+          : Array.isArray(clinicRes)
+          ? clinicRes
           : [];
 
-        const normalized = list
-          .map((item, idx) => {
-            const doc = item?.doctor || item;
-            if (!doc) return null;
+        const clinicMap = new Map();
+        rawClinics.forEach((c) => {
+          if (c?.id) clinicMap.set(String(c.id), c);
+        });
 
-            const rawImagePath =
-              doc?.doctor_image_blob_url ||
-              doc?.doctor_image_url ||
-              doc?.doctor_image ||
-              doc?.image ||
-              "";
+        const rawDocs = Array.isArray(docRes?.doctors)
+          ? docRes.doctors
+          : Array.isArray(docRes?.data?.doctors)
+          ? docRes.data.doctors
+          : Array.isArray(docRes?.data)
+          ? docRes.data
+          : Array.isArray(docRes)
+          ? docRes
+          : [];
 
-            return {
-              id: doc?.id || item?.clinic_id || `vet-${idx}`,
-              clinicId: item?.clinic_id || null,
-              clinicName: item?.name || "SnoutIQ Partner Clinic",
-              clinicCity: item?.city || "",
-              clinicAddress: item?.address || item?.formatted_address || "",
-              distance: typeof item?.distance === "number" ? item.distance : null,
-              doctorName: doc?.doctor_name || doc?.name || "Veterinary Doctor",
-              rawImagePath,
+        const docMap = new Map();
+
+        // 1. Add doctors registered with clinics from 10-may list
+        rawClinics.forEach((clinic) => {
+          const cCoords = extractCoords(clinic);
+          const cDist =
+            coords && cCoords
+              ? calculateDistanceKm(coords.lat, coords.lng, cCoords.lat, cCoords.lng)
+              : clinic.distance_km != null
+              ? Number(clinic.distance_km)
+              : null;
+
+          (clinic.doctors || []).forEach((doc) => {
+            if (!doc) return;
+            const docId = String(doc.id || doc.doctor_id || "");
+            if (!docId) return;
+
+            const rawDist = doc.distance_km ?? doc.distance ?? cDist;
+            const finalDist =
+              rawDist != null && !isNaN(Number(rawDist))
+                ? Number(rawDist)
+                : coords && cCoords
+                ? calculateDistanceKm(coords.lat, coords.lng, cCoords.lat, cCoords.lng)
+                : null;
+
+            docMap.set(docId, {
+              id: doc.id || doc.doctor_id,
+              clinicId: clinic.id,
+              clinicName: clinic.name || "SnoutIQ Partner Clinic",
+              clinicCity: clinic.city || "",
+              clinicAddress: clinic.address || clinic.formatted_address || "",
+              clinicCoords: cCoords,
+              distance: finalDist,
+              doctorName: doc.doctor_name || doc.name || "Veterinary Doctor",
+              rawImagePath:
+                doc.doctor_image_blob_url ||
+                doc.doctor_image_url ||
+                doc.doctor_image ||
+                doc.doctor_blob_url ||
+                doc.image ||
+                "",
               doctorImage: buildDoctorImageUrl(doc),
-              degree: doc?.degree || "",
-              experience: doc?.years_of_experience || doc?.experience || "",
+              degree: doc.degree || "BVSc",
+              experience: doc.years_of_experience || doc.experience || "",
               specializations: parseSpecializations(
-                doc?.specialization_select_all_that_apply || doc?.specialization
+                doc.specialization_select_all_that_apply || doc.specialization
               ),
               isAvailable: parseAvailability(
-                doc?.toggle_availability ?? doc?.doctor_status ?? doc?.status ?? item?.open_now
+                doc.toggle_availability ?? doc.doctor_status ?? doc.status ?? 1
               ),
-              videoDayRate: doc?.video_day_rate || "",
-              videoNightRate: doc?.video_night_rate || "",
-              doctorLicense: doc?.doctor_license || doc?.license || "",
-              bio: doc?.bio || "",
-              languagesSpoken: doc?.languages_spoken || "",
-              responseTimeDay: doc?.response_time_for_online_consults_day || "",
-              breakTime: doc?.break_do_not_disturb_time_example_2_4_pm || "",
+              videoDayRate: doc.video_day_rate || doc.doctors_price || clinic.clinic_day_fee || "499",
+              videoNightRate: doc.video_night_rate || clinic.clinic_night_fee || "650",
+              doctorLicense: doc.doctor_license || doc.license || "",
+              bio: doc.bio || "",
+              languagesSpoken: doc.languages_spoken || "",
+              responseTimeDay: doc.response_time_for_online_consults_day || "0 To 15 Mins",
+              breakTime: doc.break_do_not_disturb_time_example_2_4_pm || "",
               freeFollowUp:
-                doc?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta || "",
-            };
-          })
-          .filter(Boolean);
+                doc.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta || "",
+            });
+          });
+        });
 
-        setDoctors(normalized);
+        // 2. Add remaining doctors from exported_from_excell_doctors
+        rawDocs.forEach((doc) => {
+          if (!doc) return;
+          const docId = String(doc.id || doc.doctor_id || "");
+          if (!docId || docMap.has(docId)) return;
+
+          const regId = String(doc.vet_registeration_id || doc.clinic_id || doc.clinicId || "");
+          const clinic = clinicMap.get(regId) || null;
+          const cCoords = extractCoords(clinic);
+
+          const rawDist = doc.distance_km ?? doc.distance ?? clinic?.distance_km;
+          const finalDist =
+            rawDist != null && !isNaN(Number(rawDist))
+              ? Number(rawDist)
+              : coords && cCoords
+              ? calculateDistanceKm(coords.lat, coords.lng, cCoords.lat, cCoords.lng)
+              : null;
+
+          docMap.set(docId, {
+            id: doc.id || doc.doctor_id,
+            clinicId: clinic?.id || (regId ? Number(regId) : null),
+            clinicName: clinic?.name || doc.clinic_name || "SnoutIQ Partner Clinic",
+            clinicCity: clinic?.city || doc.clinic_city || doc.city || "",
+            clinicAddress: clinic?.address || clinic?.formatted_address || doc.clinic_address || "",
+            clinicCoords: cCoords,
+            distance: finalDist,
+            doctorName: doc.doctor_name || doc.name || "Veterinary Doctor",
+            rawImagePath:
+              doc.doctor_image_blob_url ||
+              doc.doctor_image_url ||
+              doc.doctor_image ||
+              doc.doctor_blob_url ||
+              doc.image ||
+              "",
+            doctorImage: buildDoctorImageUrl(doc),
+            degree: doc.degree || "BVSc",
+            experience: doc.years_of_experience || doc.experience || "",
+            specializations: parseSpecializations(
+              doc.specialization_select_all_that_apply || doc.specialization
+            ),
+            isAvailable: parseAvailability(
+              doc.toggle_availability ?? doc.doctor_status ?? doc.status ?? 1
+            ),
+            videoDayRate: doc.video_day_rate || doc.doctors_price || clinic?.clinic_day_fee || "499",
+            videoNightRate: doc.video_night_rate || clinic?.clinic_night_fee || "650",
+            doctorLicense: doc.doctor_license || doc.license || "",
+            bio: doc.bio || "",
+            languagesSpoken: doc.languages_spoken || "",
+            responseTimeDay: doc.response_time_for_online_consults_day || "0 To 15 Mins",
+            breakTime: doc.break_do_not_disturb_time_example_2_4_pm || "",
+            freeFollowUp:
+              doc.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta || "",
+          });
+        });
+
+        const normalizedList = Array.from(docMap.values());
+        setDoctors(normalizedList);
       })
       .catch((err) => {
         if (!isMounted) return;
-        console.error("Error fetching nearby vets:", err);
-        setError("Unable to load nearby doctors. Please check your connection or retry.");
+        console.error("Error fetching 10-may vets list:", err);
+        setError("Unable to load doctors. Please check your connection or retry.");
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -875,6 +1153,7 @@ export default function FindVetsNearYou() {
                       key={doctor.id}
                       doctor={doctor}
                       onSelect={setSelectedDoctor}
+                      onBook={handleBookAction}
                       onImageError={markImageBroken}
                       isImageBroken={brokenImages.has(doctor.id)}
                     />
@@ -892,9 +1171,21 @@ export default function FindVetsNearYou() {
       <ProfileModal
         doctor={selectedDoctor}
         onClose={() => setSelectedDoctor(null)}
+        onBook={handleBookAction}
         isImageBroken={selectedDoctor ? brokenImages.has(selectedDoctor.id) : false}
         onImageError={markImageBroken}
       />
+
+      {/* Modern Doctor Booking Modal (Starts at Describe step) */}
+      {bookingModal.isOpen && (
+        <ModernDoctorBooking
+          onClose={closeBookingModal}
+          orderType={bookingModal.orderType}
+          initialClinic={bookingModal.clinic}
+          initialDoctor={bookingModal.doctor}
+          initialPackage={null}
+        />
+      )}
     </>
   );
 }
