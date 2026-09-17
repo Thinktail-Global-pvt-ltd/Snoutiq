@@ -113,8 +113,8 @@ export default function MyAppointmentsPage() {
   // Check if an appointment is eligible for Cancel / Reschedule (>= 2h cutoff)
   const canCancelOrReschedule = useCallback((appointment) => {
     if (!appointment) return false;
-    const status = String(appointment.status || "").toLowerCase();
-    if (["completed", "cancelled", "rejected", "failed", "refunded"].includes(status)) {
+    const status = String(appointment.status || "").toLowerCase().trim();
+    if (["completed", "cancelled", "canceled", "rejected", "failed", "refunded"].includes(status)) {
       return false;
     }
     const appDate = appointment.date || appointment.appointment_date || appointment.created_at;
@@ -159,31 +159,48 @@ export default function MyAppointmentsPage() {
         Accept: "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
+      const payload = {
+        user_id: userId ? Number(userId) : undefined,
+        reason: cancelReason,
+        comments: cancelReason,
+        cancelled_at: new Date().toISOString(),
+      };
+
       let res = await fetch(`${API_BASE}/appointments/${encodeURIComponent(apptId)}/cancel`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          user_id: userId,
-          reason: cancelReason,
-          cancelled_at: new Date().toISOString(),
-        }),
+        body: JSON.stringify(payload),
       }).catch(() => null);
 
-      if (!res || !res.ok) {
-        res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(apptId)}/cancel`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            user_id: userId,
-            reason: cancelReason,
-          }),
-        }).catch(() => null);
+      let data = null;
+      if (res) {
+        data = await res.json().catch(() => null);
       }
 
       if (!res || !res.ok) {
-        throw new Error("Failed to cancel appointment. Please try again.");
+        if (!data || res?.status === 404) {
+          const fallbackRes = await fetch(`${API_BASE}/bookings/${encodeURIComponent(apptId)}/cancel`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          }).catch(() => null);
+
+          if (fallbackRes) {
+            const fallbackData = await fallbackRes.json().catch(() => null);
+            if (fallbackRes.ok && fallbackData?.success !== false) {
+              res = fallbackRes;
+              data = fallbackData;
+            } else if (fallbackData?.message) {
+              throw new Error(fallbackData.message);
+            }
+          }
+        }
+
+        if (!res || !res.ok) {
+          throw new Error(data?.message || data?.error || "Failed to cancel appointment. Please try again.");
+        }
       }
-      const data = await res.json().catch(() => ({}));
+
       if (data?.success === false) {
         throw new Error(data?.message || "Cancellation was not confirmed by the server.");
       }
@@ -229,34 +246,50 @@ export default function MyAppointmentsPage() {
         Accept: "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
+      const payload = {
+        user_id: userId ? Number(userId) : undefined,
+        new_date: rescheduleDate,
+        new_time_slot: rescheduleTimeSlot,
+        date: rescheduleDate,
+        time_slot: rescheduleTimeSlot,
+        reason: "User requested new time slot",
+      };
+
       let res = await fetch(`${API_BASE}/appointments/${encodeURIComponent(apptId)}/reschedule`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          user_id: userId,
-          new_date: rescheduleDate,
-          new_time_slot: rescheduleTimeSlot,
-          date: rescheduleDate,
-          time_slot: rescheduleTimeSlot,
-        }),
+        body: JSON.stringify(payload),
       }).catch(() => null);
 
-      if (!res || !res.ok) {
-        res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(apptId)}/reschedule`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            user_id: userId,
-            new_date: rescheduleDate,
-            new_time_slot: rescheduleTimeSlot,
-          }),
-        }).catch(() => null);
+      let data = null;
+      if (res) {
+        data = await res.json().catch(() => null);
       }
 
       if (!res || !res.ok) {
-        throw new Error("Failed to reschedule appointment. Please try again.");
+        if (!data || res?.status === 404) {
+          const fallbackRes = await fetch(`${API_BASE}/bookings/${encodeURIComponent(apptId)}/reschedule`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          }).catch(() => null);
+
+          if (fallbackRes) {
+            const fallbackData = await fallbackRes.json().catch(() => null);
+            if (fallbackRes.ok && fallbackData?.success !== false) {
+              res = fallbackRes;
+              data = fallbackData;
+            } else if (fallbackData?.message) {
+              throw new Error(fallbackData.message);
+            }
+          }
+        }
+
+        if (!res || !res.ok) {
+          throw new Error(data?.message || data?.error || "Failed to reschedule appointment. Please try again.");
+        }
       }
-      const data = await res.json().catch(() => ({}));
+
       if (data?.success === false) {
         throw new Error(data?.message || "Rescheduling was not confirmed by the server.");
       }
