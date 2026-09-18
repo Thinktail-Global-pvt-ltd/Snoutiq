@@ -31,20 +31,40 @@ const PAGE_DESCRIPTION =
 
 const SESSION_COORDS_KEY = "snoutiq_vets_coords";
 
-const FILTER_TAGS = [
-  { id: "all", label: "All Vets" },
-  { id: "dogs_cats", label: "Dogs & Cats" },
-  { id: "exotic", label: "Exotic Pets" },
-  { id: "surgery", label: "Surgery" },
-  { id: "dermatology", label: "Dermatology" },
-  { id: "vaccination", label: "Vaccination" },
+const SPECIALIZATION_OPTIONS = [
+  "General Practice",
+  "Dogs",
+  "Cats",
+  "Surgery",
+  "Skin / Dermatology",
+  "Exotic Pet",
+  "Livestock",
 ];
 
-const RADIUS_OPTIONS = [
-  { id: "all", label: "Any Distance" },
-  { id: "5", label: "< 5 km", max: 5 },
-  { id: "10", label: "< 10 km", max: 10 },
-  { id: "25", label: "< 25 km", max: 25 },
+const FILTER_TAGS = [
+  { id: "all", label: "All Vets" },
+  { id: "Dogs", label: "Dogs" },
+  { id: "Cats", label: "Cats" },
+  { id: "Surgery", label: "Surgery" },
+  { id: "Skin / Dermatology", label: "Skin / Dermatology" },
+  { id: "Exotic Pet", label: "Exotic Pet" },
+  { id: "Livestock", label: "Livestock" },
+  { id: "General Practice", label: "General Practice" },
+];
+
+const PRICE_OPTIONS = [
+  { id: "all", label: "Any Price" },
+  { id: "0-500", label: "Under ₹500" },
+  { id: "500-1000", label: "₹500 – ₹1000" },
+  { id: "1000+", label: "₹1000+" },
+];
+
+const EXP_OPTIONS = [
+  { id: "any", label: "Any Experience" },
+  { id: "1", label: "1+ Yrs" },
+  { id: "3", label: "3+ Yrs" },
+  { id: "5", label: "5+ Yrs" },
+  { id: "10", label: "10+ Yrs" },
 ];
 
 const getBackendBase = () => apiBaseUrl().replace(/\/+$/, "").replace(/\/api$/i, "");
@@ -577,7 +597,9 @@ export default function FindVetsNearYou() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTag, setSelectedTag] = useState("all");
-  const [selectedRadius, setSelectedRadius] = useState("all");
+  const [selectedPrice, setSelectedPrice] = useState("all");
+  const [selectedExp, setSelectedExp] = useState("any");
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [brokenImages, setBrokenImages] = useState(() => new Set());
 
@@ -803,7 +825,14 @@ export default function FindVetsNearYou() {
               isAvailable: parseAvailability(
                 doc.toggle_availability ?? doc.doctor_status ?? doc.status ?? 1
               ),
-              videoDayRate: doc.video_day_rate || doc.doctors_price || clinic.clinic_day_fee || "499",
+              videoDayRate:
+                doc.video_day_rate ||
+                doc.doctors_price ||
+                clinic.clinic_day_fee ||
+                clinic.clinic_fee ||
+                clinic.doctors_price ||
+                (Array.isArray(clinic.clinic_services) && clinic.clinic_services[0]?.price) ||
+                "499",
               videoNightRate: doc.video_night_rate || clinic.clinic_night_fee || "650",
               doctorLicense: doc.doctor_license || doc.license || "",
               bio: doc.bio || "",
@@ -859,7 +888,14 @@ export default function FindVetsNearYou() {
             isAvailable: parseAvailability(
               doc.toggle_availability ?? doc.doctor_status ?? doc.status ?? 1
             ),
-            videoDayRate: doc.video_day_rate || doc.doctors_price || clinic?.clinic_day_fee || "499",
+            videoDayRate:
+              doc.video_day_rate ||
+              doc.doctors_price ||
+              clinic?.clinic_day_fee ||
+              clinic?.clinic_fee ||
+              clinic?.doctors_price ||
+              (Array.isArray(clinic?.clinic_services) && clinic.clinic_services[0]?.price) ||
+              "499",
             videoNightRate: doc.video_night_rate || clinic?.clinic_night_fee || "650",
             doctorLicense: doc.doctor_license || doc.license || "",
             bio: doc.bio || "",
@@ -888,6 +924,38 @@ export default function FindVetsNearYou() {
     };
   }, [coords]);
 
+  // Helper to match doctor specializations against selected filter
+  const matchesDoctorSpecialty = (docSpecs, filter) => {
+    if (!filter || filter === "all") return true;
+    const target = filter.toLowerCase().trim();
+    const specText = Array.isArray(docSpecs)
+      ? docSpecs.join(" ").toLowerCase()
+      : String(docSpecs || "").toLowerCase();
+
+    if (target === "general practice" || target === "general vet") {
+      return specText.includes("general");
+    }
+    if (target.includes("skin") || target.includes("derma")) {
+      return specText.includes("skin") || specText.includes("derma");
+    }
+    if (target === "dogs") {
+      return /dog|canine/i.test(specText);
+    }
+    if (target === "cats") {
+      return /cat|feline/i.test(specText);
+    }
+    if (target === "exotic pet" || target === "exotic") {
+      return /exotic|avian|bird|rabbit|turtle|guinea|hamster/i.test(specText);
+    }
+    if (target === "livestock") {
+      return /livestock|cattle|cow|buffalo|goat|sheep|horse/i.test(specText);
+    }
+    if (target === "surgery") {
+      return /surg/i.test(specText);
+    }
+    return specText.includes(target);
+  };
+
   // Client-side filtering & distance sorting (nearest first)
   const filteredDoctors = useMemo(() => {
     let result = [...doctors];
@@ -904,26 +972,32 @@ export default function FindVetsNearYou() {
       );
     }
 
-    // 2. Specialization tag filter
+    // 2. Specialization filter strictly matching form options
     if (selectedTag !== "all") {
+      result = result.filter((doc) => matchesDoctorSpecialty(doc.specializations, selectedTag));
+    }
+
+    // 3. Price filter
+    if (selectedPrice !== "all") {
       result = result.filter((doc) => {
-        const specStr = doc.specializations.join(" ").toLowerCase();
-        if (selectedTag === "dogs_cats") return /dog|canine|cat|feline/i.test(specStr);
-        if (selectedTag === "exotic") return /exotic|avian|bird|rabbit|turtle|guinea|hamster/i.test(specStr);
-        if (selectedTag === "surgery") return /surg/i.test(specStr);
-        if (selectedTag === "dermatology") return /derma|skin/i.test(specStr);
-        if (selectedTag === "vaccination") return /vaccin|prevent/i.test(specStr);
+        const price = Number(doc.videoDayRate) || 0;
+        if (selectedPrice === "0-500") return price <= 500;
+        if (selectedPrice === "500-1000") return price > 500 && price <= 1000;
+        if (selectedPrice === "1000+") return price > 1000;
         return true;
       });
     }
 
-    // 3. Radius filter
-    if (selectedRadius !== "all") {
-      const maxDist = Number(selectedRadius);
-      result = result.filter((doc) => doc.distance !== null && doc.distance <= maxDist);
+    // 4. Experience filter
+    if (selectedExp !== "any") {
+      const minExp = Number(selectedExp) || 0;
+      result = result.filter((doc) => {
+        const expVal = parseInt(String(doc.experience || 0), 10);
+        return !isNaN(expVal) && expVal >= minExp;
+      });
     }
 
-    // 4. Sort ascending by distance (nearest first)
+    // 5. Sort ascending by distance (nearest first)
     result.sort((a, b) => {
       if (a.distance === null) return 1;
       if (b.distance === null) return -1;
@@ -931,7 +1005,18 @@ export default function FindVetsNearYou() {
     });
 
     return result;
-  }, [doctors, searchTerm, selectedTag, selectedRadius]);
+  }, [doctors, searchTerm, selectedTag, selectedPrice, selectedExp]);
+
+  // Active filters count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedPrice !== "all") count++;
+    if (selectedExp !== "any") count++;
+    if (selectedTag !== "all") count++;
+    return count;
+  }, [selectedPrice, selectedExp, selectedTag]);
+
+  const isAnyFilterActive = activeFilterCount > 0;
 
   // Structured schema for SEO
   const jsonLdSchema = useMemo(() => {
@@ -960,10 +1045,6 @@ export default function FindVetsNearYou() {
           {/* Hero Section */}
           <section className="bg-gradient-to-b from-sky-100/70 via-sky-50/40 to-slate-50 px-4 py-8 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-6xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-semibold text-sky-800 backdrop-blur shadow-sm">
-                <Crosshair className="h-3.5 w-3.5 text-sky-600" />
-                Realtime Geolocation Matching
-              </div>
 
               <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
                 Find Vets Near You
@@ -972,8 +1053,8 @@ export default function FindVetsNearYou() {
                 Verified veterinary doctors sorted by proximity to your current device location.
               </p>
 
-              {/* Search Bar + Location Refresh */}
-              <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+              {/* Search Bar + Location Refresh + Filter Button */}
+              <div className="mt-5 flex items-center gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
@@ -981,13 +1062,14 @@ export default function FindVetsNearYou() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search doctor, clinic, city or specialization..."
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 shadow-sm"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 shadow-xs"
                   />
                   {searchTerm && (
                     <button
                       type="button"
                       onClick={() => setSearchTerm("")}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title="Clear search"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -998,20 +1080,41 @@ export default function FindVetsNearYou() {
                   type="button"
                   onClick={() => requestLocation(true)}
                   disabled={locationStatus === "requesting"}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-300 bg-white px-4 py-2.5 text-xs font-bold text-sky-700 shadow-sm transition hover:bg-sky-50 disabled:opacity-60 cursor-pointer"
+                  title={coords ? "Location active (click to update)" : "Use current GPS location"}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-300 bg-white px-3 sm:px-4 py-2.5 text-xs font-bold text-sky-700 shadow-xs transition hover:bg-sky-50 disabled:opacity-60 cursor-pointer shrink-0"
                 >
                   <RefreshCw
                     className={`h-3.5 w-3.5 ${
                       locationStatus === "requesting" ? "animate-spin" : ""
                     }`}
                   />
-                  {locationStatus === "requesting" ? "Locating..." : "Update Location"}
+                  <span className="hidden sm:inline">
+                    {locationStatus === "requesting" ? "Locating..." : coords ? "Update Location" : "Location"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowFilterModal(true)}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer shrink-0 ${
+                    isAnyFilterActive
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <Filter className="h-3.5 w-3.5" />
+                  <span>Filter</span>
+                  {activeFilterCount > 0 && (
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-extrabold text-sky-600">
+                      {activeFilterCount}
+                    </span>
+                  )}
                 </button>
               </div>
 
-              {/* Quick Filter Chips */}
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+              {/* Quick Filter Chips & Reset */}
+              <div className="mt-3.5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar flex-1">
                   {FILTER_TAGS.map((tag) => (
                     <button
                       key={tag.id}
@@ -1019,7 +1122,7 @@ export default function FindVetsNearYou() {
                       onClick={() => setSelectedTag(tag.id)}
                       className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition cursor-pointer ${
                         selectedTag === tag.id
-                          ? "bg-sky-600 text-white shadow-sm"
+                          ? "bg-sky-600 text-white shadow-xs"
                           : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                       }`}
                     >
@@ -1028,21 +1131,19 @@ export default function FindVetsNearYou() {
                   ))}
                 </div>
 
-                {/* Radius Filter */}
-                <div className="ml-auto flex items-center gap-1.5 text-xs text-slate-500">
-                  <Filter className="h-3.5 w-3.5 text-slate-400" />
-                  <select
-                    value={selectedRadius}
-                    onChange={(e) => setSelectedRadius(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                {isAnyFilterActive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPrice("all");
+                      setSelectedExp("any");
+                      setSelectedTag("all");
+                    }}
+                    className="shrink-0 text-[11px] font-bold text-sky-600 hover:text-sky-800 transition underline cursor-pointer pl-1"
                   >
-                    {RADIUS_OPTIONS.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    Reset Filters
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -1127,17 +1228,18 @@ export default function FindVetsNearYou() {
                     No doctors found
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {searchTerm || selectedTag !== "all" || selectedRadius !== "all"
-                      ? "No doctors matched your selected filters. Try clearing your search or expanding the radius."
+                    {searchTerm || selectedTag !== "all" || selectedPrice !== "all" || selectedExp !== "any"
+                      ? "No doctors matched your selected filters. Try clearing your search or filters."
                       : "No verified veterinary clinics found within your location area."}
                   </p>
-                  {(searchTerm || selectedTag !== "all" || selectedRadius !== "all") && (
+                  {(searchTerm || selectedTag !== "all" || selectedPrice !== "all" || selectedExp !== "any") && (
                     <button
                       type="button"
                       onClick={() => {
                         setSearchTerm("");
                         setSelectedTag("all");
-                        setSelectedRadius("all");
+                        setSelectedPrice("all");
+                        setSelectedExp("any");
                       }}
                       className="mt-3 text-xs font-bold text-sky-600 hover:underline cursor-pointer"
                     >
@@ -1166,6 +1268,117 @@ export default function FindVetsNearYou() {
 
         <Footer />
       </div>
+
+      {/* FILTER MODAL — MOBILE BOTTOM SHEET & CENTERED DESKTOP MODAL */}
+      {showFilterModal && (
+        <div
+          className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 animate-[fadeIn_0.15s_ease-out]"
+          onClick={() => setShowFilterModal(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto animate-[scaleInUp_0.2s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div>
+                <h3 className="text-xs font-extrabold text-[#081037]">Filter Verified Doctors</h3>
+                <p className="text-[10px] text-slate-500">Refine by consultation fee, experience, and specialty</p>
+              </div>
+              <button
+                onClick={() => setShowFilterModal(false)}
+                className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* 1. Consultation Fee / Price Filter */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Consultation Fee</span>
+              <div className="flex flex-wrap gap-1.5">
+                {PRICE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setSelectedPrice(opt.id)}
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border cursor-pointer ${
+                      selectedPrice === opt.id
+                        ? "border-sky-600 bg-sky-600 text-white shadow-xs"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Experience Filter */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Experience</span>
+              <div className="flex flex-wrap gap-1.5">
+                {EXP_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setSelectedExp(opt.id)}
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border cursor-pointer ${
+                      selectedExp === opt.id
+                        ? "border-sky-600 bg-sky-600 text-white shadow-xs"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Specialty / Care Filter */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Specialty & Care</span>
+              <div className="max-h-36 overflow-y-auto flex flex-wrap gap-1.5 p-1 border border-slate-100 rounded-xl bg-slate-50/50">
+                {FILTER_TAGS.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => setSelectedTag(tag.id)}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border cursor-pointer ${
+                      selectedTag === tag.id
+                        ? "border-sky-600 bg-sky-600 text-white shadow-xs"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {tag.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPrice("all");
+                  setSelectedExp("any");
+                  setSelectedTag("all");
+                }}
+                className="flex-1 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+              >
+                Reset All
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFilterModal(false)}
+                className="flex-1 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl transition-all shadow-xs cursor-pointer"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Doctor Profile Modal */}
       <ProfileModal

@@ -1271,59 +1271,109 @@ export default function ModernDoctorBooking({
     return sortByNearbyDistance(filtered);
   }, [otherDoctors, lastVetDoctors, debouncedSearchQuery, selectedExpFilter, selectedSpecialtyFilter, selectedPriceFilter, isDay]);
 
-  // Filter Last Vet Clinics by Search (debounced)
+  // Filter Last Vet Clinics by Search (debounced), Price, Specialty & Experience
   const filteredLastVetClinics = useMemo(() => {
     const q = (debouncedSearchQuery || "").toLowerCase();
+    const minYears = parseInt(selectedExpFilter) || 0;
     const filtered = lastVetClinics.filter(c => {
-      if (!q) return true;
-      const inDocs = Array.isArray(c.doctors) && c.doctors.some(d => 
-        (d.name || "").toLowerCase().includes(q) || 
-        (d.doctor_name || "").toLowerCase().includes(q) || 
-        (d.specialization_select_all_that_apply || "").toLowerCase().includes(q)
-      );
-      const inServices = Array.isArray(c.clinic_services) && c.clinic_services.some(s => 
-        (s.name || "").toLowerCase().includes(q) || 
-        (s.description || "").toLowerCase().includes(q)
-      );
-      return (
+      const matchesSearch = !q || 
         (c.name || "").toLowerCase().includes(q) || 
         (c.city || "").toLowerCase().includes(q) ||
         (c.address || "").toLowerCase().includes(q) ||
         (c.pincode || "").toLowerCase().includes(q) ||
-        inDocs || inServices
-      );
+        (Array.isArray(c.doctors) && c.doctors.some(d => 
+          (d.name || "").toLowerCase().includes(q) || 
+          (d.doctor_name || "").toLowerCase().includes(q) || 
+          (d.specialization_select_all_that_apply || "").toLowerCase().includes(q)
+        )) ||
+        (Array.isArray(c.clinic_services) && c.clinic_services.some(s => 
+          (s.name || "").toLowerCase().includes(q) || 
+          (s.description || "").toLowerCase().includes(q)
+        ));
+
+      const clinicPrice = Number(getClinicCurrentPrice(c, isDay));
+      let matchesPrice = true;
+      if (selectedPriceFilter === "0-500") matchesPrice = clinicPrice <= 500;
+      else if (selectedPriceFilter === "500-1000") matchesPrice = clinicPrice > 500 && clinicPrice <= 1000;
+      else if (selectedPriceFilter === "1000+") matchesPrice = clinicPrice > 1000;
+
+      let matchesSpecialty = true;
+      if (selectedSpecialtyFilter !== "all") {
+        const docSpecs = Array.isArray(c.doctors)
+          ? c.doctors.map(d => d.specialization_select_all_that_apply || d.specialization || d.specializations || "").join(" ")
+          : "";
+        const clinicSpecs = Array.isArray(c.specializations) ? c.specializations.join(" ") : String(c.specialization || "");
+        const serviceSpecs = Array.isArray(c.clinic_services) ? c.clinic_services.map(s => `${s.name || ""} ${s.description || ""}`).join(" ") : "";
+        const allSpecs = `${docSpecs} ${clinicSpecs} ${serviceSpecs} ${c.name || ""}`;
+        matchesSpecialty = matchesDoctorSpecialty(allSpecs, selectedSpecialtyFilter);
+      }
+
+      let matchesExp = true;
+      if (minYears > 0) {
+        const maxExp = Array.isArray(c.doctors) && c.doctors.length > 0
+          ? Math.max(0, ...c.doctors.map(d => Number(d.years_of_experience || d.experience || 0)))
+          : 0;
+        matchesExp = maxExp >= minYears;
+      }
+
+      return matchesSearch && matchesPrice && matchesSpecialty && matchesExp;
     });
     return sortByNearbyDistance(filtered);
-  }, [lastVetClinics, debouncedSearchQuery]);
+  }, [lastVetClinics, debouncedSearchQuery, selectedPriceFilter, selectedSpecialtyFilter, selectedExpFilter, isDay]);
 
-  // Filter Other Clinics by Search (debounced), EXCLUDING duplicates from lastVetClinics
+  // Filter Other Clinics by Search (debounced), Price, Specialty & Experience, EXCLUDING duplicates from lastVetClinics
   const filteredOtherClinics = useMemo(() => {
     const q = (debouncedSearchQuery || "").toLowerCase();
+    const minYears = parseInt(selectedExpFilter) || 0;
     const deduplicated = otherClinics.filter(
       c => !lastVetClinics.some(lc => String(lc.id || lc.clinic_id) === String(c.id || c.clinic_id))
     );
 
     const filtered = deduplicated.filter(c => {
-      if (!q) return true;
-      const inDocs = Array.isArray(c.doctors) && c.doctors.some(d => 
-        (d.name || "").toLowerCase().includes(q) || 
-        (d.doctor_name || "").toLowerCase().includes(q) || 
-        (d.specialization_select_all_that_apply || "").toLowerCase().includes(q)
-      );
-      const inServices = Array.isArray(c.clinic_services) && c.clinic_services.some(s => 
-        (s.name || "").toLowerCase().includes(q) || 
-        (s.description || "").toLowerCase().includes(q)
-      );
-      return (
+      const matchesSearch = !q || 
         (c.name || "").toLowerCase().includes(q) || 
-        (c.city || "").toLowerCase().includes(q) ||
-        (c.address || "").toLowerCase().includes(q) ||
-        (c.pincode || "").toLowerCase().includes(q) ||
-        inDocs || inServices
-      );
+        (c.city || "").toLowerCase().includes(q) || 
+        (c.address || "").toLowerCase().includes(q) || 
+        (c.pincode || "").toLowerCase().includes(q) || 
+        (Array.isArray(c.doctors) && c.doctors.some(d => 
+          (d.name || "").toLowerCase().includes(q) || 
+          (d.doctor_name || "").toLowerCase().includes(q) || 
+          (d.specialization_select_all_that_apply || "").toLowerCase().includes(q)
+        )) ||
+        (Array.isArray(c.clinic_services) && c.clinic_services.some(s => 
+          (s.name || "").toLowerCase().includes(q) || 
+          (s.description || "").toLowerCase().includes(q)
+        ));
+
+      const clinicPrice = Number(getClinicCurrentPrice(c, isDay));
+      let matchesPrice = true;
+      if (selectedPriceFilter === "0-500") matchesPrice = clinicPrice <= 500;
+      else if (selectedPriceFilter === "500-1000") matchesPrice = clinicPrice > 500 && clinicPrice <= 1000;
+      else if (selectedPriceFilter === "1000+") matchesPrice = clinicPrice > 1000;
+
+      let matchesSpecialty = true;
+      if (selectedSpecialtyFilter !== "all") {
+        const docSpecs = Array.isArray(c.doctors)
+          ? c.doctors.map(d => d.specialization_select_all_that_apply || d.specialization || d.specializations || "").join(" ")
+          : "";
+        const clinicSpecs = Array.isArray(c.specializations) ? c.specializations.join(" ") : String(c.specialization || "");
+        const serviceSpecs = Array.isArray(c.clinic_services) ? c.clinic_services.map(s => `${s.name || ""} ${s.description || ""}`).join(" ") : "";
+        const allSpecs = `${docSpecs} ${clinicSpecs} ${serviceSpecs} ${c.name || ""}`;
+        matchesSpecialty = matchesDoctorSpecialty(allSpecs, selectedSpecialtyFilter);
+      }
+
+      let matchesExp = true;
+      if (minYears > 0) {
+        const maxExp = Array.isArray(c.doctors) && c.doctors.length > 0
+          ? Math.max(0, ...c.doctors.map(d => Number(d.years_of_experience || d.experience || 0)))
+          : 0;
+        matchesExp = maxExp >= minYears;
+      }
+
+      return matchesSearch && matchesPrice && matchesSpecialty && matchesExp;
     });
     return sortByNearbyDistance(filtered);
-  }, [otherClinics, lastVetClinics, debouncedSearchQuery]);
+  }, [otherClinics, lastVetClinics, debouncedSearchQuery, selectedPriceFilter, selectedSpecialtyFilter, selectedExpFilter, isDay]);
 
 
   // Live Current Fee calculation
@@ -2090,31 +2140,29 @@ export default function ModernDoctorBooking({
         </span>
       </button>
 
-      {currentOrderType !== "appointment" && (
-        <button
-          type="button"
-          onClick={() => setShowFilterModal(true)}
-          className={`px-3 py-2 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0 ${
-            isAnyFilterActive
-              ? "bg-[#309BD8] text-white border-[#309BD8]" 
-              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-          }`}
-        >
-          <Filter className="w-3.5 h-3.5" />
-          <span>
-            {selectedExpFilter !== "any" 
-              ? `${selectedExpFilter}+ Yrs` 
-              : selectedSpecialtyFilter !== "all" 
-                ? selectedSpecialtyFilter 
-                : selectedPriceFilter !== "any"
-                  ? (selectedPriceFilter === "0-500" ? "≤₹500" : selectedPriceFilter === "500-1000" ? "₹500-1k" : ">₹1k")
-                  : "Filter"}
-          </span>
-          {isAnyFilterActive && (
-            <span className="w-2 h-2 rounded-full bg-white inline-block"></span>
-          )}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setShowFilterModal(true)}
+        className={`px-3 py-2 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0 ${
+          isAnyFilterActive
+            ? "bg-[#309BD8] text-white border-[#309BD8]" 
+            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+        }`}
+      >
+        <Filter className="w-3.5 h-3.5" />
+        <span>
+          {selectedExpFilter !== "any" 
+            ? `${selectedExpFilter}+ Yrs` 
+            : selectedSpecialtyFilter !== "all" 
+              ? selectedSpecialtyFilter 
+              : selectedPriceFilter !== "any"
+                ? (selectedPriceFilter === "0-500" ? "≤₹500" : selectedPriceFilter === "500-1000" ? "₹500-1k" : ">₹1k")
+                : "Filter"}
+        </span>
+        {isAnyFilterActive && (
+          <span className="w-2 h-2 rounded-full bg-white inline-block"></span>
+        )}
+      </button>
     </div>
   );
 
