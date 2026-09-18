@@ -689,8 +689,8 @@ Route::post('/appointments/capture-transaction', function (Request $request) {
     ]);
 });
 
-Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Request $request) {
-    $fromDate = $request->query('from_date', '2026-05-10');
+$buildInClinicListResponse = function (?string $fromDate, ?float $userLat, ?float $userLng) {
+    $fromDate = $fromDate ?: '2026-05-10';
     
     if ($fromDate !== 'all' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate)) {
         return response()->json([
@@ -699,18 +699,6 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
         ], 400);
     }
 
-    $userId = $request->query('user_id');
-    $userLat = $request->filled('lat') ? (float) $request->input('lat') : ($request->filled('latitude') ? (float) $request->input('latitude') : null);
-    $userLng = $request->filled('lng') ? (float) $request->input('lng') : ($request->filled('longitude') ? (float) $request->input('longitude') : null);
-
-    if (($userLat === null || $userLng === null) && $userId) {
-        $user = DB::table('users')->select('latitude', 'longitude')->where('id', $userId)->first();
-        if ($user) {
-            $userLat = $userLat ?? ($user->latitude !== null ? (float) $user->latitude : null);
-            $userLng = $userLng ?? ($user->longitude !== null ? (float) $user->longitude : null);
-        }
-    }
-    
     $clinicProfileCompletionService = app(App\Services\ClinicProfileCompletionService::class);
     
     $clinics = VetRegisterationTemp::query()
@@ -1050,6 +1038,42 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
         'queue_rotation' => app(ClinicQueueRotationService::class)->status($summary->count()),
         'data' => $summary,
     ]);
+};
+
+// 1. New dedicated API: Location based inclinic lists (No user_id required, pure lat/long query)
+Route::get('/inclinic-lists-by-location', function (Request $request) use ($buildInClinicListResponse) {
+    $fromDate = $request->query('from_date', '2026-05-10');
+    $userLat = $request->filled('lat') ? (float) $request->input('lat') : ($request->filled('latitude') ? (float) $request->input('latitude') : null);
+    $userLng = $request->filled('lng') ? (float) $request->input('lng') : ($request->filled('longitude') ? (float) $request->input('longitude') : ($request->filled('long') ? (float) $request->input('long') : ($request->filled('lon') ? (float) $request->input('lon') : null)));
+
+    return $buildInClinicListResponse($fromDate, $userLat, $userLng);
+})->name('api.inclinic.lists.by-location');
+
+// Alias for convenience
+Route::get('/inclinic-lists-nearby', function (Request $request) use ($buildInClinicListResponse) {
+    $fromDate = $request->query('from_date', '2026-05-10');
+    $userLat = $request->filled('lat') ? (float) $request->input('lat') : ($request->filled('latitude') ? (float) $request->input('latitude') : null);
+    $userLng = $request->filled('lng') ? (float) $request->input('lng') : ($request->filled('longitude') ? (float) $request->input('longitude') : ($request->filled('long') ? (float) $request->input('long') : ($request->filled('lon') ? (float) $request->input('lon') : null)));
+
+    return $buildInClinicListResponse($fromDate, $userLat, $userLng);
+})->name('api.inclinic.lists.nearby');
+
+// 2. Existing registration route (supports optional user_id fallback + direct lat/lng)
+Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Request $request) use ($buildInClinicListResponse) {
+    $fromDate = $request->query('from_date', '2026-05-10');
+    $userId = $request->query('user_id');
+    $userLat = $request->filled('lat') ? (float) $request->input('lat') : ($request->filled('latitude') ? (float) $request->input('latitude') : null);
+    $userLng = $request->filled('lng') ? (float) $request->input('lng') : ($request->filled('longitude') ? (float) $request->input('longitude') : ($request->filled('long') ? (float) $request->input('long') : ($request->filled('lon') ? (float) $request->input('lon') : null)));
+
+    if (($userLat === null || $userLng === null) && $userId) {
+        $user = DB::table('users')->select('latitude', 'longitude')->where('id', $userId)->first();
+        if ($user) {
+            $userLat = $userLat ?? ($user->latitude !== null ? (float) $user->latitude : null);
+            $userLng = $userLng ?? ($user->longitude !== null ? (float) $user->longitude : null);
+        }
+    }
+
+    return $buildInClinicListResponse($fromDate, $userLat, $userLng);
 });
 
 Route::get('/device-tokens/issue', function (Request $request) {

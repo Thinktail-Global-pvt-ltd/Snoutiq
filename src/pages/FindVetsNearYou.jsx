@@ -716,7 +716,7 @@ export default function FindVetsNearYou() {
     const base = getBackendBase();
 
     Promise.all([
-      fetch(`${base}/api/inclinic-lists-new-after-10th-may-registerations${locQuery}`, {
+      fetch(`${base}/api/inclinic-lists-by-location${locQuery}`, {
         headers: { Accept: "application/json" },
       })
         .then((res) => (res.ok ? res.json() : null))
