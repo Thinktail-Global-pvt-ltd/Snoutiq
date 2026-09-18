@@ -67,8 +67,35 @@ export default function MyAppointmentsPage() {
     }
   }, [searchParams]);
 
-  // Pet selection
-  const [selectedPetId, setSelectedPetId] = useState("");
+  // Auth State
+  const [authState, setAuthState] = useState(() => readAiAuthState());
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const fresh = readAiAuthState();
+      setAuthState(fresh);
+    };
+    window.addEventListener("snoutiq_auth_changed", handleAuthChange);
+    window.addEventListener("snoutiq_pet_changed", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      window.removeEventListener("snoutiq_auth_changed", handleAuthChange);
+      window.removeEventListener("snoutiq_pet_changed", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
+
+  // Pet selection initialized with the active pet from SymptomCheckerFlow / AiAuth
+  const [selectedPetId, setSelectedPetId] = useState(() => {
+    const currentAuth = readAiAuthState();
+    const curUser = currentAuth?.user || {};
+    const directId = curUser.pet_id || curUser.pet?.id || curUser.pet?.pet_id;
+    if (directId) return String(directId);
+    if (Array.isArray(curUser.pets) && curUser.pets.length > 0) {
+      return String(curUser.pets[0].id || curUser.pets[0].pet_id || "");
+    }
+    return "";
+  });
   const [isPetModalOpen, setIsPetModalOpen] = useState(false);
 
   // Filter modal state
@@ -312,8 +339,6 @@ export default function MyAppointmentsPage() {
     }
   };
 
-  // Auth State
-  const authState = useMemo(() => readAiAuthState(), []);
   const token =
     authState?.token ||
     localStorage.getItem("ai_auth_token") ||
@@ -327,7 +352,7 @@ export default function MyAppointmentsPage() {
     localStorage.getItem("user_id") ||
     "";
 
-  // Normalize pets list for Pet Switcher
+  // Normalize pets list for Pet Filter
   const user = authState?.user || {};
   const petsList = useMemo(() => {
     const rawPets = Array.isArray(user.pets) && user.pets.length > 0
@@ -347,16 +372,25 @@ export default function MyAppointmentsPage() {
     return Array.from(map.values()).filter((p) => p && (p.name || p.pet_name));
   }, [user]);
 
-  // Set default selected pet
+  // Synchronize default selected pet with SymptomCheckerFlow / AiAuth active pet
   useEffect(() => {
     if (petsList.length > 0) {
-      setSelectedPetId((prev) => {
-        if (prev && petsList.some((p) => String(p.id || p.pet_id) === String(prev))) {
+      const activePetId = user.pet_id || user.pet?.id || user.pet?.pet_id;
+      if (activePetId && petsList.some((p) => String(p.id || p.pet_id) === String(activePetId))) {
+        setSelectedPetId((prev) => {
+          if (!prev || (!petsList.some((p) => String(p.id || p.pet_id) === String(prev)) && prev !== "all")) {
+            return String(activePetId);
+          }
           return prev;
-        }
-        const activePet = user?.selectedPet || petsList[0];
-        return String(activePet?.id || activePet?.pet_id || "");
-      });
+        });
+      } else {
+        setSelectedPetId((prev) => {
+          if (!prev || (!petsList.some((p) => String(p.id || p.pet_id) === String(prev)) && prev !== "all")) {
+            return String(petsList[0]?.id || petsList[0]?.pet_id || "");
+          }
+          return prev;
+        });
+      }
     }
   }, [petsList, user]);
 
@@ -480,7 +514,7 @@ export default function MyAppointmentsPage() {
       try {
         const [clinicData, videoData] = await Promise.all([
           fetchInClinicAppointments(userId, token),
-          fetchVideoConsultations(userId, selectedPetId, token),
+          fetchVideoConsultations(userId, null, token),
         ]);
         setInClinicList(clinicData);
         setVideoConsultList(videoData);
@@ -491,7 +525,7 @@ export default function MyAppointmentsPage() {
         setRefreshing(false);
       }
     },
-    [userId, token, selectedPetId, fetchInClinicAppointments, fetchVideoConsultations]
+    [userId, token, fetchInClinicAppointments, fetchVideoConsultations]
   );
 
   useEffect(() => {
@@ -754,10 +788,19 @@ export default function MyAppointmentsPage() {
     customDate !== "";
 
   // Selected Pet Name helper
-  const selectedPetObj = petsList.find((p) => String(p.id || p.pet_id) === String(selectedPetId)) || petsList[0];
-  const selectedPetDisplayName = selectedPetObj
-    ? selectedPetObj.name || selectedPetObj.pet_name
-    : "Select Pet";
+  const selectedPetObj =
+    selectedPetId === "all"
+      ? null
+      : petsList.find((p) => String(p.id || p.pet_id) === String(selectedPetId)) ||
+        petsList.find((p) => String(p.id || p.pet_id) === String(user.pet_id || user.pet?.id || user.pet?.pet_id)) ||
+        petsList[0];
+
+  const selectedPetDisplayName =
+    selectedPetId === "all"
+      ? "All Pets"
+      : selectedPetObj
+      ? selectedPetObj.name || selectedPetObj.pet_name
+      : "Select Pet";
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] flex flex-col text-slate-800 antialiased font-sans">
@@ -768,7 +811,7 @@ export default function MyAppointmentsPage() {
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => navigate(-1)}
-              className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors focus:outline-none shrink-0"
+              className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors focus:outline-none shrink-0 cursor-pointer"
               aria-label="Go Back"
             >
               <ArrowLeft className="w-3.5 h-3.5 text-slate-800" />
@@ -778,17 +821,20 @@ export default function MyAppointmentsPage() {
             </h1>
           </div>
 
-          {/* Right: Pet Switcher & Filter Icon */}
+          {/* Right: Pet Filter & Filter Icon */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Pet Switcher Button */}
+            {/* Pet Filter Button */}
             {petsList.length > 0 && (
               <button
                 type="button"
                 onClick={() => setIsPetModalOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[10px] font-semibold text-slate-800 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[10px] font-semibold text-slate-800 transition-colors cursor-pointer"
+                title="Filter by Pet"
               >
                 <span className="w-3 h-3 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[8px]">
-                  {String(selectedPetObj?.pet_type || "").toLowerCase() === "cat" ? (
+                  {selectedPetId === "all" ? (
+                    <Sparkles className="w-2 h-2 text-emerald-600" />
+                  ) : String(selectedPetObj?.pet_type || selectedPetObj?.species || "").toLowerCase() === "cat" ? (
                     <Cat className="w-2 h-2" />
                   ) : (
                     <Dog className="w-2 h-2" />
@@ -1406,26 +1452,51 @@ export default function MyAppointmentsPage() {
         )}
       </main>
 
-      {/* PET SWITCHER BOTTOM SHEET / MODAL */}
+      {/* PET FILTER BOTTOM SHEET / MODAL */}
       {isPetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-2xs animate-in fade-in duration-100">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-xs w-full overflow-hidden shadow-xl border border-slate-200 flex flex-col max-h-[75vh]">
             <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <Filter className="w-3.5 h-3.5 text-emerald-600" />
                 <h3 className="text-xs font-bold text-slate-900">
-                  Select Pet
+                  Filter by Pet
                 </h3>
               </div>
               <button
                 onClick={() => setIsPetModalOpen(false)}
-                className="w-6 h-6 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors"
+                className="w-6 h-6 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
             </div>
 
             <div className="p-2 space-y-1 overflow-y-auto">
+              {/* All Pets option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPetId("all");
+                  setIsPetModalOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-2 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                  selectedPetId === "all"
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : "text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span className="flex items-center gap-2 truncate">
+                  <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                  </span>
+                  <span className="text-left truncate">
+                    <span className="block font-bold text-slate-900 truncate text-[11px]">All Pets</span>
+                    <span className="text-[9px] text-slate-500 font-normal truncate">Show appointments for all pets</span>
+                  </span>
+                </span>
+                {selectedPetId === "all" && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+              </button>
+
               {/* Pets list */}
               {petsList.map((pet) => {
                 const petId = String(pet.id || pet.pet_id);
@@ -1442,7 +1513,7 @@ export default function MyAppointmentsPage() {
                       setSelectedPetId(petId);
                       setIsPetModalOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between p-2 rounded-lg text-[11px] font-semibold transition-colors ${
+                    className={`w-full flex items-center justify-between p-2 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
                       isSelected
                         ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                         : "text-slate-700 hover:bg-slate-50"
