@@ -700,13 +700,14 @@ Route::get('/inclinic-lists-new-after-10th-may-registerations', function (Reques
     }
 
     $userId = $request->query('user_id');
-    $userLat = null;
-    $userLng = null;
-    if ($userId) {
+    $userLat = $request->filled('lat') ? (float) $request->input('lat') : ($request->filled('latitude') ? (float) $request->input('latitude') : null);
+    $userLng = $request->filled('lng') ? (float) $request->input('lng') : ($request->filled('longitude') ? (float) $request->input('longitude') : null);
+
+    if (($userLat === null || $userLng === null) && $userId) {
         $user = DB::table('users')->select('latitude', 'longitude')->where('id', $userId)->first();
         if ($user) {
-            $userLat = $user->latitude !== null ? (float) $user->latitude : null;
-            $userLng = $user->longitude !== null ? (float) $user->longitude : null;
+            $userLat = $userLat ?? ($user->latitude !== null ? (float) $user->latitude : null);
+            $userLng = $userLng ?? ($user->longitude !== null ? (float) $user->longitude : null);
         }
     }
     
